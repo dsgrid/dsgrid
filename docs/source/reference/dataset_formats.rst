@@ -16,7 +16,7 @@ Requirements
 3. Values of dimension columns except ``model_year`` and ``weather_year`` must be strings.
    ``model_year`` and ``weather_year`` can be integers.
 4. Each dimension column name except time must match dsgrid dimension types (geography, sector,
-   subsector, etc.).
+   subsector, etc.) either directly or by specifying the mapping.
 5. The values in each dimension column must match the dataset's dimension records.
 
 Recommendations
@@ -26,13 +26,12 @@ Recommendations
    memory issues. Making them too small adds overhead and hurts performance.
 3. Trivial dimensions (one-element records) should not be stored in the data files. They should
    instead be defined in the dataset config. dsgrid will add them dynamically at runtime.
-4. Consider the appropriate floating point precision. 64-bit floats may be needed but will double
-   the storage space. 32-bit floats may be acceptable.
+4. Floating point data can be 64-bit or 32-bit. 64-bit floats provide more precision but require twice as much storage space as 32-bit floats.
 
 
 CSV Files
 =========
-While not generally recommended for data files, dsgrid does support CSV files. By default,
+While not generally recommended, dsgrid does support CSV data files. By default,
 dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be
 cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time
 zones, dsgrid provides a mechanism for defining column data types directly in the dataset
@@ -135,14 +134,14 @@ You can also specify types for only the columns that need explicit typing:
 Custom Column Names
 ===================
 By default, dsgrid expects data files to have columns named after the standard dimension types
-(``geography``, ``sector``, ``subsector``, ``metric``, etc.). However, your data files may use
+(``geography``, ``sector``, ``subsector``, ``metric``, etc.). Data files with value format "stacked" are also expected to have a `value` column. However, your data files may use
 different column names. dsgrid provides a mechanism to map custom column names to the expected
 dimension types.
 
 To rename columns, add the ``dimension_type`` field to the column definition. This tells dsgrid
 what dimension the column represents, and dsgrid will automatically rename it at runtime.
 
-This feature works for all file formats (Parquet, CSV, JSON), not just CSV files.
+This feature works for all file formats (Parquet, CSV), not just CSV files.
 
 Example with custom column names:
 
@@ -179,14 +178,8 @@ You can combine ``dimension_type`` with ``data_type`` when using CSV files:
           dimension_type: "geography",
         },
         {
-          name: "fuel_type",
-          data_type: "STRING",
-          dimension_type: "metric",
-        },
-        {
-          name: "consumption",
+          name: "value",
           data_type: "DOUBLE",
-          // No dimension_type - column name stays as "consumption"
         },
       ],
     }
@@ -201,7 +194,7 @@ reading the data.
 To ignore columns, add an ``ignore_columns`` field to the ``data_file`` (or ``lookup_data_file``)
 section in your dataset configuration. This field accepts a list of column names to drop.
 
-This feature works for all file formats (Parquet, CSV, JSON).
+This feature works for all file formats (Parquet, CSV).
 
 Example with ignored columns:
 
@@ -234,10 +227,6 @@ You can combine ``ignore_columns`` with ``columns`` for type overrides and renam
 
 Note that a column cannot appear in both ``columns`` and ``ignore_columns`` - dsgrid will
 raise an error if there is any overlap.
-
-Columns are dropped after the file is read but before any column renaming occurs. This means
-you should use the original column names from the file in the ``ignore_columns`` list.
-
 
 Time
 ====
@@ -307,7 +296,7 @@ Fields:
 - ``value_format``: Defines whether values are pivoted or stacked.
 - ``data_file``: Main data file configuration (required).
 
-  - ``path``: Path to the data file. Can be absolute or relative to the config file.
+  - ``path``: Path to the data file. Can be absolute or relative to the config file. You can also use the ``--data_base_dir`` CLI option to specify a different base directory for resolving relative paths.
   - ``columns``: Optional list of column definitions for type overrides and renaming.
 
     - ``name``: The actual column name in the file (required).
@@ -534,7 +523,7 @@ Each entry in the list can be:
 2. **A directory** containing multiple files, each for different dimension combinations
 
 Paths can be absolute or relative. Relative paths are resolved relative to the dataset
-configuration file by default.
+configuration file by default. Alternatively, a different base directory can be specified using the ``--missing-associations-base-dir`` CLI option.
 
 File Format
 ~~~~~~~~~~~
@@ -543,8 +532,8 @@ dimension types (all types except time). Each row represents a combination of di
 records that legitimately has no data.
 
 A file can contain any subset of the non-time dimension columns. During validation, dsgrid
-filters out rows from the expected associations that match the missing associations on the
-columns present in the file.
+filters out rows from the expected associations that match the missing associations
+listed in the file.
 
 Example ``missing_associations.parquet`` with all non-time dimensions::
 
@@ -556,7 +545,7 @@ Example ``missing_associations.parquet`` with all non-time dimensions::
     |    01003|   com|large_hotel|heating |      2020|        2018|
     +---------+------+-----------+--------+----------+------------+
 
-You can also use a simplified format with only the columns that vary::
+Example ``missing_associations.csv`` with only two dimensions::
 
     +---------+-----------+
     |geography|  subsector|
@@ -565,7 +554,7 @@ You can also use a simplified format with only the columns that vary::
     |    01001|  warehouse|
     |    01003|large_hotel|
     +---------+-----------+
-
+In this case, all metrics, model_years, and weather_years are expected to be missing for these combinations of (geography, subsector).
 Directory Format
 ~~~~~~~~~~~~~~~~
 When using a directory, create separate files for different dimension combinations.
@@ -630,14 +619,12 @@ an iterative workflow to help you identify them:
    Attempt to register your dataset without specifying ``missing_associations``. If there are
    missing combinations, registration will fail.
 
-2. **Review the generated output file**
+2. **Review generated outputs**
 
    When registration fails due to missing associations, dsgrid writes a Parquet file named
    ``<dataset_id>__missing_dimension_record_combinations.parquet`` to the current directory.
    This file contains all the missing dimension combinations with all dimensions. This file can
    contain huge numbers of rows.
-
-3. **Analyze patterns in the missing data**
 
    dsgrid also analyzes the missing data to identify minimal patterns that explain the gaps.
    These patterns are logged and can help you understand *why* data is missing. For example,
@@ -649,11 +636,11 @@ an iterative workflow to help you identify them:
    This tells you that all combinations involving county 01001 and large_hotel are missing,
    and all combinations involving warehouse are missing.
 
-   dsgrid records these minimal patterns in dimension-specific combination files in the
-   ``./missing_associations/`` directory, such as ``geography__subsector.csv`` and
+   dsgrid records these minimal patterns in the  ``./missing_associations/`` directory,
+   in dimension-specific combination files such as ``geography__subsector.csv`` and
    ``sector__subsector.csv``.
 
-4. **Choose which output to use**
+3. **Choose which output to use and revise as appropriate**
 
    You have several options for declaring missing associations:
 
@@ -667,16 +654,14 @@ an iterative workflow to help you identify them:
    - **Create your own files**: Create custom CSV or Parquet files based on your understanding
      of the data. This gives you full control over what is declared as missing.
 
-5. **Review and edit the missing associations files**
+   No matter which option you select, you may want to:
 
-   Examine the generated files to verify that these combinations are legitimately missing
-   (not data errors). You may want to:
-
-   - Keep the files as they are if all missing combinations are expected.
-   - Remove rows that represent data errors you need to fix.
+   - Fix data errors revealed by the missing data analysis
+   - Remove rows corresponding to data errors that you fix
+   - Pick and choose or reorganize the information
    - Combine multiple sources if needed.
 
-6. **Re-run registration with missing associations**
+4. **Re-run registration with missing associations**
 
    Add the ``missing_associations`` field to your ``data_layout`` pointing to the files or
    directories:
@@ -707,7 +692,7 @@ Validation Behavior
 -------------------
 During dataset registration, dsgrid checks that:
 
-1. All dimension combinations in the data files are valid (records exist in dimensions).
+1. All dimension combinations in the data files are valid (records match dimension definitions).
 2. All expected combinations either have data or are declared as missing.
 
 If dsgrid finds unexpected missing combinations, it will report an error and write the

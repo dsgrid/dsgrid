@@ -75,7 +75,8 @@ class Column(DSGBaseModel):
         description="Dimension represented by the data in the column. Optional if this is a "
         "time column or pivoted column. Required if the column represents a stacked dimension "
         "but an alternate name is being used, such as 'county' instead of 'geography'. "
-        "dsgrid will rename any column that is set at runtime, writing out the result to the registry's data directory.",
+        "dsgrid will rename any column that is set at runtime, writing out the result to the "
+        "registry's data directory. The original dataset is not modified.",
     )
     data_type: str | None = Field(
         description="Type of the data in the column. If None, infer the type."

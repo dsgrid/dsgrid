@@ -322,13 +322,13 @@ Records file snippet::
    This command assumes that ``dataset.json5`` and ``dimension_mappings.json5`` are in a
    directory called ``base_dir``, and that the data files (``load_data.parquet`` and
    ``load_data_lookup.parquet``) are in paths relative to the config file as specified in
-   the ``data_layout`` section.
+   the ``data_layout`` section. Note that the command provides the option ``--data-base-dir`` to
+   specify the base directory for the data files if you prefer to avoid filling in the relative
+   path.
 
    When running this command dsgrid will perform numerous validations in order to verify dataset
    consistency and that the project requirements are met. It may take up to an hour on an HPC
    compute node.
-
-   TODO: offline mode for verification, online mode for the final registration.
 
 .. code-block:: console
 

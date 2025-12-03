@@ -141,7 +141,7 @@ dimension types.
 To rename columns, add the ``dimension_type`` field to the column definition. This tells dsgrid
 what dimension the column represents, and dsgrid will automatically rename it at runtime.
 
-This feature works for all file formats (Parquet, CSV, JSON), not just CSV files.
+This feature works for all file formats (Parquet, CSV), not just CSV files.
 
 Example with custom column names:
 
@@ -178,14 +178,8 @@ You can combine ``dimension_type`` with ``data_type`` when using CSV files:
           dimension_type: "geography",
         },
         {
-          name: "fuel_type",
-          data_type: "STRING",
-          dimension_type: "metric",
-        },
-        {
-          name: "consumption",
+          name: "value",
           data_type: "DOUBLE",
-          // No dimension_type - column name stays as "consumption"
         },
       ],
     }
@@ -200,7 +194,7 @@ reading the data.
 To ignore columns, add an ``ignore_columns`` field to the ``data_file`` (or ``lookup_data_file``)
 section in your dataset configuration. This field accepts a list of column names to drop.
 
-This feature works for all file formats (Parquet, CSV, JSON).
+This feature works for all file formats (Parquet, CSV).
 
 Example with ignored columns:
 
@@ -233,10 +227,6 @@ You can combine ``ignore_columns`` with ``columns`` for type overrides and renam
 
 Note that a column cannot appear in both ``columns`` and ``ignore_columns`` - dsgrid will
 raise an error if there is any overlap.
-
-Columns are dropped after the file is read but before any column renaming occurs. This means
-you should use the original column names from the file in the ``ignore_columns`` list.
-
 
 Time
 ====
@@ -542,7 +532,7 @@ dimension types (all types except time). Each row represents a combination of di
 records that legitimately has no data.
 
 A file can contain any subset of the non-time dimension columns. During validation, dsgrid
-filters out rows from the expected associations that match the missing associations 
+filters out rows from the expected associations that match the missing associations
 listed in the file.
 
 Example ``missing_associations.parquet`` with all non-time dimensions::
@@ -635,7 +625,7 @@ an iterative workflow to help you identify them:
    ``<dataset_id>__missing_dimension_record_combinations.parquet`` to the current directory.
    This file contains all the missing dimension combinations with all dimensions. This file can
    contain huge numbers of rows.
-   
+
    dsgrid also analyzes the missing data to identify minimal patterns that explain the gaps.
    These patterns are logged and can help you understand *why* data is missing. For example,
    you might see::
@@ -646,7 +636,7 @@ an iterative workflow to help you identify them:
    This tells you that all combinations involving county 01001 and large_hotel are missing,
    and all combinations involving warehouse are missing.
 
-   dsgrid records these minimal patterns in the  ``./missing_associations/`` directory, 
+   dsgrid records these minimal patterns in the  ``./missing_associations/`` directory,
    in dimension-specific combination files such as ``geography__subsector.csv`` and
    ``sector__subsector.csv``.
 

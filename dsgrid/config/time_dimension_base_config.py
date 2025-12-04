@@ -2,6 +2,7 @@ import abc
 import logging
 from datetime import timedelta, tzinfo
 from typing import Any
+from dateutil.relativedelta import relativedelta
 
 import chronify
 
@@ -65,12 +66,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         raise NotImplementedError(msg)
 
     @abc.abstractmethod
-    def get_frequency(self) -> timedelta:
+    def get_frequency(self) -> timedelta | relativedelta:
         """Return the frequency.
 
         Returns
         -------
-        timedelta
+        timedelta | relativedelta
         """
 
     @abc.abstractmethod
@@ -194,7 +195,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def _build_time_ranges(
         self,
         time_ranges: TimeRangeModel,
-        str_format: str,
         tz: TimeZone | None = None,
     ):
-        return build_time_ranges(time_ranges, str_format, tz=tz)
+        return build_time_ranges(time_ranges, tz=tz)

@@ -18,7 +18,7 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
-    DATETIME_MULTI_TIME_ZONES = "datetime_multi_time_zones"
+    DATETIME_EXTERNAL_TZ = "datetime_external_tz"
     INDEX = "index"
     NOOP = "noop"
 
@@ -26,8 +26,8 @@ class TimeDimensionType(DSGEnum):
 class DatetimeFormat(str, Enum):
     """Defines the time format of the datetime config model"""
 
-    ALIGNED = "aligned"
-    LOCAL = "local"
+    ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"
+    ALIGNED_IN_CLOCK_TIME = "aligned_in_clock_time"
     LOCAL_AS_STRINGS = "local_as_strings"
 
 
@@ -467,7 +467,8 @@ class AnnualTimeRange(DatetimeRange):
         start = self.start.to_pydatetime()
         end = self.end.to_pydatetime()
         tz = self.tzinfo
-        for year in range(start.year, end.year + 1):
+        assert isinstance(self.frequency, int)
+        for year in range(start.year, end.year + self.frequency, self.frequency):
             yield datetime(year=year, month=1, day=1, tzinfo=tz)
 
 

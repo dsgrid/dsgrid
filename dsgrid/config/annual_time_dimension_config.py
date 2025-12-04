@@ -1,5 +1,6 @@
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 import pandas as pd
 from chronify.time_range_generator_factory import make_time_range_generator
@@ -9,7 +10,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
-from dsgrid.dimension.time_utils import is_leap_year
+from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
 from dsgrid.spark.functions import (
     cross_join,
     handle_column_spaces,
@@ -84,43 +85,38 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
-    def get_frequency(self) -> timedelta:
-        return timedelta(days=365)
+    def get_frequency(self) -> relativedelta:
+        freqs = [trange.frequency for trange in self.model.ranges]
+        assert set(freqs) == {freqs[0]}, freqs
+        return relativedelta(years=freqs[0])
 
     def get_time_ranges(self) -> list[AnnualTimeRange]:
         ranges = []
-        frequency = self.get_frequency()
-        for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, tz=self.get_tzinfo()
-        ):
-            start = pd.Timestamp(start)
-            end = pd.Timestamp(end)
+        for start, end, freq in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
             ranges.append(
                 AnnualTimeRange(
                     start=start,
                     end=end,
-                    frequency=frequency,
+                    frequency=freq,
                 )
             )
 
         return ranges
 
     def get_start_times(self) -> list[pd.Timestamp]:
-        tz = self.get_tzinfo()
         start_times = []
-        for trange in self.model.ranges:
-            start = datetime.strptime(trange.start, self.model.str_format)
-            assert start.tzinfo is None
-            start_times.append(start.replace(tzinfo=tz))
+        for start, _, _ in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
+            start_times.append(start)
 
         return start_times
 
     def get_lengths(self) -> list[int]:
         lengths = []
-        for trange in self.model.ranges:
-            start = datetime.strptime(trange.start, self.model.str_format)
-            end = datetime.strptime(trange.end, self.model.str_format)
-            lengths.append(end.year - start.year + 1)
+        for start, end, freq in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
+            length = (end.year - start.year) // freq
+            if (end.year - start.year) % freq == 0:
+                length += 1
+            lengths.append(length)
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:
@@ -137,9 +133,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def list_expected_dataset_timestamps(self) -> list[AnnualTimestampType]:
         timestamps = []
-        for time_range in self.model.ranges:
-            start, end = (int(time_range.start), int(time_range.end))
-            timestamps += [AnnualTimestampType(x) for x in range(start, end + 1)]
+        for start, end, freq in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
+            year = start.year
+            while year <= end.year:
+                timestamps.append(AnnualTimestampType(year))
+                year += freq
         return timestamps
 
 
@@ -162,7 +160,7 @@ def map_annual_time_to_date_time(
     )
 
     # Note that MeasurementType.TOTAL has already been verified.
-    with set_session_time_zone(dt_dim.model.datetime_format.timezone.tz_name):
+    with set_session_time_zone(dt_dim.model.format.timezone.tz_name):
         years = (
             select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"])
             .distinct()
@@ -181,7 +179,7 @@ def map_annual_time_to_date_time(
         .withColumn(myear_column, F.col(annual_col).cast(StringType()))
         .drop(annual_col)
     )
-    frequency = dt_dim.model.frequency
+    frequency = dt_dim.get_frequency()
     for column in value_columns:
         df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
     return df2

@@ -102,10 +102,8 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
     match time_type:
         case TimeDimensionType.DATETIME:
             time_dim["class"] = "Time"
-            time_dim["frequency"] = "P0DT1H"
-            time_dim["str_format"] = "%Y-%m-%d %H:%M:%S"
-            time_dim["datetime_format"] = {
-                "format_type": "aligned",
+            time_dim["format"] = {
+                "format_type": "aligned_in_absolute_time",
                 "timezone": "EasternStandard",
             }
             time_dim["measurement_type"] = MeasurementType.TOTAL.value
@@ -113,6 +111,8 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
                 {
                     "start": "2018-01-01 00:00:00",
                     "end": "2018-12-31 23:00:00",
+                    "frequency": "P0DT1H",
+                    "str_format": "%Y-%m-%d %H:%M:%S",
                 },
             ]
         case TimeDimensionType.ANNUAL:
@@ -122,18 +122,19 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
                 {
                     "start": "2010",
                     "end": "2024",
+                    "frequency": 1,
+                    "str_format": "%Y",
                 },
             ]
-            time_dim["str_format"] = "%Y"
         case TimeDimensionType.INDEX:
             time_dim["class"] = "IndexTime"
-            time_dim["frequency"] = "P0DT1H"
-            time_dim["starting_timestamps"] = ["2018-01-01 00:00:00"]
-            time_dim["str_format"] = "%Y-%m-%d %H:%M:%S"
             time_dim["ranges"] = [
                 {
                     "start": 0,
                     "end": 8759,
+                    "frequency": "P0DT1H",
+                    "starting_timestamp": "2018-01-01 00:00:00",
+                    "str_format": "%Y-%m-%d %H:%M:%S",
                 },
             ]
     return time_dim

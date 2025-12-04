@@ -36,19 +36,21 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             time_column=time_cols[0],
             start=pd.Timestamp(self.get_start_times()[0]),
             length=self.get_lengths()[0],
-            resolution=self._model.frequency,
+            resolution=self.get_frequency(),
             measurement_type=self._model.measurement_type,
             interval_type=self._model.time_interval_type,
         )
 
     def get_frequency(self) -> timedelta:
-        return self.model.frequency
+        freqs = [trange.frequency for trange in self.model.ranges]
+        assert set(freqs) == {freqs[0]}, freqs
+        return freqs[0]
 
     def get_start_times(self) -> list[pd.Timestamp]:
         tz = self.get_tzinfo()
         start_times = []
         for trange in self.model.ranges:
-            start = datetime.strptime(trange.start, self.model.str_format)
+            start = datetime.strptime(trange.start, trange.str_format)
             assert start.tzinfo is None
             start_times.append(start.replace(tzinfo=tz))
         return start_times
@@ -57,13 +59,13 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         tz = self.get_tzinfo()
         lengths = []
         for trange in self.model.ranges:
-            start = datetime.strptime(trange.start, self.model.str_format)
-            end = datetime.strptime(trange.end, self.model.str_format)
+            start = datetime.strptime(trange.start, trange.str_format)
+            end = datetime.strptime(trange.end, trange.str_format)
             assert start.tzinfo is None
             assert end.tzinfo is None
             start_utc = start.replace(tzinfo=tz).astimezone(tz=ZoneInfo("UTC"))
             end_utc = end.replace(tzinfo=tz).astimezone(tz=ZoneInfo("UTC"))
-            freq = self.get_frequency()
+            freq = trange.frequency
             length = (end_utc - start_utc) / freq + 1
             assert length % 1 == 0, f"{length=} is not a whole number"
             lengths.append(int(length))
@@ -73,12 +75,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return [self.model.time_column]
 
     def get_time_zone(self) -> TimeZone | None:
-        if self.model.datetime_format.format_type == DatetimeFormat.ALIGNED:
-            return self.model.datetime_format.timezone
-        if self.model.datetime_format.format_type in [DatetimeFormat.LOCAL_AS_STRINGS]:
-            return None
-        msg = f"Undefined time zone for {self.model.datetime_format.format_type=}"
-        raise NotImplementedError(msg)
+        if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME:
+            return self.model.format.timezone
+        return None
 
     def get_tzinfo(self) -> tzinfo | None:
         time_zone = self.get_time_zone()
@@ -90,18 +89,18 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return self.model.time_interval_type
 
     def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
-        if self.model.datetime_format.format_type != DatetimeFormat.LOCAL_AS_STRINGS:
+        if self.model.format.format_type != DatetimeFormat.LOCAL_AS_STRINGS:
             return df
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         df = df.withColumn(
             time_col,
-            F.to_timestamp(time_col, self.model.datetime_format.data_str_format),
+            F.to_timestamp(time_col, self.model.format.str_format),
         )
         if update_model:
             # TODO: The code doesn't support DatetimeFormat.LOCAL.
-            # self.model.datetime_format.format_type = DatetimeFormat.LOCAL
+            # self.model.format.format_type = DatetimeFormat.LOCAL
             msg = "convert_time_format DatetimeFormat.LOCAL_AS_STRINGS update_model=True"
             raise NotImplementedError(msg)
         return df

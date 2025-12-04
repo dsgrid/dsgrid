@@ -1,6 +1,6 @@
 {
   dimensions: [
-    { // #[0] 8784
+    { // #[0] 8784 - old format
       type: "time",
       class_name: "Time",
       time_type: "datetime",
@@ -16,49 +16,49 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
-        format_type: "aligned",
+        format_type: "aligned_in_absolute_time",
         timezone: "MountainStandard",
         },
       measurement_type: "total",
     },
-    { // #[1] # daily in datetime
+    { // #[1] # daily in datetime, new format
       type: "time",
       class_name: "Time",
       time_type: "datetime",
       description: "Daily time 2018\n",
-      frequency: "P1D",
       name: "daily_time",
       time_interval_type: "instantaneous",
       ranges: [
         {
           start: "2018-01-01",
           end: "2018-12-31",
+          str_format: "%Y-%m-%d",
+          frequency: "P1D",
         },
       ],
-      str_format: "%Y-%m-%d",
-      datetime_format: {
-        format_type: "aligned",
+      format: {
+        format_type: "aligned_in_absolute_time",
         timezone: "MountainPrevailing",
         },
       measurement_type: "total",
     },
-    { // #[2]
+    { // #[2] # mix of old and new format
       type: "time",
       class_name: "Time",
       time_type: "datetime",
       description: "Time dimension, 2016 hourly EPT, period-ending, total value\n",
-      frequency: "06:00:00",
       name: "Time-2016-EPT-hourly-periodEnding-total",
       time_interval_type: "period_ending",
       ranges: [
         {
           start: "2016-01-01 00:00:00",
           end: "2017-01-01 00:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "06:00:00",
         },
       ],
-      str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
-        format_type: "aligned",
+        format_type: "aligned_in_absolute_time",
         timezone: "EasternPrevailing",
         },
       measurement_type: "max",
@@ -79,7 +79,7 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
-        format_type: "aligned",
+        format_type: "aligned_in_absolute_time",
         timezone: "UTC",
         },
       measurement_type: "total",

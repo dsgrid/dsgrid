@@ -6,9 +6,10 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.time import TimeDimensionType, TimeZone
+from dsgrid.dimension.time import DatetimeFormat, TimeDimensionType, TimeZone
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions import (
+    AlignedTimeSingleTimeZone,
     RepresentativePeriodTimeDimensionModel,
     MonthRangeModel,
     TimeRangeModel,
@@ -89,15 +90,18 @@ def make_date_time_config():
             type=DimensionType.TIME,
             time_type=TimeDimensionType.DATETIME,
             measurement_type=MeasurementType.TOTAL,
-            str_format="%Y-%m-%d %H:%M:%S",
             ranges=[
                 TimeRangeModel(
                     start="2018-01-01 00:00:00",
                     end="2018-12-31 23:00:00",
+                    str_format="%Y-%m-%d %H:%M:%S",
+                    frequency=timedelta(hours=1),
                 ),
             ],
-            frequency=timedelta(hours=1),
-            timezone=TimeZone.EST,
+            format=AlignedTimeSingleTimeZone(
+                format_type=DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME,
+                timezone=TimeZone.EST,
+            ),
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
         )
     )

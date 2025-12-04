@@ -8,7 +8,7 @@ name = "minimal_patterns"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["extension-module"] }
+pyo3 = { version = "0.24.1", features = ["extension-module"] }
 arrow2 = { version = "0.18", features = ["io_parquet"] }
 parquet2 = "0.17"
 roaring = "0.10"

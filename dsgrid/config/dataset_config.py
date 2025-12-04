@@ -11,16 +11,15 @@ from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
+from dsgrid.config.file_schema import FileSchema
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
-    PivotedTableFormatModel,
-    UnpivotedTableFormatModel,
-    TableFormatModel,
-    TableFormatType,
+    TableFormat,
+    ValueFormat,
 )
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
@@ -129,21 +128,14 @@ class InputDatasetType(DSGEnum):
     UNSPECIFIED = "unspecified"
 
 
-class DataSchemaType(str, Enum):
-    """Data schema types."""
-
-    STANDARD = "standard"
-    ONE_TABLE = "one_table"
-
-
 class DSGDatasetParquetType(DSGEnum):
     """Dataset parquet types."""
 
     LOAD_DATA = EnumValue(
         value="load_data",
         description="""
-        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns.
-        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
+        In TWO_TABLE table_format, load_data is a file with ID, timestamp, and metric value columns.
+        In ONE_TABLE table_format, load_data is a file with multiple data dimension and metric value columns.
         """,
     )
     LOAD_DATA_LOOKUP = EnumValue(
@@ -181,40 +173,6 @@ class DataClassificationType(DSGEnum):
     )
 
 
-class StandardDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.STANDARD]
-    table_format: TableFormatModel
-
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy(cls, values: dict) -> dict:
-        if "load_data_column_dimension" in values:
-            logger.warning(
-                "Moving legacy load_data_column_dimension field to table_format struct."
-            )
-            values["table_format"] = PivotedTableFormatModel(
-                pivoted_dimension_type=values.pop("load_data_column_dimension")
-            )
-        return values
-
-
-class OneTableDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.ONE_TABLE]
-    table_format: TableFormatModel
-
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy(cls, values: dict) -> dict:
-        if "load_data_column_dimension" in values:
-            logger.warning(
-                "Moving legacy load_data_column_dimension field to table_format struct."
-            )
-            values["table_format"] = PivotedTableFormatModel(
-                pivoted_dimension_type=values.pop("load_data_column_dimension")
-            )
-        return values
-
-
 class DatasetQualifierType(str, Enum):
     QUANTITY = "quantity"
     GROWTH_RATE = "growth_rate"
@@ -226,14 +184,121 @@ class GrowthRateType(str, Enum):
 
 
 class QuantityModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY]
+    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY] = DatasetQualifierType.QUANTITY
 
 
 class GrowthRateModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.GROWTH_RATE]
+    dataset_qualifier_type: Literal[
+        DatasetQualifierType.GROWTH_RATE
+    ] = DatasetQualifierType.GROWTH_RATE
     growth_rate_type: GrowthRateType = Field(
         title="growth_rate_type",
         description="Type of growth rates, e.g., exponential_annual",
+    )
+
+
+class UserDataLayout(DSGBaseModel):
+    """User-defined data layout for dataset registration."""
+
+    data_file: FileSchema = Field(
+        title="data_file",
+        description="Defines the data file",
+    )
+    lookup_data_file: FileSchema | None = Field(
+        default=None,
+        title="lookup_data_file",
+        description="Defines the lookup data file. Required if the table format is 'two_table'.",
+    )
+    missing_associations: list[str] = Field(
+        default=[],
+        title="missing_associations",
+        description="List of paths to missing associations files (e.g., "
+        "missing_associations.parquet) or directories of files containing missing combinations by "
+        "dimension type (e.g., geography__subsector.csv, subsector__metric.csv).",
+    )
+    table_format: TableFormat = Field(
+        title="table_format",
+        description="Table structure: one_table (all data in single table) or "
+        "two_table (time series data separate from lookup metadata).",
+    )
+    value_format: ValueFormat = Field(
+        title="value_format",
+        description="Value column format: stacked (single value column) or "
+        "pivoted (one dimension's records as columns).",
+    )
+    pivoted_dimension_type: DimensionType | None = Field(
+        default=None,
+        title="pivoted_dimension_type",
+        description="The dimension type whose records are columns (pivoted) that contain "
+        "data values. Required when value_format is 'pivoted'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_layout(self):
+        """Validate data layout consistency."""
+        if self.table_format == TableFormat.TWO_TABLE:
+            if self.lookup_data_file is None:
+                msg = "lookup_data_file is required when table_format is 'two_table'"
+                raise ValueError(msg)
+        if self.value_format == ValueFormat.PIVOTED:
+            if self.pivoted_dimension_type is None:
+                msg = "pivoted_dimension_type is required when value_format is 'pivoted'"
+                raise ValueError(msg)
+        if self.value_format == ValueFormat.STACKED:
+            if self.pivoted_dimension_type is not None:
+                msg = "pivoted_dimension_type must be None when value_format is 'stacked'"
+                raise ValueError(msg)
+        return self
+
+
+class RegistryDataLayout(DSGBaseModel):
+    """Data layout stored in the dsgrid registry (without file paths)."""
+
+    table_format: TableFormat = Field(
+        title="table_format",
+        description="Table structure: one_table or two_table.",
+    )
+    value_format: ValueFormat = Field(
+        title="value_format",
+        description="Value column format: stacked or pivoted.",
+    )
+    pivoted_dimension_type: DimensionType | None = Field(
+        default=None,
+        title="pivoted_dimension_type",
+        description="The dimension type whose records are columns when pivoted.",
+    )
+
+    @model_validator(mode="after")
+    def validate_layout(self):
+        """Validate data layout consistency."""
+        if self.value_format == ValueFormat.PIVOTED:
+            if self.pivoted_dimension_type is None:
+                msg = "pivoted_dimension_type is required when value_format is 'pivoted'"
+                raise ValueError(msg)
+        if self.value_format == ValueFormat.STACKED:
+            if self.pivoted_dimension_type is not None:
+                msg = "pivoted_dimension_type must be None when value_format is 'stacked'"
+                raise ValueError(msg)
+        return self
+
+
+def user_layout_to_registry_layout(user_layout: UserDataLayout) -> RegistryDataLayout:
+    """Convert a UserDataLayout to a RegistryDataLayout for registry storage.
+
+    Parameters
+    ----------
+    user_layout : UserDataLayout
+        The user layout containing file paths and layout settings.
+
+    Returns
+    -------
+    RegistryDataLayout
+        A registry layout without file paths, suitable for database storage.
+    """
+    return RegistryDataLayout(
+        table_format=user_layout.table_format,
+        value_format=user_layout.value_format,
+        pivoted_dimension_type=user_layout.pivoted_dimension_type,
     )
 
 
@@ -243,6 +308,17 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
+    )
+    data_layout: UserDataLayout | None = Field(
+        default=None,
+        title="data_layout",
+        description="Defines the data layout (table format, value format, and file paths) "
+        "for dataset registration.",
+    )
+    registry_data_layout: RegistryDataLayout | None = Field(
+        default=None,
+        title="registry_data_layout",
+        description="Defines the dataset's data layout once stored in the registry.",
     )
     dataset_type: InputDatasetType = Field(
         default=InputDatasetType.UNSPECIFIED,
@@ -257,11 +333,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         title="dataset_qualifier_metadata",
         description="Additional metadata to include related to the dataset_qualifier",
         discriminator="dataset_qualifier_type",
-    )
-    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
-        title="data_schema",
-        description="Schema (table layouts) used for writing out the dataset",
-        discriminator="data_schema_type",
     )
     description: str | None = Field(
         default=None,
@@ -382,49 +453,13 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         "columns. Instead they are added by dsgrid as an alias column.",
     )
 
-    # This function can be deleted once all dataset repositories have been updated.
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy_fields(cls, values):
-        if "dataset_version" in values:
-            logger.warning("Moving data in legacy dataset_version field to version field.")
-            val = values.pop("dataset_version")
-            if val is not None:
-                values["version"] = val
-
-        if "data_schema_type" in values:
-            if "data_schema_type" in values["data_schema"]:
-                msg = f"Unknown data_schema format: {values=}"
-                raise ValueError(msg)
-            logger.warning("Moving legacy data_schema_type field into data_schema struct.")
-            values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
-
-        if "leap_day_adjustment" in values:
-            if values["leap_day_adjustment"] != "none":
-                msg = f"Unknown leap day adjustment: {values=}"
-                raise ValueError(msg)
-            logger.warning(
-                "Dropping deprecated leap_day_adjustment field from the dataset config."
-            )
-            values.pop("leap_day_adjustment")
-
-        if "source" in values:
-            logger.warning("Dropping deprecated source field from the dataset config.")
-            values.pop("source")
-
-        if "origin_date" in values:
-            logger.warning("Moving legacy origin_date field to new data_source_date field.")
-            val = values.pop("origin_date")
-            if val is not None:
-                values["data_source_date"] = val
-
-        if "origin_version" in values:
-            logger.warning("Moving legacy origin_version field to new data_source_version field.")
-            val = values.pop("origin_version")
-            if val is not None:
-                values["data_source_version"] = val
-
-        return values
+    @model_validator(mode="after")
+    def check_layout_fields(self):
+        """Ensure data_layout and registry_data_layout are mutually exclusive."""
+        if self.data_layout is not None and self.registry_data_layout is not None:
+            msg = "data_layout and registry_data_layout cannot both be set"
+            raise ValueError(msg)
+        return self
 
     @field_validator("dataset_id")
     @classmethod
@@ -519,9 +554,11 @@ def make_unvalidated_dataset_config(
     )
 
     if pivoted_dimension_type is None:
-        table_format = UnpivotedTableFormatModel()
+        value_format = ValueFormat.STACKED.value
+        pivoted_dim_type_value = None
     else:
-        table_format = PivotedTableFormatModel(pivoted_dimension_type=pivoted_dimension_type)
+        value_format = ValueFormat.PIVOTED.value
+        pivoted_dim_type_value = pivoted_dimension_type.value
 
     result = None
     if slim:
@@ -529,9 +566,13 @@ def make_unvalidated_dataset_config(
             "dataset_id": dataset_id,
             "version": "1.0.0",
             "dataset_type": dataset_type.value,
-            "data_schema": {
-                "data_schema_type": DataSchemaType.ONE_TABLE.value,
-                "table_format": table_format.model_dump(mode="json"),
+            "data_layout": {
+                "table_format": TableFormat.ONE_TABLE.value,
+                "value_format": value_format,
+                "pivoted_dimension_type": pivoted_dim_type_value,
+                "data_file": {
+                    "path": "load_data.parquet",
+                },
             },
             "description": "",
             "data_classification": data_classification,
@@ -550,9 +591,13 @@ def make_unvalidated_dataset_config(
             "dataset_qualifier_metadata": {
                 "dataset_qualifier_type": DatasetQualifierType.QUANTITY.value
             },
-            "data_schema": {
-                "data_schema_type": DataSchemaType.ONE_TABLE.value,
-                "table_format": table_format.model_dump(mode="json"),
+            "data_layout": {
+                "table_format": TableFormat.ONE_TABLE.value,
+                "value_format": value_format,
+                "pivoted_dimension_type": pivoted_dim_type_value,
+                "data_file": {
+                    "path": "load_data.parquet",
+                },
             },
             "description": "",
             "sector_description": "",
@@ -589,7 +634,6 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}  # ConfigKey to DimensionConfig
-        self._dataset_path: Path | None = None
 
     @staticmethod
     def config_filename():
@@ -604,50 +648,122 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load_from_user_path(cls, config_file, dataset_path) -> "DatasetConfig":
+    def load_from_user_path(
+        cls,
+        config_file: Path,
+        data_base_dir: Path | None = None,
+        missing_associations_base_dir: Path | None = None,
+    ) -> "DatasetConfig":
+        """Load a dataset config from a user-provided config file.
+
+        The config file must contain a UserDataLayout with file paths.
+        This method validates that all required files exist.
+
+        Parameters
+        ----------
+        config_file : Path
+            Path to the dataset configuration file.
+        data_base_dir : Path | None, optional
+            Base directory for data files. If set and data file paths are relative,
+            prepend them with this path instead of using the config file's parent directory.
+        missing_associations_base_dir : Path | None, optional
+            Base directory for missing associations files. If set and paths are relative,
+            prepend them with this path instead of using the config file's parent directory.
+
+        Returns
+        -------
+        DatasetConfig
+
+        Raises
+        ------
+        DSGInvalidParameter
+            If the config doesn't have a UserDataLayout or required files don't exist.
+        """
         config = cls.load(config_file)
-        schema_type = config.get_data_schema_type()
-        if str(dataset_path).startswith("s3://"):
-            # TODO: This may need to handle AWS s3 at some point.
-            msg = "Registering a dataset from an S3 path is not supported."
+
+        if not isinstance(config.model.data_layout, UserDataLayout):
+            msg = "load_from_user_path requires a UserDataLayout with file paths"
             raise DSGInvalidParameter(msg)
-        if not dataset_path.exists():
-            msg = f"Dataset {dataset_path} does not exist"
-            raise DSGInvalidParameter(msg)
-        dataset_path = str(dataset_path)
-        if schema_type == DataSchemaType.STANDARD:
-            check_load_data_filename(dataset_path)
-            check_load_data_lookup_filename(dataset_path)
-        elif schema_type == DataSchemaType.ONE_TABLE:
-            check_load_data_filename(dataset_path)
-        else:
-            msg = f"data_schema_type={schema_type} not supported."
+        if config.model.registry_data_layout is not None:
+            msg = "load_from_user_path requires registry_data_layout to be None"
             raise DSGInvalidParameter(msg)
 
-        config.dataset_path = dataset_path
+        user_layout = config.model.data_layout
+        if user_layout.data_file.path is None:
+            msg = "load_from_user_path requires data_file.path to be set"
+            raise DSGInvalidParameter(msg)
+
+        # Resolve data file path
+        data_path = Path(user_layout.data_file.path)
+        if not data_path.is_absolute():
+            if data_base_dir is not None:
+                data_path = (data_base_dir / data_path).resolve()
+            else:
+                data_path = (config_file.parent / data_path).resolve()
+        if str(data_path).startswith("s3://"):
+            msg = "Registering a dataset from an S3 path is not supported."
+            raise DSGInvalidParameter(msg)
+        if not data_path.exists():
+            msg = f"Data file does not exist: {data_path}"
+            raise DSGInvalidParameter(msg)
+        user_layout.data_file.path = str(data_path)
+
+        # Resolve lookup file path
+        table_format = config.get_table_format()
+        if table_format == TableFormat.TWO_TABLE:
+            if user_layout.lookup_data_file is None:
+                msg = "Two-table format requires lookup_data_file in data_layout"
+                raise DSGInvalidParameter(msg)
+            lookup_path = Path(user_layout.lookup_data_file.path)
+            if not lookup_path.is_absolute():
+                if data_base_dir is not None:
+                    lookup_path = (data_base_dir / lookup_path).resolve()
+                else:
+                    lookup_path = (config_file.parent / lookup_path).resolve()
+            if not lookup_path.exists():
+                msg = f"Lookup data file does not exist: {lookup_path}"
+                raise DSGInvalidParameter(msg)
+            user_layout.lookup_data_file.path = str(lookup_path)
+
+        # Resolve missing associations paths
+        resolved_missing_paths: list[str] = []
+        for missing_assoc in user_layout.missing_associations:
+            missing_path = Path(missing_assoc)
+            if not missing_path.is_absolute():
+                if missing_associations_base_dir is not None:
+                    missing_path = (missing_associations_base_dir / missing_path).resolve()
+                else:
+                    missing_path = (config_file.parent / missing_path).resolve()
+            resolved_missing_paths.append(str(missing_path))
+        user_layout.missing_associations = resolved_missing_paths
+
         return config
 
     @property
-    def dataset_path(self) -> Path | None:
-        """Return the directory containing the dataset file(s)."""
-        return self._dataset_path
-
-    @dataset_path.setter
-    def dataset_path(self, dataset_path: Path | str | None) -> None:
-        """Set the dataset path."""
-        if isinstance(dataset_path, str):
-            dataset_path = Path(dataset_path)
-        self._dataset_path = dataset_path
+    def has_user_layout(self) -> bool:
+        """Return True if this config has a UserDataLayout with file paths."""
+        return isinstance(self.model.data_layout, UserDataLayout)
 
     @property
-    def load_data_path(self):
-        assert self._dataset_path is not None
-        return check_load_data_filename(self._dataset_path)
+    def data_file_schema(self) -> FileSchema | None:
+        """Return the data file schema if available."""
+        if self.model.data_layout is not None:
+            return self.model.data_layout.data_file
+        return None
 
     @property
-    def load_data_lookup_path(self):
-        assert self._dataset_path is not None
-        return check_load_data_lookup_filename(self._dataset_path)
+    def lookup_file_schema(self) -> FileSchema | None:
+        """Return the lookup file schema if available."""
+        if self.model.data_layout is not None:
+            return self.model.data_layout.lookup_data_file
+        return None
+
+    @property
+    def missing_associations_paths(self) -> list[Path]:
+        """Return the list of missing associations paths if available."""
+        if self.model.data_layout is not None:
+            return [Path(p) for p in self.model.data_layout.missing_associations]
+        return []
 
     def update_dimensions(self, dimensions):
         """Update all dataset dimensions."""
@@ -683,38 +799,54 @@ class DatasetConfig(ConfigBase):
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""
-        if self.get_table_format_type() != TableFormatType.PIVOTED:
+        if self.get_value_format() != ValueFormat.PIVOTED:
             return None
-        return self.model.data_schema.table_format.pivoted_dimension_type
+        if self.model.data_layout is not None:
+            return self.model.data_layout.pivoted_dimension_type
+        if self.model.registry_data_layout is not None:
+            return self.model.registry_data_layout.pivoted_dimension_type
+        return None
 
     def get_pivoted_dimension_columns(self) -> list[str]:
         """Return the table's pivoted dimension columns or an empty list if the table isn't
         pivoted.
         """
-        if self.get_table_format_type() != TableFormatType.PIVOTED:
+        if self.get_value_format() != ValueFormat.PIVOTED:
             return []
-        dim_type = self.model.data_schema.table_format.pivoted_dimension_type
+        dim_type = self.get_pivoted_dimension_type()
+        if dim_type is None:
+            return []
         dim = self.get_dimension_with_records(dim_type)
         assert dim is not None
         return sorted(list(dim.get_unique_ids()))
 
     def get_value_columns(self) -> list[str]:
         """Return the table's columns that contain values."""
-        match self.get_table_format_type():
-            case TableFormatType.PIVOTED:
+        match self.get_value_format():
+            case ValueFormat.PIVOTED:
                 return self.get_pivoted_dimension_columns()
-            case TableFormatType.UNPIVOTED:
+            case ValueFormat.STACKED:
                 return [VALUE_COLUMN]
             case _:
-                raise NotImplementedError(str(self.get_table_format_type()))
+                raise NotImplementedError(str(self.get_value_format()))
 
-    def get_data_schema_type(self) -> DataSchemaType:
-        """Return the schema type of the table."""
-        return DataSchemaType(self.model.data_schema.data_schema_type)
+    def get_table_format(self) -> TableFormat:
+        """Return the table format (one_table or two_table)."""
+        if self.model.data_layout is not None:
+            return self.model.data_layout.table_format
+        if self.model.registry_data_layout is not None:
+            return self.model.registry_data_layout.table_format
+        msg = "Neither data_layout nor registry_data_layout is set"
+        raise DSGInvalidDataset(msg)
 
-    def get_table_format_type(self) -> TableFormatType:
-        """Return the format type of the table."""
-        return TableFormatType(self._model.data_schema.table_format.format_type)
+    def get_value_format(self) -> ValueFormat:
+        """Return the value format (stacked or pivoted)."""
+        if self.model.data_layout is not None:
+            return self.model.data_layout.value_format
+        if self.model.registry_data_layout is not None:
+            return self.model.registry_data_layout.value_format
+        msg = "Neither data_layout nor registry_data_layout is set"
+        raise DSGInvalidDataset(msg)
 
     def add_trivial_dimensions(self, df: DataFrame):
         """Add trivial 1-element dimensions to load_data_lookup."""
@@ -740,20 +872,20 @@ class DatasetConfig(ConfigBase):
 
 def get_unique_dimension_record_ids(
     path: Path,
-    schema_type: DataSchemaType,
+    table_format: TableFormat,
     pivoted_dimension_type: DimensionType | None,
     time_columns: set[str],
 ) -> dict[DimensionType, list[str]]:
     """Get the unique dimension record IDs from a table."""
-    if schema_type == DataSchemaType.STANDARD:
+    if table_format == TableFormat.TWO_TABLE:
         ld = read_dataframe(check_load_data_filename(path))
         lk = read_dataframe(check_load_data_lookup_filename(path))
         df = ld.join(lk, on="id").drop("id")
-    elif schema_type == DataSchemaType.ONE_TABLE:
+    elif table_format == TableFormat.ONE_TABLE:
         ld_path = check_load_data_filename(path)
         df = read_dataframe(ld_path)
     else:
-        msg = f"Unsupported schema type: {schema_type}"
+        msg = f"Unsupported table format: {table_format}"
         raise NotImplementedError(msg)
 
     ids_by_dimension_type: dict[DimensionType, list[str]] = {}

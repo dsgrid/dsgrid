@@ -12,7 +12,6 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     IEF_PROJECT_REPO,
     STANDARD_SCENARIOS_PROJECT_REPO,
-    TEST_DATASET_DIRECTORY,
     TEST_EFS_REGISTRATION_FILE,
     TEST_PROJECT_PATH,
 )
@@ -101,7 +100,6 @@ def test_register_project_and_dataset(tmp_registry_db):
     dataset_config = src_dir / dataset_dir / "dataset.json5"
     dataset_map_file = src_dir / dataset_dir / "dimension_mappings.json5"
     dataset_id = load_data(dataset_config)["dataset_id"]
-    dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     result = runner.invoke(
         cli,
@@ -131,8 +129,6 @@ def test_register_project_and_dataset(tmp_registry_db):
         "register-and-submit-dataset",
         "--dataset-config-file",
         str(dataset_config),
-        "--dataset-path",
-        str(dataset_path),
         "--dimension-mapping-file",
         str(dataset_map_file),
         "--project-id",
@@ -142,7 +138,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     ]
 
     result = runner.invoke(cli, cmd)
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
 
     result = runner.invoke(cli, ["--url", url, "--offline", "registry", "list"])
     assert result.exit_code == 0
@@ -368,9 +364,6 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     capacities_mapping_file = (
         project_dir / "datasets" / "modeled" / "dgen_capacities" / "dimension_mappings.json5"
     )
-    profiles_data = base / "dgen_profiles_data/"
-    capacities_data = base / "dgen_capacities_data"
-
     cmd = [
         "--url",
         url,
@@ -394,8 +387,6 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "register-and-submit-dataset",
             "-c",
             str(profiles_config_file),
-            "-d",
-            str(profiles_data),
             "-p",
             "US_DOE_DECARB_2023",
             "-m",
@@ -411,14 +402,12 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "register-and-submit-dataset",
             "-c",
             str(capacities_config_file),
-            "-d",
-            str(capacities_data),
             "-p",
             "US_DOE_DECARB_2023",
             "-m",
             str(capacities_mapping_file),
             "-l",
-            "Register and submit dgen profiles",
+            "Register and submit dgen capacities",
         ],
     )
     for cmd in cmds:

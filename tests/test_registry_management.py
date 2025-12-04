@@ -1,6 +1,5 @@
 import copy
 import getpass
-import os
 import shutil
 from pathlib import Path
 
@@ -71,7 +70,6 @@ def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
     dimension_mapping_id = dimension_mapping_ids[0]
     user = getpass.getuser()
     log_message = "initial registration"
-    dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     project_config = project_mgr.get_by_id(project_id, "1.2.0")
     assert project_config.model.status == ProjectRegistryStatus.COMPLETE
@@ -91,7 +89,7 @@ def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
         dataset_config_file = (
             test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
         )
-        dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
+        dataset_mgr.register(dataset_config_file, user, log_message)
 
     # Duplicate mappings get re-used.
     mapping_ids = dimension_mapping_mgr.list_ids()
@@ -178,7 +176,6 @@ def test_register_duplicate_project_rollback_dimensions(tmp_registry_db):
     with make_test_data_registry(
         tmp_path,
         test_project_dir,
-        dataset_path=TEST_DATASET_DIRECTORY,
         database_url=url,
         include_projects=False,
         include_datasets=False,
@@ -214,10 +211,6 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
         dataset_config_file = dataset_dir / "dataset.json5"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
         dataset_mapping_file = dataset_dir / "dimension_mappings.json5"
-        dataset_path = (
-            Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
-            / "test_efs_comstock"
-        )
         subsectors_file = (
             dataset_dir
             / "dimension_mappings"
@@ -242,7 +235,6 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
             with pytest.raises(DSGInvalidDataset):
                 manager.project_manager.register_and_submit_dataset(
                     dataset_config_file,
-                    dataset_path,
                     project_id,
                     getpass.getuser(),
                     "register dataset and submit",
@@ -730,10 +722,8 @@ def test_register_submit_dataset_long_workflow(tmp_registry_db):
             replace_dimension_mapping_names_with_current_ids(filename, dim_mapping_mappings)
 
         manager.project_manager.register(project_config_file, user, "register project")
-        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
         manager.dataset_manager.register(
             dataset_config_file,
-            dataset_path,
             user,
             "register dataset",
         )
@@ -775,6 +765,173 @@ def test_sql(cached_registry):
         project_mgr = mgr.project_manager
         df = project_mgr.db.sql(f"SELECT * FROM {RegistryTables.REGISTRATIONS.value}")
         assert "timestamp" in df.columns
+
+
+def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
+    """Test dataset registration with --data-base-dir CLI option."""
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=False,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        project_config_file = src_dir / "project_with_dimension_ids.json5"
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.json5"
+        project_dimension_file = src_dir / "dimensions.json5"
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.json5"
+        dataset_dimension_file = dataset_dir / "dimensions.json5"
+        user = getpass.getuser()
+        log_message = "register"
+
+        manager.dimension_manager.register(project_dimension_file, user, log_message)
+        manager.dimension_manager.register(dataset_dimension_file, user, log_message)
+
+        dim_mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(project_dimension_mapping_config, dim_mappings)
+        replace_dimension_names_with_current_ids(project_config_file, dim_mappings)
+        replace_dimension_names_with_current_ids(dataset_config_file, dim_mappings)
+
+        manager.dimension_mapping_manager.register(
+            project_dimension_mapping_config, user, log_message
+        )
+        dim_id_to_name = map_dimension_ids_to_names(manager.dimension_manager)
+        dim_mapping_mappings = map_dimension_mapping_names_to_ids(
+            manager.dimension_mapping_manager, dim_id_to_name
+        )
+        replace_dimension_mapping_names_with_current_ids(project_config_file, dim_mapping_mappings)
+        manager.project_manager.register(project_config_file, user, "register project")
+
+        # Create a modified dataset config with relative paths that will be resolved
+        # against a different base directory (the actual data files location)
+        data_base_dir = TEST_DATASET_DIRECTORY / "test_efs_comstock"
+        modified_config_file = tmp_path / "dataset_modified.json5"
+        data = load_data(dataset_config_file)
+
+        # Change paths to be relative to the data_base_dir
+        data["data_layout"]["data_file"]["path"] = "load_data.csv"
+        data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["missing_associations"] = ["missing_associations"]
+        dump_data(data, modified_config_file)
+
+        # Use CLI runner to test the --data-base-dir option
+        db_url = f"sqlite:///{manager.dataset_manager.db.engine.url.database}"
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "--url",
+                db_url,
+                "--offline",
+                "registry",
+                "datasets",
+                "register",
+                str(modified_config_file),
+                "-l",
+                "test register with data-base-dir",
+                "-D",
+                str(data_base_dir),
+                "-M",
+                str(data_base_dir),
+            ],
+        )
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+        assert manager.dataset_manager.list_ids() == ["test_efs_comstock"]
+
+
+def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
+    """Test register-and-submit-dataset CLI command with --data-base-dir option."""
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=False,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        project_config_file = src_dir / "project_with_dimension_ids.json5"
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.json5"
+        project_dimension_file = src_dir / "dimensions.json5"
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.json5"
+        dataset_dimension_file = dataset_dir / "dimensions.json5"
+        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.json5"
+        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
+        user = getpass.getuser()
+        log_message = "register"
+
+        manager.dimension_manager.register(project_dimension_file, user, log_message)
+        manager.dimension_manager.register(dataset_dimension_file, user, log_message)
+
+        dim_mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(project_dimension_mapping_config, dim_mappings)
+        replace_dimension_names_with_current_ids(project_config_file, dim_mappings)
+        replace_dimension_names_with_current_ids(dataset_config_file, dim_mappings)
+        replace_dimension_names_with_current_ids(dimension_mapping_config, dim_mappings)
+
+        manager.dimension_mapping_manager.register(
+            project_dimension_mapping_config, user, log_message
+        )
+        manager.dimension_mapping_manager.register(dimension_mapping_config, user, log_message)
+
+        dim_id_to_name = map_dimension_ids_to_names(manager.dimension_manager)
+        dim_mapping_mappings = map_dimension_mapping_names_to_ids(
+            manager.dimension_mapping_manager, dim_id_to_name
+        )
+        replace_dimension_mapping_names_with_current_ids(project_config_file, dim_mapping_mappings)
+        replace_dimension_mapping_names_with_current_ids(
+            dimension_mapping_refs, dim_mapping_mappings
+        )
+        manager.project_manager.register(project_config_file, user, "register project")
+        project_id = load_data(project_config_file)["project_id"]
+
+        # Create a modified dataset config with relative paths that will be resolved
+        # against a different base directory (the actual data files location)
+        data_base_dir = TEST_DATASET_DIRECTORY / "test_efs_comstock"
+        modified_config_file = tmp_path / "dataset_modified.json5"
+        data = load_data(dataset_config_file)
+
+        # Change paths to be relative to the data_base_dir
+        data["data_layout"]["data_file"]["path"] = "load_data.csv"
+        data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["missing_associations"] = ["missing_associations"]
+        dump_data(data, modified_config_file)
+
+        # Use CLI runner to test register-and-submit-dataset with --data-base-dir
+        db_url = f"sqlite:///{manager.dataset_manager.db.engine.url.database}"
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            [
+                "--url",
+                db_url,
+                "--offline",
+                "registry",
+                "projects",
+                "register-and-submit-dataset",
+                "-c",
+                str(modified_config_file),
+                "-p",
+                project_id,
+                "-r",
+                str(dimension_mapping_refs),
+                "-l",
+                "test register-and-submit with data-base-dir",
+                "-D",
+                str(data_base_dir),
+                "-M",
+                str(data_base_dir),
+            ],
+        )
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+        assert manager.dataset_manager.list_ids() == ["test_efs_comstock"]
+
+        # Verify dataset was submitted to project
+        project = manager.project_manager.get_by_id(project_id)
+        dataset = project.get_dataset("test_efs_comstock")
+        assert dataset.status == DatasetRegistryStatus.REGISTERED
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):

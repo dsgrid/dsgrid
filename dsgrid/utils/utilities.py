@@ -182,3 +182,40 @@ def display_table(table: PrettyTable):
         display(HTML(table.get_html_string()))
     else:
         print(table)
+
+
+def make_unique_key(base_name: str, existing_keys: Iterable[str]) -> str:
+    """Generate a unique key by appending an index if the base name already exists.
+
+    Parameters
+    ----------
+    base_name : str
+        The base name to use as a key.
+    existing_keys : Iterable[str]
+        Collection of existing keys to check against.
+
+    Returns
+    -------
+    str
+        A unique key, either the base name or base name with an appended index
+        (e.g., 'name_1', 'name_2').
+
+    Examples
+    --------
+    >>> make_unique_key("file", {"other", "another"})
+    'file'
+    >>> make_unique_key("file", {"file", "other"})
+    'file_1'
+    >>> make_unique_key("file", {"file", "file_1", "file_2"})
+    'file_3'
+    """
+    existing = set(existing_keys)
+    if base_name not in existing:
+        return base_name
+
+    index = 1
+    while True:
+        new_key = f"{base_name}_{index}"
+        if new_key not in existing:
+            return new_key
+        index += 1

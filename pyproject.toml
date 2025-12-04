@@ -138,6 +138,9 @@ minversion = "6.0"
 addopts = "-ra"
 testpaths = ["tests"]
 
+[tool.coverage.run]
+omit = ["tests/*"]
+
 [tool.mypy]
 plugins = "pydantic.mypy"
 

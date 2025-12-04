@@ -8,7 +8,6 @@ from dsgrid.chronify import create_store
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import (
     DataClassificationType,
-    DataSchemaType,
     InputDatasetType,
 )
 from dsgrid.config.dataset_config import DatasetConfig
@@ -16,7 +15,7 @@ from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, Dimensi
 from dsgrid.config.dimensions import DimensionModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import TableFormat, ValueFormat
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
@@ -63,10 +62,12 @@ def create_derived_dataset_config_from_query(
         return False
 
     metadata = DatasetMetadataModel.from_file(metadata_file)
-    format_type = metadata.get_table_format_type()
-    table_format = {"format_type": format_type.value}
-    if format_type == TableFormatType.PIVOTED:
-        table_format["pivoted_dimension_type"] = metadata.table_format.pivoted_dimension_type.value
+    value_format = metadata.get_value_format()
+    value_format_dict = {"value_format": value_format.value}
+    if value_format == ValueFormat.PIVOTED:
+        value_format_dict[
+            "pivoted_dimension_type"
+        ] = metadata.table_format.pivoted_dimension_type.value
 
     project = registry_manager.project_manager.load_project(
         query.project.project_id, version=query.project.version
@@ -104,7 +105,7 @@ def create_derived_dataset_config_from_query(
 
         dim = project.config.get_dimension_with_records(dim_query_name)
         if (
-            format_type == TableFormatType.PIVOTED
+            value_format == ValueFormat.PIVOTED
             and metadata.table_format.pivoted_dimension_type == dim_type
         ):
             unique_data_records = metadata.dimensions.get_column_names(dim_type)
@@ -148,7 +149,7 @@ def create_derived_dataset_config_from_query(
 
     _make_dataset_config(
         query.project.dataset.dataset_id,
-        table_format,
+        value_format_dict,
         dimension_references,
         dst_path,
         num_new_supplemental_dimensions,
@@ -244,7 +245,7 @@ def _get_matching_supplemental_dimension(
 
 def _make_dataset_config(
     dataset_id,
-    table_format: dict[str, str],
+    value_format_dict: dict[str, str],
     dimension_references,
     path: Path,
     num_new_supplemental_dimensions,
@@ -255,9 +256,12 @@ def _make_dataset_config(
     config = {
         "dataset_id": dataset_id,
         "dataset_type": InputDatasetType.MODELED.value,
-        "data_schema": {
-            "data_schema_type": DataSchemaType.ONE_TABLE.value,
-            "table_format": table_format,
+        "data_layout": {
+            "table_format": TableFormat.ONE_TABLE.value,
+            "data_file": {
+                "path": "load_data.parquet",
+            },
+            **value_format_dict,
         },
         "version": "1.0.0",
         "description": "",

@@ -33,12 +33,9 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir, tmp_pa
             config = load_data(dataset_config_file)
             config["trivial_dimensions"] = config["trivial_dimensions"] + ["geography"]
             dump_data(config, dataset_config_file)
-            dataset_path = make_test_data_dir / config["dataset_id"]
-
             with pytest.raises(DSGInvalidDimension):
                 manager.dataset_manager.register(
                     config_file=dataset_config_file,
-                    dataset_path=dataset_path,
                     submitter="test",
                     log_message="test",
                 )

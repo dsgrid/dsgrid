@@ -37,27 +37,27 @@ class DimensionsMetadata(BaseModel):
     weather_year: list[DimensionMetadata] = []
 
 
-class TableFormatType(StrEnum):
+class ValueFormat(StrEnum):
     """Defines the format of value columns in a dataset."""
 
     PIVOTED = "pivoted"
-    UNPIVOTED = "unpivoted"
+    STACKED = "stacked"
 
 
 class PivotedTableFormat(BaseModel):
-    format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
+    format_type: Literal[ValueFormat.PIVOTED] = ValueFormat.PIVOTED
     pivoted_dimension_type: str = Field(
         description="The data dimension whose records are columns (pivoted) that contain "
         "data values (numeric) in the load_data table.",
     )
 
 
-class UnpivotedTableFormat(BaseModel):
-    format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
+class StackedTableFormat(BaseModel):
+    format_type: Literal[ValueFormat.STACKED] = ValueFormat.STACKED
 
 
 TableFormat = Annotated[
-    Union[PivotedTableFormat, UnpivotedTableFormat],
+    Union[PivotedTableFormat, StackedTableFormat],
     Field(
         description="Defines the format of the value columns of the result table.",
         discriminator="format_type",
@@ -87,9 +87,9 @@ class TableMetadata(BaseModel):
         with s3.open_input_stream(f"{bucket}/{filepath}") as fs:
             return cls(**json.load(fs))
 
-    def get_table_format_type(self) -> TableFormatType:
-        """Return the format type of the table."""
-        return TableFormatType(self.table_format.format_type)
+    def get_value_format(self) -> ValueFormat:
+        """Return the value format of the table."""
+        return ValueFormat(self.table_format.format_type)
 
     def list_columns(self, dimension_type: str) -> list[str]:
         """Return the columns in the table for the given dimension type."""

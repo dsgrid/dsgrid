@@ -33,6 +33,8 @@ from dsgrid.tests.common import (
     TEST_EFS_REGISTRATION_FILE,
     CACHED_TEST_REGISTRY_DB,
 )
+from dsgrid.tests.make_us_data_registry import update_dataset_config_paths
+from dsgrid.utils.files import load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -115,7 +117,6 @@ def src_tmp_registry_db(tmp_path_factory):
     with make_test_data_registry(
         registry_dir,
         project_dir,
-        dataset_path=TEST_DATASET_DIRECTORY,
         database_url=conn.url,
     ):
         pass  # Manager is created and disposed automatically
@@ -241,6 +242,20 @@ def _make_project_dir(project, base_dir: Optional[Path] = None):
         shutil.rmtree(tmpdir)
     tmpdir.mkdir(parents=True)
     shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
+
+    # Update dataset config paths to be relative to the copied config files
+    datasets_dir = tmpdir / "dsgrid_project" / "datasets"
+    if datasets_dir.exists():
+        # Match both dataset.json5 and dataset_with_dimension_ids.json5 etc.
+        for config_file in datasets_dir.rglob("dataset*.json5"):
+            try:
+                data = load_data(config_file)
+                if "dataset_id" in data and "data_layout" in data:
+                    update_dataset_config_paths(config_file, data["dataset_id"])
+            except Exception:
+                # Some config files may not have valid paths; skip them
+                pass
+
     return tmpdir
 
 

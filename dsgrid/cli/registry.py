@@ -58,31 +58,21 @@ Click Group Definitions
 
 
 @click.group()
-# @click.option(
-#     "--remote-path",
-#     default=REMOTE_REGISTRY,
-#     show_default=True,
-#     help="path to dsgrid remote registry",
-# )
 @click.pass_context
 def registry(ctx):
     """Manage a registry."""
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
-        # database=get_value_from_context(ctx, "database_name"),
-        # username=get_value_from_context(ctx, "username"),
-        # password=get_value_from_context(ctx, "password"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     no_prompts = ctx.parent.params["no_prompts"]
-    offline = get_value_from_context(ctx, "offline")
     if "--help" in sys.argv:
         ctx.obj = None
     else:
         ctx.obj = RegistryManager.load(
             conn,
             REMOTE_REGISTRY,
-            offline_mode=offline,
+            offline_mode=True,
             no_prompts=no_prompts,
             scratch_dir=scratch_dir,
         )
@@ -1819,27 +1809,6 @@ def bulk_register_cli(
         ctx.exit(res[1])
 
 
-@click.command()
-@click.pass_obj
-@click.pass_context
-@click.option(
-    "--project-id",
-    "-P",
-    type=str,
-    help="Sync latest dataset(s) version based on Project ID",
-)
-@click.option(
-    "--dataset-id",
-    "-D",
-    type=str,
-    help="Sync latest dataset version based on Dataset ID",
-)
-def data_sync(ctx, registry_manager, project_id, dataset_id):
-    """Sync the official dsgrid registry data to the local system."""
-    no_prompts = ctx.parents[1].params["no_prompts"]
-    registry_manager.data_sync(project_id, dataset_id, no_prompts)
-
-
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
@@ -1881,4 +1850,3 @@ registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
 registry.add_command(bulk_register_cli)
-# registry.add_command(data_sync)

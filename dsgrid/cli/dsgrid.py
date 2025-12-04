@@ -42,16 +42,6 @@ logger = logging.getLogger(__name__)
 @click.option(
     "-n", "--no-prompts", default=False, is_flag=True, show_default=True, help="Do not prompt."
 )
-# Offline mode is permanently on because we do not currently support a remote, official registry.
-# @click.option(
-#     "--offline/--online",
-#     is_flag=True,
-#     default=dsgrid.runtime_config.offline,
-#     show_default=True,
-#     help="Run registry commands in offline mode. WARNING: any commands you perform in offline "
-#     "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-#     "commands will not be officially synced with the remote registry",
-# )
 @click.option(
     "--timings/--no-timings",
     default=dsgrid.runtime_config.timings,
@@ -59,24 +49,6 @@ logger = logging.getLogger(__name__)
     show_default=True,
     help="Enable tracking of function timings.",
 )
-# Server-related options are commented-out because the registry is currently only
-# supported in SQLite. If/when we add postgres support, these can be added back.
-# @click.option(
-#    "-U",
-#    "--username",
-#    type=str,
-#    default=dsgrid.runtime_config.database_user,
-#    help="Database username",
-# )
-# @click.option(
-#    "-P",
-#    "--password",
-#    prompt=True,
-#    hide_input=True,
-#    cls=OptionPromptPassword,
-#    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
-#    "runtime config file.",
-# )
 @click.option(
     "-u",
     "--url",
@@ -108,10 +80,7 @@ def cli(
     file_level,
     log_file,
     no_prompts,
-    # offline,
     timings,
-    # username,
-    # password,
     url,
     reraise_exceptions,
     scratch_dir,
@@ -121,7 +90,6 @@ def cli(
         timer_stats_collector.enable()
     else:
         timer_stats_collector.disable()
-    ctx.params["offline"] = True
     path = Path(log_file)
     check_log_file_size(path, no_prompts=no_prompts)
     ctx.params["console_level"] = get_log_level_from_str(console_level)

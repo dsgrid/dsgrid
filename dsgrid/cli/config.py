@@ -91,7 +91,6 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 # )
 # @click.option(
 #    "-o",
-#    "--offline",
 #    is_flag=True,
 #    default=False,
 #    show_default=True,

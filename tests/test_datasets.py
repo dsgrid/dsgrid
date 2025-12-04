@@ -20,7 +20,9 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_names_with_current_ids,
 )
 from dsgrid.utils.files import (
+    dump_json_file,
     dump_line_delimited_json,
+    load_json_file,
     load_line_delimited_json,
     load_data,
     delete_if_exists,
@@ -36,34 +38,29 @@ PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
 
 
-def make_registry(base_dir, test_project_dir, test_data_dir):
-    if DATASET_ID not in os.listdir(test_data_dir):
-        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
-        sys.exit(1)
-
-    manager = make_test_data_registry(
-        base_dir,
-        test_project_dir,
-        dataset_path=test_data_dir,
-        include_datasets=False,
-        database_url=f"sqlite:///{base_dir}/registry.db",
-    )
-    dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
-    assert dataset_config_path.exists()
-    dataset_config_file = dataset_config_path / "dataset.json5"
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-    return manager, dataset_config_path
-
-
 @pytest.fixture(scope="module")
 def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_data_dir_module):
     """Tests that don't successfully register the dataset can share this fixture."""
     base_dir = tmp_path_factory.mktemp("dsgrid")
     test_project_dir = make_test_project_dir_module
     test_data_dir = make_test_data_dir_module
-    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
-    yield manager, base_dir, dataset_config_path, test_data_dir
+
+    if DATASET_ID not in os.listdir(test_data_dir):
+        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
+        sys.exit(1)
+
+    with make_test_data_registry(
+        base_dir,
+        test_project_dir,
+        include_datasets=False,
+        database_url=f"sqlite:///{base_dir}/registry.db",
+    ) as manager:
+        dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
+        assert dataset_config_path.exists()
+        dataset_config_file = dataset_config_path / "dataset.json5"
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+        yield manager, base_dir, dataset_config_path, test_data_dir
 
 
 @pytest.fixture(scope="function")
@@ -72,26 +69,61 @@ def setup_registry_single(tmp_path_factory, make_test_project_dir, make_test_dat
     base_dir = tmp_path_factory.mktemp("dsgrid")
     test_project_dir = make_test_project_dir
     test_data_dir = make_test_data_dir
-    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
-    yield manager, base_dir, dataset_config_path, test_data_dir
+
+    if DATASET_ID not in os.listdir(test_data_dir):
+        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
+        sys.exit(1)
+
+    with make_test_data_registry(
+        base_dir,
+        test_project_dir,
+        include_datasets=False,
+        database_url=f"sqlite:///{base_dir}/registry.db",
+    ) as manager:
+        dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
+        assert dataset_config_path.exists()
+        dataset_config_file = dataset_config_path / "dataset.json5"
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+        yield manager, base_dir, dataset_config_path, test_data_dir
 
 
 @pytest.fixture
 def register_dataset(setup_registry):
-    manager, base_dir, dataset_config_path, dataset_path = setup_registry
+    manager, base_dir, dataset_config_path, src_dataset_path = setup_registry
     test_dir = base_dir / "test_data_dir"
-    shutil.copytree(dataset_path, test_dir)
+    shutil.copytree(src_dataset_path, test_dir)
     dataset_config_file = dataset_config_path / "dataset.json5"
-    dataset_id = load_data(dataset_config_file)["dataset_id"]
+    data = load_data(dataset_config_file)
+    dataset_id = data["dataset_id"]
     dataset_path = test_dir / dataset_id
+
+    # Create a copy of the entire dataset config directory (including dimensions)
+    test_config_dir = test_dir / "config"
+    shutil.copytree(dataset_config_path, test_config_dir)
+    test_config_file = test_config_dir / "dataset.json5"
+
+    # Update paths in the config to point to the copied test data
+    test_config = load_data(test_config_file)
+    if "data_layout" in test_config and test_config["data_layout"] is not None:
+        ts = test_config["data_layout"]
+        if "data_file" in ts:
+            ts["data_file"]["path"] = str(dataset_path / "load_data.csv")
+        if "lookup_data_file" in ts and ts["lookup_data_file"] is not None:
+            ts["lookup_data_file"]["path"] = str(dataset_path / "load_data_lookup.json")
+        if "missing_associations" in ts and ts["missing_associations"]:
+            ts["missing_associations"] = [str(dataset_path / "missing_associations")]
+    from dsgrid.utils.files import dump_data
+
+    dump_data(test_config, test_config_file)
+
     # This dict must get filled in by each test.
     expected_errors = {"exception": None, "match_msg": None}
-    yield dataset_config_path, dataset_path, expected_errors
+    yield test_config_file, dataset_path, expected_errors
     try:
         with pytest.raises(expected_errors["exception"], match=expected_errors["match_msg"]):
             manager.dataset_manager.register(
-                dataset_config_file,
-                dataset_path,
+                test_config_file,
                 getpass.getuser(),
                 "register invalid dataset",
             )
@@ -136,26 +168,32 @@ def register_dataset(setup_registry):
 #     finally:
 #         shutil.rmtree(test_dir)
 #         missing_record_file = Path(
-#             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
+#             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.parquet"
 #         )
 #         delete_if_exists(missing_record_file)
 
 
 def test_invalid_load_data_lookup_column_name(register_dataset):
-    _, dataset_path, expected_errors = register_dataset
+    config_file, dataset_path, expected_errors = register_dataset
+    config = load_json_file(config_file)
+    for column in config["data_layout"]["lookup_data_file"]["columns"]:
+        if column["name"] == "subsector":
+            column["name"] = "invalid_dimension"
+    dump_json_file(config, config_file)
     lookup_file = dataset_path / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
     for item in data:
         item["invalid_dimension"] = item.pop("subsector")
     dump_line_delimited_json(data, lookup_file)
     expected_errors["exception"] = DSGInvalidDimension
-    expected_errors["match_msg"] = r"column.*is not expected or of a known dimension type"
+    expected_errors["match_msg"] = r"column=.*invalid_dimension.*is not expected"
 
 
 def test_invalid_load_data_lookup_integer_column(register_dataset):
     _, dataset_path, expected_errors = register_dataset
     lookup_file = dataset_path / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
+    # Convert geography values from strings to integers to trigger the type validation error
     for item in data:
         item["geography"] = int(item["geography"])
     dump_line_delimited_json(data, lookup_file)
@@ -171,8 +209,9 @@ def test_invalid_load_data_lookup_no_id(register_dataset):
         if "id" in item:
             item.pop("id")
     dump_line_delimited_json(data, lookup_file)
+    # Error is now raised during file reading due to schema validation
     expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data_lookup does not include an .id. column"
+    expected_errors["match_msg"] = r"Expected columns.*id.*are not in"
 
 
 def test_invalid_load_data_lookup_mismatched_records(register_dataset):
@@ -289,7 +328,7 @@ def test_invalid_load_data_extra_column(register_dataset):
 
 def test_invalid_load_data_lookup_missing_records(register_dataset):
     _, dataset_path, expected_errors = register_dataset
-    associations_file = dataset_path / "missing_associations.csv"
+    associations_file = dataset_path / "missing_associations" / "geography__subsector.csv"
     associations_file.unlink()
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"missing required dimension records"
@@ -308,7 +347,6 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
         with pytest.raises(DSGInvalidDataset):
             manager.project_manager.register_and_submit_dataset(
                 dataset_config_file,
-                dataset_path,
                 PROJECT_ID,
                 getpass.getuser(),
                 "register and submit",
@@ -319,7 +357,6 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
 
         manager.project_manager.register_and_submit_dataset(
             dataset_config_file,
-            dataset_path,
             PROJECT_ID,
             getpass.getuser(),
             "register and submit",
@@ -329,7 +366,7 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
     finally:
         shutil.rmtree(test_dir)
         missing_record_file = Path(
-            f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
+            f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.parquet"
         )
         delete_if_exists(missing_record_file)
 

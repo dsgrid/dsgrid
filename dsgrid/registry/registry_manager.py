@@ -3,9 +3,7 @@
 import getpass
 import logging
 import os
-import requests
 import shutil
-import sys
 import uuid
 from pathlib import Path
 
@@ -15,7 +13,6 @@ from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
     SYNC_EXCLUDE_LIST,
-    on_hpc,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
@@ -48,6 +45,7 @@ class RegistryManager:
     """Manages registration of all projects and datasets."""
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
+        self._db = db
         self._data_store = db.data_store
         self._check_environment_variables(params)
         if get_active_session() is None:
@@ -154,6 +152,18 @@ class RegistryManager:
         )
         return cls(params, db)
 
+    def dispose(self) -> None:
+        """Dispose the database engine and release all connections."""
+        self._db.dispose()
+
+    def __enter__(self) -> "RegistryManager":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager and dispose resources."""
+        self.dispose()
+
     @property
     def dataset_manager(self) -> DatasetRegistryManager:
         """Return the dataset manager."""
@@ -196,7 +206,7 @@ class RegistryManager:
             If set, use load data tables from remote_path. If not set, auto-determine what to do
             based on HPC or AWS EMR environment variables.
         offline_mode : bool
-            Load registry in offline mode; default is False
+            Load registry in offline mode; default is True
         user : str
             username
         no_prompts : bool
@@ -235,6 +245,7 @@ class RegistryManager:
         )
 
         if not offline_mode:
+            sync = False
             lock_files = list(cloud_interface.get_lock_files())
             if lock_files:
                 msg = f"There are {len(lock_files)} lock files in the registry:"
@@ -299,15 +310,15 @@ class RegistryManager:
             msg = "Must provide a dataset_id or project_id for dsgrid data-sync."
             raise ValueError(msg)
 
+        datasets = []
         if project_id:
             config = self.project_manager.get_by_id(project_id)
             if dataset_id:
                 if dataset_id not in config.list_registered_dataset_ids():
                     msg = f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
                     raise DSGValueNotRegistered(msg)
-                datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
+                datasets += [(dataset_id, str(config.get_dataset(dataset_id).version))]
             else:
-                datasets = []
                 for dataset in config.list_registered_dataset_ids():
                     datasets.append((dataset, str(config.get_dataset(dataset).version)))
 
@@ -316,7 +327,7 @@ class RegistryManager:
                 msg = f"No registered dataset ID = '{dataset_id}'"
                 raise DSGValueNotRegistered(msg)
             version = self.dataset_manager.get_latest_version(dataset_id)
-            datasets = [(dataset_id, version)]
+            datasets += [(dataset_id, version)]
 
         for dataset, version in datasets:
             self._data_sync(dataset, version, no_prompts)
@@ -415,6 +426,7 @@ class RegistryManager:
         """
         src_db = RegistryDatabase.connect(src)
         src_data_path = src_db.get_data_path()
+        src_db.engine.dispose()
         # TODO: This does not support the duckdb data store. Need to implement this copy operation
         # in the DataStoreInterface.
         if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):
@@ -500,45 +512,47 @@ def get_registry_path(registry_path=None):
 
 
 def _should_use_remote_data(remote_path):
-    if not str(remote_path).lower().startswith("s3"):
-        # We are on a local filesystem. Use the remote path.
-        return True
+    # We can reconsider this code if we ever have remote registries again.
+    return False
+    # if not str(remote_path).lower().startswith("s3"):
+    #     # We are on a local filesystem. Use the remote path.
+    #     return True
 
-    use_remote_data = False
-    if "DSGRID_USE_LOCAL_DATA" in os.environ:
-        pass
-    elif sys.platform in ("darwin", "win32"):
-        # Local systems need to sync all load data files.
-        pass
-    elif on_hpc():
-        pass
-    elif "GITHUB_ACTION" in os.environ:
-        logger.info("Do not use remote data on GitHub CI")
-    else:
-        # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
-        try:
-            response = requests.get(
-                "http://169.254.169.254/latest/dynamic/instance-identity/document", timeout=2
-            )
-            ret = 0
-        except requests.ConnectTimeout:
-            logger.warning(
-                "Connection timed out while trying to read AWS identity. "
-                "If you are not running on AWS and would prefer to not experience this delay, set "
-                "the environment varible DSGRID_USE_LOCAL_DATA."
-            )
-            ret = 1
-        except Exception:
-            logger.exception("Failed to read identity document")
-            ret = 1
+    # use_remote_data = False
+    # if "DSGRID_USE_LOCAL_DATA" in os.environ:
+    #     pass
+    # elif sys.platform in ("darwin", "win32"):
+    #     # Local systems need to sync all load data files.
+    #     pass
+    # elif on_hpc():
+    #     pass
+    # elif "GITHUB_ACTION" in os.environ:
+    #     logger.info("Do not use remote data on GitHub CI")
+    # else:
+    #     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    #     try:
+    #         response = requests.get(
+    #             "http://169.254.169.254/latest/dynamic/instance-identity/document", timeout=2
+    #         )
+    #         ret = 0
+    #     except requests.ConnectTimeout:
+    #         logger.warning(
+    #             "Connection timed out while trying to read AWS identity. "
+    #             "If you are not running on AWS and would prefer to not experience this delay, set "
+    #             "the environment varible DSGRID_USE_LOCAL_DATA."
+    #         )
+    #         ret = 1
+    #     except Exception:
+    #         logger.exception("Failed to read identity document")
+    #         ret = 1
 
-        if ret == 0 and response.status_code == 200:
-            identity_data = response.json()
-            logger.info("Identity data: %s", identity_data)
-            if "instanceId" in identity_data:
-                logger.info("Use remote data on AWS")
-                use_remote_data = True
-            else:
-                logger.warning("Unknown payload from identity request.")
+    #     if ret == 0 and response.status_code == 200:
+    #         identity_data = response.json()
+    #         logger.info("Identity data: %s", identity_data)
+    #         if "instanceId" in identity_data:
+    #             logger.info("Use remote data on AWS")
+    #             use_remote_data = True
+    #         else:
+    #             logger.warning("Unknown payload from identity request.")
 
-    return use_remote_data
+    # return use_remote_data

@@ -4,7 +4,6 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.query.models import ColumnType
 from dsgrid.registry.common import DatabaseConnection
@@ -12,7 +11,6 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     IEF_PROJECT_REPO,
     STANDARD_SCENARIOS_PROJECT_REPO,
-    TEST_DATASET_DIRECTORY,
     TEST_EFS_REGISTRATION_FILE,
     TEST_PROJECT_PATH,
 )
@@ -28,7 +26,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "create-registry",
             url,
@@ -44,7 +42,6 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "dimensions",
         "register",
@@ -55,9 +52,9 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(project_dimension_mapping_config, mappings)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(project_dimension_mapping_config, mappings)
 
     # Registering duplicates is allowed.
     result = runner.invoke(cli, cmd)
@@ -66,7 +63,6 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "dimension-mappings",
         "register",
@@ -84,7 +80,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "create-registry",
             url,
@@ -101,14 +97,12 @@ def test_register_project_and_dataset(tmp_registry_db):
     dataset_config = src_dir / dataset_dir / "dataset.json5"
     dataset_map_file = src_dir / dataset_dir / "dimension_mappings.json5"
     dataset_id = load_data(dataset_config)["dataset_id"]
-    dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     result = runner.invoke(
         cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "register",
@@ -119,20 +113,17 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dataset_config, mappings)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config, mappings)
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "projects",
         "register-and-submit-dataset",
         "--dataset-config-file",
         str(dataset_config),
-        "--dataset-path",
-        str(dataset_path),
         "--dimension-mapping-file",
         str(dataset_map_file),
         "--project-id",
@@ -142,23 +133,23 @@ def test_register_project_and_dataset(tmp_registry_db):
     ]
 
     result = runner.invoke(cli, cmd)
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
 
-    result = runner.invoke(cli, ["--url", url, "--offline", "registry", "list"])
+    result = runner.invoke(cli, ["--url", url, "registry", "list"])
     assert result.exit_code == 0
     regex_project = re.compile(rf"{project_id}.*1\.1\.0")
     regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
     assert regex_project.search(result.stdout) is not None, result.stdout
     assert regex_dataset.search(result.stdout) is not None, result.stdout
-    dim_id = manager.dimension_manager.list_ids()[0]
-    dim_map_id = manager.dimension_mapping_manager.list_ids()[0]
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dim_id = manager.dimension_manager.list_ids()[0]
+        dim_map_id = manager.dimension_mapping_manager.list_ids()[0]
 
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "remove",
@@ -167,11 +158,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "datasets",
             "remove",
@@ -180,11 +170,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "dimension-mappings",
             "remove",
@@ -193,11 +182,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "dimensions",
             "remove",
@@ -213,7 +201,6 @@ def test_list_project_dimension_names(cached_registry):
     cmd = [
         "--url",
         conn.url,
-        "--offline",
         "registry",
         "projects",
         "list-dimension-names",
@@ -237,7 +224,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
     _, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "create-registry",
             url,
@@ -260,7 +247,6 @@ def test_register_dsgrid_projects(tmp_registry_db):
             [
                 "--url",
                 url,
-                "--offline",
                 "registry",
                 "projects",
                 "register",
@@ -272,18 +258,18 @@ def test_register_dsgrid_projects(tmp_registry_db):
         assert result.exit_code == 0
 
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    project = manager.project_manager.load_project("US_DOE_IEF_2023")
-    config = project.config
-    context = ScratchDirContext(tmpdir)
-    config.make_dimension_association_table("ief_2023_transport", context)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        project = manager.project_manager.load_project("US_DOE_IEF_2025")
+        config = project.config
+        context = ScratchDirContext(tmpdir)
+        config.make_dimension_association_table("ief_2025_transport", context)
 
 
 def test_bulk_register(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "create-registry",
             url,
@@ -344,7 +330,7 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     _, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "create-registry",
             url,
@@ -367,13 +353,9 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     capacities_mapping_file = (
         project_dir / "datasets" / "modeled" / "dgen_capacities" / "dimension_mappings.json5"
     )
-    profiles_data = base / "dgen_profiles_data/"
-    capacities_data = base / "dgen_capacities_data"
-
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "projects",
         "register",
@@ -393,8 +375,6 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "register-and-submit-dataset",
             "-c",
             str(profiles_config_file),
-            "-d",
-            str(profiles_data),
             "-p",
             "US_DOE_DECARB_2023",
             "-m",
@@ -410,14 +390,12 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "register-and-submit-dataset",
             "-c",
             str(capacities_config_file),
-            "-d",
-            str(capacities_data),
             "-p",
             "US_DOE_DECARB_2023",
             "-m",
             str(capacities_mapping_file),
             "-l",
-            "Register and submit dgen profiles",
+            "Register and submit dgen capacities",
         ],
     )
     for cmd in cmds:

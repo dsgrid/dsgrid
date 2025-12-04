@@ -20,3 +20,13 @@ def create_store(store_file: Path) -> Generator[chronify.Store, None, None]:
         yield store
     finally:
         store.dispose()
+
+
+@contextmanager
+def create_in_memory_store() -> Generator[chronify.Store, None, None]:
+    """Create an in-memory chronify Store."""
+    store = chronify.Store.create_in_memory_db()
+    try:
+        yield store
+    finally:
+        store.dispose()

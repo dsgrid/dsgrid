@@ -5,10 +5,10 @@ from typing import Iterable
 from chronify.utils.path_utils import check_overwrite
 
 from dsgrid.config.dataset_config import (
-    DataSchemaType,
     get_unique_dimension_record_ids,
     make_unvalidated_dataset_config,
 )
+from dsgrid.dataset.models import TableFormat
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
@@ -26,7 +26,7 @@ def generate_config_from_dataset(
     registry_manager: RegistryManager,
     dataset_id: str,
     dataset_path: Path,
-    schema_type: DataSchemaType,
+    table_format: TableFormat,
     metric_type: str,
     pivoted_dimension_type: DimensionType | None = None,
     time_type: TimeDimensionType | None = None,
@@ -57,7 +57,7 @@ def generate_config_from_dataset(
 
     dimension_references: list[DimensionReferenceModel] = []
     for dim_type, ids in get_unique_dimension_record_ids(
-        dataset_path, schema_type, pivoted_dimension_type, time_cols
+        dataset_path, table_format, pivoted_dimension_type, time_cols
     ).items():
         ref, checked_project_dim_ids = find_matching_project_base_dimension(
             project_config, ids, dim_type, no_prompts=no_prompts
@@ -109,14 +109,16 @@ def find_matching_project_base_dimension(
     if project_config is None:
         return None, checked_project_dim_ids
 
-    for dim_type in (x for x in DimensionType if x != DimensionType.TIME):
-        for dim in project_config.list_base_dimensions_with_records(dimension_type=dim_type):
-            project_records = sorted(dim.get_unique_ids())
-            checked_project_dim_ids.add(dim.model.dimension_id)
-            if sorted_record_ids == project_records and (
-                no_prompts or get_user_input_on_dimension_match(dim, "project base dimension")
-            ):
-                return make_dimension_ref(dim), checked_project_dim_ids
+    if dimension_type == DimensionType.TIME:
+        return None, checked_project_dim_ids
+
+    for dim in project_config.list_base_dimensions_with_records(dimension_type=dimension_type):
+        project_records = sorted(dim.get_unique_ids())
+        checked_project_dim_ids.add(dim.model.dimension_id)
+        if sorted_record_ids == project_records and (
+            no_prompts or get_user_input_on_dimension_match(dim, "project base dimension")
+        ):
+            return make_dimension_ref(dim), checked_project_dim_ids
 
     return None, checked_project_dim_ids
 

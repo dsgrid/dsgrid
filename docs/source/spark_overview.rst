@@ -413,7 +413,6 @@ needs to
     $ spark-submit --master spark://$(hostname):7077 \
         $(which dsgrid-cli.py) \
         query project run \
-        --offline \
         --registry-path=/scratch/${USER}/.dsgrid-registry \
         query.json
 

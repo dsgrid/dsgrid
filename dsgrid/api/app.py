@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse
 
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.config.dimensions import create_dimension_common_model, create_project_dimension_model
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
@@ -44,7 +44,7 @@ from .response_models import (
     ListProjectSupplementalDimensionNames,
     ListProjectsResponse,
     ListReportTypesResponse,
-    ListTableFormatTypesResponse,
+    ListValueFormatsResponse,
     SparkSubmitProjectQueryResponse,
 )
 
@@ -280,10 +280,10 @@ async def list_report_types():
     return ListReportTypesResponse(types=_list_enums(ReportType))
 
 
-@app.get("/table_formats/types", response_model=ListTableFormatTypesResponse)
-async def list_table_format_types():
-    """List the table format types available for query results."""
-    return ListTableFormatTypesResponse(types=_list_enums(TableFormatType))
+@app.get("/value_formats", response_model=ListValueFormatsResponse)
+async def list_value_formats():
+    """List the value formats available for query results."""
+    return ListValueFormatsResponse(formats=_list_enums(ValueFormat))
 
 
 @app.post("/queries/projects", response_model=SparkSubmitProjectQueryResponse)
@@ -368,7 +368,6 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         output_dir = Path(QUERY_OUTPUT_DIR)
         dsgrid_exec = "dsgrid-cli.py"
         base_cmd = (
-            f"--offline "
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
             f"query project run "
             f"--output={output_dir} --zip-file --overwrite {fp.name}"

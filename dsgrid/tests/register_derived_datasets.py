@@ -79,17 +79,17 @@ def _run_registration(
         dataset_config_file = dataset_config_dir / DatasetRegistry.config_filename()
 
         create_cmd = (
-            f"dsgrid query project run --offline --registry-path={registry_path} "
+            f"dsgrid query project run --registry-path={registry_path} "
             f"-o {query_output_dir} {query_file}"
         )
 
         config_cmd = (
-            f"dsgrid query project create-derived-dataset-config --offline "
+            f"dsgrid query project create-derived-dataset-config "
             f"--registry-path={registry_path} {query_output_dir / dataset_id} {dataset_config_dir}"
         )
 
         submit_cmd = (
-            f"dsgrid registry --offline --path {registry_path} projects "
+            f"dsgrid registry --path {registry_path} projects "
             f"register-and-submit-dataset -c {dataset_config_file} -p {project_id} "
             f"-l '{log_message}' -d {query_output_dir / dataset_id}"
         )

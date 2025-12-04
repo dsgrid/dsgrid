@@ -9,8 +9,7 @@ from typing import Optional
 import pytest
 from click.testing import CliRunner
 
-from dsgrid.cli.dsgrid import cli as cli
-from dsgrid.cli.dsgrid_admin import cli as cli_admin
+from dsgrid.cli.dsgrid import cli
 from dsgrid.registry.common import DataStoreType, DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
@@ -33,6 +32,8 @@ from dsgrid.tests.common import (
     TEST_EFS_REGISTRATION_FILE,
     CACHED_TEST_REGISTRY_DB,
 )
+from dsgrid.tests.make_us_data_registry import update_dataset_config_paths
+from dsgrid.utils.files import load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -71,9 +72,8 @@ def cached_registry():
         TEST_REGISTRY_BASE_PATH.mkdir()
         runner = CliRunner()
         result = runner.invoke(
-            cli_admin,
+            cli,
             [
-                "--offline",
                 "create-registry",
                 conn.url,
                 "--data-path",
@@ -87,7 +87,6 @@ def cached_registry():
             [
                 "--url",
                 conn.url,
-                "--offline",
                 "registry",
                 "bulk-register",
                 str(TEST_EFS_REGISTRATION_FILE),
@@ -112,12 +111,12 @@ def src_tmp_registry_db(tmp_path_factory):
     conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/tmp_reg.db")
     RegistryDatabase.delete(conn)
     registry_dir = tmp_path_factory.mktemp("registry_data")
-    make_test_data_registry(
+    with make_test_data_registry(
         registry_dir,
         project_dir,
-        dataset_path=TEST_DATASET_DIRECTORY,
         database_url=conn.url,
-    )
+    ):
+        pass  # Manager is created and disposed automatically
     yield conn, project_dir
     RegistryDatabase.delete(conn)
 
@@ -129,9 +128,8 @@ def registry_with_duckdb_store(tmp_path):
     data_path = tmp_path / "registry_data"
     runner = CliRunner()
     result = runner.invoke(
-        cli_admin,
+        cli,
         [
-            "--offline",
             "create-registry",
             url,
             "--data-path",
@@ -145,7 +143,6 @@ def registry_with_duckdb_store(tmp_path):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "bulk-register",
         str(TEST_EFS_REGISTRATION_FILE),
@@ -167,7 +164,10 @@ def mutable_cached_registry(src_tmp_registry_db, tmp_path) -> tuple[RegistryMana
     shutil.copytree(src_project_dir, tmp_project_dir)
     RegistryManager.copy(src_conn, dst_conn, tmp_path / "mutable_registry_data")
     mgr = RegistryManager.load(dst_conn)
-    return mgr, tmp_project_dir
+    try:
+        yield mgr, tmp_project_dir
+    finally:
+        mgr.dispose()
 
 
 def _get_latest_commit():
@@ -237,6 +237,20 @@ def _make_project_dir(project, base_dir: Optional[Path] = None):
         shutil.rmtree(tmpdir)
     tmpdir.mkdir(parents=True)
     shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
+
+    # Update dataset config paths to be relative to the copied config files
+    datasets_dir = tmpdir / "dsgrid_project" / "datasets"
+    if datasets_dir.exists():
+        # Match both dataset.json5 and dataset_with_dimension_ids.json5 etc.
+        for config_file in datasets_dir.rglob("dataset*.json5"):
+            try:
+                data = load_data(config_file)
+                if "dataset_id" in data and "data_layout" in data:
+                    update_dataset_config_paths(config_file, data["dataset_id"])
+            except Exception:
+                # Some config files may not have valid paths; skip them
+                pass
+
     return tmpdir
 
 

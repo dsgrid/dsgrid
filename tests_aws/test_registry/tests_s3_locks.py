@@ -39,19 +39,22 @@ def test_sync_push_fail_if_lock_exists():
             manager = RegistryManager.create(
                 path=base_dir / "dsgrid-registry", user="test", remote_path=TEST_REMOTE_REGISTRY
             )
-            manager.dimension_manager.cloud_interface = make_cloud_storage_interface(
-                base_dir / "dsgrid-registry",
-                remote_path=TEST_REMOTE_REGISTRY,
-                user="test",
-                offline=False,
-                uuid="0",
-            )
-            with pytest.raises(DSGRegistryLockError):
-                manager.dimension_manager.cloud_interface.check_lock_file(lock_file)
-            with pytest.raises(DSGRegistryLockError):
-                manager.dimension_manager.sync_push(
-                    base_dir / "dsgrid-registry/configs/dimensions/geography/test/1.0.0"
+            try:
+                manager.dimension_manager.cloud_interface = make_cloud_storage_interface(
+                    base_dir / "dsgrid-registry",
+                    remote_path=TEST_REMOTE_REGISTRY,
+                    user="test",
+                    offline=False,
+                    uuid="0",
                 )
+                with pytest.raises(DSGRegistryLockError):
+                    manager.dimension_manager.cloud_interface.check_lock_file(lock_file)
+                with pytest.raises(DSGRegistryLockError):
+                    manager.dimension_manager.sync_push(
+                        base_dir / "dsgrid-registry/configs/dimensions/geography/test/1.0.0"
+                    )
+            finally:
+                manager.dispose()
 
 
 def test_bad_lockfile():

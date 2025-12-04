@@ -19,7 +19,7 @@ from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
-    UnpivotedTableFormatModel,
+    StackedTableFormatModel,
 )
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
@@ -348,7 +348,6 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
-        "--offline",
         "--url",
         SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
         "query",
@@ -389,7 +388,7 @@ def test_query_cli_create_validate(tmp_path):
             "pivoted_dimension_type": "metric",
         },
         {
-            "format_type": "unpivoted",
+            "format_type": "stacked",
         },
     ],
 )
@@ -405,7 +404,6 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
         dst = tmp_path / filename.name
         dump_data(data, dst)
         cmd = [
-            "--offline",
             "--url",
             conn.url,
             "query",
@@ -496,7 +494,6 @@ def test_map_dataset(tmp_path):
     cmd = [
         "--scratch-dir",
         str(scratch_dir),
-        "--offline",
         "--url",
         SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
         "query",
@@ -549,7 +546,6 @@ def test_dataset_queries(tmp_path):
         cmd = [
             "--scratch-dir",
             str(scratch_dir),
-            "--offline",
             "--url",
             SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
             "query",
@@ -619,11 +615,16 @@ def test_dataset_queries(tmp_path):
 
 
 _projects = {}
+_managers = {}
 
 
 def get_project(conn: DatabaseConnection, project_id: str):
     """Load a Project and cache it for future calls.
     Loading is slow and the Project isn't being changed by these tests.
+
+    Note: This function uses manual dispose() via shutdown_project() instead of
+    context managers because the managers need to persist across multiple test calls.
+    The cached managers are cleaned up in shutdown_project().
     """
     key = (conn.url, project_id)
     if key in _projects:
@@ -632,6 +633,7 @@ def get_project(conn: DatabaseConnection, project_id: str):
         conn,
         offline_mode=True,
     )
+    _managers[key] = mgr
     _projects[key] = mgr.project_manager.load_project(project_id)
     return _projects[key]
 
@@ -639,6 +641,9 @@ def get_project(conn: DatabaseConnection, project_id: str):
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
     _projects.clear()
+    for mgr in _managers.values():
+        mgr.dispose()
+    _managers.clear()
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
         if spark is not None:
@@ -815,7 +820,7 @@ class QueryTestElectricityValues(QueryTestBase):
             ),
             result=QueryResultParamsModel(
                 replace_ids_with_names=True,
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
                 time_zone=self._to_time_zone,
             ),
         )
@@ -959,7 +964,7 @@ class QueryTestElectricityUse(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1051,7 +1056,7 @@ class QueryTestDatasetMappingPlan(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1124,7 +1129,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
 
@@ -1214,7 +1219,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1282,7 +1287,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 ],
                 sort_columns=["county", "hour"],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1424,7 +1429,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
                 ],
                 sort_columns=["state"],
                 output_format="csv",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1707,7 +1712,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1953,29 +1958,29 @@ def run_composite_dataset(
         "dsgrid", "query.log", console_level=logging.INFO, file_level=logging.INFO, mode="w"
     )
     conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
-    mgr = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         offline_mode=True,
-    )
-    project = mgr.project_manager.load_project("dsgrid_conus_2022")
-    query = QueryTestElectricityValuesCompositeDataset(
-        registry_path, project, output_dir=output_dir
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(
-        query.make_query(),
-        persist_intermediate_table=persist_intermediate_table,
-        load_cached_table=load_cached_table,
-    )
-    assert query.validate()
+    ) as mgr:
+        project = mgr.project_manager.load_project("dsgrid_conus_2022")
+        query = QueryTestElectricityValuesCompositeDataset(
+            registry_path, project, output_dir=output_dir
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(
+            query.make_query(),
+            persist_intermediate_table=persist_intermediate_table,
+            load_cached_table=load_cached_table,
+        )
+        assert query.validate()
 
-    query2 = QueryTestElectricityValuesCompositeDatasetAgg(
-        registry_path, project, output_dir=output_dir, geography="county"
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
-    assert query2.validate()
+        query2 = QueryTestElectricityValuesCompositeDatasetAgg(
+            registry_path, project, output_dir=output_dir, geography="county"
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
+        assert query2.validate()
 
-    query3 = QueryTestElectricityValuesCompositeDatasetAgg(
-        registry_path, project, output_dir=output_dir, geography="state"
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
-    assert query3.validate()
+        query3 = QueryTestElectricityValuesCompositeDatasetAgg(
+            registry_path, project, output_dir=output_dir, geography="state"
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
+        assert query3.validate()

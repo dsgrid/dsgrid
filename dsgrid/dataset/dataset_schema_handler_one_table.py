@@ -6,7 +6,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.types import (
@@ -16,10 +16,8 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
-from dsgrid.utils.spark import (
-    check_for_nulls,
-    read_dataframe,
-)
+from dsgrid.config.file_schema import read_data_file
+from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -45,7 +43,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         **kwargs,
     ) -> Self:
         if store is None:
-            df = read_dataframe(config.load_data_path)
+            if config.data_file_schema is None:
+                msg = "Cannot load dataset without data file schema or store"
+                raise DSGInvalidDataset(msg)
+            df = read_data_file(config.data_file_schema)
         else:
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
@@ -56,7 +57,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
+    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
         self._check_one_table_data_consistency()
         self._check_dimension_associations(missing_dimension_associations)
 
@@ -83,8 +84,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if time_dim is not None:
             time_columns = set(time_dim.get_load_data_time_columns())
         assert (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-        ), self._config.get_table_format_type()
+            self._config.get_value_format() == ValueFormat.STACKED
+        ), self._config.get_value_format()
         self._check_load_data_unpivoted_value_column(self._load_data)
         allowed_columns = DimensionType.get_allowed_dimension_column_names().union(time_columns)
         allowed_columns.add(VALUE_COLUMN)
@@ -108,8 +109,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         assert (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-        ), self._config.get_table_format_type()
+            self._config.get_value_format() == ValueFormat.STACKED
+        ), self._config.get_value_format()
         load_df = self._load_data
         df_columns = set(load_df.columns)
         stacked_columns = set()

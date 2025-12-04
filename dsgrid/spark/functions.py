@@ -7,17 +7,17 @@ from typing import Any, Iterable
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-import pandas as pd
+import duckdb
 
 import dsgrid
-from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
     DataFrame,
     F,
     SparkConf,
     SparkSession,
-    TimestampType,
     use_duckdb,
 )
 from dsgrid.utils.files import load_line_delimited_json, dump_data
@@ -399,28 +399,71 @@ def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable
     return timestamps
 
 
-def read_csv(path: Path | str, cast_timestamp: bool = True) -> DataFrame:
+def read_csv(path: Path | str, schema: dict[str, str] | None = None) -> DataFrame:
     """Return a DataFrame from a CSV file, handling special cases with duckdb."""
+    func = read_csv_duckdb if use_duckdb() else _read_csv_spark
+    df = func(path, schema)
+    if schema is not None:
+        if set(df.columns).symmetric_difference(schema.keys()):
+            msg = (
+                f"Mismatch in CSV schema ({sorted(schema.keys())}) "
+                f"vs DataFrame columns ({df.columns})"
+            )
+            raise DSGInvalidDataset(msg)
+
+    return df
+
+
+def _read_csv_spark(path: Path | str, schema: dict[str, str] | None) -> DataFrame:
     spark = get_spark_session()
+    if schema is None:
+        return spark.read.csv(str(path), header=True, inferSchema=True)
+
+    schema_str = ",".join([f"{key} {val}" for key, val in schema.items()])
+    return spark.read.csv(str(path), header=True, schema=schema_str)
+
+
+def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> DataFrame:
+    """Read a CSV file using DuckDB and return a Spark DataFrame.
+
+    Parameters
+    ----------
+    path_or_str : Path | str
+        Path to the CSV file or directory containing CSV files.
+    schema : dict[str, str] | None
+        Mapping of column names to DuckDB data types.
+    """
+    path = Path(path_or_str)
+    if path.is_dir():
+        path_str = str(path) + "**/*.csv"
+    else:
+        path_str = str(path)
+
+    spark = get_spark_session()
+    if not schema:
+        return spark.read.csv(path_str, header=True)
+
+    dtypes = {k: duckdb.type(v) for k, v in schema.items()}
+    rel = duckdb.read_csv(path_str, header=True, dtype=dtypes)
     if use_duckdb():
-        path_ = path if isinstance(path, Path) else Path(path)
-        if path_.is_dir():
-            path_str = str(path_) + "**/*.csv"
-        else:
-            path_str = str(path_)
-        df = spark.createDataFrame(pd.read_csv(path_str))
-        if cast_timestamp and "timestamp" in df.columns:
-            if "PYTEST_VERSION" not in os.environ:
-                msg = f"cast_timestamp in read_csv can only be set in a test environment: {path=}"
-                raise Exception(msg)
-            # TODO: need a better way of guessing and setting the correct type.
-            df = df.withColumn("timestamp", F.col("timestamp").cast(TimestampType()))
-        dup_cols = [x for x in df.columns if x.endswith(".1")]
-        if dup_cols:
-            msg = f"Detected a duplicate column in the dataset: {dup_cols}"
-            raise DSGInvalidDimension(msg)
-        return df
-    return spark.read.csv(str(path), header=True, inferSchema=True)
+        return spark.createDataFrame(rel.to_df())
+
+    # DT 12/1/2025
+    # This obnoxious code block provides the only way I've found to read a CSV file into Spark
+    # while allowing these behaviors:
+    # - Preserve NULL values. DuckDB -> Pandas -> Spark converts NULLs to NaNs.
+    # - Allow the user to specify a subset of columns with data types. The native Spark CSV
+    #   reader will drop columns not specified in the schema.
+    # This shouldn't matter much because Spark + CSV should never happen with large datasets.
+    scratch_dir = DsgridRuntimeConfig().get_scratch_dir()
+    with NamedTemporaryFile(suffix=".parquet", dir=scratch_dir) as f:
+        f.close()
+        rel.write_parquet(f.name)
+        df = spark.read.parquet(f.name)
+        # Bring the entire table into memory so that we can delete the file.
+        df.cache()
+        df.count()
+    return df
 
 
 def read_json(path: Path | str) -> DataFrame:

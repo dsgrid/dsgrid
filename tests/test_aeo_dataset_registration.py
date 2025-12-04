@@ -8,19 +8,18 @@ from tempfile import TemporaryDirectory, gettempdir
 
 import pandas as pd
 import pytest
-from dsgrid.spark.types import use_duckdb
-
 from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
     create_local_test_registry,
 )
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.files import load_json_file, dump_json_file
 from dsgrid.utils.spark import get_unique_values
 
 
@@ -55,7 +54,7 @@ def _make_project_dir(project):
 
 # set up registry for AEO data
 def make_registry_for_aeo(
-    src_dir, registry_path, conn, dataset_name: str, dataset_path=None
+    src_dir, registry_path, conn, dataset_name: str, data_dir: Path
 ) -> RegistryManager:
     """Creates a local registry to test registration of AEO dimensions and dataset.
 
@@ -65,21 +64,25 @@ def make_registry_for_aeo(
         Path in which the registry will be created.
     src_dir : Path
         Path containing source config files
-    dataset_path : Path | None
-        If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
+    dataset_name : str
+        Name of the dataset to register.
+    data_dir : Path
+        Path to the data files for this dataset.
 
     """
-    if dataset_path is None:
-        dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
+
     create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(conn, offline_mode=True)
-
-    dataset_config_file = src_dir / dataset_dir / "dataset.json5"
-    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
-    logger.info(f"dataset={dataset_name} registered successfully!\n")
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dataset_config_file = src_dir / dataset_dir / "dataset.json5"
+        # Update the data file path to point to the actual data location
+        config = load_json_file(dataset_config_file)
+        config["data_layout"]["data_file"]["path"] = str(data_dir / "load_data.csv")
+        dump_json_file(config, dataset_config_file)
+        manager.dataset_manager.register(dataset_config_file, user, log_message)
+        logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager
 
 
@@ -111,9 +114,8 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
             # This is not really a valuable test any more.
             # Spark doesn't allow duplicate columns in CSV files. Maybe previous versions did.
             # It appends the column index to each duplicate column name.
-            # DuckDB appends ".1" to the duplicate, and our code catches that.
-            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
-            with pytest.raises((ValueError, exc)):
+            # DuckDB appends "_1" suffix to the duplicate, and our code catches that as unexpected.
+            with pytest.raises(DSGInvalidDataset):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("4. End Uses dataset only - missing time ")
@@ -136,7 +138,7 @@ def _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset):
         registry_dir,
         conn,
         dataset,
-        dataset_path=data_dir,
+        data_dir,
     )
 
 
@@ -157,20 +159,21 @@ def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         dataset = "Commercial_End_Use_Growth_Factors"
-        data_dir = Path(make_test_data_dir_module) / "test_aeo_data" / dataset
+        data_dir = make_test_data_dir_module / "test_aeo_data" / dataset
         make_registry_for_aeo(
             src_dir,
             base_dir,
             conn,
             dataset,
-            dataset_path=data_dir,
+            data_dir,
         )
         try:
-            FilterRegistryManager.load(conn, offline_mode=True).filter(simple_model)
-            mgr = RegistryManager.load(conn, offline_mode=True)
-            config = mgr.dataset_manager.get_by_id(dataset_id)
-            geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
-            assert get_unique_values(geo, "id") == {geography_record}
+            with FilterRegistryManager.load(conn, offline_mode=True) as filter_mgr:
+                filter_mgr.filter(simple_model)
+            with RegistryManager.load(conn, offline_mode=True) as mgr:
+                config = mgr.dataset_manager.get_by_id(dataset_id)
+                geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
+                assert get_unique_values(geo, "id") == {geography_record}
         finally:
             RegistryDatabase.delete(conn)
 

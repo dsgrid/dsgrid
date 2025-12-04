@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.api.models import AsyncTaskStatus, SparkSubmitProjectQueryRequest
 from dsgrid.api.response_models import (
@@ -29,7 +29,7 @@ from dsgrid.api.response_models import (
     ListProjectsResponse,
     ListProjectDimensionsResponse,
     ListReportTypesResponse,
-    ListTableFormatTypesResponse,
+    ListValueFormatsResponse,
     SparkSubmitProjectQueryResponse,
 )
 from dsgrid.query.models import ReportType
@@ -182,11 +182,9 @@ def test_list_report_types(client):
     assert response.types == sorted(list(ReportType), key=lambda x: x.value)
 
 
-def test_list_table_format_types(client):
-    response = ListTableFormatTypesResponse(
-        **check_response(client, "/table_formats/types").json()
-    )
-    assert response.types == sorted(list(TableFormatType), key=lambda x: x.value)
+def test_list_value_formats(client):
+    response = ListValueFormatsResponse(**check_response(client, "/value_formats").json())
+    assert response.formats == sorted(list(ValueFormat), key=lambda x: x.value)
 
 
 def test_submit_project_query(client):

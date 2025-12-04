@@ -27,17 +27,17 @@ from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 def config_as_dict(cached_registry, tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("dsgrid")
     conn = cached_registry
-    mgr = RegistryManager.load(conn, offline_mode=True)
-    dim_map = map_dimension_names_to_ids(mgr.dimension_manager)
-    dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
-    dim_mappings_map = map_dimension_mapping_names_to_ids(
-        mgr.dimension_mapping_manager, dim_id_to_name
-    )
-    project_config_file = tmp_path / "project.json5"
-    shutil.copyfile(PROJECT_CONFIG_FILE, project_config_file)
-    replace_dimension_names_with_current_ids(project_config_file, dim_map)
-    replace_dimension_mapping_names_with_current_ids(project_config_file, dim_mappings_map)
-    yield load_data(project_config_file), mgr.dimension_manager
+    with RegistryManager.load(conn, offline_mode=True) as mgr:
+        dim_map = map_dimension_names_to_ids(mgr.dimension_manager)
+        dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
+        dim_mappings_map = map_dimension_mapping_names_to_ids(
+            mgr.dimension_mapping_manager, dim_id_to_name
+        )
+        project_config_file = tmp_path / "project.json5"
+        shutil.copyfile(PROJECT_CONFIG_FILE, project_config_file)
+        replace_dimension_names_with_current_ids(project_config_file, dim_map)
+        replace_dimension_mapping_names_with_current_ids(project_config_file, dim_mappings_map)
+        yield load_data(project_config_file), mgr.dimension_manager
 
 
 def test_good_project_config(config_as_dict):

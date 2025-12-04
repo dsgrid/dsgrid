@@ -27,6 +27,7 @@ from dsgrid.exceptions import (
     DSGInvalidDataset,
 )
 from dsgrid.spark.functions import (
+    coalesce,
     count_distinct_on_group_by,
     create_temp_view,
     handle_column_spaces,
@@ -36,7 +37,6 @@ from dsgrid.spark.functions import (
     join,
     join_multiple_columns,
     unpivot,
-    write_csv,
 )
 from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
@@ -51,6 +51,7 @@ from dsgrid.spark.types import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
+    write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -254,8 +255,8 @@ def handle_dimension_association_errors(
     dataset_table: DataFrame,
     dataset_id: str,
 ) -> None:
-    """Record missing dimension record combinations in a CSV file and log an error."""
-    out_file = f"{dataset_id}__missing_dimension_record_combinations.csv"
+    """Record missing dimension record combinations in a Parquet file and log an error."""
+    out_file = Path(f"{dataset_id}__missing_dimension_record_combinations.parquet")
     df = diff
     changed = False
     for column in diff.columns:
@@ -264,13 +265,53 @@ def handle_dimension_association_errors(
             changed = True
     if changed:
         df = df.distinct()
-    write_csv(df, out_file, header=True, overwrite=True)
+    df = write_dataframe(coalesce(df, 1), out_file, overwrite=True)
     logger.error(
         "Dataset %s is missing required dimension records. Recorded missing records in %s",
         dataset_id,
         out_file,
     )
-    _look_for_error_contributors(df, dataset_table)
+
+    # Analyze patterns in missing data to help identify root causes
+    try:
+        from dsgrid.rust_ext import find_minimal_patterns_from_file
+
+        logger.info("Analyzing missing data patterns for dataset %s...", dataset_id)
+        if out_file.is_dir():
+            files = list(out_file.glob("*.parquet"))
+            assert len(files) == 1, f"Expected 1 file, got {files}"
+            filename = files[0]
+        else:
+            filename = out_file
+        patterns = find_minimal_patterns_from_file(
+            filename,
+            max_depth=0,
+            verbose=False,
+        )
+
+        if patterns:
+            logger.error("Found %d minimal closed patterns in missing data:", len(patterns))
+            for pattern in patterns[:10]:  # Show top 10 patterns
+                logger.error(
+                    "  Pattern %d: %s = %s (%d missing rows)",
+                    pattern.pattern_id,
+                    " | ".join(pattern.columns),
+                    " | ".join(pattern.values),
+                    pattern.num_rows,
+                )
+            if len(patterns) > 10:
+                logger.error("  ... and %d more patterns", len(patterns) - 10)
+        else:
+            logger.warning("No closed patterns found in missing data")
+    except ImportError:
+        logger.warning(
+            "Rust pattern analysis not available. Install with: pip install -e . "
+            "or build with: maturin develop"
+        )
+        _look_for_error_contributors(df, dataset_table)
+    except Exception as e:
+        logger.warning("Failed to analyze missing data patterns: %s", e)
+
     msg = (
         f"Dataset {dataset_id} is missing required dimension records. "
         "Please look in the log file for more information."
@@ -428,9 +469,7 @@ def convert_time_zone_with_chronify_spark_hive(
     time_zone: str | TimeZone,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark and a Hive Metastore.
-    All operations are performed in memory.
-    """
+    """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     with store.engine.begin() as conn:
@@ -460,7 +499,6 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -518,9 +556,7 @@ def convert_time_zone_with_chronify_spark_path(
     time_zone: str | TimeZone,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark using the local filesystem.
-    All operations are performed in memory.
-    """
+    """Create a single time zone-converted table with chronify and Spark using the local filesystem."""
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
@@ -546,7 +582,6 @@ def convert_time_zone_by_column_with_chronify_spark_path(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)

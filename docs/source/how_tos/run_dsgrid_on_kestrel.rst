@@ -16,7 +16,7 @@ How to Run dsgrid on Kestrel
 
 .. code-block:: console
 
-    $ dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db -N standard-scenarios --offline
+    $ dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db -N standard-scenarios
 
 4. Start a Spark cluster with your desired number of compute nodes by following the instructions at
    :ref:`how-to-start-spark-cluster-kestrel`.

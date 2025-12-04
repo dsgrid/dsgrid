@@ -1,15 +1,11 @@
 import getpass
 import logging
-import os
 from pathlib import Path
 
 import pytest
 
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import (
-    create_local_test_registry,
-    # TEST_DATASET_DIRECTORY,
-)
+from dsgrid.tests.common import create_local_test_registry
 from dsgrid.utils.files import load_data
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
@@ -38,7 +34,7 @@ def test_register_project_and_dataset(
     # assert config_ids[0] == "tempo_standard_scenarios_2021"
 
 
-def make_registry_for_tempo(registry_path, src_dir, conn, dataset_path=None) -> RegistryManager:
+def make_registry_for_tempo(registry_path, src_dir, conn) -> RegistryManager:
     """Creates a local registry to test registration of TEMPO dimensions and dataset.
 
     Parameters
@@ -47,12 +43,10 @@ def make_registry_for_tempo(registry_path, src_dir, conn, dataset_path=None) -> 
         Path in which the registry will be created.
     src_dir : Path
         Path containing source config files
-    dataset_path : Path | None
-        If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
+    conn : DatabaseConnection
+        Database connection for the registry.
 
     """
-    if dataset_path is None:
-        dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
     create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path("datasets/modeled/tempo_standard_scenarios_2021")
     user = getpass.getuser()
@@ -70,7 +64,7 @@ def make_registry_for_tempo(registry_path, src_dir, conn, dataset_path=None) -> 
     for filename in (project_config_file, dataset_config_file):
         replace_dimension_names_with_current_ids(filename, mappings)
 
-    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
+    manager.dataset_manager.register(dataset_config_file, user, log_message)
     manager.project_manager.register(project_config_file, user, log_message)
     manager.project_manager.submit_dataset(
         project_id,

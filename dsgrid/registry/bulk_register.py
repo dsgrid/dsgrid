@@ -126,7 +126,6 @@ def _run_bulk_registration(
         assert dataset.log_message is not None
         dataset_mgr.register(
             config_file,
-            dataset.dataset_path,
             user,
             dataset.log_message,
         )

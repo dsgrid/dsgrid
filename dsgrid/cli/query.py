@@ -168,12 +168,35 @@ def create_project_query(
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
     )
-    registry_manager = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
-    )
-    project = registry_manager.project_manager.load_project(project_id)
+    ) as registry_manager:
+        project = registry_manager.project_manager.load_project(project_id)
+        _create_project_query_impl(
+            ctx,
+            project,
+            query_name,
+            project_id,
+            dataset_id,
+            filters,
+            aggregation_function,
+            query_file,
+            default_result_aggregation,
+        )
+
+
+def _create_project_query_impl(
+    ctx,
+    project,
+    query_name,
+    project_id,
+    dataset_id,
+    filters,
+    aggregation_function,
+    query_file,
+    default_result_aggregation,
+):
     query = ProjectQueryModel(
         name=query_name,
         project=ProjectQueryParamsModel(
@@ -335,27 +358,26 @@ def _run_project_query(
         url=get_value_from_context(ctx, "url"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
-    registry_manager = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
-    )
-    project = registry_manager.project_manager.load_project(query.project.project_id)
-    fs_interface = make_filesystem_interface(output)
-    submitter = ProjectQuerySubmitter(project, fs_interface.path(output))
-    res = handle_dsgrid_exception(
-        ctx,
-        submitter.submit,
-        query,
-        scratch_dir,
-        checkpoint_file=checkpoint_file,
-        persist_intermediate_table=persist_intermediate_table,
-        load_cached_table=load_cached_table,
-        zip_file=zip_file,
-        overwrite=overwrite,
-    )
-    if res[1] != 0:
-        ctx.exit(res[1])
+    ) as registry_manager:
+        project = registry_manager.project_manager.load_project(query.project.project_id)
+        fs_interface = make_filesystem_interface(output)
+        submitter = ProjectQuerySubmitter(project, fs_interface.path(output))
+        res = handle_dsgrid_exception(
+            ctx,
+            submitter.submit,
+            query,
+            scratch_dir,
+            checkpoint_file=checkpoint_file,
+            persist_intermediate_table=persist_intermediate_table,
+            load_cached_table=load_cached_table,
+            zip_file=zip_file,
+            overwrite=overwrite,
+        )
+        if res[1] != 0:
+            ctx.exit(res[1])
 
 
 _map_dataset_epilog = """
@@ -552,23 +574,22 @@ def _run_dataset_query(
         url=get_value_from_context(ctx, "url"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
-    registry_manager = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
-    )
-    fs_interface = make_filesystem_interface(output)
-    submitter = DatasetQuerySubmitter(fs_interface.path(output))
-    res = handle_dsgrid_exception(
-        ctx,
-        submitter.submit,
-        query,
-        registry_manager,
-        scratch_dir,
-        overwrite=overwrite,
-    )
-    if res[1] != 0:
-        ctx.exit(res[1])
+    ) as registry_manager:
+        fs_interface = make_filesystem_interface(output)
+        submitter = DatasetQuerySubmitter(fs_interface.path(output))
+        res = handle_dsgrid_exception(
+            ctx,
+            submitter.submit,
+            query,
+            registry_manager,
+            scratch_dir,
+            overwrite=overwrite,
+        )
+        if res[1] != 0:
+            ctx.exit(res[1])
 
 
 @click.command("create_dataset")
@@ -597,7 +618,6 @@ def create_composite_dataset(
     # registry_manager = RegistryManager.load(
     #     conn,
     #     remote_path=remote_path,
-    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=overwrite)
@@ -629,7 +649,6 @@ def query_composite_dataset(
     # registry_manager = RegistryManager.load(
     #     registry_path,
     #     remote_path=remote_path,
-    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, overwrite=overwrite)
@@ -666,15 +685,14 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, overwrite):
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
     )
-    registry_manager = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
-    )
-    result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
-    if not result:
-        logger.error("The query defined in %s does not support a derived dataset.", src)
-        return 1
+    ) as registry_manager:
+        result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
+        if not result:
+            logger.error("The query defined in %s does not support a derived dataset.", src)
+            return 1
 
 
 @click.group()

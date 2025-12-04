@@ -1,7 +1,6 @@
 import abc
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import Iterable, Self
 
@@ -9,7 +8,7 @@ import chronify
 from sqlalchemy import Connection
 
 import dsgrid
-from dsgrid.chronify import create_store
+from dsgrid.chronify import create_store, create_in_memory_store
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -29,13 +28,15 @@ from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
+    UserDataLayout,
 )
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
 from dsgrid.config.simple_models import DimensionSimpleModel
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
+from dsgrid.config.file_schema import read_data_file
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
@@ -47,7 +48,6 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import (
     cache,
-    cross_join,
     except_all,
     is_dataframe_empty,
     join,
@@ -55,7 +55,7 @@ from dsgrid.spark.functions import (
     unpersist,
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import DataFrame, F
+from dsgrid.spark.types import DataFrame, F, use_duckdb
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -75,10 +75,10 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
     create_dataframe_from_product,
+    get_unique_values,
     persist_table,
     read_dataframe,
     save_to_warehouse,
-    union,
     write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -126,7 +126,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
+    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
         """
@@ -161,70 +161,85 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
-        self, missing_dimension_associations: DataFrame | None
+        self, missing_dimension_associations: dict[str, DataFrame]
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
-        context = ScratchDirContext(Path(tempfile.gettempdir()))
-        assoc_by_records = self._make_expected_dimension_association_table_from_records(
-            [x for x in DimensionType if x != DimensionType.TIME], context
-        )
-        assoc_by_data = self._make_actual_dimension_association_table_from_data()
-        if missing_dimension_associations is None:
-            required_assoc = assoc_by_records
-        else:
-            required_assoc = filter_out_expected_missing_associations(
-                assoc_by_records, missing_dimension_associations
+        logger.info("Check dimension associations")
+        dsgrid_config = DsgridRuntimeConfig.load()
+        scratch_dir = dsgrid_config.get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as context:
+            assoc_by_records = self._make_expected_dimension_association_table_from_records(
+                [x for x in DimensionType if x != DimensionType.TIME], context
             )
-        cols = sorted(required_assoc.columns)
-        diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-        cache(diff)
-        try:
-            if not is_dataframe_empty(diff):
-                handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
-        finally:
-            unpersist(diff)
+            assoc_by_data = self._make_actual_dimension_association_table_from_data()
+            # This first check is redundant with the checks below. But, it is significantly
+            # easier for users to debug.
+            for column in assoc_by_records.columns:
+                expected = get_unique_values(assoc_by_records, column)
+                actual = get_unique_values(assoc_by_data, column)
+                if actual != expected:
+                    missing = sorted(expected.difference(actual))
+                    extra = sorted(actual.difference(expected))
+                    num_matching = len(actual.intersection(expected))
+                    msg = (
+                        f"Dataset records for dimension type {column} do not match expected "
+                        f"values. {missing=} {extra=} {num_matching=}"
+                    )
+                    raise DSGInvalidDataset(msg)
 
-    def make_mapped_dimension_association_table(
-        self, store: DataStoreInterface, context: ScratchDirContext
-    ) -> DataFrame:
+            required_assoc = assoc_by_records
+            if missing_dimension_associations:
+                for missing_df in missing_dimension_associations.values():
+                    required_assoc = filter_out_expected_missing_associations(
+                        required_assoc, missing_df
+                    )
+
+            cols = sorted(required_assoc.columns)
+            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
+            cache(diff)
+            try:
+                if not is_dataframe_empty(diff):
+                    handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+                logger.info("Successfully checked dataset dimension associations")
+            finally:
+                unpersist(diff)
+
+    def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use mapped dimensions.
         """
-        df = self._make_actual_dimension_association_table_from_data()
-        missing_associations = store.read_missing_associations_table(
-            self._config.model.dataset_id, self._config.model.version
-        )
-        if missing_associations is not None:
-            missing_associations = self._union_not_covered_dimensions(
-                missing_associations, context
-            )
-            assert sorted(df.columns) == sorted(missing_associations.columns)
-            df = union([df, missing_associations.select(*df.columns)])
+        assoc_df = self._make_actual_dimension_association_table_from_data()
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction").distinct()
+            df = (
+                self._remap_dimension_columns(assoc_df, mapping_manager)
+                .drop("fraction")
+                .distinct()
+            )
         check_for_nulls(df)
         return df
 
-    def _union_not_covered_dimensions(
-        self, df: DataFrame, context: ScratchDirContext
+    def remove_expected_missing_mapped_associations(
+        self, store: DataStoreInterface, df: DataFrame, context: ScratchDirContext
     ) -> DataFrame:
-        columns = set(df.columns)
-        not_covered_dims: list[DimensionType] = []
-        for dim in DimensionType:
-            if dim != DimensionType.TIME and dim.value not in columns:
-                not_covered_dims.append(dim)
-
-        if not not_covered_dims:
+        """Remove expected missing associations from the full join of expected associations."""
+        missing_associations = store.read_missing_associations_tables(
+            self._config.model.dataset_id, self._config.model.version
+        )
+        if not missing_associations:
             return df
 
-        expected_table = self._make_expected_dimension_association_table_from_records(
-            not_covered_dims, context
-        )
-        return cross_join(
-            df,
-            expected_table,
-        )
+        final_df = df
+        mapping_plan = self.build_default_dataset_mapping_plan()
+        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
+            for missing_df in missing_associations.values():
+                mapped_df = (
+                    self._remap_dimension_columns(missing_df, mapping_manager)
+                    .drop("fraction")
+                    .distinct()
+                )
+                final_df = filter_out_expected_missing_associations(final_df, mapped_df)
+        return final_df
 
     @abc.abstractmethod
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
@@ -322,23 +337,37 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return
 
         logger.info("Check dataset time consistency.")
-        path = Path(self._config.load_data_path)
-        assert path.exists()
-        load_data_df = read_dataframe(path)
-        schema = self._get_chronify_schema(load_data_df)
-        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
-        with ScratchDirContext(scratch_dir) as context:
-            if path.suffix == ".parquet":
-                src_path = path
-            else:
-                src_path = context.get_temp_filename(suffix=".parquet")
-                write_dataframe(load_data_df, src_path)
+        assert isinstance(self._config.model.data_layout, UserDataLayout)
+        file_schema = self._config.model.data_layout.data_file
+        load_data_df = read_data_file(file_schema)
+        chronify_schema = self._get_chronify_schema(load_data_df)
 
-            store_file = context.get_temp_filename(suffix=".db")
-            with create_store(store_file) as store:
-                # This performs all of the checks.
-                store.create_view_from_parquet(src_path, schema)
-                store.drop_view(schema.name)
+        data_file_path = Path(file_schema.path)
+        if data_file_path.suffix == ".parquet" or not use_duckdb():
+            scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+            with ScratchDirContext(scratch_dir) as context:
+                if data_file_path.suffix == ".csv":
+                    # This is a workaround for time zone issues between Spark, Pandas,
+                    # and Chronify when reading CSV files.
+                    # Chronify can ingest them correctly when we go to Parquet first.
+                    # This is really only a test issue because normal dsgrid users will not
+                    # use Spark with CSV data files.
+                    src_path = context.get_temp_filename(suffix=".parquet")
+                    write_dataframe(load_data_df, src_path)
+                else:
+                    src_path = data_file_path
+                store_file = context.get_temp_filename(suffix=".db")
+                with create_store(store_file) as store:
+                    # This performs all of the checks.
+                    store.create_view_from_parquet(src_path, chronify_schema)
+                    store.drop_view(chronify_schema.name)
+        else:
+            # For CSV and JSON files, use in-memory store with ingest_table.
+            # This avoids the complexity of converting to parquet.
+            with create_in_memory_store() as store:
+                # ingest_table performs all of the time checks.
+                store.ingest_table(load_data_df.toPandas(), chronify_schema)
+                store.drop_table(chronify_schema.name)
 
         self._check_model_year_time_consistency(load_data_df)
 
@@ -356,7 +385,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             and x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+        if self._config.get_value_format() == ValueFormat.PIVOTED:
             # We can ignore all pivoted columns but one for time checking.
             # Looking at the rest would be redundant.
             value_column = next(iter(self._config.get_pivoted_dimension_columns()))
@@ -452,7 +481,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO: remove ProjectConfig so that dataset queries can use this.
         # Issue #370
         table_handler = make_table_format_handler(
-            self._config.get_table_format_type(),
+            self._config.get_value_format(),
             project_config,
             dataset_id=self.dataset_id,
         )
@@ -569,7 +598,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _list_dimension_types_in_load_data(self, df: DataFrame) -> list[DimensionType]:
         dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+        if self._config.get_value_format() == ValueFormat.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()
             assert pivoted_type is not None
             dims.append(pivoted_type)

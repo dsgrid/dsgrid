@@ -171,7 +171,6 @@ def create_project_query(
     with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
     ) as registry_manager:
         project = registry_manager.project_manager.load_project(project_id)
         _create_project_query_impl(
@@ -362,7 +361,6 @@ def _run_project_query(
     with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
     ) as registry_manager:
         project = registry_manager.project_manager.load_project(query.project.project_id)
         fs_interface = make_filesystem_interface(output)
@@ -579,7 +577,6 @@ def _run_dataset_query(
     with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
     ) as registry_manager:
         fs_interface = make_filesystem_interface(output)
         submitter = DatasetQuerySubmitter(fs_interface.path(output))
@@ -621,7 +618,6 @@ def create_composite_dataset(
     # registry_manager = RegistryManager.load(
     #     conn,
     #     remote_path=remote_path,
-    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=overwrite)
@@ -653,7 +649,6 @@ def query_composite_dataset(
     # registry_manager = RegistryManager.load(
     #     registry_path,
     #     remote_path=remote_path,
-    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, overwrite=overwrite)
@@ -693,7 +688,6 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, overwrite):
     with RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
     ) as registry_manager:
         result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
         if not result:

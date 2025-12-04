@@ -27,8 +27,6 @@ from dsgrid.registry.registry_manager import RegistryManager
     help="path to dsgrid remote registry",
 )
 @click.option(
-    "--offline",
-    "-o",
     is_flag=True,
     help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
     "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "

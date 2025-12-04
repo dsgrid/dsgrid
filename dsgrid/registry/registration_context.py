@@ -165,7 +165,7 @@ class RegistrationContext:
                             self._conn, set(manager_context.ids), error_occurred
                         )
                         manager_context.ids.clear()
-                        manager_context.set_unlocked()
+                        # manager_context.set_unlocked()
                     self._managers[registry_type] = None
         except Exception:
             logger.exception(

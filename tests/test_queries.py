@@ -348,7 +348,6 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
-        "--offline",
         "--url",
         SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
         "query",
@@ -405,7 +404,6 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
         dst = tmp_path / filename.name
         dump_data(data, dst)
         cmd = [
-            "--offline",
             "--url",
             conn.url,
             "query",
@@ -496,7 +494,6 @@ def test_map_dataset(tmp_path):
     cmd = [
         "--scratch-dir",
         str(scratch_dir),
-        "--offline",
         "--url",
         SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
         "query",
@@ -549,7 +546,6 @@ def test_dataset_queries(tmp_path):
         cmd = [
             "--scratch-dir",
             str(scratch_dir),
-            "--offline",
             "--url",
             SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
             "query",

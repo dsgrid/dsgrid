@@ -85,7 +85,7 @@ registry with this CLI command:
 
 .. code-block:: bash
 
-   dsgrid-admin create-registry --help
+   dsgrid create-registry --help
 
 Apache Spark
 ============
@@ -118,7 +118,7 @@ The appropriate configuration for using the shared registry at NREL is:
 
 .. code-block:: console
 
-    $ dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db --offline
+    $ dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db
 
 .. todo:: Access from AWS
 

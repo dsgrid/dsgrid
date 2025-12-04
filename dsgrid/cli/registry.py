@@ -21,7 +21,11 @@ from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.common import SUPPORTED_METRIC_TYPES
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.bulk_register import bulk_register
-from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
+from dsgrid.registry.common import (
+    DatabaseConnection,
+    DatasetRegistryStatus,
+    VersionUpdateType,
+)
 from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.project_config_generator import generate_project_config
@@ -54,31 +58,21 @@ Click Group Definitions
 
 
 @click.group()
-@click.option(
-    "--remote-path",
-    default=REMOTE_REGISTRY,
-    show_default=True,
-    help="path to dsgrid remote registry",
-)
 @click.pass_context
-def registry(ctx, remote_path):
+def registry(ctx):
     """Manage a registry."""
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
-        # database=get_value_from_context(ctx, "database_name"),
-        # username=get_value_from_context(ctx, "username"),
-        # password=get_value_from_context(ctx, "password"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     no_prompts = ctx.parent.params["no_prompts"]
-    offline = get_value_from_context(ctx, "offline")
     if "--help" in sys.argv:
         ctx.obj = None
     else:
         ctx.obj = RegistryManager.load(
             conn,
-            remote_path,
-            offline_mode=offline,
+            REMOTE_REGISTRY,
+            offline_mode=True,
             no_prompts=no_prompts,
             scratch_dir=scratch_dir,
         )
@@ -347,6 +341,14 @@ def update_dimension(
         ctx.exit(res[1])
 
 
+@click.command(name="remove")
+@click.argument("dimension-id")
+@click.pass_obj
+def remove_dimension(registry_manager: RegistryManager, dimension_id: str):
+    """Remove a dimension from the dsgrid repository."""
+    registry_manager.dimension_manager.remove(dimension_id)
+
+
 """
 Dimension Mapping Commands
 """
@@ -589,6 +591,14 @@ def update_dimension_mapping(
         log_message,
         version,
     )
+
+
+@click.command(name="remove")
+@click.argument("dimension-mapping-id")
+@click.pass_obj
+def remove_dimension_mapping(registry_manager: RegistryManager, dimension_mapping_id: str):
+    """Remove a dimension mapping from the dsgrid repository."""
+    registry_manager.dimension_mapping_manager.remove(dimension_mapping_id)
 
 
 """
@@ -1358,6 +1368,14 @@ def generate_project_config_from_ids(
         ctx.exit(res[1])
 
 
+@click.command(name="remove")
+@click.argument("project-id")
+@click.pass_obj
+def remove_project(registry_manager: RegistryManager, project_id: str):
+    """Remove a project from the dsgrid repository."""
+    registry_manager.project_manager.remove(project_id)
+
+
 """
 Dataset Commands
 """
@@ -1689,6 +1707,42 @@ def generate_dataset_config_from_dataset(
         ctx.exit(res[1])
 
 
+@click.command(name="remove")
+@click.argument("dataset-ids", nargs=-1)
+@click.pass_obj
+def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
+    """Remove one or more datasets from the dsgrid repository."""
+    dataset_mgr = registry_manager.dataset_manager
+    project_mgr = registry_manager.project_manager
+
+    # Ensure that all dataset IDs are valid before removing any of them.
+    for dataset_id in dataset_ids:
+        dataset_mgr.get_by_id(dataset_id)
+
+    for dataset_id in dataset_ids:
+        registry_manager.dataset_manager.remove(dataset_id)
+
+    dataset_ids_set = set(dataset_ids)
+    for project_id in project_mgr.list_ids():
+        config = project_mgr.get_by_id(project_id)
+        removed_dataset_ids = []
+        for dataset in config.iter_datasets():
+            if (
+                dataset.dataset_id in dataset_ids_set
+                and dataset.status == DatasetRegistryStatus.REGISTERED
+            ):
+                dataset.status = DatasetRegistryStatus.UNREGISTERED
+                dataset.mapping_references.clear()
+                removed_dataset_ids.append(dataset.dataset_id)
+        if removed_dataset_ids:
+            ids = ", ".join(removed_dataset_ids)
+            msg = (
+                f"Set status for datasets {ids} to unregistered in project {project_id} "
+                "after removal."
+            )
+            project_mgr.update(config, VersionUpdateType.MAJOR, msg)
+
+
 _bulk_register_epilog = """
 Examples:\n
 $ dsgrid registry bulk-register registration.json5
@@ -1755,38 +1809,19 @@ def bulk_register_cli(
         ctx.exit(res[1])
 
 
-@click.command()
-@click.pass_obj
-@click.pass_context
-@click.option(
-    "--project-id",
-    "-P",
-    type=str,
-    help="Sync latest dataset(s) version based on Project ID",
-)
-@click.option(
-    "--dataset-id",
-    "-D",
-    type=str,
-    help="Sync latest dataset version based on Dataset ID",
-)
-def data_sync(ctx, registry_manager, project_id, dataset_id):
-    """Sync the official dsgrid registry data to the local system."""
-    no_prompts = ctx.parents[1].params["no_prompts"]
-    registry_manager.data_sync(project_id, dataset_id, no_prompts)
-
-
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
 dimensions.add_command(show_dimension)
 dimensions.add_command(update_dimension)
+dimensions.add_command(remove_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
 dimension_mappings.add_command(show_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
+dimension_mappings.add_command(remove_dimension_mapping)
 
 projects.add_command(list_projects)
 projects.add_command(register_project)
@@ -1800,12 +1835,14 @@ projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
 projects.add_command(list_project_dimension_names)
 projects.add_command(generate_project_config_from_ids)
+projects.add_command(remove_project)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
 datasets.add_command(generate_dataset_config_from_dataset)
+datasets.add_command(remove_datasets)
 
 registry.add_command(list_)
 registry.add_command(dimensions)
@@ -1813,4 +1850,3 @@ registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
 registry.add_command(bulk_register_cli)
-registry.add_command(data_sync)

@@ -6,6 +6,10 @@ from pathlib import Path
 import rich_click as click
 
 import dsgrid
+from chronify.utils.path_utils import check_overwrite
+from dsgrid.common import LOCAL_REGISTRY
+from dsgrid.registry.common import DatabaseConnection, DataStoreType
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir
 from dsgrid.cli.config import config
@@ -39,39 +43,12 @@ logger = logging.getLogger(__name__)
     "-n", "--no-prompts", default=False, is_flag=True, show_default=True, help="Do not prompt."
 )
 @click.option(
-    "--offline/--online",
-    is_flag=True,
-    default=dsgrid.runtime_config.offline,
-    show_default=True,
-    help="Run registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
     "--timings/--no-timings",
     default=dsgrid.runtime_config.timings,
     is_flag=True,
     show_default=True,
     help="Enable tracking of function timings.",
 )
-# Server-related options are commented-out because the registry is currently only
-# supported in SQLite. If/when we add postgres support, these can be added back.
-# @click.option(
-#    "-U",
-#    "--username",
-#    type=str,
-#    default=dsgrid.runtime_config.database_user,
-#    help="Database username",
-# )
-# @click.option(
-#    "-P",
-#    "--password",
-#    prompt=True,
-#    hide_input=True,
-#    cls=OptionPromptPassword,
-#    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
-#    "runtime config file.",
-# )
 @click.option(
     "-u",
     "--url",
@@ -103,10 +80,7 @@ def cli(
     file_level,
     log_file,
     no_prompts,
-    offline,
     timings,
-    # username,
-    # password,
     url,
     reraise_exceptions,
     scratch_dir,
@@ -135,7 +109,48 @@ def callback(*args, **kwargs):
         timer_stats_collector.log_stats()
 
 
+_create_registry_epilog = """
+Examples:\n
+$ dsgrid create-registry sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
+"""
+
+
+@click.command(name="create-registry", epilog=_create_registry_epilog)
+@click.argument("url")
+@click.option(
+    "-p",
+    "--data-path",
+    default=LOCAL_REGISTRY,
+    show_default=True,
+    callback=lambda *x: Path(x[2]),
+    help="Local dsgrid registry data path. Must not contain the registry file listed in URL.",
+)
+@click.option(
+    "-f",
+    "--overwrite",
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Delete registry_path and the database if they already exist.",
+)
+@click.option(
+    "-t",
+    "--data-store-type",
+    type=click.Choice([x.value for x in DataStoreType]),
+    default=DataStoreType.FILESYSTEM.value,
+    show_default=True,
+    help="Type of store to use for the registry data.",
+    callback=lambda *x: DataStoreType(x[2]),
+)
+def create_registry(url: str, data_path: Path, overwrite: bool, data_store_type: DataStoreType):
+    """Create a new registry."""
+    check_overwrite(data_path, overwrite)
+    conn = DatabaseConnection(url=url)
+    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
+
+
 cli.add_command(config)
+cli.add_command(create_registry)
 cli.add_command(download)
 cli.add_command(install_notebooks)
 cli.add_command(query)

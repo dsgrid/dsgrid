@@ -113,7 +113,7 @@ name as needed.
 
 .. code-block:: console
 
-   $ dsgrid config create sqlite:///<your-db-path> -N standard-scenarios --offline
+   $ dsgrid config create sqlite:///<your-db-path> -N standard-scenarios
    Wrote dsgrid config to /Users/dthom/.dsgrid.json5
 
 Environment variables

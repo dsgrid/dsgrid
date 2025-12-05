@@ -21,8 +21,9 @@ logger = logging.getLogger(__name__)
 def bulk_register(
     registry_manager: RegistryManager,
     registration_file: Path,
-    base_data_dir: Path | None = None,
-    base_repo_dir: Path | None = None,
+    data_base_dir: Path | None = None,
+    missing_associations_base_dir: Path | None = None,
+    repo_base_dir: Path | None = None,
     journal_file: Path | None = None,
 ):
     """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
@@ -48,8 +49,9 @@ def bulk_register(
             registry_manager,
             registration,
             tmp_files,
-            base_data_dir,
-            base_repo_dir,
+            data_base_dir,
+            missing_associations_base_dir,
+            repo_base_dir,
             journal,
         )
     except Exception:
@@ -75,7 +77,8 @@ def _run_bulk_registration(
     mgr: RegistryManager,
     registration: RegistrationModel,
     tmp_files: list[Path],
-    base_data_dir: Path | None,
+    data_base_dir: Path | None,
+    missing_associations_base_dir: Path | None,
     base_repo_dir: Path | None,
     journal: RegistrationJournal,
 ):
@@ -101,11 +104,6 @@ def _run_bulk_registration(
                 if path is not None and not path.is_absolute():
                     setattr(dataset, field, base_repo_dir / path)
 
-    if base_data_dir is not None:
-        for dataset in registration.datasets:
-            if not dataset.dataset_path.is_absolute():
-                dataset.dataset_path = base_data_dir / dataset.dataset_path
-
     for project in registration.projects:
         assert project.log_message is not None
         project_mgr.register(project.config_file, user, project.log_message)
@@ -128,6 +126,8 @@ def _run_bulk_registration(
             config_file,
             user,
             dataset.log_message,
+            data_base_dir=data_base_dir,
+            missing_associations_base_dir=missing_associations_base_dir,
         )
         journal.add_dataset(dataset.dataset_id)
 

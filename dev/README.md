@@ -12,12 +12,16 @@ configured can be challenging.
 
 **pip extras**
 
+**Cargo**
+dsgrid builds a Rust library and so to run all tests, you must have Cargo installed.
+Refer to these [instructions](https://rust-lang.org/tools/install/)
+
 ```
 pip install -e .[tests]
 
 # or
 
-pip install -e .[dev,spark] --group=pyhive # includes what is needed for tests and code development
+pip install -e .[dev,spark] # includes what is needed for tests and code development
 (Leave off `spark` and `pyhive` if you don't need/want to use spark.)
 
 # or
@@ -118,7 +122,7 @@ $ spark-submit \
     --master=spark://$(hostname):7077 \
     --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) --url sqlite:///./standard-scenarios.db registry bulk-register \
-        --data-path=standard-scenarios-registry-data \
+        --data-base-dir=standard-scenarios-registry-data \
         tests/data/standard_scenarios_registration.json5
 ```
 

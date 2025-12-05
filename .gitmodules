@@ -1,11 +1,11 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = issue-372
+	branch = main
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
-	branch = fix/supplemental-dimensions
+	branch = main
 [submodule "dsgrid-project-IEF"]
 	path = dsgrid-project-IEF
 	url = https://github.com/dsgrid/dsgrid-project-IEF

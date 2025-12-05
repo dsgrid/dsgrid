@@ -26,7 +26,7 @@ conda activate dsgrid
 dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data. There are no separate installation steps for Apache Spark beyond installing the dsgrid package and installing:
 
 ```
-pip install "dsgrid-toolkit[spark]" --group=pyhive
+pip install "dsgrid-toolkit[spark]"
 ```
 
 Otherwise installing the pyspark Python dependency handles it.
@@ -55,7 +55,7 @@ pip install dsgrid-toolkit
 
 or
 
-pip install "dsgrid-toolkit[spark]" --group=pyhive
+pip install "dsgrid-toolkit[spark]"
 
 ### From pip+git
 
@@ -92,12 +92,12 @@ cloned repository.
 
 **Users:**
 ```
-pip install -e . --group=pyhive
+pip install -e .
 ```
 
 **Developers:**
 ```
-pip install -e '.[dev,spark]' --group=pyhive
+pip install -e '.[dev,spark]'
 ```
 
 ## Usage

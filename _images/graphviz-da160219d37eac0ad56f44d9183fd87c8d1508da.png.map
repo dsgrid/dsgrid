@@ -1,0 +1,21 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AlignedTime
+
+Data has absolute timestamps that are aligned with the same start and end
+for each geography.
+" alt="" coords="681,182,1052,266"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="5,5,476,509"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.LocalTimeAsStrings
+
+Data has absolute timestamps formatted as strings with offsets from UTC.
+They are aligned for each geography when adjusted for time zone but staggered
+in an absolute time scale.
+" alt="" coords="620,314,1113,398"/>
+<area shape="rect" id="node4" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="792,446,941,530"/>
+</map>

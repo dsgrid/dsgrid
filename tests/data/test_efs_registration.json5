@@ -8,13 +8,11 @@
   datasets: [
     {
       dataset_id: "test_efs_comstock_unpivoted",
-      dataset_path: "dsgrid-test-data/datasets/test_efs_comstock_unpivoted",
       config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_unpivoted/dataset.json5",
       replace_dimension_names_with_ids: true,
     },
     {
       dataset_id: "test_efs_comstock",
-      dataset_path: "dsgrid-test-data/datasets/test_efs_comstock",
       config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.json5",
       replace_dimension_names_with_ids: true,
     },

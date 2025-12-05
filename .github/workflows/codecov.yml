@@ -17,7 +17,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install '.[dev,spark]'
+        python -m pip install maturin
+        python -m pip install -e '.[dev,spark]'
     - name: Generate coverage report
       run: |
         # This does not run the AWS tests.

@@ -33,22 +33,42 @@ release = dsgrid.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
-    "sphinx.ext.graphviz",
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
+    # "sphinx.ext.autosectionlabel",  # Temporarily disabled due to NoneType parent error
     "sphinxarg.ext",
     "sphinx.ext.todo",
     "sphinxcontrib.programoutput",
     "sphinx_copybutton",
     "sphinx_click",
+    "sphinx_design",
     "sphinxcontrib.autodoc_pydantic",
     "sphinx_tabs.tabs",
 ]
+
+# MyST parser configuration
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "substitution",
+    "tasklist",
+]
+
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -111,5 +131,5 @@ copybutton_copy_empty_lines = False
 autodoc_pydantic_model_show_json = False
 autodoc_pydantic_model_show_config_member = False
 autodoc_pydantic_model_show_config_summary = False
-autodoc_pydantic_model_erdantic_figure = True
+autodoc_pydantic_model_erdantic_figure = False
 autodoc_pydantic_model_erdantic_figure_collapsed = False

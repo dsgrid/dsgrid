@@ -175,6 +175,12 @@ class StockShare(MetricDimensionBaseModel):
     unit: str
 
 
+class WeatherVariable(MetricDimensionBaseModel):
+    """Weather attributes - e.g., dry bulb temperature, relative humidity"""
+
+    unit: str
+
+
 class FractionalIndex(MetricDimensionBaseModel):
     """Fractional Index attributes - e.g., human development index (HDI)
 

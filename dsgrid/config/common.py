@@ -15,6 +15,7 @@ from dsgrid.dimension.standard import (
     Stock,
     StockShare,
     StockRegression,
+    WeatherVariable,
 )
 from dsgrid.exceptions import DSGInvalidParameter
 
@@ -34,6 +35,7 @@ SUPPORTED_METRIC_TYPES = {
         Stock,
         StockShare,
         StockRegression,
+        WeatherVariable,
     )
 }
 

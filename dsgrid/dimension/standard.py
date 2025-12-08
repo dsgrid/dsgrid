@@ -7,6 +7,7 @@ from pydantic import Field
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     AnnualTimeDimensionModel,
+    DailyTimeDimensionModel,
     NoOpTimeDimensionModel,
 )
 from dsgrid.dimension.base_models import (
@@ -229,6 +230,10 @@ class Time(DateTimeDimensionModel):
 
 class AnnualTime(AnnualTimeDimensionModel):
     """Annual Time attributes"""
+
+
+class DailyTime(DailyTimeDimensionModel):
+    """Daily Time attributes"""
 
 
 class NoOpTime(NoOpTimeDimensionModel):

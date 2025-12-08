@@ -20,6 +20,7 @@ from dsgrid.dimension.time import (
     TimeDimensionType,
     RepresentativePeriodFormat,
     DatetimeFormat,
+    LeapDayAdjustmentType,
 )
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
@@ -283,6 +284,19 @@ class IndexRangeModel(DSGBaseModel):
     )
 
 
+class DailyRangeModel(DSGBaseModel):
+    """Defines a continuous range of daily time."""
+
+    start: str = Field(
+        title="start",
+        description="First date in the data (e.g., '2018-01-01' or '2018-06-01' for partial year)",
+    )
+    end: str = Field(
+        title="end",
+        description="Last date in the data (inclusive, e.g., '2018-12-31' or '2018-08-31' for partial year)",
+    )
+
+
 class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
     """Defines a base model common to all time dimensions."""
 
@@ -514,6 +528,81 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
         return False
 
 
+class DailyTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a daily time dimension where timestamps are year-month-day."""
+
+    time_type: TimeDimensionType = Field(default=TimeDimensionType.DAILY)
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.TOTAL,
+        description="""
+        The type of measurement represented by a value associated with a timestamp:
+            e.g., mean, total
+        """,
+        json_schema_extra={
+            "options": MeasurementType.format_for_docs(),
+        },
+    )
+    str_format: str = Field(
+        title="str_format",
+        default="%Y-%m-%d",
+        description="Timestamp string format. "
+        "The string format is used to parse the timestamps provided in the time ranges. "
+        "Cheatsheet reference: `<https://strftime.org/>`_.",
+    )
+    ranges: list[DailyRangeModel] = Field(
+        default=[],
+        title="time_ranges",
+        description="Defines the contiguous ranges of daily time in the data, inclusive of start and end time. "
+        "Supports partial years (e.g., summer only).",
+    )
+    leap_day_adjustment: LeapDayAdjustmentType = Field(
+        title="leap_day_adjustment",
+        default=LeapDayAdjustmentType.NONE,
+        description="Leap day adjustment method applied to time data. Options: none (include leap day), "
+        "drop_feb29, drop_dec31, drop_jan1.",
+        json_schema_extra={
+            "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
+        },
+    )
+    time_interval_type: TimeIntervalType = Field(
+        title="time_interval",
+        default=TimeIntervalType.PERIOD_BEGINNING,
+        description="The range of time that the value associated with a timestamp represents",
+        json_schema_extra={
+            "options": TimeIntervalType.format_for_docs(),
+        },
+    )
+    year_column: str = Field(
+        title="year_column",
+        default="time_year",
+        description="The column name containing year values in the load data. "
+        "Options: 'time_year' (default), 'weather_year', 'model_year'. "
+        "This column must exist in the dataset and will be combined with time_month and time_day.",
+    )
+
+    @field_validator("ranges")
+    @classmethod
+    def check_times(
+        cls, ranges: list[DailyRangeModel], info: ValidationInfo
+    ) -> list[DailyRangeModel]:
+        if "str_format" not in info.data:
+            return ranges
+        return _check_daily_ranges(ranges, info.data["str_format"])
+
+    @field_validator("year_column")
+    @classmethod
+    def check_year_column(cls, year_column: str) -> str:
+        valid_columns = {"time_year", "weather_year", "model_year"}
+        if year_column not in valid_columns:
+            msg = f"year_column must be one of {valid_columns}, got: {year_column}"
+            raise ValueError(msg)
+        return year_column
+
+    def is_time_zone_required_in_geography(self) -> bool:
+        return False
+
+
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a representative time dimension."""
 
@@ -655,6 +744,8 @@ def handle_dimension_union(values):
                 values[i] = DateTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.ANNUAL.value:
                 values[i] = AnnualTimeDimensionModel(**value)
+            elif value["time_type"] == TimeDimensionType.DAILY.value:
+                values[i] = DailyTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
                 values[i] = RepresentativePeriodTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.INDEX.value:
@@ -676,6 +767,7 @@ DimensionsListModel = Annotated[
             DimensionModel,
             DateTimeDimensionModel,
             AnnualTimeDimensionModel,
+            DailyTimeDimensionModel,
             RepresentativePeriodTimeDimensionModel,
             IndexTimeDimensionModel,
             NoOpTimeDimensionModel,
@@ -712,6 +804,34 @@ def _check_annual_ranges(ranges: list[TimeRangeModel], str_format: str):
         end = datetime.strptime(trange.end, str_format)
         if end < start:
             msg = f"annual time range {trange} end must not be less than start."
+            raise ValueError(msg)
+
+    return ranges
+
+
+def _check_daily_ranges(ranges: list[DailyRangeModel], str_format: str):
+    """Check that daily ranges are valid.
+
+    Validates:
+    - Date strings can be parsed with the given format
+    - Start date is before or equal to end date
+    - Dates are valid (e.g., rejects Feb 30)
+
+    Note: Python's datetime.strptime() automatically validates dates,
+    rejecting invalid dates like Feb 30.
+    """
+    for time_range in ranges:
+        try:
+            start = datetime.strptime(time_range.start, str_format)
+            end = datetime.strptime(time_range.end, str_format)
+        except ValueError as exc:
+            msg = (
+                f"Failed to parse time range with {str_format=}. " f"Invalid date or format: {exc}"
+            )
+            raise ValueError(msg) from exc
+
+        if start > end:
+            msg = f"start={time_range.start} is after end={time_range.end}"
             raise ValueError(msg)
 
     return ranges

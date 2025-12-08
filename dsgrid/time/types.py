@@ -38,6 +38,14 @@ class AnnualTimestampType(NamedTuple):
     time_year: int
 
 
+class DailyTimestampType(NamedTuple):
+    """Columns for daily time with year, month, and day."""
+
+    time_year: int
+    time_month: int
+    time_day: int
+
+
 class OneWeekPerMonthByHourType(NamedTuple):
     """Columns of representative time with one week per month."""
 

@@ -20,6 +20,7 @@ class TimeDimensionType(DSGEnum):
     REPRESENTATIVE_PERIOD = "representative_period"
     INDEX = "index"
     NOOP = "noop"
+    DAILY = "daily"
 
 
 class DatetimeFormat(str, Enum):
@@ -468,6 +469,35 @@ class AnnualTimeRange(DatetimeRange):
         tz = self.tzinfo
         for year in range(start.year, end.year + 1):
             yield datetime(year=year, month=1, day=1, tzinfo=tz)
+
+
+class DailyTimeRange(DatetimeRange):
+    def _iter_timestamps(self):
+        """
+        Return a list of dates (datetime obj) at midnight for each day.
+        Respects leap_day_adjustment setting.
+        """
+        cur = self.start.to_pydatetime()
+        end = self.end.to_pydatetime()
+        tz = self.tzinfo
+        one_day = timedelta(days=1)
+
+        while cur <= end:
+            month = cur.month
+            day = cur.day
+            skip = False
+
+            if self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29:
+                if month == 2 and day == 29:
+                    skip = True
+            elif self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31:
+                if month == 12 and day == 31:
+                    skip = True
+
+            if not skip:
+                yield cur.replace(tzinfo=tz)
+
+            cur += one_day
 
 
 class IndexTimeRange(DatetimeRange):

@@ -81,18 +81,14 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
             raise DSGInvalidDataset(msg)
 
     def build_time_dataframe(self) -> DataFrame:
-        year_col = self.get_year_column()
-
-        schema = StructType(
-            [
-                StructField(year_col, IntegerType(), False),
-                StructField("month", IntegerType(), False),
-                StructField("day", IntegerType(), False),
-            ]
-        )
-
         model_time = self.list_expected_dataset_timestamps()
-        df_time = get_spark_session().createDataFrame(model_time, schema=schema)
+        df_time = get_spark_session().createDataFrame(
+            model_time,
+            schema=StructType(
+                [StructField(col, IntegerType(), False) for col in ["year", "month", "day"]]
+            ),
+        )
+        df_time = df_time.withColumnRenamed("year", self.get_year_column())
         return df_time
 
     def get_frequency(self) -> timedelta:

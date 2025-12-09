@@ -207,6 +207,13 @@ def test_daily_time_dimension_get_lengths(daily_time_dimension_basic):
     assert lengths == [31]  # January has 31 days
 
 
+def test_daily_time_dimension_get_lengths_with_leap_day_drop(daily_time_dimension_drop_feb29):
+    """Test that get_lengths correctly accounts for dropped leap days."""
+    lengths = daily_time_dimension_drop_feb29.get_lengths()
+    # Feb 25-28 (4 days, skipping 29) + Mar 1-5 (5 days) = 9 days
+    assert lengths == [9]
+
+
 def test_daily_time_dimension_get_start_times(daily_time_dimension_basic):
     """Test that get_start_times returns correct start timestamps."""
     start_times = daily_time_dimension_basic.get_start_times()

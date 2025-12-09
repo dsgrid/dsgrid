@@ -85,7 +85,7 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
         df_time = get_spark_session().createDataFrame(
             model_time,
             schema=StructType(
-                [StructField(col, IntegerType(), False) for col in ["year", "month", "day"]]
+                [StructField(col, IntegerType(), False) for col in DailyTimestampType._fields]
             ),
         )
         df_time = df_time.withColumnRenamed("year", self.get_year_column())
@@ -128,12 +128,9 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_lengths(self) -> list[int]:
         lengths = []
-        for trange in self.model.ranges:
-            start = datetime.strptime(trange.start, self.model.str_format)
-            end = datetime.strptime(trange.end, self.model.str_format)
-            # Calculate number of days
-            delta = end - start
-            lengths.append(delta.days + 1)
+        for time_range in self.get_time_ranges():
+            # Count the number of days after leap day adjustment
+            lengths.append(len(time_range.list_time_range()))
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:

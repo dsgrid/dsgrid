@@ -19,15 +19,15 @@ from dsgrid.utils.spark import create_dataframe_from_dicts
 
 @pytest.fixture(scope="module")
 def daily_dataframe():
-    """Create a daily time dataframe with time_year, time_month, time_day columns."""
+    """Create a daily time dataframe with time_year, month, day columns."""
     data = []
     # Add data for Jan 1-5, 2012
     for day in range(1, 6):
         data.append(
             {
                 "time_year": 2012,
-                "time_month": 1,
-                "time_day": day,
+                "month": 1,
+                "day": day,
                 "geography": "CO",
                 "value": 100.0 + day,
             }
@@ -37,8 +37,8 @@ def daily_dataframe():
         data.append(
             {
                 "time_year": 2012,
-                "time_month": 2,
-                "time_day": day,
+                "month": 2,
+                "day": day,
                 "geography": "CO",
                 "value": 200.0 + day,
             }
@@ -117,7 +117,7 @@ def daily_time_dimension_drop_feb29():
 def test_daily_time_dimension_get_load_data_time_columns(daily_time_dimension_basic):
     """Test that get_load_data_time_columns returns the correct column names."""
     columns = daily_time_dimension_basic.get_load_data_time_columns()
-    assert columns == ["time_year", "time_month", "time_day"]
+    assert columns == ["time_year", "month", "day"]
 
 
 def test_daily_time_dimension_get_year_column(daily_time_dimension_basic):
@@ -145,7 +145,7 @@ def test_daily_time_dimension_with_weather_year():
         )
     )
     columns = config.get_load_data_time_columns()
-    assert columns == ["weather_year", "time_month", "time_day"]
+    assert columns == ["weather_year", "month", "day"]
     assert config.get_year_column() == "weather_year"
 
 
@@ -155,11 +155,11 @@ def test_daily_time_dimension_list_expected_timestamps(daily_time_dimension_basi
     assert len(timestamps) == 31  # January has 31 days
     # Check first and last timestamp
     assert timestamps[0].time_year == 2012
-    assert timestamps[0].time_month == 1
-    assert timestamps[0].time_day == 1
+    assert timestamps[0].month == 1
+    assert timestamps[0].day == 1
     assert timestamps[-1].time_year == 2012
-    assert timestamps[-1].time_month == 1
-    assert timestamps[-1].time_day == 31
+    assert timestamps[-1].month == 1
+    assert timestamps[-1].day == 31
 
 
 def test_daily_time_dimension_leap_day_none(daily_time_dimension_leap_year):
@@ -168,7 +168,7 @@ def test_daily_time_dimension_leap_day_none(daily_time_dimension_leap_year):
     # Feb 25-29 (5 days) + Mar 1-5 (5 days) = 10 days
     assert len(timestamps) == 10
     # Check that Feb 29 is included
-    feb_29 = [t for t in timestamps if t.time_month == 2 and t.time_day == 29]
+    feb_29 = [t for t in timestamps if t.month == 2 and t.day == 29]
     assert len(feb_29) == 1
 
 
@@ -178,7 +178,7 @@ def test_daily_time_dimension_leap_day_drop(daily_time_dimension_drop_feb29):
     # Feb 25-28 (4 days, skipping 29) + Mar 1-5 (5 days) = 9 days
     assert len(timestamps) == 9
     # Check that Feb 29 is NOT included
-    feb_29 = [t for t in timestamps if t.time_month == 2 and t.time_day == 29]
+    feb_29 = [t for t in timestamps if t.month == 2 and t.day == 29]
     assert len(feb_29) == 0
 
 
@@ -224,20 +224,20 @@ def test_daily_time_dimension_build_time_dataframe(daily_time_dimension_basic):
     # Check that all required columns are present
     columns = set(df.columns)
     assert "time_year" in columns
-    assert "time_month" in columns
-    assert "time_day" in columns
+    assert "month" in columns
+    assert "day" in columns
 
     # Check first row
-    first_row = df.orderBy("time_year", "time_month", "time_day").first()
+    first_row = df.orderBy("time_year", "month", "day").first()
     assert first_row.time_year == 2012
-    assert first_row.time_month == 1
-    assert first_row.time_day == 1
+    assert first_row.month == 1
+    assert first_row.day == 1
 
 
 def test_daily_time_dimension_check_consistency_valid(daily_dataframe, daily_time_dimension_basic):
     """Test that check_dataset_time_consistency passes for valid data."""
     # Filter to only January data to match the dimension config
-    df_jan = daily_dataframe.filter("time_month = 1")
+    df_jan = daily_dataframe.filter("month = 1")
 
     # Modify the dimension to match the data
     daily_time_dimension_basic.model.ranges = [
@@ -254,7 +254,7 @@ def test_daily_time_dimension_check_consistency_invalid(
 ):
     """Test that check_dataset_time_consistency fails for invalid data."""
     # Use February data with a January dimension config
-    df_feb = daily_dataframe.filter("time_month = 2")
+    df_feb = daily_dataframe.filter("month = 2")
 
     # Set dimension to only expect January
     daily_time_dimension_basic.model.ranges = [

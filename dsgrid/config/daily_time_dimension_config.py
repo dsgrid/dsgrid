@@ -44,8 +44,8 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
 
         # Get the year column name (time_year, weather_year, or model_year)
         year_col = self.get_year_column()
-        month_col = "time_month"
-        day_col = "time_day"
+        month_col = "month"
+        day_col = "day"
 
         # Get time ranges
         time_ranges = self.get_time_ranges()
@@ -86,8 +86,8 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
         schema = StructType(
             [
                 StructField(year_col, IntegerType(), False),
-                StructField("time_month", IntegerType(), False),
-                StructField("time_day", IntegerType(), False),
+                StructField("month", IntegerType(), False),
+                StructField("day", IntegerType(), False),
             ]
         )
 
@@ -143,7 +143,7 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_load_data_time_columns(self) -> list[str]:
         """Return the time columns based on the year_column setting."""
         year_col = self.get_year_column()
-        return [year_col, "time_month", "time_day"]
+        return [year_col, "month", "day"]
 
     def get_year_column(self) -> str:
         """Return the year column name (time_year, weather_year, or model_year)."""
@@ -165,36 +165,15 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
     def list_expected_dataset_timestamps(self) -> list[DailyTimestampType]:
         """List all expected timestamps as DailyTimestampType tuples."""
         timestamps = []
-        year_col = self.get_year_column()
 
         for time_range in self.get_time_ranges():
             for dt in time_range.list_time_range():
-                if year_col == "time_year":
-                    timestamps.append(
-                        DailyTimestampType(
-                            time_year=dt.year,
-                            time_month=dt.month,
-                            time_day=dt.day,
-                        )
+                timestamps.append(
+                    DailyTimestampType(
+                        time_year=dt.year,
+                        month=dt.month,
+                        day=dt.day,
                     )
-                elif year_col == "weather_year":
-                    timestamps.append(
-                        DailyTimestampType(
-                            time_year=dt.year,  # Store in time_year field
-                            time_month=dt.month,
-                            time_day=dt.day,
-                        )
-                    )
-                elif year_col == "model_year":
-                    timestamps.append(
-                        DailyTimestampType(
-                            time_year=dt.year,  # Store in time_year field
-                            time_month=dt.month,
-                            time_day=dt.day,
-                        )
-                    )
-                else:
-                    msg = f"Unknown year_column: {year_col}"
-                    raise ValueError(msg)
+                )
 
         return timestamps

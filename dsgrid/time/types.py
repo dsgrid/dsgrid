@@ -42,8 +42,8 @@ class DailyTimestampType(NamedTuple):
     """Columns for daily time with year, month, and day."""
 
     time_year: int
-    time_month: int
-    time_day: int
+    month: int
+    day: int
 
 
 class OneWeekPerMonthByHourType(NamedTuple):

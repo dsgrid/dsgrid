@@ -114,6 +114,48 @@ def daily_time_dimension_drop_feb29():
     )
 
 
+@pytest.fixture
+def daily_time_dimension_drop_dec31():
+    """Create a daily time dimension config that drops Dec 31."""
+    yield DailyTimeDimensionConfig(
+        DailyTimeDimensionModel(
+            dimension_type=DimensionType.TIME,
+            class_name="DailyTime",
+            module="dsgrid.dimension.standard",
+            name="daily_time_no_dec31",
+            description="test daily time without Dec 31",
+            ranges=[
+                DailyRangeModel(start="2012-12-28", end="2013-01-03"),
+            ],
+            str_format="%Y-%m-%d",
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+            leap_day_adjustment=LeapDayAdjustmentType.DROP_DEC31,
+            year_column="year",
+        )
+    )
+
+
+@pytest.fixture
+def daily_time_dimension_drop_jan1():
+    """Create a daily time dimension config that drops Jan 1."""
+    yield DailyTimeDimensionConfig(
+        DailyTimeDimensionModel(
+            dimension_type=DimensionType.TIME,
+            class_name="DailyTime",
+            module="dsgrid.dimension.standard",
+            name="daily_time_no_jan1",
+            description="test daily time without Jan 1",
+            ranges=[
+                DailyRangeModel(start="2012-12-28", end="2013-01-03"),
+            ],
+            str_format="%Y-%m-%d",
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+            leap_day_adjustment=LeapDayAdjustmentType.DROP_JAN1,
+            year_column="year",
+        )
+    )
+
+
 def test_daily_time_dimension_get_load_data_time_columns(daily_time_dimension_basic):
     """Test that get_load_data_time_columns returns the correct column names."""
     columns = daily_time_dimension_basic.get_load_data_time_columns()
@@ -180,6 +222,36 @@ def test_daily_time_dimension_leap_day_drop(daily_time_dimension_drop_feb29):
     # Check that Feb 29 is NOT included
     feb_29 = [t for t in timestamps if t.month == 2 and t.day == 29]
     assert len(feb_29) == 0
+
+
+def test_daily_time_dimension_leap_day_drop_dec31(daily_time_dimension_drop_dec31):
+    """Test that Dec 31 is dropped when adjustment is DROP_DEC31."""
+    timestamps = daily_time_dimension_drop_dec31.list_expected_dataset_timestamps()
+    # Dec 28-30 (3 days, skipping 31) + Jan 1-3 (3 days) = 6 days
+    assert len(timestamps) == 6
+    # Check that Dec 31 is NOT included
+    dec_31 = [t for t in timestamps if t.month == 12 and t.day == 31]
+    assert len(dec_31) == 0
+    # Verify Dec 30 and Jan 1 are included
+    dec_30 = [t for t in timestamps if t.month == 12 and t.day == 30]
+    assert len(dec_30) == 1
+    jan_1 = [t for t in timestamps if t.month == 1 and t.day == 1]
+    assert len(jan_1) == 1
+
+
+def test_daily_time_dimension_leap_day_drop_jan1(daily_time_dimension_drop_jan1):
+    """Test that Jan 1 is dropped when adjustment is DROP_JAN1."""
+    timestamps = daily_time_dimension_drop_jan1.list_expected_dataset_timestamps()
+    # Dec 28-31 (4 days) + Jan 2-3 (2 days, skipping Jan 1) = 6 days
+    assert len(timestamps) == 6
+    # Check that Jan 1 is NOT included
+    jan_1 = [t for t in timestamps if t.month == 1 and t.day == 1]
+    assert len(jan_1) == 0
+    # Verify Dec 31 and Jan 2 are included
+    dec_31 = [t for t in timestamps if t.month == 12 and t.day == 31]
+    assert len(dec_31) == 1
+    jan_2 = [t for t in timestamps if t.month == 1 and t.day == 2]
+    assert len(jan_2) == 1
 
 
 def test_daily_time_dimension_get_time_ranges(daily_time_dimension_basic):
@@ -319,3 +391,66 @@ def test_daily_time_dimension_model_year_column_validation():
 def test_daily_time_dimension_supports_chronify(daily_time_dimension_basic):
     """Test that daily time dimension does not support chronify yet."""
     assert daily_time_dimension_basic.supports_chronify() is False
+
+
+def test_daily_time_dimension_multiple_ranges():
+    """Test daily time dimension with multiple date ranges."""
+    config = DailyTimeDimensionConfig(
+        DailyTimeDimensionModel(
+            dimension_type=DimensionType.TIME,
+            class_name="DailyTime",
+            module="dsgrid.dimension.standard",
+            name="daily_time_multi",
+            description="test daily time with multiple ranges",
+            ranges=[
+                DailyRangeModel(start="2012-01-01", end="2012-01-05"),
+                DailyRangeModel(start="2013-02-15", end="2013-02-20"),
+            ],
+            str_format="%Y-%m-%d",
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+            leap_day_adjustment=LeapDayAdjustmentType.NONE,
+            year_column="year",
+        )
+    )
+
+    # Test get_time_ranges
+    time_ranges = config.get_time_ranges()
+    assert len(time_ranges) == 2
+
+    # Test get_lengths
+    lengths = config.get_lengths()
+    assert lengths == [5, 6]  # Jan 1-5 = 5 days, Feb 15-20 = 6 days
+
+    # Test get_start_times
+    start_times = config.get_start_times()
+    assert len(start_times) == 2
+    assert start_times[0].year == 2012
+    assert start_times[0].month == 1
+    assert start_times[0].day == 1
+    assert start_times[1].year == 2013
+    assert start_times[1].month == 2
+    assert start_times[1].day == 15
+
+    # Test list_expected_dataset_timestamps
+    timestamps = config.list_expected_dataset_timestamps()
+    assert len(timestamps) == 11  # 5 + 6 days
+
+    # Check first range timestamps
+    first_range_timestamps = [t for t in timestamps if t.year == 2012]
+    assert len(first_range_timestamps) == 5
+    assert first_range_timestamps[0].month == 1
+    assert first_range_timestamps[0].day == 1
+    assert first_range_timestamps[-1].month == 1
+    assert first_range_timestamps[-1].day == 5
+
+    # Check second range timestamps
+    second_range_timestamps = [t for t in timestamps if t.year == 2013]
+    assert len(second_range_timestamps) == 6
+    assert second_range_timestamps[0].month == 2
+    assert second_range_timestamps[0].day == 15
+    assert second_range_timestamps[-1].month == 2
+    assert second_range_timestamps[-1].day == 20
+
+    # Test build_time_dataframe
+    df = config.build_time_dataframe()
+    assert df.count() == 11

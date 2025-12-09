@@ -1,7 +1,11 @@
 from typing import Any, Iterable
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.time import MeasurementType, TimeDimensionType, TimeIntervalType
+from dsgrid.dimension.time import (
+    MeasurementType,
+    TimeDimensionType,
+    TimeIntervalType,
+)
 from dsgrid.dimension.standard import (
     EnergyEfficiency,
     EnergyEndUse,
@@ -15,6 +19,7 @@ from dsgrid.dimension.standard import (
     Stock,
     StockShare,
     StockRegression,
+    WeatherVariable,
 )
 from dsgrid.exceptions import DSGInvalidParameter
 
@@ -34,6 +39,7 @@ SUPPORTED_METRIC_TYPES = {
         Stock,
         StockShare,
         StockRegression,
+        WeatherVariable,
     )
 }
 
@@ -125,6 +131,16 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
                 },
             ]
             time_dim["str_format"] = "%Y"
+        case TimeDimensionType.DAILY:
+            time_dim["class"] = "DailyTime"
+            time_dim["year_column"] = "year"
+            time_dim["ranges"] = [
+                {
+                    "start": "2012-01-01",
+                    "end": "2012-12-31",
+                },
+            ]
+            time_dim["str_format"] = "%Y-%m-%d"
         case TimeDimensionType.INDEX:
             time_dim["class"] = "IndexTime"
             time_dim["frequency"] = "P0DT1H"

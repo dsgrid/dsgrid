@@ -2,6 +2,7 @@ from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.files import load_data
 from .date_time_dimension_config import DateTimeDimensionConfig
 from .annual_time_dimension_config import AnnualTimeDimensionConfig
+from .daily_time_dimension_config import DailyTimeDimensionConfig
 from .noop_time_dimension_config import NoOpTimeDimensionConfig
 from .index_time_dimension_config import IndexTimeDimensionConfig
 from .dimension_config import DimensionConfig
@@ -11,6 +12,7 @@ from .dimensions import (
     DimensionModel,
     DimensionType,
     AnnualTimeDimensionModel,
+    DailyTimeDimensionModel,
     RepresentativePeriodTimeDimensionModel,
     NoOpTimeDimensionModel,
     IndexTimeDimensionModel,
@@ -22,6 +24,8 @@ def get_dimension_config(model):
         return DateTimeDimensionConfig(model)
     if isinstance(model, AnnualTimeDimensionModel):
         return AnnualTimeDimensionConfig(model)
+    if isinstance(model, DailyTimeDimensionModel):
+        return DailyTimeDimensionConfig(model)
     if isinstance(model, RepresentativePeriodTimeDimensionModel):
         return RepresentativePeriodTimeDimensionConfig(model)
     if isinstance(model, DimensionModel):
@@ -52,6 +56,8 @@ def load_dimension_config(filename):
             return DateTimeDimensionConfig.load(filename)
         elif data["time_type"] == TimeDimensionType.ANNUAL.value:
             return AnnualTimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.DAILY.value:
+            return DailyTimeDimensionConfig.load(filename)
         elif data["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
             return RepresentativePeriodTimeDimensionConfig.load(filename)
         elif data["time_type"] == TimeDimensionType.NOOP.value:

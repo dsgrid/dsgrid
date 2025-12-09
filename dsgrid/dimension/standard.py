@@ -7,6 +7,7 @@ from pydantic import Field
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     AnnualTimeDimensionModel,
+    DailyTimeDimensionModel,
     NoOpTimeDimensionModel,
 )
 from dsgrid.dimension.base_models import (
@@ -175,6 +176,12 @@ class StockShare(MetricDimensionBaseModel):
     unit: str
 
 
+class WeatherVariable(MetricDimensionBaseModel):
+    """Weather attributes - e.g., dry bulb temperature, relative humidity"""
+
+    unit: str
+
+
 class FractionalIndex(MetricDimensionBaseModel):
     """Fractional Index attributes - e.g., human development index (HDI)
 
@@ -223,6 +230,10 @@ class Time(DateTimeDimensionModel):
 
 class AnnualTime(AnnualTimeDimensionModel):
     """Annual Time attributes"""
+
+
+class DailyTime(DailyTimeDimensionModel):
+    """Daily Time attributes"""
 
 
 class NoOpTime(NoOpTimeDimensionModel):

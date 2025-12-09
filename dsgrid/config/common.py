@@ -2,7 +2,6 @@ from typing import Any, Iterable
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
-    LeapDayAdjustmentType,
     MeasurementType,
     TimeDimensionType,
     TimeIntervalType,
@@ -134,7 +133,6 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
             time_dim["str_format"] = "%Y"
         case TimeDimensionType.DAILY:
             time_dim["class"] = "DailyTime"
-            time_dim["leap_day_adjustment"] = LeapDayAdjustmentType.NONE.value
             time_dim["year_column"] = "time_year"
             time_dim["ranges"] = [
                 {

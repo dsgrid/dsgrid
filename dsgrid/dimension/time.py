@@ -17,10 +17,10 @@ class TimeDimensionType(DSGEnum):
 
     DATETIME = "datetime"
     ANNUAL = "annual"
+    DAILY = "daily"
     REPRESENTATIVE_PERIOD = "representative_period"
     INDEX = "index"
     NOOP = "noop"
-    DAILY = "daily"
 
 
 class DatetimeFormat(str, Enum):
@@ -483,20 +483,27 @@ class DailyTimeRange(DatetimeRange):
         one_day = timedelta(days=1)
 
         while cur <= end:
-            month = cur.month
-            day = cur.day
-            skip = False
-
-            if self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29:
-                if month == 2 and day == 29:
-                    skip = True
-            elif self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31:
-                if month == 12 and day == 31:
-                    skip = True
-
-            if not skip:
+            if self.leap_day_adjustment == LeapDayAdjustmentType.NONE:
                 yield cur.replace(tzinfo=tz)
-
+            else:
+                month = cur.month
+                day = cur.day
+                if not (
+                    self.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1
+                    and month == 1
+                    and day == 1
+                ):
+                    if not (
+                        self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
+                        and month == 2
+                        and day == 29
+                    ):
+                        if not (
+                            self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31
+                            and month == 12
+                            and day == 31
+                        ):
+                            yield cur.replace(tzinfo=tz)
             cur += one_day
 
 

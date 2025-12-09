@@ -152,6 +152,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def get_time_zone(self) -> TimeZone | None:
         """Return a TimeZone instance for this dimension."""
 
+    def get_time_zones(self) -> list[TimeZone]:
+        """Return a list of TimeZone instances for this dimension."""
+        if self.get_time_zone():
+            return [self.get_time_zone()]
+        return []
+
     @abc.abstractmethod
     def get_tzinfo(self) -> tzinfo | None:
         """Return a tzinfo instance for this dimension.
@@ -187,10 +193,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
         msg = f"{type(self)}.list_expected_dataset_timestamps is not implemented"
         raise NotImplementedError(msg)
-
-    def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
-        """Convert time from str format to datetime if exists."""
-        return df
 
     def _build_time_ranges(
         self,

@@ -69,9 +69,6 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
         load_data_df = convert_types_if_necessary(load_data_df)
-        time_dim = config.get_time_dimension()
-        if time_dim is not None:
-            load_data_df = time_dim.convert_time_format(load_data_df)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         load_data_lookup = convert_types_if_necessary(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)

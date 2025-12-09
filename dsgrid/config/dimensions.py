@@ -424,13 +424,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
         title="format",
         discriminator="format_type",
-        description="""
-        Format of the timestamps in the load data, defines whether the timestamps
-        share a single time zone or span multiple time zones. If multiple time zones
-        are present, they are defined by geography dimension records and the format
-        specifies whether they are aligned in absolute time or represented as local
-        time.
-        """,
+        description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
     )
 
     measurement_type: MeasurementType = Field(
@@ -461,6 +455,11 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         description="Name of time column in the dataframe. It should be updated during the query process to reflect "
         "any changes to the dataframe time column.",
         default=next(iter(DatetimeTimestampType._fields)),
+    )
+    localize_to_time_zone: bool = Field(
+        title="localize_to_time_zone",
+        default=True,
+        description="Whether to localize timestamps to time zone(s). If True, timestamps in the dataframe must be tz-naive.",
     )
 
     @model_validator(mode="before")
@@ -570,6 +569,8 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         return _check_time_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
+        if self.format.format_type == DatetimeFormat.ALIGNED_IN_CLOCK_TIME:
+            return True
         return False
 
 

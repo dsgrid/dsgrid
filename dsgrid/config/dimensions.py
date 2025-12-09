@@ -575,10 +575,10 @@ class DailyTimeDimensionModel(TimeDimensionBaseModel):
     )
     year_column: str = Field(
         title="year_column",
-        default="time_year",
+        default="year",
         description="The column name containing year values in the load data. "
-        "Options: 'time_year' (default), 'weather_year', 'model_year'. "
-        "This column must exist in the dataset and will be combined with time_month and time_day.",
+        "Options: 'year' (default), 'weather_year', 'model_year'. "
+        "This column must exist in the dataset and will be combined with month and day.",
     )
 
     @field_validator("ranges")
@@ -593,7 +593,7 @@ class DailyTimeDimensionModel(TimeDimensionBaseModel):
     @field_validator("year_column")
     @classmethod
     def check_year_column(cls, year_column: str) -> str:
-        valid_columns = {"time_year", "weather_year", "model_year"}
+        valid_columns = {"year", "weather_year", "model_year"}
         if year_column not in valid_columns:
             msg = f"year_column must be one of {valid_columns}, got: {year_column}"
             raise ValueError(msg)

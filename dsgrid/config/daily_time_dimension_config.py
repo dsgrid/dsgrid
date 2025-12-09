@@ -170,7 +170,7 @@ class DailyTimeDimensionConfig(TimeDimensionBaseConfig):
             for dt in time_range.list_time_range():
                 timestamps.append(
                     DailyTimestampType(
-                        time_year=dt.year,
+                        year=dt.year,
                         month=dt.month,
                         day=dt.day,
                     )

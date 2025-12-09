@@ -41,7 +41,7 @@ class AnnualTimestampType(NamedTuple):
 class DailyTimestampType(NamedTuple):
     """Columns for daily time with year, month, and day."""
 
-    time_year: int
+    year: int
     month: int
     day: int
 

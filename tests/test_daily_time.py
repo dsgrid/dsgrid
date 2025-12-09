@@ -19,13 +19,13 @@ from dsgrid.utils.spark import create_dataframe_from_dicts
 
 @pytest.fixture(scope="module")
 def daily_dataframe():
-    """Create a daily time dataframe with time_year, month, day columns."""
+    """Create a daily time dataframe with year, month, day columns."""
     data = []
     # Add data for Jan 1-5, 2012
     for day in range(1, 6):
         data.append(
             {
-                "time_year": 2012,
+                "year": 2012,
                 "month": 1,
                 "day": day,
                 "geography": "CO",
@@ -36,7 +36,7 @@ def daily_dataframe():
     for day in range(1, 6):
         data.append(
             {
-                "time_year": 2012,
+                "year": 2012,
                 "month": 2,
                 "day": day,
                 "geography": "CO",
@@ -67,7 +67,7 @@ def daily_time_dimension_basic():
             str_format="%Y-%m-%d",
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
             leap_day_adjustment=LeapDayAdjustmentType.NONE,
-            year_column="time_year",
+            year_column="year",
         )
     )
 
@@ -88,7 +88,7 @@ def daily_time_dimension_leap_year():
             str_format="%Y-%m-%d",
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
             leap_day_adjustment=LeapDayAdjustmentType.NONE,
-            year_column="time_year",
+            year_column="year",
         )
     )
 
@@ -109,7 +109,7 @@ def daily_time_dimension_drop_feb29():
             str_format="%Y-%m-%d",
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
             leap_day_adjustment=LeapDayAdjustmentType.DROP_FEB29,
-            year_column="time_year",
+            year_column="year",
         )
     )
 
@@ -117,13 +117,13 @@ def daily_time_dimension_drop_feb29():
 def test_daily_time_dimension_get_load_data_time_columns(daily_time_dimension_basic):
     """Test that get_load_data_time_columns returns the correct column names."""
     columns = daily_time_dimension_basic.get_load_data_time_columns()
-    assert columns == ["time_year", "month", "day"]
+    assert columns == ["year", "month", "day"]
 
 
 def test_daily_time_dimension_get_year_column(daily_time_dimension_basic):
     """Test that get_year_column returns the configured year column."""
     year_col = daily_time_dimension_basic.get_year_column()
-    assert year_col == "time_year"
+    assert year_col == "year"
 
 
 def test_daily_time_dimension_with_weather_year():
@@ -154,10 +154,10 @@ def test_daily_time_dimension_list_expected_timestamps(daily_time_dimension_basi
     timestamps = daily_time_dimension_basic.list_expected_dataset_timestamps()
     assert len(timestamps) == 31  # January has 31 days
     # Check first and last timestamp
-    assert timestamps[0].time_year == 2012
+    assert timestamps[0].year == 2012
     assert timestamps[0].month == 1
     assert timestamps[0].day == 1
-    assert timestamps[-1].time_year == 2012
+    assert timestamps[-1].year == 2012
     assert timestamps[-1].month == 1
     assert timestamps[-1].day == 31
 
@@ -223,13 +223,13 @@ def test_daily_time_dimension_build_time_dataframe(daily_time_dimension_basic):
 
     # Check that all required columns are present
     columns = set(df.columns)
-    assert "time_year" in columns
+    assert "year" in columns
     assert "month" in columns
     assert "day" in columns
 
     # Check first row
-    first_row = df.orderBy("time_year", "month", "day").first()
-    assert first_row.time_year == 2012
+    first_row = df.orderBy("year", "month", "day").first()
+    assert first_row.year == 2012
     assert first_row.month == 1
     assert first_row.day == 1
 
@@ -278,7 +278,7 @@ def test_daily_range_model_validation():
 def test_daily_time_dimension_model_year_column_validation():
     """Test that DailyTimeDimensionModel validates year_column field."""
     # Valid year_column values
-    for year_col in ["time_year", "weather_year", "model_year"]:
+    for year_col in ["year", "weather_year", "model_year"]:
         config = DailyTimeDimensionModel(
             dimension_type=DimensionType.TIME,
             class_name="DailyTime",

@@ -375,7 +375,7 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
-        if values["format_type"] == "aligned":
+        if values.get("format_type") == "aligned":
             logger.warning(
                 "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config format parameter."
             )
@@ -479,7 +479,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             if "format" in values:
                 if isinstance(values["format"], dict):
                     assert (
-                        values["format"]["format_type"]
+                        values["format"].get("format_type")
                         == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
                     )
                     values["format"]["time_zone"] = time_zone
@@ -500,7 +500,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         if "format" in values:
             if isinstance(values["format"], dict):
-                if values["format"]["format_type"] == "aligned":
+                if values["format"].get("format_type") == "aligned":
                     logger.warning(
                         "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config."
                     )
@@ -668,6 +668,7 @@ class DatetimeExternalTimeZoneDimensionModel(TimeDimensionBaseModel):
 
     format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
         title="format",
+        discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
     )
     time_type: TimeDimensionType = Field(default=TimeDimensionType.DATETIME_EXTERNAL_TZ)

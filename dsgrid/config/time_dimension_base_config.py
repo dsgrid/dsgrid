@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta, tzinfo
 from typing import Any
 from dateutil.relativedelta import relativedelta
+import pandas as pd
 
 import chronify
 
@@ -196,7 +197,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     def _build_time_ranges(
         self,
-        time_ranges: TimeRangeModel,
+        time_ranges: list[TimeRangeModel],
         tz: TimeZone | None = None,
-    ):
+    ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timedelta]]:
         return build_time_ranges(time_ranges, tz=tz)

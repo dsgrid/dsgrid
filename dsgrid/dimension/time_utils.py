@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_annual_ranges(
-    time_ranges: AnnualRangeModel,
+    time_ranges: list[AnnualRangeModel],
     tz: TimeZone | None = None,
 ) -> list[tuple[pd.Timestamp, pd.Timestamp, int]]:
     ranges = []
@@ -36,7 +36,7 @@ def build_annual_ranges(
 
 
 def build_time_ranges(
-    time_ranges: TimeRangeModel,
+    time_ranges: list[TimeRangeModel],
     tz: TimeZone | None = None,
 ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timedelta]]:
     ranges = []

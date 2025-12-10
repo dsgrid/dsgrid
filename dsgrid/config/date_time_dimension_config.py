@@ -128,6 +128,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             case (DatetimeFormat.ALIGNED_IN_CLOCK_TIME, False):
                 return "tz_naive_datetime_multiple_tz"
             case _:
-                msg = f"Unsupported combination of format_type {self.model.format.format_type} "
-                f"and localize_to_time_zone {self.model.localize_to_time_zone}"
+                msg = (
+                    f"Unsupported combination of format_type {self.model.format.format_type} "
+                    f"and localize_to_time_zone {self.model.localize_to_time_zone}"
+                )
                 raise ValueError(msg)

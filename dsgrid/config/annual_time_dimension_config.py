@@ -119,9 +119,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_lengths(self) -> list[int]:
         lengths = []
         for start, end, freq in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
-            length = (end.year - start.year) // freq
             if (end.year - start.year) % freq == 0:
-                length += 1
+                length = (end.year - start.year) // freq + 1
+            else:
+                length = (end.year - start.year) // freq
             lengths.append(length)
         return lengths
 

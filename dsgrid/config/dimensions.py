@@ -238,6 +238,92 @@ class DimensionModel(DimensionBaseModel):
         return None
 
 
+class DateTimeFormatDateTimeTZ(DSGBaseModel):
+    """Format of timestamps in a dataset is timezone-aware datetime."""
+
+    dtype: Literal["TIMESTAMP_TZ"] = "TIMESTAMP_TZ"
+
+    time_column: str = Field(
+        title="time_column",
+        description="Name of the timestamp column in the dataset.",
+        default=next(iter(DatetimeTimestampType._fields)),
+    )
+
+    def convert_to_datetime(self):
+        return False
+
+    def get_time_columns(self) -> list[str]:
+        return [self.time_column]
+
+
+class DateTimeFormatDateTimeNTZ(DSGBaseModel):
+    """Format of timestamps in a dataset is timezone-naive datetime,
+    requiring localization to time zones."""
+
+    dtype: Literal["TIMESTAMP_NTZ"] = "TIMESTAMP_NTZ"
+    time_column: str = Field(
+        title="time_column",
+        description="Name of the timestamp column in the dataset.",
+        default=next(iter(DatetimeTimestampType._fields)),
+    )
+
+    def convert_to_datetime(self):
+        return True
+
+    def get_time_columns(self) -> list[str]:
+        return [self.time_column]
+
+
+class DateTimeFormatInParts(DSGBaseModel):
+    """Format of timestamps in a dataset is in parts,
+    e.g., month-day-hour format,
+    requiring conversion to datetime."""
+
+    dtype: Literal["YEAR_MONTH_DAY_HOUR"] = "YEAR_MONTH_DAY_HOUR"
+    year_column: str | None = Field(
+        title="year_column",
+        description="Name of the year column in the dataset.",
+        default=None,
+    )
+    month_column: str | None = Field(
+        title="month_column",
+        description="Name of the month column in the dataset.",
+        default=None,
+    )
+    day_column: str | None = Field(
+        title="day_column",
+        description="Name of the day column in the dataset.",
+        default=None,
+    )
+    hour_column: str | None = Field(
+        title="hour_column",
+        description="Name of the hour column in the dataset.",
+        default=None,
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_columns(cls, values):
+        year_col = values.get("year_column")
+        month_col = values.get("month_column")
+        day_col = values.get("day_column")
+        hour_col = values.get("hour_column")
+        if not year_col and not month_col and not day_col and not hour_col:
+            msg = "At least one of year_column, month_column, day_column, or hour_column must be provided."
+            raise ValueError(msg)
+        return values
+
+    def convert_to_datetime(self):
+        return True
+
+    def get_time_columns(self) -> list[str]:
+        cols = [self.year_column, self.month_column, self.day_column, self.hour_column]
+        return [col for col in cols if col is not None]
+
+
+DateTimeFormats = Union[DateTimeFormatDateTimeTZ, DateTimeFormatDateTimeNTZ, DateTimeFormatInParts]
+
+
 class TimeRangeModel(DSGBaseModel):
     """Defines a continuous range of time."""
 
@@ -415,6 +501,13 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
+    )
+
+    format: DateTimeFormats = Field(
+        title="format",
+        description="""Defines the format of timestamps in the dataset. This controls subsequent processing requirements at dataset registration.
+        All processed timestamps will be converted to a timezone-aware datetime column""",
+        default=DateTimeFormatDateTimeTZ,
     )
 
     measurement_type: MeasurementType = Field(

@@ -242,7 +242,7 @@ class TimeRangeModel(DSGBaseModel):
     """Defines a continuous range of time."""
 
     # This uses str instead of datetime because this object doesn't have the ability
-    # to serialize/deserialize by itself (no str-format).
+    # to serialize/deserialize by itself.
     # We use the DatetimeRange object during processing.
     start: str = Field(
         title="start",

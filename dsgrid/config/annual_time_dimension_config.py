@@ -38,7 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
-    """Provides an interface to an AnnualTimeDimensionModel."""
+    """Provides an interface to an AnnualTimeDimensionModel.
+
+    Note: Annual time does not currently support Chronify conversion because the annual time
+    to datetime mapping is not yet available in Chronify.
+    """
 
     @staticmethod
     def model_class() -> AnnualTimeDimensionModel:
@@ -87,7 +91,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_frequency(self) -> relativedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
-        assert set(freqs) == {freqs[0]}, freqs
+        if len(set(freqs)) > 1:
+            msg = f"AnnualTimeDimensionConfig.get_frequency found multiple frequencies: {freqs}"
+            raise ValueError(msg)
         return relativedelta(years=freqs[0])
 
     def get_time_ranges(self) -> list[AnnualTimeRange]:

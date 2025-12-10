@@ -19,7 +19,7 @@ from dsgrid.dimension.time import (
     TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
-    DatetimeFormat,
+    TimeZoneFormat,
 )
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
@@ -295,7 +295,7 @@ class MonthRangeModel(DSGBaseModel):
     """Defines a continuous range of time."""
 
     # This uses str instead of datetime because this object doesn't have the ability
-    # to serialize/deserialize by itself (no str-format).
+    # to serialize/deserialize by itself.
     # We use the DatetimeRange object during processing.
     start: int = Field(
         title="start",
@@ -365,8 +365,8 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     """
 
     format_type: Literal[
-        DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
-    ] = DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
+        TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
+    ] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
     time_zone: TimeZone = Field(
         title="time_zone",
         description="Time zone of data",
@@ -377,13 +377,13 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     def handle_legacy_fields(cls, values):
         if values.get("format_type") == "aligned":
             logger.warning(
-                "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config format parameter."
+                "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config time_zone_format parameter."
             )
-            values["format_type"] = DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
+            values["format_type"] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME.value
 
         if "timezone" in values:
             logger.warning(
-                "Renaming legacy timezone field to time_zone within the aligned_in_absolute_time single time zone format."
+                "Renaming legacy timezone field to time_zone within the aligned_in_absolute_time single time zone time_zone_format."
             )
             values["time_zone"] = values.pop("timezone")
         return values
@@ -400,8 +400,8 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     """
 
     format_type: Literal[
-        DatetimeFormat.ALIGNED_IN_CLOCK_TIME
-    ] = DatetimeFormat.ALIGNED_IN_CLOCK_TIME
+        TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
+    ] = TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
     time_zones: list[TimeZone] = Field(
         title="time_zones",
         description="List of unique time zones in the dataset",
@@ -411,8 +411,8 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
 
-    format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
-        title="format",
+    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+        title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
     )
@@ -466,53 +466,58 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         if "datetime_format" in values:
             logger.warning(
-                "Moving legacy datetime_format field to new format struct within the datetime config."
+                "Moving legacy datetime_format field to new time_zone_format struct within the datetime config."
             )
             datetime_format = values.pop("datetime_format")
-            values["format"] = datetime_format
+            values["time_zone_format"] = datetime_format
 
         if "timezone" in values:
             logger.warning(
-                "Renaming legacy timezone field to time_zone and moving it to new format struct within the datetime config."
+                "Renaming legacy timezone field to time_zone and moving it to new time_zone_format struct within the datetime config."
             )
             time_zone = values.pop("timezone")
-            if "format" in values:
-                if isinstance(values["format"], dict):
+            if "time_zone_format" in values:
+                if isinstance(values["time_zone_format"], dict):
                     assert (
-                        values["format"].get("format_type")
-                        == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
+                        values["time_zone_format"].get("format_type")
+                        == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME.value
                     )
-                    values["format"]["time_zone"] = time_zone
-                elif isinstance(values["format"], AlignedTimeSingleTimeZone):
-                    assert values["format"].format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
-                    values["format"].time_zone = time_zone
-                elif isinstance(values["format"], LocalTimeMultipleTimeZones):
-                    msg = "Cannot set single time_zone for LocalTimeMultipleTimeZones format."
+                    values["time_zone_format"]["time_zone"] = time_zone
+                elif isinstance(values["time_zone_format"], AlignedTimeSingleTimeZone):
+                    assert (
+                        values["time_zone_format"].format_type
+                        == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
+                    )
+                    values["time_zone_format"].time_zone = time_zone
+                elif isinstance(values["time_zone_format"], LocalTimeMultipleTimeZones):
+                    msg = "Cannot set single time_zone for LocalTimeMultipleTimeZones time_zone_format."
                     raise ValueError(msg)
                 else:
-                    msg = f"Unexpected format type: {values['format']}"
+                    msg = f"Unexpected time_zone_format type: {values['time_zone_format']}"
                     raise ValueError(msg)
             else:
-                values["format"] = {
-                    "format_type": DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value,
+                values["time_zone_format"] = {
+                    "format_type": TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME.value,
                     "time_zone": time_zone,
                 }
 
-        if "format" in values:
-            if isinstance(values["format"], dict):
-                if values["format"].get("format_type") == "aligned":
+        if "time_zone_format" in values:
+            if isinstance(values["time_zone_format"], dict):
+                if values["time_zone_format"].get("format_type") == "aligned":
                     logger.warning(
                         "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config."
                     )
-                    values["format"]["format_type"] = DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
-            elif isinstance(values["format"], AlignedTimeSingleTimeZone):
+                    values["time_zone_format"][
+                        "format_type"
+                    ] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME.value
+            elif isinstance(values["time_zone_format"], AlignedTimeSingleTimeZone):
                 # already correct
                 pass
-            elif isinstance(values["format"], LocalTimeMultipleTimeZones):
+            elif isinstance(values["time_zone_format"], LocalTimeMultipleTimeZones):
                 # already correct
                 pass
             else:
-                msg = f"Unexpected format type: {values['format']}"
+                msg = f"Unexpected time_zone_format type: {values['time_zone_format']}"
                 raise ValueError(msg)
 
         if "str_format" in values:
@@ -559,7 +564,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         return _check_time_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
-        if self.format.format_type == DatetimeFormat.ALIGNED_IN_CLOCK_TIME:
+        if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
             return True
         return False
 
@@ -669,8 +674,8 @@ class DatetimeExternalTimeZoneDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps are tz-naive and require localizing to a time zone
     using a time zone column."""
 
-    format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
-        title="format",
+    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+        title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
     )
@@ -875,7 +880,7 @@ def _check_time_ranges(ranges: list[TimeRangeModel]) -> list[TimeRangeModel]:
         if start.tzinfo is not None or end.tzinfo is not None:
             msg = (
                 f"datetime range {trange} start and end need to be tz-naive. "
-                "Pass in the time zone info via the format parameter"
+                "Pass in the time zone info via the time_zone_format parameter"
             )
             raise ValueError(msg)
         if end < start:

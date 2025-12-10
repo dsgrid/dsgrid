@@ -169,7 +169,7 @@ def map_annual_time_to_date_time(
 
     # Note that MeasurementType.TOTAL has already been verified, i.e.,
     # each value associated with an annual time represents the total over that year.
-    with set_session_time_zone(dt_dim.model.format.time_zone.tz_name):
+    with set_session_time_zone(dt_dim.model.time_zone_format.time_zone.tz_name):
         years = (
             select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"])
             .distinct()

@@ -7,7 +7,7 @@ import pandas as pd
 import chronify
 
 from dsgrid.dimension.time import TimeZone
-from dsgrid.dimension.time import DatetimeFormat, TimeIntervalType
+from dsgrid.dimension.time import TimeZoneFormat, TimeIntervalType
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -96,15 +96,15 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return [self.model.time_column]
 
     def get_time_zone(self) -> TimeZone | None:
-        if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return self.model.format.time_zone
+        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
+            return self.model.time_zone_format.time_zone
         return None
 
     def get_time_zones(self) -> list[TimeZone]:
-        if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return [self.model.format.time_zone]
-        if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_CLOCK_TIME:
-            return self.model.format.time_zones
+        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
+            return [self.model.time_zone_format.time_zone]
+        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
+            return self.model.time_zone_format.time_zones
         return []
 
     def get_tzinfo(self) -> tzinfo | None:
@@ -118,18 +118,18 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def _get_datetime_type(self) -> str:
         """Return a string representing the datetime type for this dimension."""
-        match (self.model.format.format_type, self.model.localize_to_time_zone):
-            case (DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME, True):
+        match (self.model.time_zone_format.format_type, self.model.localize_to_time_zone):
+            case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, True):
                 return "tz_aware_datetime_single_tz"
-            case (DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME, False):
+            case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, False):
                 return "tz_naive_datetime_single_tz"
-            case (DatetimeFormat.ALIGNED_IN_CLOCK_TIME, True):
+            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, True):
                 return "tz_aware_datetime_multiple_tz"
-            case (DatetimeFormat.ALIGNED_IN_CLOCK_TIME, False):
+            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, False):
                 return "tz_naive_datetime_multiple_tz"
             case _:
                 msg = (
-                    f"Unsupported combination of format_type {self.model.format.format_type} "
+                    f"Unsupported combination of format_type {self.model.time_zone_format.format_type} "
                     f"and localize_to_time_zone {self.model.localize_to_time_zone}"
                 )
                 raise ValueError(msg)

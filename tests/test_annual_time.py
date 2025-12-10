@@ -12,7 +12,7 @@ from dsgrid.config.date_time_dimension_config import (
 )
 from dsgrid.config.dimensions import AlignedTimeSingleTimeZone, AnnualRangeModel, TimeRangeModel
 from dsgrid.dimension.time import (
-    DatetimeFormat,
+    TimeZoneFormat,
     MeasurementType,
     TimeIntervalType,
     TimeZone,
@@ -136,8 +136,8 @@ def date_time_dimension():
             dimension_type=DimensionType.TIME,
             class_name="Time",
             module="dsgrid.dimension.standard",
-            format=AlignedTimeSingleTimeZone(
-                format_type=DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME,
+            time_zone_format=AlignedTimeSingleTimeZone(
+                format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
                 time_zone=TimeZone.EST,
             ),
             name="datetime",

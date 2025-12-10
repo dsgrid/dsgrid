@@ -23,7 +23,7 @@ class TimeDimensionType(DSGEnum):
     NOOP = "noop"
 
 
-class DatetimeFormat(str, Enum):
+class TimeZoneFormat(str, Enum):
     """Defines the time format of the datetime config model"""
 
     ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"

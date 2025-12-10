@@ -36,7 +36,7 @@
           frequency: "P1D",
         },
       ],
-      format: {
+      time_zone_format: {
         format_type: "aligned_in_absolute_time",
         time_zone: "MountainPrevailing",
         },
@@ -78,7 +78,7 @@
           frequency: "00:15:00",
         },
       ],
-      format: {
+      time_zone_format: {
         format_type: "aligned_in_absolute_time",
         time_zone: "UTC",
         },
@@ -150,7 +150,7 @@
           frequency: "01:00:00",
         },
       ],
-      format: {
+      time_zone_format: {
         format_type: "aligned_in_clock_time",
         time_zones: ["EasternPrevailing", "CentralPrevailing", "MountainPrevailing", "PacificPrevailing"]
         },

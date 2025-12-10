@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.time import DatetimeFormat, TimeDimensionType, TimeZone
+from dsgrid.dimension.time import TimeZoneFormat, TimeDimensionType, TimeZone
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions import (
     AlignedTimeSingleTimeZone,
@@ -98,8 +98,8 @@ def make_date_time_config():
                     frequency=timedelta(hours=1),
                 ),
             ],
-            format=AlignedTimeSingleTimeZone(
-                format_type=DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME,
+            time_zone_format=AlignedTimeSingleTimeZone(
+                format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
                 time_zone=TimeZone.EST,
             ),
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,

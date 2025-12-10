@@ -102,7 +102,7 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
     match time_type:
         case TimeDimensionType.DATETIME:
             time_dim["class"] = "Time"
-            time_dim["format"] = {
+            time_dim["time_zone_format"] = {
                 "format_type": "aligned_in_absolute_time",
                 "time_zone": "EasternStandard",
             }

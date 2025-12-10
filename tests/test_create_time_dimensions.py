@@ -233,7 +233,7 @@ def check_date_range_creation(time_dimension_model, time_based_data_adjustment=N
     df = pd.DataFrame()
     df["dim_dt"] = time_range[0].list_time_range()
     if tz is None:
-        # if timezone naive, Spark will create timestamps in local system time
+        # if time_zone naive, Spark will create timestamps in local system time
         tz = df.loc[0, "dim_dt"].tzinfo
         df["dim_dt"] = df["dim_dt"].apply(lambda x: x.astimezone(tz))
 

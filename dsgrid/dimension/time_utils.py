@@ -70,12 +70,12 @@ def build_time_ranges(
 
 def get_time_ranges(
     time_dimension_config,  #: DateTimeDimensionConfig,
-    timezone: TimeZone = None,
+    time_zone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     dim_model = time_dimension_config.model
-    if timezone is None:
-        timezone = time_dimension_config.get_tzinfo()
+    if time_zone is None:
+        time_zone = time_dimension_config.get_tzinfo()
 
     if dim_model.time_type == TimeDimensionType.DATETIME:
         dt_ranges = dim_model.ranges
@@ -86,7 +86,7 @@ def get_time_ranges(
         raise ValueError(msg)
 
     ranges = []
-    for start, end, freq in build_time_ranges(dt_ranges, tz=timezone):
+    for start, end, freq in build_time_ranges(dt_ranges, tz=time_zone):
         ranges.append(
             DatetimeRange(
                 start=start,

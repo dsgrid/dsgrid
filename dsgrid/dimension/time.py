@@ -143,7 +143,7 @@ class MeasurementType(DSGEnum):
 class TimeZone(DSGEnum):
     """Time zone enum types
     - tz: zoneinfo.available_timezones()
-    - tz_name: spark uses Java timezones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
+    - tz_name: spark uses Java time_zones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
     """
 
     UTC = EnumValue(

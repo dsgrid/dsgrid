@@ -17,7 +17,7 @@
       str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
         format_type: "aligned_in_absolute_time",
-        timezone: "MountainStandard",
+        time_zone: "MountainStandard",
         },
       measurement_type: "total",
     },
@@ -38,7 +38,7 @@
       ],
       format: {
         format_type: "aligned_in_absolute_time",
-        timezone: "MountainPrevailing",
+        time_zone: "MountainPrevailing",
         },
       measurement_type: "total",
     },
@@ -59,7 +59,7 @@
       ],
       datetime_format: {
         format_type: "aligned_in_absolute_time",
-        timezone: "EasternPrevailing",
+        time_zone: "EasternPrevailing",
         },
       measurement_type: "max",
     },
@@ -80,7 +80,7 @@
       ],
       format: {
         format_type: "aligned_in_absolute_time",
-        timezone: "UTC",
+        time_zone: "UTC",
         },
       measurement_type: "total",
     },

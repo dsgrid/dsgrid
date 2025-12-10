@@ -75,10 +75,10 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
         default=None,
         title="Local Prevailing Time Zone",
         description="""
-        These time zone information are used in reference to project timezone
+        These time zone information are used in reference to project time_zone
         to convert between project time and local times as necessary.
-        All Prevailing timezones account for daylight savings time.
-        If a location does not observe daylight savings, use Standard timezones.
+        All Prevailing time_zones account for daylight savings time.
+        If a location does not observe daylight savings, use Standard time_zones.
         """,
     )
 
@@ -198,7 +198,7 @@ def check_timezone_in_geography(dimension, err_msg=None):
     if dimension.dimension_type != DimensionType.GEOGRAPHY:
         msg = (
             f"Dimension has type {dimension.dimension_type}, "
-            "Can only check timezone for Geography."
+            "Can only check time_zone for Geography."
         )
         raise DSGInvalidDimension(msg)
 
@@ -212,7 +212,7 @@ def check_timezone_in_geography(dimension, err_msg=None):
     diff = record_tz.difference(tz)
     if diff:
         msg = (
-            f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records: "
+            f"Geography dimension {dimension.dimension_id} has invalid time_zone(s) in records: "
             f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only ({tz})."
         )
         raise DSGInvalidDimension(msg)

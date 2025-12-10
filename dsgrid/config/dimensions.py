@@ -254,7 +254,7 @@ class TimeRangeModel(DSGBaseModel):
     )
     str_format: str = Field(
         title="str_format",
-        default="%Y-%m-%d %H:%M:%s",
+        default="%Y-%m-%d %H:%M:%S",
         description="Timestamp string format (for parsing the time ranges). "
         "The string format is used to parse the timestamps provided in the time ranges."
         "Cheatsheet reference: `<https://strftime.org/>`_.",
@@ -324,7 +324,7 @@ class IndexRangeModel(DSGBaseModel):
     )
     str_format: str = Field(
         title="str_format",
-        default="%Y-%m-%d %H:%M:%s",
+        default="%Y-%m-%d %H:%M:%S",
         description="Timestamp string format. "
         "The string format is used to parse the starting timestamp provided. "
         "Cheatsheet reference: `<https://strftime.org/>`_.",
@@ -367,10 +367,26 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     format_type: Literal[
         DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
     ] = DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
-    timezone: TimeZone = Field(
-        title="timezone",
+    time_zone: TimeZone = Field(
+        title="time_zone",
         description="Time zone of data",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if values["format_type"] == "aligned":
+            logger.warning(
+                "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config format parameter."
+            )
+            values["format_type"] = DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
+
+        if "timezone" in values:
+            logger.warning(
+                "Renaming legacy timezone field to time_zone within the aligned_in_absolute_time single time zone format."
+            )
+            values["time_zone"] = values.pop("timezone")
+        return values
 
 
 class LocalTimeMultipleTimeZones(DSGBaseModel):
@@ -386,36 +402,10 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     format_type: Literal[
         DatetimeFormat.ALIGNED_IN_CLOCK_TIME
     ] = DatetimeFormat.ALIGNED_IN_CLOCK_TIME
-    timezones: list[TimeZone] = Field(
-        title="timezones",
+    time_zones: list[TimeZone] = Field(
+        title="time_zones",
         description="List of unique time zones in the dataset",
     )
-    # str_format: str = Field(
-    #     title="str_format",
-    #     default="yyyy-MM-dd HH:mm:ssZZZZZ",
-    #     description="Timestamp string format (for parsing the time column of the dataframe). "
-    #     "The string format is used to parse the timestamps in the dataframe while in Spark, "
-    #     "(e.g., yyyy-MM-dd HH:mm:ssZZZZZ). "
-    #     "Cheatsheet reference: `<https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html>`_.",
-    # )
-
-    # @field_validator("str_format")
-    # @classmethod
-    # def check_str_format(cls, str_format):
-    #     msg = "DatetimeFormat.LOCAL_AS_STRINGS is not fully implemented."
-    #     raise NotImplementedError(msg)
-    #     # dsf = str_format
-    #     # if (
-    #     #     "x" not in dsf
-    #     #     and "X" not in dsf
-    #     #     and "Z" not in dsf
-    #     #     and "z" not in dsf
-    #     #     and "V" not in dsf
-    #     #     and "O" not in dsf
-    #     # ):
-    #     #     msg = "str_format must provide time zone or zone offset."
-    #     #     raise ValueError(msg)
-    #     # return str_format
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
@@ -483,21 +473,21 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         if "timezone" in values:
             logger.warning(
-                "Moving legacy timezone field to new format struct within the datetime config."
+                "Renaming legacy timezone field to time_zone and moving it to new format struct within the datetime config."
             )
-            timezone = values.pop("timezone")
+            time_zone = values.pop("timezone")
             if "format" in values:
                 if isinstance(values["format"], dict):
                     assert (
                         values["format"]["format_type"]
                         == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value
                     )
-                    values["format"]["timezone"] = timezone
+                    values["format"]["time_zone"] = time_zone
                 elif isinstance(values["format"], AlignedTimeSingleTimeZone):
                     assert values["format"].format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME
-                    values["format"].timezone = timezone
+                    values["format"].time_zone = time_zone
                 elif isinstance(values["format"], LocalTimeMultipleTimeZones):
-                    msg = "Cannot set single timezone for LocalTimeMultipleTimeZones format."
+                    msg = "Cannot set single time_zone for LocalTimeMultipleTimeZones format."
                     raise ValueError(msg)
                 else:
                     msg = f"Unexpected format type: {values['format']}"
@@ -505,7 +495,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             else:
                 values["format"] = {
                     "format_type": DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME.value,
-                    "timezone": timezone,
+                    "time_zone": time_zone,
                 }
 
         if "format" in values:
@@ -661,7 +651,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: list[MonthRangeModel] = Field(
         title="ranges",
-        description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
+        description="Defines the continuous ranges of datetime in the data, inclusive of start and end time.",
     )
     time_interval_type: TimeIntervalType = Field(
         title="time_interval",
@@ -877,8 +867,8 @@ def _check_time_ranges(ranges: list[TimeRangeModel]) -> list[TimeRangeModel]:
         end = datetime.strptime(trange.end, trange.str_format)
         # Make sure start and end is tz-naive.
         if start.tzinfo is not None or end.tzinfo is not None:
-            msg = f"datetime range {trange} start and end need to be tz-naive. Pass in the time zone info via the "
-            "format parameter"
+            msg = f"datetime range {trange} start and end need to be tz-naive. "
+            "Pass in the time zone info via the format parameter"
             raise ValueError(msg)
         if end < start:
             msg = f"datetime range {trange} end must not be less than start."

@@ -104,7 +104,7 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
             time_dim["class"] = "Time"
             time_dim["format"] = {
                 "format_type": "aligned_in_absolute_time",
-                "timezone": "EasternStandard",
+                "time_zone": "EasternStandard",
             }
             time_dim["measurement_type"] = MeasurementType.TOTAL.value
             time_dim["ranges"] = [

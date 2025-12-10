@@ -138,7 +138,7 @@ def date_time_dimension():
             module="dsgrid.dimension.standard",
             format=AlignedTimeSingleTimeZone(
                 format_type=DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME,
-                timezone=TimeZone.EST,
+                time_zone=TimeZone.EST,
             ),
             name="datetime",
             description="example date time",

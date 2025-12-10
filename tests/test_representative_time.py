@@ -100,7 +100,7 @@ def make_date_time_config():
             ],
             format=AlignedTimeSingleTimeZone(
                 format_type=DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME,
-                timezone=TimeZone.EST,
+                time_zone=TimeZone.EST,
             ),
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
         )

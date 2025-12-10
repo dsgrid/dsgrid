@@ -118,7 +118,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_col, self.model.name)
 
     def get_time_ranges(self) -> list[Any]:
-        """Return time ranges with timezone applied.
+        """Return time ranges with time_zone applied.
 
         Returns
         -------

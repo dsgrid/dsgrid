@@ -1,7 +1,7 @@
 geography,subsector
 36119,com__Hospital
 36119,com__SmallHotel
-36001,com__QuickServiceRestaurant
 06075,com__QuickServiceRestaurant
-08031,com__SmallHotel
 08031,com__QuickServiceRestaurant
+08031,com__SmallHotel
+36001,com__QuickServiceRestaurant

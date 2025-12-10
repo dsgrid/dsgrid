@@ -97,12 +97,12 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_time_zone(self) -> TimeZone | None:
         if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return self.model.format.timezone
+            return self.model.format.time_zone
         return None
 
     def get_time_zones(self) -> list[TimeZone]:
         if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return [self.model.format.timezone]
+            return [self.model.format.time_zone]
         if self.model.format.format_type == DatetimeFormat.ALIGNED_IN_CLOCK_TIME:
             return self.model.format.time_zones
         return []

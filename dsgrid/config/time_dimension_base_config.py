@@ -1,8 +1,7 @@
 import abc
 import logging
-from datetime import timedelta, tzinfo
+from datetime import tzinfo
 from typing import Any
-from dateutil.relativedelta import relativedelta
 import pandas as pd
 
 import chronify
@@ -65,15 +64,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
         msg = f"{self.__class__.__name__}.build_time_dataframe is not implemented"
         raise NotImplementedError(msg)
-
-    @abc.abstractmethod
-    def get_frequency(self) -> timedelta | relativedelta:
-        """Return the frequency.
-
-        Returns
-        -------
-        timedelta | relativedelta
-        """
 
     @abc.abstractmethod
     def get_load_data_time_columns(self) -> list[str]:

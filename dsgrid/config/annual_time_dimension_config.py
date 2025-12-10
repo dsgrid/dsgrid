@@ -122,6 +122,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             if (end.year - start.year) % freq == 0:
                 length = (end.year - start.year) // freq + 1
             else:
+                # In case where end year is not inclusive
                 length = (end.year - start.year) // freq
             lengths.append(length)
         return lengths
@@ -166,7 +167,8 @@ def map_annual_time_to_date_time(
         [(x.to_pydatetime(),) for x in timestamps], schema=schema
     )
 
-    # Note that MeasurementType.TOTAL has already been verified.
+    # Note that MeasurementType.TOTAL has already been verified, i.e.,
+    # each value associated with an annual time represents the total over that year.
     with set_session_time_zone(dt_dim.model.format.time_zone.tz_name):
         years = (
             select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"])
@@ -186,7 +188,7 @@ def map_annual_time_to_date_time(
         .withColumn(myear_column, F.col(annual_col).cast(StringType()))
         .drop(annual_col)
     )
-    frequency = dt_dim.get_frequency()
+    frequency: timedelta = dt_dim.get_frequency()
     for column in value_columns:
         df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
     return df2

@@ -565,15 +565,18 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
-    """Defines an annual time dimension where timestamps are years."""
+    """Defines an annual time dimension where timestamps are years.
+    Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+    i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.
+    """
 
     time_type: TimeDimensionType = Field(default=TimeDimensionType.ANNUAL)
     measurement_type: MeasurementType = Field(
         title="measurement_type",
         default=MeasurementType.TOTAL,
         description="""
-        The type of measurement represented by a value associated with a timestamp:
-            e.g., mean, total
+        The type of measurement represented by a value associated with an annual time:
+            e.g., total
         """,
         json_schema_extra={
             "options": MeasurementType.format_for_docs(),
@@ -685,8 +688,10 @@ class DatetimeExternalTimeZoneDimensionModel(TimeDimensionBaseModel):
     )
     ranges: list[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data, inclusive of start and end time. "
-        "If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records.",
+        description="""
+        Defines the continuous ranges of time in the data, inclusive of start and end time.
+        If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records.
+        """,
     )
     time_interval_type: TimeIntervalType = Field(
         title="time_interval",
@@ -868,8 +873,10 @@ def _check_time_ranges(ranges: list[TimeRangeModel]) -> list[TimeRangeModel]:
         end = datetime.strptime(trange.end, trange.str_format)
         # Make sure start and end is tz-naive.
         if start.tzinfo is not None or end.tzinfo is not None:
-            msg = f"datetime range {trange} start and end need to be tz-naive. "
-            "Pass in the time zone info via the format parameter"
+            msg = (
+                f"datetime range {trange} start and end need to be tz-naive. "
+                "Pass in the time zone info via the format parameter"
+            )
             raise ValueError(msg)
         if end < start:
             msg = f"datetime range {trange} end must not be less than start."

@@ -37,9 +37,6 @@ class DatasetRegistrationModel(DSGBaseModel):
     """Defines a dataset to be registered."""
 
     dataset_id: str = Field(description="Dataset ID")
-    dataset_path: Path = Field(
-        description="Directory containing load_data/load_data_lookup.parquet"
-    )
     config_file: Path = Field(description="Path to dataset.json5")
     replace_dimension_names_with_ids: bool = Field(
         description="Replace the dimension entries with IDs of dimensions in the database "
@@ -60,15 +57,7 @@ class DatasetRegistrationModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def fix_paths(cls, data: dict[str, Any]) -> dict[str, Any]:
-        _fix_paths(
-            data,
-            (
-                "dataset_path",
-                "config_file",
-                "dimension_mapping_file",
-                "dimension_mapping_references_file",
-            ),
-        )
+        _fix_paths(data, ("config_file",))
         return data
 
 

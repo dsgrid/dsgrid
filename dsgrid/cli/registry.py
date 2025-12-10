@@ -1753,16 +1753,24 @@ $ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f7
 @click.command(name="bulk-register", epilog=_bulk_register_epilog)
 @click.argument("registration_file", type=click.Path(exists=True))
 @click.option(
-    "-d",
-    "--base-data-dir",
+    "-D",
+    "--data-base-dir",
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Base directory for input data. If set, and if the dataset paths are relative, prepend "
-    "them with this path.",
+    help="Base directory for data files. If set and data file paths are relative, "
+    "prepend them with this path.",
+)
+@click.option(
+    "-M",
+    "--missing-associations-base-dir",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Base directory for missing associations files. If set and missing associations "
+    "paths are relative, prepend them with this path.",
 )
 @click.option(
     "-r",
-    "--base-repo-dir",
+    "--repo-base-dir",
     type=click.Path(exists=True),
     callback=path_callback,
     help="Base directory for dsgrid project/dataset repository. If set, and if the config file "
@@ -1783,8 +1791,9 @@ def bulk_register_cli(
     ctx,
     registry_manager: RegistryManager,
     registration_file: Path,
-    base_data_dir: Path | None,
-    base_repo_dir: Path | None,
+    data_base_dir: Path | None,
+    missing_associations_base_dir: Path | None,
+    repo_base_dir: Path | None,
     journal_file: Path | None,
 ):
     """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
@@ -1801,8 +1810,9 @@ def bulk_register_cli(
         bulk_register,
         registry_manager,
         registration_file,
-        base_data_dir=base_data_dir,
-        base_repo_dir=base_repo_dir,
+        data_base_dir=data_base_dir,
+        missing_associations_base_dir=missing_associations_base_dir,
+        repo_base_dir=repo_base_dir,
         journal_file=journal_file,
     )
     if res[1] != 0:

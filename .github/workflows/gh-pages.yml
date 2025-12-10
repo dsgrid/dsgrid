@@ -18,7 +18,8 @@ jobs:
           sudo apt update
           sudo apt install -y pandoc graphviz graphviz-dev
           python -m pip install --upgrade pip
-          python -m pip install '.[dev,doc]'
+          python -m pip install maturin
+          python -m pip install -e '.[dev,doc,spark]'
       - name: build documentation
         run: |
           git submodule init

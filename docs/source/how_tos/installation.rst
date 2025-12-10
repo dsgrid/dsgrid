@@ -66,7 +66,7 @@ To use Apache Spark as the backend:
 
 .. code-block:: console
 
-    $ pip install "dsgrid-toolkit[spark]" --group=pyhive
+    $ pip install "dsgrid-toolkit[spark]"
 
 
 Registry

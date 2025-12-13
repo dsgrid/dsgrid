@@ -40,7 +40,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             start=self._model.ranges[0].start,
             length=self.get_lengths()[0],
             start_timestamp=pd.Timestamp(self.get_start_times()[0]),
-            resolution=self._model.frequency,
+            resolution=self.get_frequency(),
             time_zone_column="time_zone",
             measurement_type=self._model.measurement_type,
             interval_type=self._model.time_interval_type,
@@ -48,14 +48,16 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         return config
 
     def get_frequency(self) -> timedelta:
-        return self.model.frequency
+        freqs = [trange.frequency for trange in self.model.ranges]
+        assert set(freqs) == {freqs[0]}, freqs
+        return freqs[0]
 
     def get_start_times(self) -> list[pd.Timestamp]:
         """get represented start times"""
         tz = self.get_tzinfo()
         start_times = []
-        for ts in self.model.starting_timestamps:
-            start = datetime.strptime(ts, self.model.str_format)
+        for trange in self.model.ranges:
+            start = datetime.strptime(trange.starting_timestamp, trange.str_format)
             assert start.tzinfo is None
             start_times.append(start.replace(tzinfo=tz))
         return start_times

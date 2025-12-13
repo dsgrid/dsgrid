@@ -1,6 +1,6 @@
 {
   dimensions: [
-    { // #[0] 8784
+    { // #[0] 8784 - legacy format (before Dec 2025)
       type: "time",
       class_name: "Time",
       time_type: "datetime",
@@ -16,8 +16,8 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
-        format_type: "aligned",
-        timezone: "Etc/GMT+7",
+        format_type: "aligned_in_absolute_time",
+        time_zone: "Etc/GMT+7",
       },
       measurement_type: "total",
     },
@@ -26,40 +26,40 @@
       class_name: "Time",
       time_type: "datetime",
       description: "Daily time 2018\n",
-      frequency: "P1D",
       name: "daily_time",
       time_interval_type: "instantaneous",
       ranges: [
         {
           start: "2018-01-01",
           end: "2018-12-31",
+          str_format: "%Y-%m-%d",
+          frequency: "P1D",
         },
       ],
-      str_format: "%Y-%m-%d",
-      datetime_format: {
-        format_type: "aligned",
-        timezone: "America/Denver",
+      time_zone_format: {
+        format_type: "aligned_in_absolute_time",
+        time_zone: "America/Denver",
         },
       measurement_type: "total",
     },
-    { // #[2]
+    { // #[2] # mix of legacy and new format
       type: "time",
       class_name: "Time",
       time_type: "datetime",
       description: "Time dimension, 2016 hourly EPT, period-ending, total value\n",
-      frequency: "06:00:00",
       name: "Time-2016-EPT-hourly-periodEnding-total",
       time_interval_type: "period_ending",
       ranges: [
         {
           start: "2016-01-01 00:00:00",
           end: "2017-01-01 00:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "06:00:00",
         },
       ],
-      str_format: "%Y-%m-%d %H:%M:%S",
       datetime_format: {
-        format_type: "aligned",
-        timezone: "America/New_York",
+        format_type: "aligned_in_absolute_time",
+        time_zone: "America/New_York",
       },
       measurement_type: "max",
     },
@@ -68,19 +68,19 @@
       class_name: "Time",
       time_type: "datetime",
       description: "Time dimension, 2012 15-min UTC, period-ending, total value\n",
-      frequency: "00:15:00",
       name: "Time-2012-UTC-model-15min-periodEnding-total",
       time_interval_type: "period_ending",
       ranges: [
         {
           start: "2012-03-11 00:00:00",
           end: "2012-11-04 23:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "00:15:00",
         },
       ],
-      str_format: "%Y-%m-%d %H:%M:%S",
-      datetime_format: {
-        format_type: "aligned",
-        timezone: "UTC",
+      time_zone_format: {
+        format_type: "aligned_in_absolute_time",
+        time_zone: "UTC",
         },
       measurement_type: "total",
     },
@@ -95,9 +95,9 @@
         {
           start: "2020",
           end: "2050",
+          str_format: "%Y",
         },
       ],
-      str_format: "%Y",
       include_leap_day: true,
       measurement_type: "total",
     },
@@ -126,35 +126,33 @@
 	      {
           start: 0, // start: 1680,
           end: 8783, // end: 7395,
+          starting_timestamp: "2012-01-01 00:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "P0DT1H0M0.000000S",
         },
       ],
-      starting_timestamps: [
-        "2012-01-01 00:00:00",
-      ],
-      str_format: "%Y-%m-%d %H:%M:%S",
-      frequency: "P0DT1H0M0.000000S",
       time_interval_type: "period_beginning",
       measurement_type: "total",
       description: "Industrial time, index, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
     },
-    { // #[7] - datetime form of [6]
+    { // #[7] - datetime form of [6] - multiple time zones
       type: "time",
       class_name: "Time",
       time_type: "datetime",
       description: "Industrial time, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
-      frequency: "01:00:00",
       name: "Local-model-time-2012",
       time_interval_type: "period_beginning",
       ranges: [
         {
           start: "2012-01-01 00:00:00", // start: "2012-03-11 00:00:00",
           end: "2012-12-31 23:00:00", // end: "2012-11-04 03:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "01:00:00",
         },
       ],
-      str_format: "%Y-%m-%d %H:%M:%S",
-      datetime_format: {
-        format_type: "local_as_strings",
-        data_str_format: "yyyy-MM-dd HH:mm:ssZZZZZ",
+      time_zone_format: {
+        format_type: "aligned_in_clock_time",
+        time_zones: ["EasternPrevailing", "CentralPrevailing", "MountainPrevailing", "PacificPrevailing"]
         },
       measurement_type: "total",
     },

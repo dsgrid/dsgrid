@@ -1,7 +1,8 @@
 import abc
 import logging
-from datetime import timedelta, tzinfo
+from datetime import tzinfo
 from typing import Any
+import pandas as pd
 
 import chronify
 
@@ -64,15 +65,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         raise NotImplementedError(msg)
 
     @abc.abstractmethod
-    def get_frequency(self) -> timedelta:
-        """Return the frequency.
-
-        Returns
-        -------
-        timedelta
-        """
-
-    @abc.abstractmethod
     def get_load_data_time_columns(self) -> list[str]:
         """Return the required timestamp columns in the load data table.
 
@@ -116,7 +108,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_col, self.model.name)
 
     def get_time_ranges(self) -> list[Any]:
-        """Return time ranges with timezone applied.
+        """Return time ranges with time_zone applied.
 
         Returns
         -------
@@ -149,6 +141,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     @abc.abstractmethod
     def get_time_zone(self) -> str | None:
         """Return a time zone instance for this dimension."""
+
+    def get_time_zones(self) -> list[str]:
+        """Return a list of time zones for this dimension."""
+        if self.get_time_zone():
+            return [self.get_time_zone()]
+        return []
 
     @abc.abstractmethod
     def get_tzinfo(self) -> tzinfo | None:
@@ -186,14 +184,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         msg = f"{type(self)}.list_expected_dataset_timestamps is not implemented"
         raise NotImplementedError(msg)
 
-    def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
-        """Convert time from str format to datetime if exists."""
-        return df
-
     def _build_time_ranges(
         self,
-        time_ranges: TimeRangeModel,
-        str_format: str,
+        time_ranges: list[TimeRangeModel],
         tz: str | None = None,
-    ):
-        return build_time_ranges(time_ranges, str_format, tz=tz)
+    ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timedelta]]:
+        return build_time_ranges(time_ranges, tz=tz)

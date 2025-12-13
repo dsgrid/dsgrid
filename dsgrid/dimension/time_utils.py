@@ -9,7 +9,6 @@ import pandas as pd
 
 from dsgrid.dimension.time import (
     DatetimeRange,
-    TimeZone,
     TimeBasedDataAdjustmentModel,
     TimeDimensionType,
 )
@@ -22,7 +21,7 @@ logger = logging.getLogger(__name__)
 def build_time_ranges(
     time_ranges: TimeRangeModel,
     str_format: str,
-    tz: TimeZone | None = None,
+    tz: str | None = None,
 ):
     ranges = []
     for time_range in time_ranges:
@@ -54,7 +53,7 @@ def build_time_ranges(
 
 def get_time_ranges(
     time_dimension_config,  #: DateTimeDimensionConfig,
-    timezone: TimeZone = None,
+    timezone: str = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     dim_model = time_dimension_config.model

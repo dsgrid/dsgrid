@@ -106,7 +106,7 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
             time_dim["str_format"] = "%Y-%m-%d %H:%M:%S"
             time_dim["datetime_format"] = {
                 "format_type": "aligned",
-                "timezone": "EasternStandard",
+                "timezone": "Etc/GMT+5",
             }
             time_dim["measurement_type"] = MeasurementType.TOTAL.value
             time_dim["ranges"] = [

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.time import TimeDimensionType, TimeZone
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions import (
     RepresentativePeriodTimeDimensionModel,
@@ -97,7 +97,7 @@ def make_date_time_config():
                 ),
             ],
             frequency=timedelta(hours=1),
-            timezone=TimeZone.EST,
+            timezone="Etc/GMT+5",
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
         )
     )
@@ -156,7 +156,7 @@ def test_time_mapping(
             scratch_dir_context=scratch_dir_context,
         )
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
-    zi = ZoneInfo("EST")
+    zi = ZoneInfo("Etc/GMT+5")
     est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]
     start = datetime(year=2018, month=1, day=1, tzinfo=zi)
     resolution = timedelta(hours=1)

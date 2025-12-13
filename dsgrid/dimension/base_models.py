@@ -1,11 +1,12 @@
 """Dimension types for dsgrid"""
 
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.utilities import check_uniqueness
-from dsgrid.dimension.time import TimeZone
 
 
 class DimensionType(DSGEnum):
@@ -71,7 +72,7 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: TimeZone | None = Field(
+    time_zone: str | None = Field(
         default=None,
         title="Local Prevailing Time Zone",
         description="""
@@ -207,12 +208,17 @@ def check_timezone_in_geography(dimension, err_msg=None):
             err_msg = "These geography dimension records must include a time_zone column."
         raise ValueError(err_msg)
 
-    tz = set(TimeZone)
-    record_tz = {rec.time_zone for rec in dimension.records}
-    diff = record_tz.difference(tz)
-    if diff:
+    record_tzs = {rec.time_zone for rec in dimension.records if rec.time_zone is not None}
+    invalid_tzs = []
+    for tz in record_tzs:
+        try:
+            ZoneInfo(tz)
+        except ZoneInfoNotFoundError:
+            invalid_tzs.append(tz)
+
+    if invalid_tzs:
         msg = (
-            f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records: "
-            f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only ({tz})."
+            f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records "
+            f"{dimension.filename}: {invalid_tzs}. Use IANA time zone names only."
         )
         raise DSGInvalidDimension(msg)

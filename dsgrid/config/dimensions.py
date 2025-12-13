@@ -16,7 +16,6 @@ from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
     TimeIntervalType,
     MeasurementType,
-    TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
     DatetimeFormat,
@@ -309,7 +308,7 @@ class AlignedTime(DSGBaseModel):
     for each geography."""
 
     format_type: Literal[DatetimeFormat.ALIGNED] = DatetimeFormat.ALIGNED
-    timezone: TimeZone = Field(
+    timezone: str = Field(
         title="timezone",
         description="Time zone of data",
     )

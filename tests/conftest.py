@@ -95,7 +95,17 @@ def cached_registry():
         if result.exit_code == 0:
             commit_file.write_text(latest_commit + "\n")
         elif TEST_REGISTRY_DATA_PATH.exists():
-            print("make script returned non-zero:", result.exit_code)
+            print("bulk-register returned non-zero:", result.exit_code)
+            print("Output:", result.output)
+            if result.exception:
+                import traceback
+
+                print("Exception:")
+                traceback.print_exception(
+                    type(result.exception),
+                    result.exception,
+                    result.exception.__traceback__,
+                )
             # Delete it because it is invalid.
             shutil.rmtree(TEST_REGISTRY_DATA_PATH)
             RegistryDatabase.delete(conn)

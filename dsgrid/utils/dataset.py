@@ -19,7 +19,6 @@ from dsgrid.dimension.time import (
     DaylightSavingFallBackType,
     DaylightSavingSpringForwardType,
     TimeBasedDataAdjustmentModel,
-    TimeZone,
 )
 from dsgrid.exceptions import (
     DSGInvalidField,
@@ -100,17 +99,7 @@ def add_time_zone(
     pyspark.sql.DataFrame
 
     """
-    spark = get_spark_session()
-    dsg_geo_records = geography_dim.get_records_dataframe()
-    tz_map_table = spark.createDataFrame(
-        [(x.value, x.tz_name) for x in TimeZone], ("dsgrid_name", "tz_name")
-    )
-    geo_records = (
-        join(dsg_geo_records, tz_map_table, "time_zone", "dsgrid_name")
-        .drop("time_zone", "dsgrid_name")
-        .withColumnRenamed("tz_name", "time_zone")
-    )
-    assert dsg_geo_records.count() == geo_records.count()
+    geo_records = geography_dim.get_records_dataframe()
     if df_key not in load_data_df.columns:
         msg = f"Cannot locate {df_key=} in load_data_df: {load_data_df.columns}"
         raise ValueError(msg)
@@ -379,7 +368,7 @@ def convert_time_zone_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str | TimeZone,
+    time_zone: str,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and DuckDB.
@@ -388,7 +377,7 @@ def convert_time_zone_with_chronify_duckdb(
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    zone_info_tz = time_zone.tz if isinstance(time_zone, TimeZone) else ZoneInfo(time_zone)
+    zone_info_tz = ZoneInfo(time_zone)
     dst_schema = store.convert_time_zone(
         src_schema.name,
         zone_info_tz,
@@ -466,7 +455,7 @@ def convert_time_zone_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str | TimeZone,
+    time_zone: str | str,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
@@ -475,7 +464,7 @@ def convert_time_zone_with_chronify_spark_hive(
     with store.engine.begin() as conn:
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
-    zone_info_tz = time_zone.tz if isinstance(time_zone, TimeZone) else ZoneInfo(time_zone)
+    zone_info_tz = ZoneInfo(time_zone)
     try:
         dst_schema = store.convert_time_zone(
             src_schema.name,
@@ -553,7 +542,7 @@ def convert_time_zone_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str | TimeZone,
+    time_zone: str | str,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark using the local filesystem."""
@@ -561,7 +550,7 @@ def convert_time_zone_with_chronify_spark_path(
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    zone_info_tz = time_zone.tz if isinstance(time_zone, TimeZone) else ZoneInfo(time_zone)
+    zone_info_tz = ZoneInfo(time_zone)
     store.convert_time_zone(
         src_schema.name,
         zone_info_tz,

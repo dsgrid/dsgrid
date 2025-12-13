@@ -67,7 +67,6 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidOperation
 
 logger = logging.getLogger(__name__)
@@ -352,7 +351,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         time_dim.model.time_column = time_col
 
         config = dsgrid.runtime_config
-        if isinstance(model.result.time_zone, TimeZone):
+        if isinstance(model.result.time_zone, str) and model.result.time_zone != "geography":
             if time_dim.supports_chronify():
                 match (config.backend_engine, config.use_hive_metastore):
                     case (BackendEngine.SPARK, True):
@@ -704,7 +703,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             # of the local computer.
             # If any other settings get customized here, handle them in restart_spark()
             # as well. This change won't persist Spark session restarts.
-            with custom_time_zone(tz.tz_name):
+            with custom_time_zone(tz):
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -760,7 +759,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             # of the local computer.
             # If any other settings get customized here, handle them in restart_spark()
             # as well. This change won't persist Spark session restarts.
-            with custom_time_zone(tz.tz_name):  # type: ignore
+            with custom_time_zone(tz):  # type: ignore
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -806,7 +805,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             context.metadata = metadata
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.
-            with custom_time_zone(tz.tz_name):  # type: ignore
+            with custom_time_zone(tz):  # type: ignore
                 df = self._process_aggregations_and_save(df, context, repartition=False)
             context.finalize()
             return df
@@ -877,7 +876,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
             args = (context, handler)
             kwargs = {"time_dimension": dims.get(DimensionType.TIME)}
             if time_dim is not None and time_zone is not None:
-                with custom_time_zone(time_zone.tz_name):
+                with custom_time_zone(time_zone):
                     df = self._run_query(*args, **kwargs)
             else:
                 df = self._run_query(*args, **kwargs)

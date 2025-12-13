@@ -14,7 +14,6 @@ from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.dimension.time import (
     MeasurementType,
     TimeIntervalType,
-    TimeZone,
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
@@ -137,7 +136,7 @@ def date_time_dimension():
             class_name="Time",
             module="dsgrid.dimension.standard",
             frequency="P0DT1H",
-            timezone=TimeZone.EST,
+            timezone="Etc/GMT+4",
             name="datetime",
             description="example date time",
             ranges=[

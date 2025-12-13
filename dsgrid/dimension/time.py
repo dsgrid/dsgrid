@@ -18,15 +18,16 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    DATETIME_EXTERNAL_TZ = "datetime_external_tz"
     INDEX = "index"
     NOOP = "noop"
 
 
-class DatetimeFormat(str, Enum):
+class TimeZoneFormat(str, Enum):
     """Defines the time format of the datetime config model"""
 
-    ALIGNED = "aligned"
-    LOCAL = "local"
+    ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"
+    ALIGNED_IN_CLOCK_TIME = "aligned_in_clock_time"
     LOCAL_AS_STRINGS = "local_as_strings"
 
 
@@ -142,7 +143,7 @@ class MeasurementType(DSGEnum):
 class TimeZone(DSGEnum):
     """Time zone enum types
     - tz: zoneinfo.available_timezones()
-    - tz_name: spark uses Java timezones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
+    - tz_name: spark uses Java time_zones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
     """
 
     UTC = EnumValue(
@@ -466,7 +467,8 @@ class AnnualTimeRange(DatetimeRange):
         start = self.start.to_pydatetime()
         end = self.end.to_pydatetime()
         tz = self.tzinfo
-        for year in range(start.year, end.year + 1):
+        assert isinstance(self.frequency, int)
+        for year in range(start.year, end.year + self.frequency, self.frequency):
             yield datetime(year=year, month=1, day=1, tzinfo=tz)
 
 

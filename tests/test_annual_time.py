@@ -10,8 +10,9 @@ from dsgrid.config.date_time_dimension_config import (
     DateTimeDimensionConfig,
     DateTimeDimensionModel,
 )
-from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.config.dimensions import AlignedTimeSingleTimeZone, AnnualRangeModel, TimeRangeModel
 from dsgrid.dimension.time import (
+    TimeZoneFormat,
     MeasurementType,
     TimeIntervalType,
     TimeZone,
@@ -120,9 +121,8 @@ def annual_time_dimension():
             name="annual_time",
             description="test annual time",
             ranges=[
-                TimeRangeModel(start="2010", end="2020"),
+                AnnualRangeModel(start="2010", end="2020", str_format="%Y"),
             ],
-            str_format="%Y",
             measurement_type=MeasurementType.TOTAL,
             include_leap_day=True,
         )
@@ -136,14 +136,20 @@ def date_time_dimension():
             dimension_type=DimensionType.TIME,
             class_name="Time",
             module="dsgrid.dimension.standard",
-            frequency="P0DT1H",
-            timezone=TimeZone.EST,
+            time_zone_format=AlignedTimeSingleTimeZone(
+                format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
+                time_zone=TimeZone.EST,
+            ),
             name="datetime",
             description="example date time",
             ranges=[
-                TimeRangeModel(start="2012-02-01 00:00:00", end="2012-02-07 23:00:00"),
+                TimeRangeModel(
+                    start="2012-02-01 00:00:00",
+                    end="2012-02-07 23:00:00",
+                    frequency="P0DT1H",
+                    str_format="%Y-%m-%d %H:%M:%S",
+                ),
             ],
-            str_format="%Y-%m-%d %H:%M:%S",
             time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
             measurement_type=MeasurementType.TOTAL,
         )

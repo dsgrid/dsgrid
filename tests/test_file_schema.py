@@ -616,7 +616,7 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
     """Test reading a CSV file with timestamps that have no time zone offset.
 
     This verifies that timestamps like '2012-01-01 01:00:00' are correctly
-    parsed as naive timestamps (no timezone conversion occurs).
+    parsed as naive timestamps (no time_zone conversion occurs).
     """
     csv_file = tmp_path / "test_timestamps_no_tz.csv"
     csv_content = """id,timestamp,com_cooling,com_fans
@@ -642,12 +642,12 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
     # Collect the timestamps and verify they were parsed correctly
     rows = df.orderBy("timestamp").collect()
 
-    # The first timestamp should be 2012-01-01 01:00:00 with no timezone conversion
+    # The first timestamp should be 2012-01-01 01:00:00 with no time_zone conversion
     first_ts = rows[0].timestamp
     assert first_ts.year == 2012
     assert first_ts.month == 1
     assert first_ts.day == 1
-    # No timezone conversion, so hour remains 1
+    # No time_zone conversion, so hour remains 1
     assert first_ts.hour == 1, f"Expected hour 1, got {first_ts.hour}"
 
     # Verify the timestamps are in the correct order (1 hour apart)

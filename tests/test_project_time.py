@@ -285,7 +285,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
             time_df = spark.sql(f"SELECT * FROM {table}")
     finally:
-        # reset session timezone
+        # reset session time_zone
         set_current_time_zone(session_tz_orig)
         session_tz = get_current_time_zone()
 
@@ -352,7 +352,7 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     """
     - DF.show() (and probably all arithmetics) use spark.sql.session.timeZone
     - DF.toPandas() likely goes through spark.sql.session.timeZone
-    - DF.collect() converts timestamps to system timezone (different from spark.sql.session.timeZone!)
+    - DF.collect() converts timestamps to system time_zone (different from spark.sql.session.timeZone!)
     - hour(F.col(timestamp)) extracts hour from timestamp col as exactly shown in DF.show()
     - spark.sql.session.timeZone time that is consistent with system time seems to show time correctly
         (in session time) for DF.show(), however, it does not work well with time converting functions

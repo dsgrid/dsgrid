@@ -1,0 +1,97 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dataset_config.DatasetConfigModel
+
+Represents dataset configurations.
+" alt="" coords="5,664,2047,1420"/>
+<area shape="rect" id="node2" title="dsgrid.config.dataset_config.GrowthRateModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2272,411,2804,495"/>
+<area shape="rect" id="node3" title="dsgrid.config.dataset_config.QuantityModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2293,543,2783,599"/>
+<area shape="rect" id="node4" title="dsgrid.config.dataset_config.RegistryDataLayout
+
+Data layout stored in the dsgrid registry (without file paths).
+" alt="" coords="2355,250,2721,362"/>
+<area shape="rect" id="node5" title="dsgrid.config.dataset_config.UserDataLayout
+
+User&#45;defined data layout for dataset registration.
+" alt="" coords="2355,5,2721,201"/>
+<area shape="rect" id="node6" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.
+" alt="" coords="2370,1117,2706,1509"/>
+<area shape="rect" id="node7" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="2191,2025,2885,2501"/>
+<area shape="rect" id="node8" title="dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel
+
+Defines a time dimension where timestamps are tz&#45;naive and require localizing to a time zone
+using a time zone column.
+" alt="" coords="2204,1557,2872,1977"/>
+<area shape="rect" id="node9" title="dsgrid.config.dimensions.DimensionModel
+
+Defines a non&#45;time dimension
+" alt="" coords="2413,2549,2663,2913"/>
+<area shape="rect" id="node10" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+" alt="" coords="2413,3759,2663,3871"/>
+<area shape="rect" id="node11" title="dsgrid.config.dimensions.IndexTimeDimensionModel
+
+Defines a time dimension where timestamps are indices and requires converting to datetime.
+" alt="" coords="2376,2962,2700,3354"/>
+<area shape="rect" id="node12" title="dsgrid.config.dimensions.NoOpTimeDimensionModel
+
+Defines a NoOp time dimension.
+" alt="" coords="2393,3403,2683,3711"/>
+<area shape="rect" id="node13" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel
+
+Defines a representative time dimension.
+" alt="" coords="2357,648,2719,1068"/>
+<area shape="rect" id="node14" title="dsgrid.config.file_schema.FileSchema
+
+Defines the format of a data file (CSV, JSON, Parquet).
+" alt="" coords="3199,49,3425,161"/>
+<area shape="rect" id="node16" title="dsgrid.config.dimensions.AnnualRangeModel
+
+Defines a continuous range of annual time.
+" alt="" coords="3229,1453,3395,1593"/>
+<area shape="rect" id="node15" title="dsgrid.config.dimensions.AlignedTimeSingleTimeZone
+
+For each geography, data has the same set of timestamps in absolute time.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA and NY both start in 2018&#45;01&#45;01 00:00 EST.
+" alt="" coords="3029,1996,3595,2080"/>
+<area shape="rect" id="node17" title="dsgrid.config.dimensions.LocalTimeMultipleTimeZones
+
+For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
+for the time zone of each geography.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA may start in 2018&#45;01&#45;01 00:00 PST while data in NY may start in 2018&#45;01&#45;01 00:00 EST.
+They are aligned in clock time but not in absolute time.
+" alt="" coords="3046,2193,3578,2277"/>
+<area shape="rect" id="node18" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3231,2359,3393,2499"/>
+<area shape="rect" id="node19" title="dsgrid.config.dimensions.IndexRangeModel
+
+Defines a continuous range of indices.
+" alt="" coords="3199,3299,3425,3467"/>
+<area shape="rect" id="node20" title="dsgrid.config.dimensions.MonthRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3231,1013,3393,1097"/>
+<area shape="rect" id="node21" title="dsgrid.config.file_schema.Column
+
+Base data model for all dsgrid data models
+" alt="" coords="3739,106,4041,218"/>
+</map>

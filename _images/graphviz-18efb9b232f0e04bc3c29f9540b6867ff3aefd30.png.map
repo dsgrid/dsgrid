@@ -1,0 +1,88 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.dataset.models.PivotedTableFormatModel
+
+Defines a pivoted table format where one dimension&#39;s records are columns.
+" alt="" coords="2392,269,2825,353"/>
+<area shape="rect" id="node2" title="dsgrid.dataset.models.StackedTableFormatModel
+
+Defines a stacked (unpivoted) table format with a single value column.
+" alt="" coords="2435,402,2782,458"/>
+<area shape="rect" id="node3" title="dsgrid.dimension.dimension_filters.DimensionFilterBetweenColumnOperatorModel
+
+Filters a table where a dimension column is between the lower bound and upper bound,
+inclusive.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;timestamp&quot;).between(&quot;2012&#45;07&#45;01 00:00:00&quot;, &quot;2012&#45;08&#45;01 00:00:00&quot;))
+" alt="" coords="2289,506,2928,730"/>
+<area shape="rect" id="node4" title="dsgrid.dimension.dimension_filters.DimensionFilterColumnOperatorModel
+
+Filters a table where a dimension column matches a Spark SQL operator.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;geography&quot;).like(&quot;abc%&quot;))
+df.filter(~F.col(&quot;sector&quot;).startswith(&quot;com&quot;))
+" alt="" coords="2337,778,2880,1002"/>
+<area shape="rect" id="node5" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionModel
+
+Filters a table where a dimension column matches an expression.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;operator=&quot;==&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;06037&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+" alt="" coords="2373,1051,2844,1247"/>
+<area shape="rect" id="node6" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionRawModel
+
+Filters a table where a dimension column matches an expression.
+Uses the passed string with no modification.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionRawModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;== &#39;06037&#39;&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+
+The difference between this class and DimensionFilterExpressionModel is that the latter
+will attempt to add quotes as necessary.
+" alt="" coords="2347,1295,2870,1463"/>
+<area shape="rect" id="node7" title="dsgrid.dimension.dimension_filters.SubsetDimensionFilterModel
+
+Filters base dimension records that match a subset dimension.
+" alt="" coords="2390,1512,2827,1652"/>
+<area shape="rect" id="node8" title="dsgrid.dimension.dimension_filters.SupplementalDimensionFilterColumnOperatorModel
+
+Filters base dimension records that have a valid mapping to a supplemental dimension.
+" alt="" coords="2263,1701,2955,1925"/>
+<area shape="rect" id="node9" title="dsgrid.query.models.AggregationModel
+
+Aggregate on one or more dimensions.
+" alt="" coords="2433,5,2784,89"/>
+<area shape="rect" id="node10" title="dsgrid.query.models.DimensionNamesModel
+
+Defines the list of dimensions to which the value columns should be aggregated.
+If a value is empty, that dimension will be aggregated and dropped from the table.
+" alt="" coords="3099,63,3437,315"/>
+<area shape="rect" id="node11" title="dsgrid.query.models.ColumnModel
+
+Defines one column in a SQL aggregation statement.
+" alt="" coords="3581,191,3795,303"/>
+<area shape="rect" id="node12" title="dsgrid.query.models.QueryResultParamsModel
+
+Controls post&#45;processing and storage of CompositeDatasets
+" alt="" coords="5,388,2119,696"/>
+<area shape="rect" id="node13" title="dsgrid.query.models.ReportInputModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2516,137,2701,221"/>
+</map>

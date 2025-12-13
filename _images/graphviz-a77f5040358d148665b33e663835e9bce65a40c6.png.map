@@ -1,0 +1,26 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AlignedTimeSingleTimeZone
+
+For each geography, data has the same set of timestamps in absolute time.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA and NY both start in 2018&#45;01&#45;01 00:00 EST.
+" alt="" coords="844,183,1409,267"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="5,5,700,481"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.LocalTimeMultipleTimeZones
+
+For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
+for the time zone of each geography.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA may start in 2018&#45;01&#45;01 00:00 PST while data in NY may start in 2018&#45;01&#45;01 00:00 EST.
+They are aligned in clock time but not in absolute time.
+" alt="" coords="861,315,1393,399"/>
+<area shape="rect" id="node4" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="1045,447,1208,587"/>
+</map>

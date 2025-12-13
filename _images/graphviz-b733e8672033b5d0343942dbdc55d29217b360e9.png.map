@@ -1,0 +1,71 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AlignedTimeSingleTimeZone
+
+For each geography, data has the same set of timestamps in absolute time.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA and NY both start in 2018&#45;01&#45;01 00:00 EST.
+" alt="" coords="2860,348,3425,432"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.AnnualRangeModel
+
+Defines a continuous range of annual time.
+" alt="" coords="3060,1335,3225,1475"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.
+" alt="" coords="2201,998,2537,1390"/>
+<area shape="rect" id="node4" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="2021,473,2716,949"/>
+<area shape="rect" id="node5" title="dsgrid.config.dimensions.LocalTimeMultipleTimeZones
+
+For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
+for the time zone of each geography.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA may start in 2018&#45;01&#45;01 00:00 PST while data in NY may start in 2018&#45;01&#45;01 00:00 EST.
+They are aligned in clock time but not in absolute time.
+" alt="" coords="2877,545,3409,629"/>
+<area shape="rect" id="node6" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3061,807,3224,947"/>
+<area shape="rect" id="node7" title="dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel
+
+Defines a time dimension where timestamps are tz&#45;naive and require localizing to a time zone
+using a time zone column.
+" alt="" coords="2035,5,2703,425"/>
+<area shape="rect" id="node8" title="dsgrid.config.dimensions.DimensionModel
+
+Defines a non&#45;time dimension
+" alt="" coords="2243,1439,2494,1803"/>
+<area shape="rect" id="node9" title="dsgrid.config.dimensions.IndexRangeModel
+
+Defines a continuous range of indices.
+" alt="" coords="3029,2189,3256,2357"/>
+<area shape="rect" id="node10" title="dsgrid.config.dimensions.IndexTimeDimensionModel
+
+Defines a time dimension where timestamps are indices and requires converting to datetime.
+" alt="" coords="2207,1851,2531,2243"/>
+<area shape="rect" id="node11" title="dsgrid.config.dimensions.MonthRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3062,3013,3223,3097"/>
+<area shape="rect" id="node12" title="dsgrid.config.dimensions.NoOpTimeDimensionModel
+
+Defines a NoOp time dimension.
+" alt="" coords="2224,2292,2513,2600"/>
+<area shape="rect" id="node13" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel
+
+Defines a representative time dimension.
+" alt="" coords="2187,2648,2550,3068"/>
+<area shape="rect" id="node14" title="dsgrid.config.dimensions_config.DimensionsConfigModel
+
+Represents multiple dimension models.
+
+Used when registering multiple dimensions in one command.
+" alt="" coords="5,1410,1877,1466"/>
+</map>

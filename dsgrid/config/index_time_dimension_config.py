@@ -49,7 +49,9 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_frequency(self) -> timedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
-        assert set(freqs) == {freqs[0]}, freqs
+        if len(set(freqs)) > 1:
+            msg = f"IndexTimeDimensionConfig.get_frequency found multiple frequencies: {freqs}"
+            raise ValueError(msg)
         return freqs[0]
 
     def get_start_times(self) -> list[pd.Timestamp]:

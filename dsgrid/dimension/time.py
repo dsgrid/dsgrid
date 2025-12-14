@@ -19,6 +19,7 @@ class TimeDimensionType(DSGEnum):
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
     DATETIME_EXTERNAL_TZ = "datetime_external_tz"
+    DATETIME_EXTERNAL_TZ = "datetime_external_tz"
     INDEX = "index"
     NOOP = "noop"
 

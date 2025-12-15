@@ -17,8 +17,9 @@ def test_filter_by_journal():
     assert journal.has_entries()
     registration2 = registration.filter_by_journal(journal)
     assert not registration2.projects
-    assert len(registration2.datasets) == 1
-    assert registration2.datasets[0].dataset_id == "test_efs_comstock"
+    assert len(registration2.datasets) == 2
+    dataset_ids = {x.dataset_id for x in registration2.datasets}
+    assert not dataset_ids.difference(("test_efs_comstock", "test_efs_comstock_time_in_parts"))
     assert len(registration2.dataset_submissions) == 2
 
     # Everything worked on the second try.
@@ -38,5 +39,8 @@ def test_filter_by_journal():
     )
     registration3 = registration.filter_by_journal(journal2)
     assert not registration3.projects
-    assert not registration3.datasets
+    assert (
+        len(registration3.datasets) == 1
+        and registration3.datasets[0].dataset_id == "test_efs_comstock_time_in_parts"
+    )
     assert not registration3.dataset_submissions

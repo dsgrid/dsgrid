@@ -126,7 +126,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
+    def check_consistency(
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
         """
@@ -134,6 +138,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @abc.abstractmethod
     def check_time_consistency(self):
         """Check the time consistency of the dataset."""
+
+    @abc.abstractmethod
+    def get_base_load_data_table(self) -> DataFrame:
+        """Return the base load data table, which must include time."""
 
     @abc.abstractmethod
     def _get_load_data_table(self) -> DataFrame:
@@ -161,31 +169,28 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
-        self, missing_dimension_associations: dict[str, DataFrame]
+        self, missing_dimension_associations: dict[str, DataFrame], context: ScratchDirContext
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
         logger.info("Check dimension associations")
-        dsgrid_config = DsgridRuntimeConfig.load()
-        scratch_dir = dsgrid_config.get_scratch_dir()
-        with ScratchDirContext(scratch_dir) as context:
-            assoc_by_records = self._make_expected_dimension_association_table_from_records(
-                [x for x in DimensionType if x != DimensionType.TIME], context
-            )
-            assoc_by_data = self._make_actual_dimension_association_table_from_data()
-            # This first check is redundant with the checks below. But, it is significantly
-            # easier for users to debug.
-            for column in assoc_by_records.columns:
-                expected = get_unique_values(assoc_by_records, column)
-                actual = get_unique_values(assoc_by_data, column)
-                if actual != expected:
-                    missing = sorted(expected.difference(actual))
-                    extra = sorted(actual.difference(expected))
-                    num_matching = len(actual.intersection(expected))
-                    msg = (
-                        f"Dataset records for dimension type {column} do not match expected "
-                        f"values. {missing=} {extra=} {num_matching=}"
-                    )
-                    raise DSGInvalidDataset(msg)
+        assoc_by_records = self._make_expected_dimension_association_table_from_records(
+            [x for x in DimensionType if x != DimensionType.TIME], context
+        )
+        assoc_by_data = self._make_actual_dimension_association_table_from_data()
+        # This first check is redundant with the checks below. But, it is significantly
+        # easier for users to debug.
+        for column in assoc_by_records.columns:
+            expected = get_unique_values(assoc_by_records, column)
+            actual = get_unique_values(assoc_by_data, column)
+            if actual != expected:
+                missing = sorted(expected.difference(actual))
+                extra = sorted(actual.difference(expected))
+                num_matching = len(actual.intersection(expected))
+                msg = (
+                    f"Dataset records for dimension type {column} do not match expected "
+                    f"values. {missing=} {extra=} {num_matching=}"
+                )
+                raise DSGInvalidDataset(msg)
 
             required_assoc = assoc_by_records
             if missing_dimension_associations:

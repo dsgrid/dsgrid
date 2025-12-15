@@ -201,6 +201,12 @@ class PeggedIndex(MetricDimensionBaseModel):
     base_value: float
 
 
+class WeatherVariable(MetricDimensionBaseModel):
+    """Weather attributes - e.g., dry bulb temperature, relative humidity"""
+
+    unit: str
+
+
 # ---------------------------
 # TIME DIMENSIONS
 # ---------------------------

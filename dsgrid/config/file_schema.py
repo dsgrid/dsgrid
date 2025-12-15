@@ -79,7 +79,7 @@ class Column(DSGBaseModel):
         "registry's data directory. The original dataset is not modified.",
     )
     data_type: str | None = Field(
-        description="Type of the data in the column. If None, infer the type."
+        default=None, description="Type of the data in the column. If None, infer the type."
     )
 
     @field_validator("data_type")

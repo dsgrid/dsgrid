@@ -16,6 +16,11 @@
       config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.json5",
       replace_dimension_names_with_ids: true,
     },
+    {
+      dataset_id: "test_efs_comstock_time_in_parts",
+      config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_time_in_parts/dataset.json5",
+      replace_dimension_names_with_ids: true,
+    },
   ],
   dataset_submissions: [
     {

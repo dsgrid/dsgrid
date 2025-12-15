@@ -278,39 +278,31 @@ class TimeFormatInPartsModel(DSGBaseModel):
     e.g., month-day-hour format,
     requiring conversion to datetime."""
 
-    dtype: Literal["YEAR_MONTH_DAY_HOUR"] = "YEAR_MONTH_DAY_HOUR"
-    year_column: str | None = Field(
+    dtype: Literal["time_format_in_parts"] = "time_format_in_parts"
+    # TODO: we may allow more columns to be None
+    year_column: str = Field(
         title="year_column",
         description="Name of the year column in the dataset.",
-        default=None,
     )
-    month_column: str | None = Field(
+    month_column: str = Field(
         title="month_column",
         description="Name of the month column in the dataset.",
-        default=None,
     )
-    day_column: str | None = Field(
+    day_column: str = Field(
         title="day_column",
         description="Name of the day column in the dataset.",
-        default=None,
     )
     hour_column: str | None = Field(
         title="hour_column",
-        description="Name of the hour column in the dataset.",
+        description="Name of the hour column in the dataset. If None, the hour will be set to 0 "
+        "for all rows.",
         default=None,
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def check_columns(cls, values):
-        year_col = values.get("year_column")
-        month_col = values.get("month_column")
-        day_col = values.get("day_column")
-        hour_col = values.get("hour_column")
-        if not year_col and not month_col and not day_col and not hour_col:
-            msg = "At least one of year_column, month_column, day_column, or hour_column must be provided."
-            raise ValueError(msg)
-        return values
+    time_zone: str | None = Field(
+        default=None,
+        title="time_zone",
+        description="Time zone of the timestamps. Use None for time zone-naive timestamps.",
+    )
 
     def converted_to_datetime(self):
         return False
@@ -320,8 +312,9 @@ class TimeFormatInPartsModel(DSGBaseModel):
         return [col for col in cols if col is not None]
 
 
-DateTimeFormatModels = Union[
-    TimeFormatDateTimeTZModel, TimeFormatDateTimeNTZModel, TimeFormatInPartsModel
+DateTimeFormat = Annotated[
+    TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel | TimeFormatInPartsModel,
+    Field(discriminator="dtype"),
 ]
 
 
@@ -498,6 +491,11 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
 
+    column_format: DateTimeFormat = Field(
+        default=TimeFormatDateTimeTZModel(),
+        title="time_format",
+        description="Specifies the format of the timestamps in the dataset.",
+    )
     time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
         title="time_zone_format",
         discriminator="format_type",
@@ -654,28 +652,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
             return True
         return False
-
-    # Can move this to a preprocessing utility module (outside of date_time_dimension_config.py)
-    def _convert_to_datetime(self, df):
-        """Convert time column(s) in dataframe to single tz-aware timestamp column."""
-        if self.format.converted_to_datetime():
-            return df
-
-        match (self.format.dtype, self.time_zone_format.format_type):
-            case ("YEAR_MONTH_DAY_HOUR", TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME):
-                # do transformation, based on presence of time part columns
-                # assemble timestamps by assuming time parts are in the time zone specified in time_zone_format
-                # update self.format model to TimeFormatDateTimeTZModel after conversion
-                return df
-            case ("YEAR_MONTH_DAY_HOUR", TimeZoneFormat.ALIGNED_IN_CLOCK_TIME):
-                # do transformation, based on presence of time part columns, time zone column must be present
-                # assemble timestamps by assuming time parts are in the local time zone of each geography
-                # update self.format model to TimeFormatDateTimeTZModel after conversion
-                return df
-
-            case _:
-                msg = f"Unsupported time format dtype: {self.format.dtype}"
-                raise ValueError(msg)
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):

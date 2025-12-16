@@ -390,69 +390,100 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
+        hour_col = col_format.hour_column
 
-        year_col = col_format.year_column
-        month_col = col_format.month_column
-        day_col = col_format.day_column
-        hour_col = col_format.hour_column if col_format.hour_column is not None else None
+        timestamp_str_expr = self._build_timestamp_string_expr(col_format)
+        df, fixed_tz = self._resolve_timezone(df, config, col_format)
+        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, fixed_tz)
 
-        # Build a timestamp from year/month/day/hour columns using SQL expression
-        # Use VARCHAR for DuckDB, STRING for Spark
+        cols_to_drop = self._get_time_columns_to_drop(col_format)
+        reformatted_df = self._apply_timestamp_transformation(df, cols_to_drop, timestamp_sql)
+
+        self._update_config_for_timestamp(
+            config, reformatted_df, scratch_dir_context, cols_to_drop, new_col_format
+        )
+        self._update_time_dimension(time_dim, new_col_format, hour_col)
+
+    @staticmethod
+    def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
+        """Build SQL expression that creates a timestamp string from time-in-parts columns."""
         str_type = "varchar" if use_duckdb() else "string"
+        hour_col = col_format.hour_column
         hour_expr = f"lpad(cast({hour_col} as {str_type}), 2, '0')" if hour_col else "'00'"
-        timestamp_str = (
-            f"cast({year_col} as {str_type}) || '-' || "
-            f"lpad(cast({month_col} as {str_type}), 2, '0') || '-' || "
-            f"lpad(cast({day_col} as {str_type}), 2, '0') || ' ' || "
+
+        return (
+            f"cast({col_format.year_column} as {str_type}) || '-' || "
+            f"lpad(cast({col_format.month_column} as {str_type}), 2, '0') || '-' || "
+            f"lpad(cast({col_format.day_column} as {str_type}), 2, '0') || ' ' || "
             f"{hour_expr} || ':00:00'"
         )
 
-        # Determine timezone source: either from config or from geography dimension
-        if col_format.time_zone is not None:
-            fixed_tz = col_format.time_zone
-        else:
-            geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
-            assert geo_dim is not None
-            df = add_time_zone(df, geo_dim)
-            fixed_tz = None
+    @staticmethod
+    def _resolve_timezone(
+        df: DataFrame, config: DatasetConfig, col_format: TimeFormatInPartsModel
+    ) -> tuple[DataFrame, str | None]:
+        """Resolve timezone from config or geography dimension.
 
-        # Build timestamp SQL based on backend and timezone source
+        Returns the (possibly modified) dataframe and the fixed timezone if single-tz,
+        or None if multi-timezone.
+        """
+        if col_format.time_zone is not None:
+            return df, col_format.time_zone
+
+        geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
+        assert geo_dim is not None
+        return add_time_zone(df, geo_dim), None
+
+    @staticmethod
+    def _build_timestamp_sql(
+        timestamp_str_expr: str, fixed_tz: str | None
+    ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
+        """Build the final timestamp SQL expression and determine the column format."""
         if fixed_tz is not None:
-            # Single timezone - create timezone-aware timestamp
             if use_duckdb():
-                timestamp_sql = (
-                    f"cast({timestamp_str} || ' {fixed_tz}' as timestamptz) as timestamp"
-                )
+                sql = f"cast({timestamp_str_expr} || ' {fixed_tz}' as timestamptz) as timestamp"
             else:
-                # Spark: Convert IANA timezone to offset (e.g., "Etc/GMT+5" -> "-05:00")
                 tz = ZoneInfo(fixed_tz)
                 offset = datetime(2012, 1, 1, tzinfo=tz).strftime("%z")
                 offset_formatted = f"{offset[:3]}:{offset[3:]}"
-                timestamp_sql = (
-                    f"cast({timestamp_str} || '{offset_formatted}' as timestamp) as timestamp"
+                sql = (
+                    f"cast({timestamp_str_expr} || '{offset_formatted}' as timestamp) as timestamp"
                 )
-            new_col_format = TimeFormatDateTimeTZModel(time_column="timestamp")
-        else:
-            # Multi-timezone (clock-time-aligned): create naive timestamp, keep time_zone column.
-            # Using naive timestamps preserves local clock time across timezones.
-            timestamp_sql = f"cast({timestamp_str} as timestamp) as timestamp"
-            new_col_format = TimeFormatDateTimeNTZModel(time_column="timestamp")
+            return sql, TimeFormatDateTimeTZModel(time_column="timestamp")
 
-        # Build list of columns to drop (the time-in-parts columns)
-        # Don't drop columns that are also dimension columns (e.g., weather_year)
-        dimension_columns = DimensionType.get_allowed_dimension_column_names()
-        cols_to_drop = {year_col, month_col, day_col}
-        if hour_col:
-            cols_to_drop.add(hour_col)
-        cols_to_drop -= dimension_columns
+        # Multi-timezone: create naive timestamp, keep time_zone column
+        sql = f"cast({timestamp_str_expr} as timestamp) as timestamp"
+        return sql, TimeFormatDateTimeNTZModel(time_column="timestamp")
 
-        # Select all existing columns except time-in-parts, plus the new timestamp column
+    @staticmethod
+    def _get_time_columns_to_drop(col_format: TimeFormatInPartsModel) -> set[str]:
+        """Get the set of time-in-parts columns to drop, excluding dimension columns."""
+        cols_to_drop = {col_format.year_column, col_format.month_column, col_format.day_column}
+        if col_format.hour_column:
+            cols_to_drop.add(col_format.hour_column)
+        return cols_to_drop - DimensionType.get_allowed_dimension_column_names()
+
+    @staticmethod
+    def _apply_timestamp_transformation(
+        df: DataFrame, cols_to_drop: set[str], timestamp_sql: str
+    ) -> DataFrame:
+        """Apply the timestamp transformation to the dataframe."""
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
-        exprs = existing_cols + [timestamp_sql]
-        reformatted_df = select_expr(df, exprs)
+        return select_expr(df, existing_cols + [timestamp_sql])
+
+    def _update_config_for_timestamp(
+        self,
+        config: DatasetConfig,
+        df: DataFrame,
+        scratch_dir_context: ScratchDirContext,
+        cols_to_drop: set[str],
+        new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
+    ) -> None:
+        """Write the transformed dataframe and update config paths and columns."""
         path = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        write_dataframe(reformatted_df, path)
+        write_dataframe(df, path)
         config.model.data_layout.data_file.path = str(path)
+
         if config.model.data_layout.data_file.columns is not None:
             updated_columns = [
                 c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
@@ -465,9 +496,15 @@ class DatasetRegistryManager(RegistryManagerBase):
             updated_columns.append(Column(name="timestamp", data_type=timestamp_data_type))
             config.model.data_layout.data_file.columns = updated_columns
 
+    @staticmethod
+    def _update_time_dimension(
+        time_dim,
+        new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
+        hour_col: str | None,
+    ) -> None:
+        """Update the time dimension model with the new format."""
         time_dim.model.column_format = new_col_format
         time_dim.model.time_column = "timestamp"
-        # Update frequency based on time resolution (daily if no hour column)
         if hour_col is None:
             for time_range in time_dim.model.ranges:
                 time_range.frequency = timedelta(days=1)
@@ -726,27 +763,31 @@ class DatasetRegistryManager(RegistryManagerBase):
         updated_config = DatasetConfig(updated_model)
         self._update_dimensions(conn, updated_config)
 
-        # Note: this method mutates updated_config.
-        self._write_to_registry(updated_config, orig_version=cur_config.model.version)
+        dsgrid_config = DsgridRuntimeConfig.load()
+        scratch_dir = dsgrid_config.get_scratch_dir()
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            # Note: this method mutates updated_config.
+            self._write_to_registry(updated_config, orig_version=cur_config.model.version)
 
-        assoc_df = self._store.read_missing_associations_tables(
-            updated_config.model.dataset_id, updated_config.model.version
-        )
-        try:
-            self._run_checks(conn, updated_config, assoc_df)
-        except Exception:
-            self._store.remove_tables(
+            assoc_df = self._store.read_missing_associations_tables(
                 updated_config.model.dataset_id, updated_config.model.version
             )
-            raise
+            try:
+                self._run_checks(conn, updated_config, assoc_df, scratch_dir_context)
+            except Exception:
+                self._store.remove_tables(
+                    updated_config.model.dataset_id, updated_config.model.version
+                )
+                raise
 
-        old_key = ConfigKey(dataset_id, cur_config.model.version)
-        new_key = ConfigKey(dataset_id, updated_config.model.version)
-        self._datasets.pop(old_key, None)
-        self._datasets[new_key] = updated_config
+            old_key = ConfigKey(dataset_id, cur_config.model.version)
+            new_key = ConfigKey(dataset_id, updated_config.model.version)
+            self._datasets.pop(old_key, None)
+            self._datasets[new_key] = updated_config
 
-        if not self.offline_mode:
-            self.sync_push(self.get_registry_data_directory(dataset_id))
+            if not self.offline_mode:
+                self.sync_push(self.get_registry_data_directory(dataset_id))
 
         return updated_config
 

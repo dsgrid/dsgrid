@@ -91,13 +91,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_load_data_unpivoted_value_column(self._load_data)
         allowed_columns = DimensionType.get_allowed_dimension_column_names().union(time_columns)
         allowed_columns.add(VALUE_COLUMN)
+        allowed_columns.add("time_zone")
 
         schema = self._load_data.schema
         for column in self._load_data.columns:
             if column not in allowed_columns:
                 msg = f"{column=} is not expected in load_data"
                 raise DSGInvalidDataset(msg)
-            if not (column in time_columns or column == VALUE_COLUMN):
+            if not (column in time_columns or column == VALUE_COLUMN or column == "time_zone"):
                 dim_type = DimensionType.from_column(column)
                 if schema[column].dataType != StringType():
                     msg = f"dimension column {column} must have data type = StringType"

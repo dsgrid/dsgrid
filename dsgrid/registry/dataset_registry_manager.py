@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Self, Type, Union
 from zoneinfo import ZoneInfo
@@ -47,7 +47,7 @@ from dsgrid.spark.functions import (
 )
 from dsgrid.spark.types import use_duckdb
 from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -407,30 +407,44 @@ class DatasetRegistryManager(RegistryManagerBase):
             f"{hour_expr} || ':00:00'"
         )
 
+        # Determine timezone source: either from config or from geography dimension
         if col_format.time_zone is not None:
-            # Create time-zone-aware timestamp
+            fixed_tz = col_format.time_zone
+        else:
+            geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
+            assert geo_dim is not None
+            df = add_time_zone(df, geo_dim)
+            fixed_tz = None
+
+        # Build timestamp SQL based on backend and timezone source
+        if fixed_tz is not None:
+            # Single timezone - create timezone-aware timestamp
             if use_duckdb():
-                # DuckDB: append timezone and cast to timestamptz (preserves timezone info)
-                timestamp_sql = f"cast({timestamp_str} || ' {col_format.time_zone}' as timestamptz) as timestamp"
+                timestamp_sql = (
+                    f"cast({timestamp_str} || ' {fixed_tz}' as timestamptz) as timestamp"
+                )
             else:
-                # Spark: include timezone offset in the timestamp string so it's parsed correctly
-                # Convert IANA timezone to offset (e.g., "Etc/GMT+5" -> "-05:00")
-                tz = ZoneInfo(col_format.time_zone)
+                # Spark: Convert IANA timezone to offset (e.g., "Etc/GMT+5" -> "-05:00")
+                tz = ZoneInfo(fixed_tz)
                 offset = datetime(2012, 1, 1, tzinfo=tz).strftime("%z")
-                # Format as -05:00 instead of -0500
                 offset_formatted = f"{offset[:3]}:{offset[3:]}"
                 timestamp_sql = (
                     f"cast({timestamp_str} || '{offset_formatted}' as timestamp) as timestamp"
                 )
             new_col_format = TimeFormatDateTimeTZModel(time_column="timestamp")
         else:
+            # Multi-timezone (clock-time-aligned): create naive timestamp, keep time_zone column.
+            # Using naive timestamps preserves local clock time across timezones.
             timestamp_sql = f"cast({timestamp_str} as timestamp) as timestamp"
             new_col_format = TimeFormatDateTimeNTZModel(time_column="timestamp")
 
         # Build list of columns to drop (the time-in-parts columns)
+        # Don't drop columns that are also dimension columns (e.g., weather_year)
+        dimension_columns = DimensionType.get_allowed_dimension_column_names()
         cols_to_drop = {year_col, month_col, day_col}
         if hour_col:
             cols_to_drop.add(hour_col)
+        cols_to_drop -= dimension_columns
 
         # Select all existing columns except time-in-parts, plus the new timestamp column
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
@@ -444,12 +458,19 @@ class DatasetRegistryManager(RegistryManagerBase):
                 c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
             ]
             timestamp_data_type = (
-                "TIMESTAMP_TZ" if col_format.time_zone is not None else "TIMESTAMP_NTZ"
+                "TIMESTAMP_TZ"
+                if isinstance(new_col_format, TimeFormatDateTimeTZModel)
+                else "TIMESTAMP_NTZ"
             )
             updated_columns.append(Column(name="timestamp", data_type=timestamp_data_type))
             config.model.data_layout.data_file.columns = updated_columns
 
         time_dim.model.column_format = new_col_format
+        time_dim.model.time_column = "timestamp"
+        # Update frequency based on time resolution (daily if no hour column)
+        if hour_col is None:
+            for time_range in time_dim.model.ranges:
+                time_range.frequency = timedelta(days=1)
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig

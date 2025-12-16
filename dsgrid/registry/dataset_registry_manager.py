@@ -388,6 +388,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         ):
             return
 
+        # This code only exists because we lack full support for time zone naive timestamps.
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
         hour_col = col_format.hour_column
@@ -568,7 +569,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         return df
 
     def _read_table_from_user_path(
-        self, config: DatasetConfig, pre_converted_df: DataFrame | None = None
+        self, config: DatasetConfig
     ) -> tuple[DataFrame, DataFrame | None]:
         """Read a table from a user-provided path. Split expected-missing rows into a separate
         DataFrame.
@@ -577,9 +578,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         ----------
         config : DatasetConfig
             The dataset configuration.
-        pre_converted_df : DataFrame | None, optional
-            If provided, use this dataframe instead of reading from file.
-            This is used when time format conversion has already been applied.
 
         Returns
         -------
@@ -587,13 +585,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             The first DataFrame contains the expected rows, and the second DataFrame contains the
             missing rows or will be None if there are no missing rows.
         """
-        if pre_converted_df is None:
-            if config.data_file_schema is None:
-                msg = "Cannot read table without data file schema"
-                raise DSGInvalidDataset(msg)
-            df = read_data_file(config.data_file_schema)
-        else:
-            df = pre_converted_df
+        if config.data_file_schema is None:
+            msg = "Cannot read table without data file schema"
+            raise DSGInvalidDataset(msg)
+        df = read_data_file(config.data_file_schema)
 
         if config.get_value_format() == ValueFormat.PIVOTED:
             logger.info("Convert dataset %s from pivoted to stacked.", config.model.dataset_id)

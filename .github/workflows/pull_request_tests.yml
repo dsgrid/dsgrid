@@ -46,8 +46,8 @@ jobs:
         #  echo "Spark restored from cache."
         #fi
 
-        export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        ${SPARK_HOME}/sbin/start-thriftserver.sh
+        # export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
+        # ${SPARK_HOME}/sbin/start-thriftserver.sh
 
     - name: Run tests
       run: |

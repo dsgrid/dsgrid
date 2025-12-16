@@ -446,7 +446,7 @@ def convert_time_zone_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str | str,
+    time_zone: str,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
@@ -533,7 +533,7 @@ def convert_time_zone_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str | str,
+    time_zone: str,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark using the local filesystem."""

@@ -9,6 +9,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
 from dsgrid.spark.types import DataFrame
+from dsgrid.utils.spark import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 
 
@@ -172,7 +173,16 @@ def read_data_file(schema: FileSchema) -> DataFrame:
 
     df = _drop_ignored_columns(df, schema.ignore_columns)
     renames = _get_column_renames(schema)
-    df = _rename_columns(df, renames)
+    if renames:
+        df = _rename_columns(df, renames)
+        renamed_path = path.with_stem(path.stem + "_renamed")
+        # TODO: This renamed table will persist. Find a way to delete it after use.
+        write_dataframe(df, renamed_path, overwrite=True)
+        schema.path = str(renamed_path)
+        for column in schema.columns:
+            if column.name in renames:
+                column.name = renames[column.name]
+                column.dimension_type = None
     return df
 
 

@@ -9,6 +9,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
 from dsgrid.spark.types import DataFrame
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 
@@ -129,13 +130,17 @@ class FileSchema(DSGBaseModel):
         return {x.name: x.data_type for x in self.columns if x.data_type is not None}
 
 
-def read_data_file(schema: FileSchema) -> DataFrame:
+def read_data_file(
+    schema: FileSchema, scratch_dir_context: ScratchDirContext | None = None
+) -> DataFrame:
     """Read a data file from a schema.
 
     Parameters
     ----------
     schema : FileSchema
         Schema defining the file path and column types.
+    scratch_dir_context : ScratchDirContext
+        Optional location to write temporary files.
 
     Returns
     -------
@@ -175,8 +180,14 @@ def read_data_file(schema: FileSchema) -> DataFrame:
     renames = _get_column_renames(schema)
     if renames:
         df = _rename_columns(df, renames)
-        renamed_path = path.with_stem(path.stem + "_renamed")
-        # TODO: This renamed table will persist. Find a way to delete it after use.
+        if scratch_dir_context is None:
+            renamed_path = path.with_stem(path.stem + "_renamed")
+            logger.warning(
+                "Creating temporary file at %s. Pass scratch_dir_context to avoid this.",
+                renamed_path,
+            )
+        else:
+            renamed_path = scratch_dir_context.get_temp_filename(suffix=path.suffix)
         write_dataframe(df, renamed_path, overwrite=True)
         schema.path = str(renamed_path)
         for column in schema.columns:

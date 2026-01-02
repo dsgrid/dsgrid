@@ -344,7 +344,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
             self._convert_time_format_if_necessary(config, schema_handler, scratch_dir_context)
             schema_handler.check_time_consistency()
-            self._write_to_registry(config)
+            self._write_to_registry(config, scratch_dir_context=scratch_dir_context)
 
             assoc_dfs = self._store.read_missing_associations_tables(
                 config.model.dataset_id, config.model.version
@@ -391,7 +391,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         # This code only exists because we lack full support for time zone naive timestamps.
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
-        hour_col = col_format.hour_column
 
         timestamp_str_expr = self._build_timestamp_string_expr(col_format)
         df, fixed_tz = self._resolve_timezone(df, config, col_format)
@@ -403,7 +402,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._update_config_for_timestamp(
             config, reformatted_df, scratch_dir_context, cols_to_drop, new_col_format
         )
-        self._update_time_dimension(time_dim, new_col_format, hour_col)
+        self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
@@ -511,13 +510,13 @@ class DatasetRegistryManager(RegistryManagerBase):
                 time_range.frequency = timedelta(days=1)
 
     def _read_lookup_table_from_user_path(
-        self, config: DatasetConfig
+        self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
     ) -> tuple[DataFrame, DataFrame | None]:
         if config.lookup_file_schema is None:
             msg = "Cannot read lookup table without lookup file schema"
             raise DSGInvalidDataset(msg)
 
-        df = read_data_file(config.lookup_file_schema)
+        df = read_data_file(config.lookup_file_schema, scratch_dir_context=scratch_dir_context)
         if "id" not in df.columns:
             msg = "load_data_lookup does not include an 'id' column"
             raise DSGInvalidDataset(msg)
@@ -569,7 +568,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         return df
 
     def _read_table_from_user_path(
-        self, config: DatasetConfig
+        self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
     ) -> tuple[DataFrame, DataFrame | None]:
         """Read a table from a user-provided path. Split expected-missing rows into a separate
         DataFrame.
@@ -578,6 +577,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         ----------
         config : DatasetConfig
             The dataset configuration.
+        scratch_dir_context : ScratchDirContext | None
+            Optional location to store temporary files
 
         Returns
         -------
@@ -588,7 +589,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if config.data_file_schema is None:
             msg = "Cannot read table without data file schema"
             raise DSGInvalidDataset(msg)
-        df = read_data_file(config.data_file_schema)
+        df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
 
         if config.get_value_format() == ValueFormat.PIVOTED:
             logger.info("Convert dataset %s from pivoted to stacked.", config.model.dataset_id)
@@ -627,6 +628,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config: DatasetConfig,
         orig_version: str | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
     ) -> None:
         lk_df: DataFrame | None = None
         missing_dfs: dict[str, DataFrame] = {}
@@ -644,7 +646,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
                 else:
                     # Note: config will be updated if this is a pivoted table.
-                    ld_df, missing_df1 = self._read_table_from_user_path(config)
+                    ld_df, missing_df1 = self._read_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
@@ -662,14 +666,18 @@ class DatasetRegistryManager(RegistryManagerBase):
                     )
                 else:
                     # Note: config will be updated if this is a pivoted table.
-                    ld_df, tmp = self._read_table_from_user_path(config)
+                    ld_df, tmp = self._read_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     if tmp is not None:
                         msg = (
                             "NULL rows cannot be present in the load_data table in standard format. "
                             "They must be provided in the load_data_lookup table."
                         )
                         raise DSGInvalidDataset(msg)
-                    lk_df, missing_df1 = self._read_lookup_table_from_user_path(config)
+                    lk_df, missing_df1 = self._read_lookup_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
@@ -763,7 +771,11 @@ class DatasetRegistryManager(RegistryManagerBase):
         scratch_dir.mkdir(parents=True, exist_ok=True)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Note: this method mutates updated_config.
-            self._write_to_registry(updated_config, orig_version=cur_config.model.version)
+            self._write_to_registry(
+                updated_config,
+                orig_version=cur_config.model.version,
+                scratch_dir_context=scratch_dir_context,
+            )
 
             assoc_df = self._store.read_missing_associations_tables(
                 updated_config.model.dataset_id, updated_config.model.version

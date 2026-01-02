@@ -344,13 +344,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         logger.info("Check dataset time consistency.")
         assert isinstance(self._config.model.data_layout, UserDataLayout)
         file_schema = self._config.model.data_layout.data_file
-        load_data_df = read_data_file(file_schema)
-        chronify_schema = self._get_chronify_schema(load_data_df)
-
-        data_file_path = Path(file_schema.path)
-        if data_file_path.suffix == ".parquet" or not use_duckdb():
-            scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
-            with ScratchDirContext(scratch_dir) as context:
+        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as context:
+            load_data_df = read_data_file(file_schema, scratch_dir_context=context)
+            chronify_schema = self._get_chronify_schema(load_data_df)
+            assert file_schema.path is not None
+            data_file_path = Path(file_schema.path)
+            if data_file_path.suffix == ".parquet" or not use_duckdb():
                 if data_file_path.suffix == ".csv":
                     # This is a workaround for time zone issues between Spark, Pandas,
                     # and Chronify when reading CSV files.
@@ -366,15 +366,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     # This performs all of the checks.
                     store.create_view_from_parquet(src_path, chronify_schema)
                     store.drop_view(chronify_schema.name)
-        else:
-            # For CSV and JSON files, use in-memory store with ingest_table.
-            # This avoids the complexity of converting to parquet.
-            with create_in_memory_store() as store:
-                # ingest_table performs all of the time checks.
-                store.ingest_table(load_data_df.toPandas(), chronify_schema)
-                store.drop_table(chronify_schema.name)
+            else:
+                # For CSV and JSON files, use in-memory store with ingest_table.
+                # This avoids the complexity of converting to parquet.
+                with create_in_memory_store() as store:
+                    # ingest_table performs all of the time checks.
+                    store.ingest_table(load_data_df.toPandas(), chronify_schema)
+                    store.drop_table(chronify_schema.name)
 
-        self._check_model_year_time_consistency(load_data_df)
+            self._check_model_year_time_consistency(load_data_df)
 
     def _get_chronify_schema(self, df: DataFrame):
         time_dim = self._config.get_dimension(DimensionType.TIME)

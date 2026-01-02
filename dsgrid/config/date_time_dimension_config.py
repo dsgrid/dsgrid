@@ -6,7 +6,6 @@ import pandas as pd
 
 import chronify
 
-from dsgrid.dimension.time import TimeZone
 from dsgrid.dimension.time import TimeZoneFormat, TimeIntervalType
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -64,7 +63,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_frequency(self) -> timedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
-        assert set(freqs) == {freqs[0]}, freqs
+        if len(set(freqs)) > 1:
+            msg = f"DateTimeDimensionConfig.get_frequency found multiple frequencies: {freqs}"
+            raise ValueError(msg)
         return freqs[0]
 
     def get_start_times(self) -> list[pd.Timestamp]:
@@ -95,12 +96,12 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_load_data_time_columns(self) -> list[str]:
         return [self.model.time_column]
 
-    def get_time_zone(self) -> TimeZone | None:
+    def get_time_zone(self) -> str | None:
         if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
             return self.model.time_zone_format.time_zone
         return None
 
-    def get_time_zones(self) -> list[TimeZone]:
+    def get_time_zones(self) -> list[str]:
         if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
             return [self.model.time_zone_format.time_zone]
         if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
@@ -111,7 +112,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_zone = self.get_time_zone()
         if time_zone is None:
             return None
-        return time_zone.tz
+        return ZoneInfo(time_zone)
 
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type

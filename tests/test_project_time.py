@@ -1,4 +1,5 @@
 import logging
+from zoneinfo import ZoneInfo
 
 import pytest
 from typing import Optional
@@ -14,7 +15,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
+from dsgrid.dimension.time import TimeIntervalType
 
 from dsgrid.spark.functions import (
     create_temp_view,
@@ -78,14 +79,6 @@ def tempo(project):
     dataset_id = "tempo_conus_2022"
     project.load_dataset(dataset_id)
     return project.get_dataset(dataset_id)
-
-
-def test_no_unexpected_timezone():
-    for tzo in TimeZone:
-        if tzo != TimeZone.ARIZONA:
-            assert (
-                tzo.is_standard() + tzo.is_prevailing() == 1
-            ), f"{tzo} can either be prevailing or standard"
 
 
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
@@ -378,7 +371,7 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     # QC 2: model_time == project_time == tempo_time
     session_tz = get_current_time_zone()
     assert session_tz is not None
-    z_info = get_zone_info_from_spark_session(session_tz)
+    z_info = ZoneInfo(session_tz)
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
     project_time = [t[0].astimezone(z_info) for t in project_time.collect()]
     project_time = pd.DataFrame(project_time, columns=["project_time"])

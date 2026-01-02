@@ -82,7 +82,6 @@ from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
-from dsgrid.dimension.time import TimeZone
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -133,7 +132,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    with custom_time_zone(tz.tz_name):
+    with custom_time_zone(tz):
         expected = (
             df.groupBy("county", F.hour("time_est").alias("hour"))
             .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
@@ -146,7 +145,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 
 
 @pytest.mark.parametrize("category", list(DimensionCategory))
-@pytest.mark.parametrize("to_time_zone", [None, TimeZone.PPT, "geography"])
+@pytest.mark.parametrize("to_time_zone", [None, "America/Los_Angeles", "geography"])
 def test_electricity_values(category, to_time_zone):
     run_query_test(QueryTestElectricityValues, category, to_time_zone=to_time_zone)
 
@@ -873,18 +872,18 @@ class QueryTestElectricityValues(QueryTestBase):
         # Check time zone conversion
         if self._model.result.time_zone:
             expected.append("time_zone")
-            if isinstance(self._model.result.time_zone, TimeZone):
-                assert set(pdf["time_zone"]) == {self._model.result.time_zone.tz_name}
+            if self._model.result.time_zone != "geography":
+                assert set(pdf["time_zone"]) == {self._model.result.time_zone}
                 assert pdf.loc[0, "time_est"].tz is None
                 expected_min = (
-                    pd.Timestamp("2012-01-01", tz=ZoneInfo("EST"))
-                    .tz_convert(self._to_time_zone.tz)
+                    pd.Timestamp("2012-01-01", tz=ZoneInfo("Etc/GMT+5"))
+                    .tz_convert(self._to_time_zone)
                     .tz_localize(None)
                 )
                 assert pdf["time_est"].min() == expected_min
                 expected_max = (
-                    pd.Timestamp("2012-12-31 23:00", tz=ZoneInfo("EST"))
-                    .tz_convert(self._to_time_zone.tz)
+                    pd.Timestamp("2012-12-31 23:00", tz=ZoneInfo("Etc/GMT+5"))
+                    .tz_convert(self._to_time_zone)
                     .tz_localize(None)
                 )
                 assert pdf["time_est"].max() == expected_max

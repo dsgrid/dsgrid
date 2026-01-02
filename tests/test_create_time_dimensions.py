@@ -135,7 +135,7 @@ def create_index_time_dataframe(interval="1h"):
     )
     df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
-    time_zones = ["MountainPrevailing", "PacificPrevailing", "USArizona"]
+    time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     if interval == "1h":
         indices = np.arange(0, 8784).tolist()
         values = np.arange(0.0, 8784.0).tolist()
@@ -178,13 +178,13 @@ def df_date_time():
     )
     df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
-    time_zones = ["MountainPrevailing", "PacificPrevailing", "USArizona"]
+    time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     ts_pt = pd.date_range(
-        "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
+        "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("America/Denver")
     )
     ts_pt = [str(ts) for ts in ts_pt]
     ts_st = pd.date_range(
-        "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
+        "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("America/Denver")
     )
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]

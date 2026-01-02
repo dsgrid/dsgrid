@@ -16,7 +16,6 @@ from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
     TimeIntervalType,
     MeasurementType,
-    TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
     TimeZoneFormat,
@@ -367,7 +366,7 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     format_type: Literal[
         TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
     ] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
-    time_zone: TimeZone = Field(
+    time_zone: str = Field(
         title="time_zone",
         description="Time zone of data",
     )
@@ -402,7 +401,7 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     format_type: Literal[
         TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
     ] = TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
-    time_zones: list[TimeZone] = Field(
+    time_zones: list[str] = Field(
         title="time_zones",
         description="List of unique time zones in the dataset",
     )

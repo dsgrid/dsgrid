@@ -8,7 +8,6 @@ import chronify
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
-    TimeZone,
     TimeIntervalType,
     TimeBasedDataAdjustmentModel,
 )
@@ -140,11 +139,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_time_zone(self) -> TimeZone | None:
-        """Return a TimeZone instance for this dimension."""
+    def get_time_zone(self) -> str | None:
+        """Return a time zone instance for this dimension."""
 
-    def get_time_zones(self) -> list[TimeZone]:
-        """Return a list of TimeZone instances for this dimension."""
+    def get_time_zones(self) -> list[str]:
+        """Return a list of time zones for this dimension."""
         if self.get_time_zone():
             return [self.get_time_zone()]
         return []
@@ -188,6 +187,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def _build_time_ranges(
         self,
         time_ranges: list[TimeRangeModel],
-        tz: TimeZone | None = None,
+        tz: str | None = None,
     ) -> list[tuple[pd.Timestamp, pd.Timestamp, pd.Timedelta]]:
         return build_time_ranges(time_ranges, tz=tz)

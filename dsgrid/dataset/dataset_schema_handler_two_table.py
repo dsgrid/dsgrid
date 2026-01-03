@@ -52,6 +52,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         config: DatasetConfig,
         *args,
         store: DataStoreInterface | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
         **kwargs,
     ) -> Self:
         if store is None:
@@ -61,8 +62,12 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if config.lookup_file_schema is None:
                 msg = "TWO_TABLE format requires lookup_data_file"
                 raise DSGInvalidDataset(msg)
-            load_data_df = read_data_file(config.data_file_schema)
-            load_data_lookup = read_data_file(config.lookup_file_schema)
+            load_data_df = read_data_file(
+                config.data_file_schema, scratch_dir_context=scratch_dir_context
+            )
+            load_data_lookup = read_data_file(
+                config.lookup_file_schema, scratch_dir_context=scratch_dir_context
+            )
         else:
             load_data_df = store.read_table(config.model.dataset_id, config.model.version)
             load_data_lookup = store.read_lookup_table(

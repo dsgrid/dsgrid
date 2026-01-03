@@ -8,6 +8,7 @@ from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
 def make_dataset_schema_handler(
@@ -17,6 +18,7 @@ def make_dataset_schema_handler(
     dimension_mapping_mgr: DimensionMappingRegistryManager,
     store: DataStoreInterface | None = None,
     mapping_references: list[DimensionMappingReferenceModel] | None = None,
+    scratch_dir_context: ScratchDirContext | None = None,
 ):
     match config.get_table_format():
         case TableFormat.TWO_TABLE:
@@ -27,6 +29,7 @@ def make_dataset_schema_handler(
                 dimension_mapping_mgr,
                 store=store,
                 mapping_references=mapping_references,
+                scratch_dir_context=scratch_dir_context,
             )
         case TableFormat.ONE_TABLE:
             return OneTableDatasetSchemaHandler.load(
@@ -36,6 +39,7 @@ def make_dataset_schema_handler(
                 dimension_mapping_mgr,
                 store=store,
                 mapping_references=mapping_references,
+                scratch_dir_context=scratch_dir_context,
             )
         case _:
             msg = f"Unsupported table format: {config.get_table_format()}"

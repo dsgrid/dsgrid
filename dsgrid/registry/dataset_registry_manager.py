@@ -341,6 +341,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 self._dimension_mgr,
                 self._dimension_mapping_mgr,
                 store=None,
+                scratch_dir_context=scratch_dir_context,
             )
             self._convert_time_format_if_necessary(config, schema_handler, scratch_dir_context)
             schema_handler.check_time_consistency()

@@ -41,13 +41,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         config: DatasetConfig,
         *args,
         store: DataStoreInterface | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
         **kwargs,
     ) -> Self:
         if store is None:
             if config.data_file_schema is None:
                 msg = "Cannot load dataset without data file schema or store"
                 raise DSGInvalidDataset(msg)
-            df = read_data_file(config.data_file_schema)
+            df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
         else:
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)

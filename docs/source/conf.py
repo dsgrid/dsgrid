@@ -10,9 +10,12 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+docs_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(docs_dir))
 
 # -- Project information -----------------------------------------------------
 import dsgrid
@@ -133,3 +136,33 @@ autodoc_pydantic_model_show_config_member = False
 autodoc_pydantic_model_show_config_summary = False
 autodoc_pydantic_model_erdantic_figure = False
 autodoc_pydantic_model_erdantic_figure_collapsed = False
+
+# Display Pydantic model fields in compact table format
+autodoc_pydantic_model_show_field_summary = True
+autodoc_pydantic_model_summary_list_order = "bysource"
+autodoc_pydantic_field_list_validators = True
+autodoc_pydantic_field_doc_policy = "docstring"
+autodoc_pydantic_field_show_constraints = True
+autodoc_pydantic_field_show_alias = False
+autodoc_pydantic_field_show_default = True
+autodoc_pydantic_model_hide_paramlist = True
+autodoc_pydantic_model_members = True
+autodoc_pydantic_model_undoc_members = False
+
+
+# -- Custom setup for auto-generating model documentation -------------------
+
+
+def setup(app):
+    """Sphinx setup hook to auto-generate data model documentation."""
+    # Generate data model documentation before building
+    try:
+        from generate_all_models import main as generate_models
+
+        print("Generating data model documentation...")
+        result = generate_models()
+        if result != 0:
+            print("Warning: Failed to generate some model documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate model documentation: {e}")
+        # Don't fail the build if generation fails

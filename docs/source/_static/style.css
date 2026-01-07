@@ -132,3 +132,27 @@
     font-size: small;
     font-style: italic;
 }
+
+/* Data Model Table Styling - make text more uniform and compact */
+/* Target tables in the data_models section */
+article[role="main"] table td,
+article[role="main"] table th {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+/* Make plain text in tables similar size to code text */
+article[role="main"] table td {
+    vertical-align: top;
+}
+
+/* Ensure code blocks in tables don't get too large */
+article[role="main"] table td code {
+    font-size: 0.85rem;
+}
+
+/* Slightly reduce padding for more compact tables */
+article[role="main"] table td,
+article[role="main"] table th {
+    padding: 0.5rem 0.75rem;
+}

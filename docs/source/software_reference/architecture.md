@@ -156,5 +156,5 @@ User → Web Browser → Dash App → HTTP API → Registry DB
 
 - Learn about [CLI fundamentals](cli_fundamentals)
 - Explore the [Python API](../api_reference/index)
-- Understand [dataset formats](dataset_formats)
+- Understand [dataset formats](../user_guide/dataset_registration/formats)
 - See [data models](data_models/index) for configuration schemas

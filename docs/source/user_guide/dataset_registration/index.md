@@ -22,6 +22,5 @@ validity_checks
 Legacy detailed guides available at:
 - [Dimensions (detailed)](../../explanations/components/dimensions)
 - [Datasets (detailed)](../../explanations/components/datasets)
-- [Dataset Formats (detailed)](../../reference/dataset_formats)
 - [Create Dataset Dimensions (detailed)](../../how_tos/create_dataset_dimensions)
 :::

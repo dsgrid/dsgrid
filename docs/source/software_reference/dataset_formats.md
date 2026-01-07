@@ -1,6 +1,11 @@
 # Dataset Formats
 
-dsgrid aims to support all dataset formats that users need for efficient queries and analysis. If you need a new format, please contact the dsgrid team to discuss it.
+:::{attention}
+This page has been moved to [User Guide > Dataset Registration > Formats](../user_guide/dataset_registration/formats).
+
+Please update your bookmarks.
+:::
+
 
 ## Requirements
 

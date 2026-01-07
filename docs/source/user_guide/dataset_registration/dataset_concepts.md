@@ -22,7 +22,7 @@ For space-saving reasons, these trivial dimensions do not need to exist in the d
 
 ## File Format
 
-A dataset must comply with a supported dsgrid file format. Please refer to [](../../software_reference/dataset_formats) for options.
+A dataset must comply with a supported dsgrid file format. Please refer to [](formats) for options.
 
 ## Submit-to-Project
 

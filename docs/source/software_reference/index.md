@@ -7,7 +7,6 @@ Technical reference documentation for dsgrid software components.
 
 architecture
 cli_fundamentals
-dataset_formats
 data_models/index
 ```
 
@@ -16,5 +15,4 @@ Legacy detailed guides and auto-generated reference:
 - [CLI Reference (auto-generated)](../reference/cli)
 - [Architecture (detailed)](../reference/architecture)
 - [CLI Fundamentals (detailed)](../reference/cli_fundamentals)
-- [Dataset Formats (detailed)](../reference/dataset_formats)
 :::

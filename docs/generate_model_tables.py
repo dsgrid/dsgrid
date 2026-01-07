@@ -6,6 +6,7 @@ It can be called on individual models or recursively generate docs for nested mo
 
 import inspect
 import sys
+from enum import Enum
 from pathlib import Path
 from typing import Any, get_args, get_origin, Union
 import importlib
@@ -60,7 +61,11 @@ def get_type_string(field_type: Any) -> str:
         # For regular classes and Pydantic models
         name = field_type.__name__
         if hasattr(field_type, "__module__") and field_type.__module__.startswith("dsgrid"):
-            # Link to other dsgrid models
+            # Check if it's an Enum - link to enums page
+            if inspect.isclass(field_type) and issubclass(field_type, Enum):
+                # Link to the enums page with anchor
+                return f"[{name}](enums.md#{name.lower()})"
+            # Link to other dsgrid models (Pydantic models)
             return f"[{name}](#{name.lower()})"
         return f"`{name}`"
     else:
@@ -326,11 +331,18 @@ def generate_model_documentation(
     # Get model docstring
     doc = inspect.getdoc(model) or ""
 
+    # Get full module path (only show for top-level models)
+    full_path = f"{model.__module__}.{model.__name__}"
+
     # Use heading_level for model name, heading_level+1 for sections
     lines = [
         f"{'#' * heading_level} {model.__name__}",
         "",
     ]
+
+    # Add full path for top-level models (H1 headings)
+    if heading_level == 1:
+        lines.extend([f"*{full_path}*", ""])
 
     if doc:
         lines.extend([doc, ""])
@@ -396,6 +408,57 @@ def import_model(model_path: str) -> type[BaseModel]:
         raise ValueError(msg)
 
     return model
+
+
+def generate_enum_documentation(enum_class: type[Enum]) -> str:
+    """Generate markdown documentation for an Enum.
+
+    Parameters
+    ----------
+    enum_class : type[Enum]
+        The Enum class to document
+
+    Returns
+    -------
+    str
+        Markdown documentation for the enum
+    """
+    doc = inspect.getdoc(enum_class) or ""
+
+    # Get full module path
+    full_path = f"{enum_class.__module__}.{enum_class.__name__}"
+
+    lines = [
+        f"## {enum_class.__name__}",
+        "",
+        f"*{full_path}*",
+        "",
+    ]
+
+    if doc:
+        lines.extend([doc, ""])
+
+    # Create a table showing both the constant name and its value
+    lines.extend(
+        [
+            "| Constant | Value |",
+            "|----------|-------|",
+        ]
+    )
+
+    for member in enum_class:
+        # Show the enum member name and its actual value
+        value = member.value
+        # Format the value appropriately (string values get quotes)
+        if isinstance(value, str):
+            value_str = f"`'{value}'`"
+        else:
+            value_str = f"`{value}`"
+
+        lines.append(f"| `{member.name}` | {value_str} |")
+
+    lines.append("")
+    return "\n".join(lines)
 
 
 @click.command()

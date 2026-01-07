@@ -155,7 +155,19 @@ autodoc_pydantic_model_undoc_members = False
 
 def setup(app):
     """Sphinx setup hook to auto-generate data model documentation."""
-    # Generate data model documentation before building
+    # Generate enum documentation first
+    try:
+        from generate_enums import main as generate_enums
+
+        print("Generating enum documentation...")
+        result = generate_enums()
+        if result != 0:
+            print("Warning: Failed to generate some enum documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate enum documentation: {e}")
+        # Don't fail the build if generation fails
+
+    # Generate data model documentation
     try:
         from generate_all_models import main as generate_models
 

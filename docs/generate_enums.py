@@ -30,6 +30,7 @@ ENUMS = [
     "dsgrid.config.dataset_config.GrowthRateType",
     # From dsgrid.config.dimension_mapping_base
     "dsgrid.config.dimension_mapping_base.DimensionMappingType",
+    "dsgrid.config.dimension_mapping_base.DimensionMappingArchetype",
 ]
 
 
@@ -46,8 +47,6 @@ def main():
     """Generate enum documentation."""
     docs_dir = Path(__file__).parent
     output_path = docs_dir / "source/software_reference/data_models/enums.md"
-
-    print("Generating enum documentation...")
 
     lines = [
         "# Enums",

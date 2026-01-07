@@ -16,19 +16,24 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 
-def get_type_string(field_type: Any) -> str:
+def get_type_string(field_type: Any, documented_models: dict = None) -> str:
     """Convert a Python type annotation to a readable string.
 
     Parameters
     ----------
     field_type : Any
         The type annotation to convert
+    documented_models : dict, optional
+        Mapping of models to their documentation file paths
 
     Returns
     -------
     str
         Human-readable type string
     """
+    if documented_models is None:
+        documented_models = {}
+
     # Handle None type
     if field_type is type(None):
         return "None"
@@ -39,22 +44,22 @@ def get_type_string(field_type: Any) -> str:
 
     if origin is Union:
         # Handle Optional and Union types
-        type_strs = [get_type_string(arg) for arg in args]
+        type_strs = [get_type_string(arg, documented_models) for arg in args]
         # Escape pipes for markdown tables
         return " \\| ".join(type_strs)
     elif origin is list:
         if args:
-            return f"list[{get_type_string(args[0])}]"
+            return f"list[{get_type_string(args[0], documented_models)}]"
         return "list"
     elif origin is dict:
         if args:
-            key_type = get_type_string(args[0])
-            val_type = get_type_string(args[1])
+            key_type = get_type_string(args[0], documented_models)
+            val_type = get_type_string(args[1], documented_models)
             return f"dict[{key_type}, {val_type}]"
         return "dict"
     elif origin is tuple:
         if args:
-            arg_strs = [get_type_string(arg) for arg in args]
+            arg_strs = [get_type_string(arg, documented_models) for arg in args]
             return f"tuple[{', '.join(arg_strs)}]"
         return "tuple"
     elif hasattr(field_type, "__name__"):
@@ -65,8 +70,14 @@ def get_type_string(field_type: Any) -> str:
             if inspect.isclass(field_type) and issubclass(field_type, Enum):
                 # Link to the enums page with anchor
                 return f"[{name}](enums.md#{name.lower()})"
-            # Link to other dsgrid models (Pydantic models)
-            return f"[{name}](#{name.lower()})"
+            # Check if it's a documented model - link to its page
+            elif field_type in documented_models:
+                doc_path = documented_models[field_type]
+                # Link to the file with anchor (H2 heading)
+                return f"[{name}]({doc_path}#{name.lower()})"
+            # Otherwise link to local anchor
+            else:
+                return f"[{name}](#{name.lower()})"
         return f"`{name}`"
     else:
         return str(field_type)
@@ -172,19 +183,24 @@ def extract_nested_models(model: type[BaseModel]) -> set[type[BaseModel]]:
     return nested
 
 
-def generate_fields_table(model: type[BaseModel]) -> str:
+def generate_fields_table(model: type[BaseModel], documented_models: dict = None) -> str:
     """Generate a markdown table for a model's fields.
 
     Parameters
     ----------
     model : type[BaseModel]
         The Pydantic model to document
+    documented_models : dict, optional
+        Mapping of models to their documentation file paths
 
     Returns
     -------
     str
         Markdown table string
     """
+    if documented_models is None:
+        documented_models = {}
+
     lines = ["| Name | Type | Default | Description |", "|------|------|---------|-------------|"]
 
     for field_name, field_info in model.model_fields.items():
@@ -192,7 +208,7 @@ def generate_fields_table(model: type[BaseModel]) -> str:
         if field_name.startswith("_"):
             continue
 
-        type_str = get_type_string(field_info.annotation)
+        type_str = get_type_string(field_info.annotation, documented_models)
         default_str = get_default_string(field_info)
         desc = get_field_description(field_info)
 
@@ -331,7 +347,7 @@ def generate_model_documentation(
     # Get model docstring
     doc = inspect.getdoc(model) or ""
 
-    # Get full module path (only show for top-level models)
+    # Get full module path
     full_path = f"{model.__module__}.{model.__name__}"
 
     # Use heading_level for model name, heading_level+1 for sections
@@ -340,8 +356,9 @@ def generate_model_documentation(
         "",
     ]
 
-    # Add full path for top-level models (H1 headings)
-    if heading_level == 1:
+    # Add full path for H1 or H2 (top-level models on a page)
+    # Don't show for H3+ (nested models)
+    if heading_level <= 2:
         lines.extend([f"*{full_path}*", ""])
 
     if doc:
@@ -351,7 +368,7 @@ def generate_model_documentation(
         [
             f"{'#' * (heading_level + 1)} Fields",
             "",
-            generate_fields_table(model),
+            generate_fields_table(model, documented_models),
         ]
     )
 
@@ -369,12 +386,8 @@ def generate_model_documentation(
         for nested_model in sorted(nested_models, key=lambda m: m.__name__):
             # Check if this nested model is already documented at top level
             if nested_model in documented_models:
-                # Create a link instead of duplicating documentation
-                doc_path = documented_models[nested_model]
-                lines.append(f"{'#' * (heading_level + 1)} {nested_model.__name__}")
-                lines.append("")
-                lines.append(f"See [{nested_model.__name__}]({doc_path}) for details.")
-                lines.append("")
+                # Skip - the table already has a link to it
+                continue
             else:
                 # Document the nested model inline
                 nested_doc = generate_model_documentation(
@@ -425,6 +438,17 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
     """
     doc = inspect.getdoc(enum_class) or ""
 
+    # Filter out inherited str class documentation
+    # Enums that inherit from str (either via StrEnum or (str, Enum)) get str's __doc__
+    # Check if str is in the base classes
+    if str in enum_class.__mro__:
+        # Only use the docstring if it's explicitly defined on the class itself
+        # (not inherited from str)
+        if enum_class.__doc__ is None or enum_class.__doc__ == str.__doc__:
+            doc = ""
+        else:
+            doc = enum_class.__doc__
+
     # Get full module path
     full_path = f"{enum_class.__module__}.{enum_class.__name__}"
 
@@ -438,14 +462,63 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
     if doc:
         lines.extend([doc, ""])
 
-    # Create a table showing both the constant name and its value
+    # Check if any enum members have additional attributes (from EnumValue)
+    # We need to check the actual __dict__ of the member to get only the extra attributes
+    extra_attrs = set()
+    has_description = False
+
+    # Get all enum member names to exclude them from attributes
+    enum_member_names = {member.name for member in enum_class}
+
+    for member in enum_class:
+        # Check for description
+        if hasattr(member, "description") and member.description:
+            has_description = True
+
+        # Get attributes that are not callables and not standard enum attributes
+        for attr in dir(member):
+            if attr.startswith("_"):
+                continue
+            if attr in ("name", "value", "description"):
+                continue
+            # Skip if this attribute name is actually another enum member
+            if attr in enum_member_names:
+                continue
+
+            attr_val = getattr(member, attr, None)
+            # Skip methods, functions, and other callables
+            if callable(attr_val):
+                continue
+            # Skip if the attribute value is an enum member
+            if isinstance(attr_val, Enum):
+                continue
+
+            # Only include if it's an actual data attribute
+            extra_attrs.add(attr)
+
+    # Build table header based on what attributes are present
+    if has_description and extra_attrs:
+        # All fields: Constant, Value, Description, and other attributes
+        header_cols = ["Constant", "Value", "Description"] + sorted(extra_attrs)
+    elif has_description:
+        # Just Constant, Value, and Description
+        header_cols = ["Constant", "Value", "Description"]
+    elif extra_attrs:
+        # Constant, Value, and other attributes (no description)
+        header_cols = ["Constant", "Value"] + sorted(extra_attrs)
+    else:
+        # Just Constant and Value (basic enum)
+        header_cols = ["Constant", "Value"]
+
+    # Create table header
     lines.extend(
         [
-            "| Constant | Value |",
-            "|----------|-------|",
+            "| " + " | ".join(header_cols) + " |",
+            "|" + "|".join(["-" * (len(col) + 2) for col in header_cols]) + "|",
         ]
     )
 
+    # Create table rows
     for member in enum_class:
         # Show the enum member name and its actual value
         value = member.value
@@ -455,7 +528,31 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
         else:
             value_str = f"`{value}`"
 
-        lines.append(f"| `{member.name}` | {value_str} |")
+        row = [f"`{member.name}`", value_str]
+
+        # Add description if present in header
+        if has_description:
+            desc = getattr(member, "description", None) or ""
+            # Clean up description: remove newlines and extra whitespace, escape pipes
+            desc = " ".join(desc.split()).replace("|", "\\|")
+            row.append(desc)
+
+        # Add other attributes if present in header
+        for attr in sorted(extra_attrs):
+            attr_value = getattr(member, attr, None)
+            if attr_value is not None:
+                # Format the attribute value
+                if isinstance(attr_value, str):
+                    attr_str = attr_value
+                else:
+                    attr_str = str(attr_value)
+                # Clean and escape
+                attr_str = " ".join(attr_str.split()).replace("|", "\\|")
+                row.append(attr_str)
+            else:
+                row.append("")
+
+        lines.append("| " + " | ".join(row) + " |")
 
     lines.append("")
     return "\n".join(lines)

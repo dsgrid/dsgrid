@@ -40,10 +40,10 @@ Defines the supported time formats in the load data.
 
 Defines the supported formats for representative period data.
 
-| Constant | Value |
-|----------|-------|
-| `ONE_WEEK_PER_MONTH_BY_HOUR` | `'one_week_per_month_by_hour'` |
-| `ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR` | `'one_weekday_day_and_one_weekend_day_per_month_by_hour'` |
+| Constant | Value | Description | frequency |
+|----------|-------|-------------|-----------|
+| `ONE_WEEK_PER_MONTH_BY_HOUR` | `'one_week_per_month_by_hour'` | load_data columns use 'month', 'day_of_week', 'hour' to specify time | 1:00:00 |
+| `ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR` | `'one_weekday_day_and_one_weekend_day_per_month_by_hour'` | load_data columns use 'month', 'hour', 'is_weekday' to specify time | 1:00:00 |
 
 ## LeapDayAdjustmentType
 
@@ -51,12 +51,12 @@ Defines the supported formats for representative period data.
 
 Leap day adjustment enum types
 
-| Constant | Value |
-|----------|-------|
-| `DROP_DEC31` | `'drop_dec31'` |
-| `DROP_FEB29` | `'drop_feb29'` |
-| `DROP_JAN1` | `'drop_jan1'` |
-| `NONE` | `'none'` |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DROP_DEC31` | `'drop_dec31'` | To adjust for leap years, December 31st timestamps and data get dropped. |
+| `DROP_FEB29` | `'drop_feb29'` | Feburary 29th timestamps and data are dropped. Currently not yet supported by dsgrid. |
+| `DROP_JAN1` | `'drop_jan1'` | To adjust for leap years, January 1st timestamps and data get dropped. |
+| `NONE` | `'none'` | No leap day adjustment made. |
 
 ## TimeIntervalType
 
@@ -64,11 +64,11 @@ Leap day adjustment enum types
 
 Time interval enum types
 
-| Constant | Value |
-|----------|-------|
-| `PERIOD_ENDING` | `'period_ending'` |
-| `PERIOD_BEGINNING` | `'period_beginning'` |
-| `INSTANTANEOUS` | `'instantaneous'` |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `PERIOD_ENDING` | `'period_ending'` | A time interval that is period ending is coded by the end time. E.g., 2pm (with freq=1h) represents a period of time between 1-2pm. |
+| `PERIOD_BEGINNING` | `'period_beginning'` | A time interval that is period beginning is coded by the beginning time. E.g., 2pm (with freq=01:00:00) represents a period of time between 2-3pm. This is the dsgrid default. |
+| `INSTANTANEOUS` | `'instantaneous'` | The time record value represents measured, instantaneous time |
 
 ## MeasurementType
 
@@ -76,13 +76,13 @@ Time interval enum types
 
 Time value measurement enum types
 
-| Constant | Value |
-|----------|-------|
-| `MEAN` | `'mean'` |
-| `MIN` | `'min'` |
-| `MAX` | `'max'` |
-| `MEASURED` | `'measured'` |
-| `TOTAL` | `'total'` |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MEAN` | `'mean'` | Data values represent the average value in a time range |
+| `MIN` | `'min'` | Data values represent the minimum value in a time range |
+| `MAX` | `'max'` | Data values represent the maximum value in a time range |
+| `MEASURED` | `'measured'` | Data values represent the measured value at that reported time |
+| `TOTAL` | `'total'` | Data values represent the sum of values in a time range |
 
 ## DatasetRegistryStatus
 
@@ -133,25 +133,14 @@ for more information. In general these classifications describe potential impact
 organizations and individuals. In more detailed schemes a separate classification could
 be applied to confidentiality, integrity, and availability.
 
-| Constant | Value |
-|----------|-------|
-| `LOW` | `'low'` |
-| `MODERATE` | `'moderate'` |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `LOW` | `'low'` | The loss of confidentiality, integrity, or availability could be expected to have a limited adverse effect on organizational operations, organizational assets, or individuals. |
+| `MODERATE` | `'moderate'` | The loss of confidentiality, integrity, or availability could be expected to have a serious adverse effect on organizational operations, organizational assets, or individuals. |
 
 ## DatasetQualifierType
 
 *dsgrid.config.dataset_config.DatasetQualifierType*
-
-str(object='') -> str
-str(bytes_or_buffer[, encoding[, errors]]) -> str
-
-Create a new string object from the given object. If encoding or
-errors is specified, then the object must expose a data buffer
-that will be decoded using the given encoding and error handler.
-Otherwise, returns the result of object.__str__() (if defined)
-or repr(object).
-encoding defaults to 'utf-8'.
-errors defaults to 'strict'.
 
 | Constant | Value |
 |----------|-------|
@@ -161,17 +150,6 @@ errors defaults to 'strict'.
 ## GrowthRateType
 
 *dsgrid.config.dataset_config.GrowthRateType*
-
-str(object='') -> str
-str(bytes_or_buffer[, encoding[, errors]]) -> str
-
-Create a new string object from the given object. If encoding or
-errors is specified, then the object must expose a data buffer
-that will be decoded using the given encoding and error handler.
-Otherwise, returns the result of object.__str__() (if defined)
-or repr(object).
-encoding defaults to 'utf-8'.
-errors defaults to 'strict'.
 
 | Constant | Value |
 |----------|-------|
@@ -200,3 +178,25 @@ Defines the operation dsgrid will apply to the data during a mapping.
 | `ONE_TO_MANY_EXPLICIT_MULTIPLIERS` | `'one_to_many_explicit_multipliers'` |
 | `MANY_TO_ONE_EXPLICIT_MULTIPLIERS` | `'many_to_one_explicit_multipliers'` |
 | `MANY_TO_MANY_EXPLICIT_MULTIPLIERS` | `'many_to_many_explicit_multipliers'` |
+
+## DimensionMappingArchetype
+
+*dsgrid.config.dimension_mapping_base.DimensionMappingArchetype*
+
+Dimension mapping archetype, used to check whether duplicates are allowed in from/to
+dimensions and apply rules about the sum of the from_fraction column.
+
+| Constant | Value | Description | allow_dup_from_records | allow_dup_to_records | check_fraction_sum_eq1_from_id | check_fraction_sum_eq1_to_id |
+|----------|-------|-------------|------------------------|----------------------|--------------------------------|------------------------------|
+| `ONE_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1` | `'one_to_one_map_fraction_sum_from_id_eq1'` | One-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id | False | False | True | False |
+| `ONE_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1` | `'one_to_many_map_fraction_sum_from_id_eq1'` | One-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id | True | False | True | False |
+| `MANY_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1` | `'many_to_one_map_fraction_sum_from_id_eq1'` | Many-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id | False | True | True | False |
+| `MANY_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1` | `'many_to_many_map_fraction_sum_from_id_eq1'` | Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id | True | True | True | False |
+| `ONE_TO_ONE_MAP_FRACTION_SUM_TO_ID_EQ1` | `'one_to_one_map_fraction_sum_to_id_eq1'` | One-to-one dimension mapping with sum of from_fraction = 1 when grouped by to_id | False | False | False | True |
+| `ONE_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1` | `'one_to_many_map_fraction_sum_to_id_eq1'` | One-to-many dimension mapping with sum of from_fraction = 1 when grouped by to_id | True | False | False | True |
+| `MANY_TO_ONE_MAP_FRACTION_SUM_TO_ID_EQ1` | `'many_to_one_map_fraction_sum_to_id_eq1'` | Many-to-one dimension mapping with sum of from_fraction = 1 when grouped by to_id | False | True | False | True |
+| `MANY_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1` | `'many_to_many_map_fraction_sum_to_id_eq1'` | Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by to_id | True | True | False | True |
+| `ONE_TO_ONE_MAP` | `'one_to_one_map'` | One-to-one dimension mapping with no from_fraction sum check | False | False | False | False |
+| `ONE_TO_MANY_MAP` | `'one_to_many_map'` | One-to-many dimension mapping with no from_fraction sum check | True | False | False | False |
+| `MANY_TO_ONE_MAP` | `'many_to_one_map'` | Many-to-one dimension mapping with no from_fraction sum check | False | True | False | False |
+| `MANY_TO_MANY_MAP` | `'many_to_many_map'` | Many-to-many dimension mapping with no from_fraction sum check | True | True | False | False |

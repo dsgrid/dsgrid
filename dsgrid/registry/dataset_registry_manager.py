@@ -449,7 +449,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         time_dim = config.get_time_dimension()
         if time_dim is not None:
             time_columns.extend(time_dim.get_load_data_time_columns())
-            df = time_dim.convert_time_format(df, update_model=True)
 
         if needs_unpivot:
             assert pivoted_columns is not None

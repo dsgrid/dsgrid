@@ -51,9 +51,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
         load_data_df = convert_types_if_necessary(load_data_df)
-        time_dim = config.get_time_dimension()
-        if time_dim is not None:
-            load_data_df = time_dim.convert_time_format(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)

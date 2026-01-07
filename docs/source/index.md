@@ -3,14 +3,14 @@
 :::{admonition} Active Development
 :class: warning
 
-dsgrid is under active development and does not yet have a formal package release. Details are subject to change. Please reach out to the dsgrid coordination team with questions or feedback.
+dsgrid is under active development and details are subject to change. Please reach out to the [dsgrid team](mailto:dsgrid.info@nrel.gov) with questions or feedback.
 :::
 
 ## What is dsgrid?
 
-The **demand-side grid (dsgrid)** toolkit is a Python framework for compiling high-resolution energy demand datasets across multiple dimensions—time, geography, time, sector, subsector, enduse, and more. dsgrid enables researchers, analysts, and planners to integrate diverse energy datasets into cohesive projects suitable for power system analysis, policy evaluation, and energy planning.
+The **demand-side grid (dsgrid)** toolkit is a Python framework for compiling high-resolution energy demand datasets across multiple dimensions: time, geography, time, sector, subsector, enduse, etc. dsgrid enables researchers, analysts, and planners to integrate diverse energy datasets into cohesive projects suitable for power system analysis, policy evaluation, and energy planning.
 
-For more information and completed work products, please visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html).
+For more information, please visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html).
 
 ---
 
@@ -25,9 +25,7 @@ For more information and completed work products, please visit [https://www.nrel
 
 **For:** Data Users, Analysts, Researchers
 
-Download and analyze pre-compiled dsgrid datasets for your research or analysis.
-
-[Browse Published Datasets →](published_data/published_datasets.md)
+Browse, download and analyze pre-compiled dsgrid datasets for your research or analysis.
 :::
 
 :::{grid-item-card} Submit a Dataset
@@ -37,8 +35,6 @@ Download and analyze pre-compiled dsgrid datasets for your research or analysis.
 **For:** Dataset Submitters, Modelers
 
 Register and submit your energy demand dataset to a dsgrid project.
-
-[Registration Guide →](user_guide/dataset_registration/index.md)
 :::
 
 :::{grid-item-card} Map a Dataset
@@ -47,9 +43,7 @@ Register and submit your energy demand dataset to a dsgrid project.
 
 **For:** Dataset Mappers, Data Engineers
 
-Transform datasets to different time conventions, geographies, or dimension systems.
-
-[Mapping Guide →](user_guide/dataset_mapping/index.md)
+Transform datasets to different time conventions, geographies, etc.
 :::
 
 :::{grid-item-card} Manage a Project
@@ -59,8 +53,6 @@ Transform datasets to different time conventions, geographies, or dimension syst
 **For:** Project Coordinators, Lead Analysts
 
 Create projects, compile datasets, run queries, and create derived datasets.
-
-[Project Guide →](user_guide/project_creation/index.md)
 :::
 
 ::::

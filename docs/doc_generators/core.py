@@ -1,17 +1,14 @@
-"""Generate MyST markdown tables for Pydantic models.
+"""Core documentation generation functions for Pydantic models and Enums.
 
-This script generates clean, scannable documentation tables for Pydantic models.
-It can be called on individual models or recursively generate docs for nested models.
+This module provides the low-level functions for generating MyST markdown
+documentation from Pydantic models and Python enumerations.
 """
 
-import inspect
-import sys
-from enum import Enum
-from pathlib import Path
-from typing import Any, get_args, get_origin, Union
 import importlib
+import inspect
+from enum import Enum
+from typing import Any, get_args, get_origin
 
-import click
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
@@ -42,8 +39,8 @@ def get_type_string(field_type: Any, documented_models: dict = None) -> str:
     origin = get_origin(field_type)
     args = get_args(field_type)
 
-    if origin is Union:
-        # Handle Optional and Union types
+    if origin is type(None) or origin is type(type(None)):
+        # Handle Union types
         type_strs = [get_type_string(arg, documented_models) for arg in args]
         # Escape pipes for markdown tables
         return " \\| ".join(type_strs)
@@ -227,10 +224,9 @@ def generate_validators_table(model: type[BaseModel], heading_level: int = 2) ->
     Parameters
     ----------
     model : type[BaseModel]
-        The Pydantic model
+        The Pydantic model to document
     heading_level : int, default=2
         Heading level for the "Validators" section
-        The Pydantic model to document
 
     Returns
     -------
@@ -399,30 +395,6 @@ def generate_model_documentation(
     return "\n".join(lines)
 
 
-def import_model(model_path: str) -> type[BaseModel]:
-    """Import a Pydantic model from a module path.
-
-    Parameters
-    ----------
-    model_path : str
-        Full path to the model, e.g., 'dsgrid.config.dataset_config.DatasetConfigModel'
-
-    Returns
-    -------
-    type[BaseModel]
-        The imported Pydantic model class
-    """
-    module_path, class_name = model_path.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    model = getattr(module, class_name)
-
-    if not is_pydantic_model(model):
-        msg = f"{model_path} is not a Pydantic model"
-        raise ValueError(msg)
-
-    return model
-
-
 def generate_enum_documentation(enum_class: type[Enum]) -> str:
     """Generate markdown documentation for an Enum.
 
@@ -558,41 +530,43 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
     return "\n".join(lines)
 
 
-@click.command()
-@click.argument("model_path")
-@click.option(
-    "-o",
-    "--output",
-    type=click.Path(),
-    help="Output file path. If not provided, prints to stdout.",
-)
-@click.option(
-    "--no-nested",
-    is_flag=True,
-    help="Don't recursively document nested models.",
-)
-def main(model_path: str, output: str | None, no_nested: bool):
-    """Generate markdown documentation for a Pydantic model.
+def import_model(model_path: str) -> type[BaseModel]:
+    """Import a Pydantic model from a module path.
 
-    MODEL_PATH should be the full Python path to the model, e.g.:
-    dsgrid.config.dataset_config.DatasetConfigModel
+    Parameters
+    ----------
+    model_path : str
+        Full path to the model, e.g., 'dsgrid.config.dataset_config.DatasetConfigModel'
+
+    Returns
+    -------
+    type[BaseModel]
+        The imported Pydantic model class
     """
-    try:
-        model = import_model(model_path)
-        documentation = generate_model_documentation(model, include_nested=not no_nested)
+    module_path, class_name = model_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    model = getattr(module, class_name)
 
-        if output:
-            output_path = Path(output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(documentation, encoding="utf-8")
-            click.echo(f"Documentation written to {output_path}")
-        else:
-            click.echo(documentation)
+    if not is_pydantic_model(model):
+        msg = f"{model_path} is not a Pydantic model"
+        raise ValueError(msg)
 
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+    return model
 
 
-if __name__ == "__main__":
-    main()
+def import_enum(enum_path: str) -> type[Enum]:
+    """Import an enum from a module path.
+
+    Parameters
+    ----------
+    enum_path : str
+        Full path to the enum, e.g., 'dsgrid.dimension.time.TimeDimensionType'
+
+    Returns
+    -------
+    type[Enum]
+        The imported Enum class
+    """
+    module_path, enum_name = enum_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, enum_name)

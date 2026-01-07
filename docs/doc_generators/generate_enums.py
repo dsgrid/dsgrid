@@ -3,12 +3,9 @@
 This script generates markdown documentation for all dsgrid enumerations.
 """
 
-import sys
 from pathlib import Path
 
-# Import the generation function
-sys.path.insert(0, str(Path(__file__).parent))
-from generate_model_tables import generate_enum_documentation
+from .core import generate_enum_documentation, import_enum
 
 # Enums to document: (module_path.EnumName)
 ENUMS = [
@@ -34,18 +31,9 @@ ENUMS = [
 ]
 
 
-def import_enum(enum_path: str):
-    """Import an enum from a module path."""
-    import importlib
-
-    module_path, enum_name = enum_path.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    return getattr(module, enum_name)
-
-
 def main():
     """Generate enum documentation."""
-    docs_dir = Path(__file__).parent
+    docs_dir = Path(__file__).parent.parent  # Go up to docs/ directory
     output_path = docs_dir / "source/software_reference/data_models/enums.md"
 
     lines = [

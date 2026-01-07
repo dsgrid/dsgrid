@@ -3,12 +3,9 @@
 This script generates markdown documentation for all dsgrid configuration models.
 """
 
-import sys
 from pathlib import Path
 
-# Import the generation function directly instead of using subprocess
-sys.path.insert(0, str(Path(__file__).parent))
-from generate_model_tables import import_model, generate_model_documentation
+from .core import generate_model_documentation, import_model
 
 # Models to document with their output paths
 # Format: (page_title, model_path, output_file, additional_models_to_include)
@@ -55,7 +52,7 @@ MODELS = [
 
 def main():
     """Generate all model documentation."""
-    docs_dir = Path(__file__).parent
+    docs_dir = Path(__file__).parent.parent  # Go up to docs/ directory
 
     # Build a mapping of models to their documentation paths
     # This allows us to link to already-documented models instead of duplicating

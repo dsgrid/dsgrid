@@ -16,7 +16,7 @@ Represents dataset configurations.
 | `data_layout` | dsgrid.config.dataset_config.UserDataLayout | None | `None` | Defines the data layout (table format, value format, and file paths) for dataset registration. |
 | `registry_data_layout` | dsgrid.config.dataset_config.RegistryDataLayout | None | `None` | Defines the dataset's data layout once stored in the registry. |
 | `dataset_type` | [InputDatasetType](enums.md#inputdatasettype) | `InputDatasetType.UNSPECIFIED` | Input dataset type. |
-| `dataset_qualifier_metadata` | [QuantityModel](#quantitymodel) \| [GrowthRateModel](#growthratemodel) | `dataset_qualifier_type=<DatasetQualifierType.QUANTITY: 'quantity'>` | Additional metadata to include related to the dataset_qualifier |
+| `dataset_qualifier_metadata` | `Union` | `dataset_qualifier_type=<DatasetQualifierType.QUANTITY: 'quantity'>` | Additional metadata to include related to the dataset_qualifier |
 | `description` | str | None | `None` | A detailed description of the dataset |
 | `sector_description` | str | None | `None` | Sectoral description (e.g., residential, commercial, industrial, transportation, electricity) |
 | `data_source` | str | None | `None` | Original data source name, e.g. 'ComStock', 'EIA 861'. |
@@ -33,7 +33,7 @@ Represents dataset configurations.
 | `data_classification` | [DataClassificationType](enums.md#dataclassificationtype) | *(required)* | Data security classification (e.g., low, moderate). |
 | `enable_unit_conversion` | `bool` | `True` | If the dataset uses its dimension mapping for the metric dimension to also perform unit conversion, then this value should be false. |
 | `use_project_geography_time_zone` | `bool` | `False` | If true, time zones will be applied from the project's geography dimension. If false, the dataset's geography dimension records must provide a time zone column. |
-| `dimensions` | list[[DimensionModel](dimension_model.md#dimensionmodel) \| [DateTimeDimensionModel](dimension_model.md#datetimedimensionmodel) \| [AnnualTimeDimensionModel](dimension_model.md#annualtimedimensionmodel) \| [RepresentativePeriodTimeDimensionModel](dimension_model.md#representativeperiodtimedimensionmodel) \| [DatetimeExternalTimeZoneDimensionModel](dimension_model.md#datetimeexternaltimezonedimensionmodel) \| [IndexTimeDimensionModel](dimension_model.md#indextimedimensionmodel) \| [NoOpTimeDimensionModel](dimension_model.md#nooptimedimensionmodel)] | `[]` | List of dimensions that make up the dimensions of dataset. They will be automatically registered during dataset registration and then converted to dimension_references. |
+| `dimensions` | list[`Union`] | `[]` | List of dimensions that make up the dimensions of dataset. They will be automatically registered during dataset registration and then converted to dimension_references. |
 | `dimension_references` | list[[DimensionReferenceModel](dimension_model.md#dimensionreferencemodel)] | `[]` | List of registered dimension references that make up the dimensions of dataset. |
 | `trivial_dimensions` | list[[DimensionType](enums.md#dimensiontype)] | `[]` | List of trivial dimensions (i.e., 1-element dimensions) that do not exist in the load_data_lookup. List the dimensions by dimension type. Trivial dimensions are 1-element dimensions that are not present in the parquet data columns. Instead they are added by dsgrid as an alias column. |
 

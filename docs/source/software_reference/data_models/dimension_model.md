@@ -56,7 +56,7 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `cls` | `Any` | `None` | Dimension record model class |
 | `description` | str | None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME` | Type of time dimension |
-| `time_zone_format` | [AlignedTimeSingleTimeZone](#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](#localtimemultipletimezones) | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
+| `time_zone_format` | `Union` | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: mean, min, max, measured, total |
 | `ranges` | list[[TimeRangeModel](#timerangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
@@ -243,7 +243,7 @@ using a time zone column.
 | `cls` | `Any` | `None` | Dimension record model class |
 | `description` | str | None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME_EXTERNAL_TZ` |  |
-| `time_zone_format` | [AlignedTimeSingleTimeZone](#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](#localtimemultipletimezones) | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
+| `time_zone_format` | `Union` | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: e.g., mean, total |
 | `ranges` | list[[TimeRangeModel](#timerangemodel)] | *(required)* | Defines the continuous ranges of time in the data, inclusive of start and end time. If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |

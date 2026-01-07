@@ -157,7 +157,7 @@ def setup(app):
     """Sphinx setup hook to auto-generate data model documentation."""
     # Generate enum documentation first
     try:
-        from generate_enums import main as generate_enums
+        from doc_generators.generate_enums import main as generate_enums
 
         print("Generating enum documentation...")
         result = generate_enums()
@@ -169,7 +169,7 @@ def setup(app):
 
     # Generate data model documentation
     try:
-        from generate_all_models import main as generate_models
+        from doc_generators.generate_all_models import main as generate_models
 
         print("Generating data model documentation...")
         result = generate_models()

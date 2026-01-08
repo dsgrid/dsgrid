@@ -59,6 +59,28 @@ Create projects, compile datasets, run queries, and create derived datasets.
 
 ---
 
+## Key Features
+
+- **Multi-Dimensional Data**: Organize energy data across scenario, geography, time, sector, subsector, enduse, and custom dimensions
+- **Flexible Mappings**: Map datasets between different dimensional systems with explicit, documented transformations
+- **Powerful Queries**: Aggregate, filter, and transform data across dimensions to create custom views
+- **Big Data Support**: Process terabyte-scale datasets using Apache Spark or gigabyte-scale datasets using DuckDB
+- **Data Integrity**: Validation ensures dataset consistency and project compatibility
+- **Registry System**: Central metadata management for dimensions, datasets, and projects
+
+---
+
+## Quick Links for Stakeholders
+
+If you're evaluating dsgrid for your organization:
+
+- **Capabilities Overview**: See [dsgrid Fundamentals](user_guide/fundamentals.md) for a high-level introduction
+- **Published Work**: Browse [Published Datasets](published_data/published_datasets.md) and [Publications](publications.md) to see dsgrid in action
+- **Technical Team**: Direct your technical staff to [Getting Started](getting_started/index.md)
+- **dsgrid Webpage**: Visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html)
+
+---
+
 ## Documentation Sections
 
 ### User Guide
@@ -91,28 +113,6 @@ Create projects, compile datasets, run queries, and create derived datasets.
 - **[Publications](publications.md)** - Research papers and reports using dsgrid
 - **[Citation & Attribution](citation.md)** - How to cite dsgrid and datasets
 - **[Contact](contact.md)** - Get help or provide feedback
-
----
-
-## Key Features
-
-- **Multi-Dimensional Data**: Organize energy data across scenario, geography, time, sector, subsector, enduse, and custom dimensions
-- **Flexible Mappings**: Map datasets between different dimensional systems with explicit, documented transformations
-- **Powerful Queries**: Aggregate, filter, and transform data across dimensions to create custom views
-- **Big Data Support**: Process terabyte-scale datasets using Apache Spark or gigabyte-scale datasets using DuckDB
-- **Data Integrity**: Validation ensures dataset consistency and project compatibility
-- **Registry System**: Central metadata management for dimensions, datasets, and projects
-
----
-
-## Quick Links for Stakeholders
-
-If you're evaluating dsgrid for your organization:
-
-- **Capabilities Overview**: See [dsgrid Fundamentals](user_guide/fundamentals.md) for a high-level introduction
-- **Published Work**: Browse [Publications](publications.md) to see dsgrid in action
-- **Technical Team**: Direct your technical staff to [Getting Started](getting_started/index.md)
-- **NLR dsgrid Webpage**: Visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html)
 
 ```{toctree}
 :hidden:

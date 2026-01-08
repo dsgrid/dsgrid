@@ -1,9 +1,5 @@
 # dsgrid Fundamentals
 
-Core concepts and architecture of the dsgrid framework.
-
-## Overview
-
 The demand-side grid (dsgrid) toolkit provides a structured approach to managing multi-dimensional energy demand datasets. Understanding the fundamental building blocks is essential for working effectively with dsgrid.
 
 ## Core Components

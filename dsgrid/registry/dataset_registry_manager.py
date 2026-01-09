@@ -45,7 +45,7 @@ from dsgrid.spark.functions import (
     is_dataframe_empty,
     select_expr,
 )
-from dsgrid.spark.types import use_duckdb
+from dsgrid.spark.types import get_str_type, use_duckdb
 from dsgrid.spark.types import DataFrame, F, StringType
 from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -389,7 +389,9 @@ class DatasetRegistryManager(RegistryManagerBase):
         ):
             return
 
+        # TEMPORARY
         # This code only exists because we lack full support for time zone naive timestamps.
+        # Refactor when the existing chronify work is complete.
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
 
@@ -404,11 +406,12 @@ class DatasetRegistryManager(RegistryManagerBase):
             config, reformatted_df, scratch_dir_context, cols_to_drop, new_col_format
         )
         self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
+        logger.info("Replaced time columns %s with %s", cols_to_drop, new_col_format.time_column)
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
         """Build SQL expression that creates a timestamp string from time-in-parts columns."""
-        str_type = "varchar" if use_duckdb() else "string"
+        str_type = get_str_type()
         hour_col = col_format.hour_column
         hour_expr = f"lpad(cast({hour_col} as {str_type}), 2, '0')" if hour_col else "'00'"
 

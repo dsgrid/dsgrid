@@ -241,7 +241,6 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     """Format of timestamps in a dataset is timezone-aware datetime."""
 
     dtype: Literal["TIMESTAMP_TZ"] = "TIMESTAMP_TZ"
-
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
@@ -268,8 +267,7 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
 
 
 class TimeFormatInPartsModel(DSGBaseModel):
-    """Format of timestamps in a dataset is in parts,
-    e.g., month-day-hour format,
+    """Format of timestamps in a dataset is in parts, e.g., month-day-hour format,
     requiring conversion to datetime."""
 
     dtype: Literal["time_format_in_parts"] = "time_format_in_parts"

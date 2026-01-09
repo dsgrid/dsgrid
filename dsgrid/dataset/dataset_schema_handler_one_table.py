@@ -92,7 +92,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_load_data_unpivoted_value_column(self._load_data)
         allowed_columns = DimensionType.get_allowed_dimension_column_names().union(time_columns)
         allowed_columns.add(VALUE_COLUMN)
-        allowed_columns.add("time_zone")
+        allowed_columns.add(TIME_ZONE_COLUMN)
 
         schema = self._load_data.schema
         for column in self._load_data.columns:

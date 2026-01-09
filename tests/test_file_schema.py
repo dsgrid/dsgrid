@@ -8,9 +8,6 @@ import pytest
 from dsgrid.config.file_schema import (
     Column,
     FileSchema,
-    SUPPORTED_TYPES,
-    DUCKDB_COLUMN_TYPES,
-    SPARK_COLUMN_TYPES,
     read_data_file,
     _drop_ignored_columns,
     _get_column_renames,
@@ -19,7 +16,14 @@ from dsgrid.config.file_schema import (
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
-from dsgrid.spark.types import F, SparkSession, use_duckdb
+from dsgrid.spark.types import (
+    DUCKDB_COLUMN_TYPES,
+    F,
+    SPARK_COLUMN_TYPES,
+    SUPPORTED_TYPES,
+    SparkSession,
+    use_duckdb,
+)
 from dsgrid.utils.spark import get_spark_session, set_session_time_zone
 
 

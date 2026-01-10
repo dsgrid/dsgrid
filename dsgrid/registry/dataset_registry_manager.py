@@ -2,8 +2,10 @@
 
 import logging
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Self, Type, Union
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from prettytable import PrettyTable
@@ -15,13 +17,22 @@ from dsgrid.config.dataset_config import (
     DatasetConfigModel,
     user_layout_to_registry_layout,
 )
+from dsgrid.config.dimensions import (
+    DateTimeDimensionModel,
+    TimeFormatDateTimeNTZModel,
+    TimeFormatDateTimeTZModel,
+    TimeFormatInPartsModel,
+)
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.models import TableFormat, ValueFormat
-from dsgrid.config.file_schema import read_data_file
+from dsgrid.config.file_schema import Column, read_data_file
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import (
+    DimensionType,
     check_required_dataset_dimensions,
 )
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
@@ -32,11 +43,15 @@ from dsgrid.registry.registry_interface import DatasetRegistryInterface
 from dsgrid.spark.functions import (
     get_spark_session,
     is_dataframe_empty,
+    select_expr,
 )
+from dsgrid.spark.types import get_str_type, use_duckdb
 from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
+    write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -112,6 +127,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         conn: Connection,
         config: DatasetConfig,
         missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
     ) -> None:
         logger.info("Run dataset registration checks.")
         check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
@@ -121,6 +137,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 conn,
                 config,
                 missing_dimension_associations,
+                scratch_dir_context,
             )
 
     def _check_dataset_consistency(
@@ -128,6 +145,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         conn: Connection,
         config: DatasetConfig,
         missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
     ) -> None:
         schema_handler = make_dataset_schema_handler(
             conn,
@@ -136,7 +154,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._dimension_mapping_mgr,
             store=self._store,
         )
-        schema_handler.check_consistency(missing_dimension_associations)
+        schema_handler.check_consistency(missing_dimension_associations, scratch_dir_context)
 
     @property
     def dimension_manager(self) -> DimensionRegistryManager:
@@ -313,56 +331,196 @@ class DatasetRegistryManager(RegistryManagerBase):
         #    In the nominal case where the dataset is valid, there is no difference in performance.
         #    In the failure case where the dataset is invalid, it will take longer to detect the
         #    errors.
-        self._check_time_consistency(config, context)
-        self._write_to_registry(config)
-
-        assoc_dfs = self._store.read_missing_associations_tables(
-            config.model.dataset_id, config.model.version
-        )
-        try:
-            self._run_checks(
+        dsgrid_config = DsgridRuntimeConfig.load()
+        scratch_dir = dsgrid_config.get_scratch_dir()
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            schema_handler = make_dataset_schema_handler(
                 context.connection,
                 config,
-                assoc_dfs,
+                self._dimension_mgr,
+                self._dimension_mapping_mgr,
+                store=None,
+                scratch_dir_context=scratch_dir_context,
             )
-        except Exception:
-            self._store.remove_tables(config.model.dataset_id, config.model.version)
-            raise
+            self._convert_time_format_if_necessary(config, schema_handler, scratch_dir_context)
+            schema_handler.check_time_consistency()
+            self._write_to_registry(config, scratch_dir_context=scratch_dir_context)
 
-        if config.model.data_layout is not None:
-            registry_layout = user_layout_to_registry_layout(config.model.data_layout)
-            config.model.data_layout = None
-            config.model.registry_data_layout = registry_layout
-        self._db.insert(context.connection, config.model, context.registration)
-        logger.info(
-            "%s Registered dataset %s with version=%s",
-            self._log_offline_mode_prefix(),
-            config.model.dataset_id,
-            config.model.version,
-        )
+            assoc_dfs = self._store.read_missing_associations_tables(
+                config.model.dataset_id, config.model.version
+            )
+            try:
+                self._run_checks(
+                    context.connection,
+                    config,
+                    assoc_dfs,
+                    scratch_dir_context,
+                )
+            except Exception:
+                self._store.remove_tables(config.model.dataset_id, config.model.version)
+                raise
 
-    def _check_time_consistency(
+            if config.model.data_layout is not None:
+                registry_layout = user_layout_to_registry_layout(config.model.data_layout)
+                config.model.data_layout = None
+                config.model.registry_data_layout = registry_layout
+            self._db.insert(context.connection, config.model, context.registration)
+            logger.info(
+                "%s Registered dataset %s with version=%s",
+                self._log_offline_mode_prefix(),
+                config.model.dataset_id,
+                config.model.version,
+            )
+
+    def _convert_time_format_if_necessary(
         self,
         config: DatasetConfig,
-        context: RegistrationContext,
+        handler: DatasetSchemaHandlerBase,
+        scratch_dir_context: ScratchDirContext,
     ) -> None:
-        schema_handler = make_dataset_schema_handler(
-            context.connection,
-            config,
-            self._dimension_mgr,
-            self._dimension_mapping_mgr,
-            store=None,
+        """Convert time-in-parts format to timestamp format if necessary."""
+        time_dim = config.get_dimension(DimensionType.TIME)
+        if time_dim is None:
+            return
+
+        if not isinstance(time_dim.model, DateTimeDimensionModel) or not isinstance(
+            time_dim.model.column_format, TimeFormatInPartsModel
+        ):
+            return
+
+        # TEMPORARY
+        # This code only exists because we lack full support for time zone naive timestamps.
+        # Refactor when the existing chronify work is complete.
+        df = handler.get_base_load_data_table()
+        col_format = time_dim.model.column_format
+
+        timestamp_str_expr = self._build_timestamp_string_expr(col_format)
+        df, fixed_tz = self._resolve_timezone(df, config, col_format)
+        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, fixed_tz)
+
+        cols_to_drop = self._get_time_columns_to_drop(col_format)
+        reformatted_df = self._apply_timestamp_transformation(df, cols_to_drop, timestamp_sql)
+
+        self._update_config_for_timestamp(
+            config, reformatted_df, scratch_dir_context, cols_to_drop, new_col_format
         )
-        schema_handler.check_time_consistency()
+        self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
+        logger.info("Replaced time columns %s with %s", cols_to_drop, new_col_format.time_column)
+
+    @staticmethod
+    def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
+        """Build SQL expression that creates a timestamp string from time-in-parts columns."""
+        str_type = get_str_type()
+        hour_col = col_format.hour_column
+        hour_expr = f"lpad(cast({hour_col} as {str_type}), 2, '0')" if hour_col else "'00'"
+
+        return (
+            f"cast({col_format.year_column} as {str_type}) || '-' || "
+            f"lpad(cast({col_format.month_column} as {str_type}), 2, '0') || '-' || "
+            f"lpad(cast({col_format.day_column} as {str_type}), 2, '0') || ' ' || "
+            f"{hour_expr} || ':00:00'"
+        )
+
+    @staticmethod
+    def _resolve_timezone(
+        df: DataFrame, config: DatasetConfig, col_format: TimeFormatInPartsModel
+    ) -> tuple[DataFrame, str | None]:
+        """Resolve timezone from config or geography dimension.
+
+        Returns the (possibly modified) dataframe and the fixed timezone if single-tz,
+        or None if multi-timezone.
+        """
+        if col_format.time_zone is not None:
+            return df, col_format.time_zone
+
+        geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
+        assert geo_dim is not None
+        return add_time_zone(df, geo_dim), None
+
+    @staticmethod
+    def _build_timestamp_sql(
+        timestamp_str_expr: str, fixed_tz: str | None
+    ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
+        """Build the final timestamp SQL expression and determine the column format."""
+        if fixed_tz is not None:
+            if use_duckdb():
+                sql = f"cast({timestamp_str_expr} || ' {fixed_tz}' as timestamptz) as timestamp"
+            else:
+                tz = ZoneInfo(fixed_tz)
+                offset = datetime(2012, 1, 1, tzinfo=tz).strftime("%z")
+                offset_formatted = f"{offset[:3]}:{offset[3:]}"
+                sql = (
+                    f"cast({timestamp_str_expr} || '{offset_formatted}' as timestamp) as timestamp"
+                )
+            return sql, TimeFormatDateTimeTZModel(time_column="timestamp")
+
+        # Multi-timezone: create naive timestamp, keep time_zone column
+        sql = f"cast({timestamp_str_expr} as timestamp) as timestamp"
+        return sql, TimeFormatDateTimeNTZModel(time_column="timestamp")
+
+    @staticmethod
+    def _get_time_columns_to_drop(col_format: TimeFormatInPartsModel) -> set[str]:
+        """Get the set of time-in-parts columns to drop, excluding dimension columns."""
+        cols_to_drop = {col_format.year_column, col_format.month_column, col_format.day_column}
+        if col_format.hour_column:
+            cols_to_drop.add(col_format.hour_column)
+        return cols_to_drop - DimensionType.get_allowed_dimension_column_names()
+
+    @staticmethod
+    def _apply_timestamp_transformation(
+        df: DataFrame, cols_to_drop: set[str], timestamp_sql: str
+    ) -> DataFrame:
+        """Apply the timestamp transformation to the dataframe."""
+        existing_cols = [c for c in df.columns if c not in cols_to_drop]
+        return select_expr(df, existing_cols + [timestamp_sql])
+
+    def _update_config_for_timestamp(
+        self,
+        config: DatasetConfig,
+        df: DataFrame,
+        scratch_dir_context: ScratchDirContext,
+        cols_to_drop: set[str],
+        new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
+    ) -> None:
+        """Write the transformed dataframe and update config paths and columns."""
+        path = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        write_dataframe(df, path)
+        config.model.data_layout.data_file.path = str(path)
+
+        if config.model.data_layout.data_file.columns is not None:
+            updated_columns = [
+                c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
+            ]
+            timestamp_data_type = (
+                "TIMESTAMP_TZ"
+                if isinstance(new_col_format, TimeFormatDateTimeTZModel)
+                else "TIMESTAMP_NTZ"
+            )
+            updated_columns.append(Column(name="timestamp", data_type=timestamp_data_type))
+            config.model.data_layout.data_file.columns = updated_columns
+
+    @staticmethod
+    def _update_time_dimension(
+        time_dim,
+        new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
+        hour_col: str | None,
+    ) -> None:
+        """Update the time dimension model with the new format."""
+        time_dim.model.column_format = new_col_format
+        time_dim.model.time_column = "timestamp"
+        if hour_col is None:
+            for time_range in time_dim.model.ranges:
+                time_range.frequency = timedelta(days=1)
 
     def _read_lookup_table_from_user_path(
-        self, config: DatasetConfig
+        self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
     ) -> tuple[DataFrame, DataFrame | None]:
         if config.lookup_file_schema is None:
             msg = "Cannot read lookup table without lookup file schema"
             raise DSGInvalidDataset(msg)
 
-        df = read_data_file(config.lookup_file_schema)
+        df = read_data_file(config.lookup_file_schema, scratch_dir_context=scratch_dir_context)
         if "id" not in df.columns:
             msg = "load_data_lookup does not include an 'id' column"
             raise DSGInvalidDataset(msg)
@@ -414,10 +572,17 @@ class DatasetRegistryManager(RegistryManagerBase):
         return df
 
     def _read_table_from_user_path(
-        self, config: DatasetConfig
+        self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
     ) -> tuple[DataFrame, DataFrame | None]:
         """Read a table from a user-provided path. Split expected-missing rows into a separate
         DataFrame.
+
+        Parameters
+        ----------
+        config : DatasetConfig
+            The dataset configuration.
+        scratch_dir_context : ScratchDirContext | None
+            Optional location to store temporary files
 
         Returns
         -------
@@ -428,6 +593,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if config.data_file_schema is None:
             msg = "Cannot read table without data file schema"
             raise DSGInvalidDataset(msg)
+        df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
 
         if config.get_value_format() == ValueFormat.PIVOTED:
             logger.info("Convert dataset %s from pivoted to stacked.", config.model.dataset_id)
@@ -442,8 +608,6 @@ class DatasetRegistryManager(RegistryManagerBase):
             needs_unpivot = False
             pivoted_columns = None
             pivoted_dimension_type = None
-
-        df = read_data_file(config.data_file_schema)
 
         time_columns: list[str] = []
         time_dim = config.get_time_dimension()
@@ -468,6 +632,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config: DatasetConfig,
         orig_version: str | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
     ) -> None:
         lk_df: DataFrame | None = None
         missing_dfs: dict[str, DataFrame] = {}
@@ -485,7 +650,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
                 else:
                     # Note: config will be updated if this is a pivoted table.
-                    ld_df, missing_df1 = self._read_table_from_user_path(config)
+                    ld_df, missing_df1 = self._read_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
@@ -503,14 +670,18 @@ class DatasetRegistryManager(RegistryManagerBase):
                     )
                 else:
                     # Note: config will be updated if this is a pivoted table.
-                    ld_df, tmp = self._read_table_from_user_path(config)
+                    ld_df, tmp = self._read_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     if tmp is not None:
                         msg = (
                             "NULL rows cannot be present in the load_data table in standard format. "
                             "They must be provided in the load_data_lookup table."
                         )
                         raise DSGInvalidDataset(msg)
-                    lk_df, missing_df1 = self._read_lookup_table_from_user_path(config)
+                    lk_df, missing_df1 = self._read_lookup_table_from_user_path(
+                        config, scratch_dir_context=scratch_dir_context
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
@@ -599,27 +770,35 @@ class DatasetRegistryManager(RegistryManagerBase):
         updated_config = DatasetConfig(updated_model)
         self._update_dimensions(conn, updated_config)
 
-        # Note: this method mutates updated_config.
-        self._write_to_registry(updated_config, orig_version=cur_config.model.version)
+        dsgrid_config = DsgridRuntimeConfig.load()
+        scratch_dir = dsgrid_config.get_scratch_dir()
+        scratch_dir.mkdir(parents=True, exist_ok=True)
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            # Note: this method mutates updated_config.
+            self._write_to_registry(
+                updated_config,
+                orig_version=cur_config.model.version,
+                scratch_dir_context=scratch_dir_context,
+            )
 
-        assoc_df = self._store.read_missing_associations_tables(
-            updated_config.model.dataset_id, updated_config.model.version
-        )
-        try:
-            self._run_checks(conn, updated_config, assoc_df)
-        except Exception:
-            self._store.remove_tables(
+            assoc_df = self._store.read_missing_associations_tables(
                 updated_config.model.dataset_id, updated_config.model.version
             )
-            raise
+            try:
+                self._run_checks(conn, updated_config, assoc_df, scratch_dir_context)
+            except Exception:
+                self._store.remove_tables(
+                    updated_config.model.dataset_id, updated_config.model.version
+                )
+                raise
 
-        old_key = ConfigKey(dataset_id, cur_config.model.version)
-        new_key = ConfigKey(dataset_id, updated_config.model.version)
-        self._datasets.pop(old_key, None)
-        self._datasets[new_key] = updated_config
+            old_key = ConfigKey(dataset_id, cur_config.model.version)
+            new_key = ConfigKey(dataset_id, updated_config.model.version)
+            self._datasets.pop(old_key, None)
+            self._datasets[new_key] = updated_config
 
-        if not self.offline_mode:
-            self.sync_push(self.get_registry_data_directory(dataset_id))
+            if not self.offline_mode:
+                self.sync_push(self.get_registry_data_directory(dataset_id))
 
         return updated_config
 

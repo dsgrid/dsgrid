@@ -85,4 +85,4 @@ class DsgridRuntimeConfig(DSGBaseModel):
 
     def get_scratch_dir(self) -> Path:
         """Return the scratch_dir to use."""
-        return self.scratch_dir or Path(DEFAULT_SCRATCH_DIR)
+        return (self.scratch_dir or Path(DEFAULT_SCRATCH_DIR)).resolve()

@@ -1,7 +1,7 @@
 import logging
 from typing import Self
 
-from dsgrid.common import VALUE_COLUMN
+from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -17,6 +17,7 @@ from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
 from dsgrid.config.file_schema import read_data_file
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -40,13 +41,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         config: DatasetConfig,
         *args,
         store: DataStoreInterface | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
         **kwargs,
     ) -> Self:
         if store is None:
             if config.data_file_schema is None:
                 msg = "Cannot load dataset without data file schema or store"
                 raise DSGInvalidDataset(msg)
-            df = read_data_file(config.data_file_schema)
+            df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
         else:
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
@@ -54,9 +56,13 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
+    def check_consistency(
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
         self._check_one_table_data_consistency()
-        self._check_dimension_associations(missing_dimension_associations)
+        self._check_dimension_associations(missing_dimension_associations, scratch_dir_context)
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
@@ -86,19 +92,25 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_load_data_unpivoted_value_column(self._load_data)
         allowed_columns = DimensionType.get_allowed_dimension_column_names().union(time_columns)
         allowed_columns.add(VALUE_COLUMN)
+        allowed_columns.add(TIME_ZONE_COLUMN)
 
         schema = self._load_data.schema
         for column in self._load_data.columns:
             if column not in allowed_columns:
                 msg = f"{column=} is not expected in load_data"
                 raise DSGInvalidDataset(msg)
-            if not (column in time_columns or column == VALUE_COLUMN):
+            if not (
+                column in time_columns or column == VALUE_COLUMN or column == TIME_ZONE_COLUMN
+            ):
                 dim_type = DimensionType.from_column(column)
                 if schema[column].dataType != StringType():
                     msg = f"dimension column {column} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
         check_for_nulls(self._load_data)
+
+    def get_base_load_data_table(self) -> DataFrame:
+        return self._load_data
 
     def _get_load_data_table(self) -> DataFrame:
         return self._load_data

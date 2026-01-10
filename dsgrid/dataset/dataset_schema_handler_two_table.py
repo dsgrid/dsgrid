@@ -30,6 +30,7 @@ from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
 from dsgrid.config.file_schema import read_data_file
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -51,6 +52,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         config: DatasetConfig,
         *args,
         store: DataStoreInterface | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
         **kwargs,
     ) -> Self:
         if store is None:
@@ -60,8 +62,12 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if config.lookup_file_schema is None:
                 msg = "TWO_TABLE format requires lookup_data_file"
                 raise DSGInvalidDataset(msg)
-            load_data_df = read_data_file(config.data_file_schema)
-            load_data_lookup = read_data_file(config.lookup_file_schema)
+            load_data_df = read_data_file(
+                config.data_file_schema, scratch_dir_context=scratch_dir_context
+            )
+            load_data_lookup = read_data_file(
+                config.lookup_file_schema, scratch_dir_context=scratch_dir_context
+            )
         else:
             load_data_df = store.read_table(config.model.dataset_id, config.model.version)
             load_data_lookup = store.read_lookup_table(
@@ -74,10 +80,14 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
+    def check_consistency(
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
         self._check_lookup_data_consistency()
         self._check_dataset_internal_consistency()
-        self._check_dimension_associations(missing_dimension_associations)
+        self._check_dimension_associations(missing_dimension_associations, scratch_dir_context)
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
@@ -89,6 +99,9 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_time_consistency_with_chronify()
         else:
             self._check_dataset_time_consistency(self._get_load_data_table())
+
+    def get_base_load_data_table(self) -> DataFrame:
+        return self._load_data
 
     def _get_load_data_table(self) -> DataFrame:
         return self._load_data.join(self._load_data_lookup, on="id")

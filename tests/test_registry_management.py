@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from pandas.testing import assert_frame_equal
 from click.testing import CliRunner
 from pydantic import ValidationError
 
@@ -399,10 +400,13 @@ def test_register_with_duckdb_store(registry_with_duckdb_store):
         assert len(project_ids) == 1
         project_id = project_ids[0]
         dataset_ids = dataset_mgr.list_ids()
-        assert len(dataset_ids) == 2
+        assert len(dataset_ids) == 3
         project = project_mgr.load_project(project_id)
+        # Only 2 datasets are submitted to the project
+        submitted_dataset_ids = [d.dataset_id for d in project.config.model.datasets]
+        assert len(submitted_dataset_ids) == 2
         found_lookup = False
-        for dataset_id in dataset_ids:
+        for dataset_id in submitted_dataset_ids:
             dataset = project.load_dataset(dataset_id)
             assert isinstance(dataset._handler._load_data, DataFrame)
             if dataset_id == "test_efs_comstock":
@@ -748,7 +752,7 @@ def test_registry_contains(cached_registry):
         assert county_dim is not None
         containing_models = project_mgr.db.get_containing_models(None, county_dim)
         assert len(containing_models[RegistryType.PROJECT]) == 1
-        assert len(containing_models[RegistryType.DATASET]) == 2
+        assert len(containing_models[RegistryType.DATASET]) == 3
         assert len(containing_models[RegistryType.DIMENSION_MAPPING]) == 4
         assert len(containing_models[RegistryType.DIMENSION]) == 0
 
@@ -998,3 +1002,30 @@ def check_config_remove(mgr, config_id):
     mgr.remove(config_id)
     with pytest.raises(DSGValueNotRegistered):
         mgr.get_by_id(config_id)
+
+
+def test_time_in_parts_matches_timestamp(cached_registry):
+    """Test that time-in-parts format produces the same data as timestamp format.
+
+    Verifies that a dataset registered with time_format_in_parts column format
+    is correctly converted to timestamp format and matches an equivalent dataset
+    that was registered with timestamp format.
+    """
+    conn = cached_registry
+    with RegistryManager.load(conn, offline_mode=True) as mgr:
+        # Read registered data from both datasets
+        store = mgr.dataset_manager.store
+        comstock_df = store.read_table("test_efs_comstock", "1.0.0")
+        time_parts_df = store.read_table("test_efs_comstock_time_in_parts", "1.0.0")
+
+        # Convert to pandas for comparison
+        comstock_pd = comstock_df.toPandas()
+        time_parts_pd = time_parts_df.toPandas()
+
+        # Sort both dataframes for consistent comparison
+        sort_columns = ["id", "timestamp", "metric"]
+        comstock_pd = comstock_pd.sort_values(sort_columns).reset_index(drop=True)
+        time_parts_pd = time_parts_pd.sort_values(sort_columns).reset_index(drop=True)
+
+        # Compare the dataframes
+        assert_frame_equal(comstock_pd, time_parts_pd)

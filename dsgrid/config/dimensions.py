@@ -237,6 +237,76 @@ class DimensionModel(DimensionBaseModel):
         return None
 
 
+class TimeFormatDateTimeTZModel(DSGBaseModel):
+    """Format of timestamps in a dataset is timezone-aware datetime."""
+
+    dtype: Literal["TIMESTAMP_TZ"] = "TIMESTAMP_TZ"
+    time_column: str = Field(
+        title="time_column",
+        description="Name of the timestamp column in the dataset.",
+        default=next(iter(DatetimeTimestampType._fields)),
+    )
+
+    def get_time_columns(self) -> list[str]:
+        return [self.time_column]
+
+
+class TimeFormatDateTimeNTZModel(DSGBaseModel):
+    """Format of timestamps in a dataset is timezone-naive datetime,
+    requiring localization to time zones."""
+
+    dtype: Literal["TIMESTAMP_NTZ"] = "TIMESTAMP_NTZ"
+    time_column: str = Field(
+        title="time_column",
+        description="Name of the timestamp column in the dataset.",
+        default=next(iter(DatetimeTimestampType._fields)),
+    )
+
+    def get_time_columns(self) -> list[str]:
+        return [self.time_column]
+
+
+class TimeFormatInPartsModel(DSGBaseModel):
+    """Format of timestamps in a dataset is in parts, e.g., month-day-hour format,
+    requiring conversion to datetime."""
+
+    dtype: Literal["time_format_in_parts"] = "time_format_in_parts"
+    # TODO: we may allow more columns to be None
+    year_column: str = Field(
+        title="year_column",
+        description="Name of the year column in the dataset.",
+    )
+    month_column: str = Field(
+        title="month_column",
+        description="Name of the month column in the dataset. Value is the month in a year (1 - 12)",
+    )
+    day_column: str = Field(
+        title="day_column",
+        description="Name of the day column in the dataset. Value is the day in a month (1 - 31).",
+    )
+    hour_column: str | None = Field(
+        title="hour_column",
+        description="Name of the hour column in the dataset. Value is the hour in a day (0 - 23). "
+        "If None, the hour will be set to 0 for all rows.",
+        default=None,
+    )
+    time_zone: str | None = Field(
+        default=None,
+        title="time_zone",
+        description="IANA time zone of the timestamps. Use None for time zone-naive timestamps.",
+    )
+
+    def get_time_columns(self) -> list[str]:
+        cols = [self.year_column, self.month_column, self.day_column, self.hour_column]
+        return [col for col in cols if col is not None]
+
+
+DateTimeFormat = Annotated[
+    TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel | TimeFormatInPartsModel,
+    Field(discriminator="dtype"),
+]
+
+
 class TimeRangeModel(DSGBaseModel):
     """Defines a continuous range of time."""
 
@@ -368,7 +438,7 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     ] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
     time_zone: str = Field(
         title="time_zone",
-        description="Time zone of data",
+        description="IANA time zone of data",
     )
 
     @model_validator(mode="before")
@@ -403,13 +473,18 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     ] = TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
     time_zones: list[str] = Field(
         title="time_zones",
-        description="List of unique time zones in the dataset",
+        description="List of unique IANA time zones in the dataset",
     )
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
 
+    column_format: DateTimeFormat = Field(
+        default=TimeFormatDateTimeTZModel(),
+        title="time_format",
+        description="Specifies the format of the timestamps in the dataset.",
+    )
     time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
         title="time_zone_format",
         discriminator="format_type",

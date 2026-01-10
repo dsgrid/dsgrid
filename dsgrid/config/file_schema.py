@@ -8,62 +8,11 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
-from dsgrid.spark.types import DataFrame
+from dsgrid.spark.types import DataFrame, DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 
-
-SUPPORTED_TYPES = set(
-    (
-        "BOOLEAN",
-        "INT",
-        "INTEGER",
-        "TINYINT",
-        "SMALLINT",
-        "BIGINT",
-        "FLOAT",
-        "DOUBLE",
-        "TIMESTAMP_TZ",
-        "TIMESTAMP_NTZ",
-        "STRING",
-        "TEXT",
-        "VARCHAR",
-    )
-)
-
-DUCKDB_COLUMN_TYPES = {
-    "BOOLEAN": "BOOLEAN",
-    "INT": "INTEGER",
-    "INTEGER": "INTEGER",
-    "TINYINT": "TINYINT",
-    "SMALLINT": "INTEGER",
-    "BIGINT": "BIGINT",
-    "FLOAT": "FLOAT",
-    "DOUBLE": "DOUBLE",
-    "TIMESTAMP_TZ": "TIMESTAMP WITH TIME ZONE",
-    "TIMESTAMP_NTZ": "TIMESTAMP",
-    "STRING": "VARCHAR",
-    "TEXT": "VARCHAR",
-    "VARCHAR": "VARCHAR",
-}
-
-SPARK_COLUMN_TYPES = {
-    "BOOLEAN": "BOOLEAN",
-    "INT": "INT",
-    "INTEGER": "INT",
-    "TINYINT": "TINYINT",
-    "SMALLINT": "SMALLINT",
-    "BIGINT": "BIGINT",
-    "FLOAT": "FLOAT",
-    "DOUBLE": "DOUBLE",
-    "STRING": "STRING",
-    "TEXT": "STRING",
-    "VARCHAR": "STRING",
-    "TIMESTAMP_TZ": "TIMESTAMP",
-    "TIMESTAMP_NTZ": "TIMESTAMP_NTZ",
-}
-
-assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
-assert not SUPPORTED_TYPES.difference(DUCKDB_COLUMN_TYPES.keys())
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +28,7 @@ class Column(DSGBaseModel):
         "registry's data directory. The original dataset is not modified.",
     )
     data_type: str | None = Field(
-        description="Type of the data in the column. If None, infer the type."
+        default=None, description="Type of the data in the column. If None, infer the type."
     )
 
     @field_validator("data_type")
@@ -128,13 +77,17 @@ class FileSchema(DSGBaseModel):
         return {x.name: x.data_type for x in self.columns if x.data_type is not None}
 
 
-def read_data_file(schema: FileSchema) -> DataFrame:
+def read_data_file(
+    schema: FileSchema, scratch_dir_context: ScratchDirContext | None = None
+) -> DataFrame:
     """Read a data file from a schema.
 
     Parameters
     ----------
     schema : FileSchema
         Schema defining the file path and column types.
+    scratch_dir_context : ScratchDirContext
+        Optional location to write temporary files.
 
     Returns
     -------
@@ -172,7 +125,22 @@ def read_data_file(schema: FileSchema) -> DataFrame:
 
     df = _drop_ignored_columns(df, schema.ignore_columns)
     renames = _get_column_renames(schema)
-    df = _rename_columns(df, renames)
+    if renames:
+        df = _rename_columns(df, renames)
+        if scratch_dir_context is None:
+            renamed_path = path.with_stem(path.stem + "_renamed")
+            logger.warning(
+                "Creating temporary file at %s. Pass scratch_dir_context to avoid this.",
+                renamed_path,
+            )
+        else:
+            renamed_path = scratch_dir_context.get_temp_filename(suffix=path.suffix)
+        write_dataframe(df, renamed_path, overwrite=True)
+        schema.path = str(renamed_path)
+        for column in schema.columns:
+            if column.name in renames:
+                column.name = renames[column.name]
+                column.dimension_type = None
     return df
 
 

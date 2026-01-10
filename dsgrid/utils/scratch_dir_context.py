@@ -43,6 +43,7 @@ class ScratchDirContext:
         add_tracked_path : bool
             If True, add tracking of the path
         """
+        self._scratch_dir.mkdir(parents=True, exist_ok=True)
         with NamedTemporaryFile(dir=self._scratch_dir, prefix=prefix, suffix=suffix) as f:
             path = Path(f.name)
             if add_tracked_path:
@@ -60,5 +61,5 @@ class ScratchDirContext:
 
     def __exit__(self, *args, **kwargs):
         self.finalize()
-        if not list(self._scratch_dir.iterdir()):
+        if self._scratch_dir.exists() and not list(self._scratch_dir.iterdir()):
             os.rmdir(self._scratch_dir)

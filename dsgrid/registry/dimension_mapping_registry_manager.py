@@ -380,7 +380,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
         return refs
 
-    def register(self, config_file, submitter, log_message):
+    def register(self, config_file, submitter, log_message) -> list[str]:
         with RegistrationContext(
             self.db, log_message, VersionUpdateType.MAJOR, submitter
         ) as context:
@@ -391,10 +391,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self,
         config: DimensionMappingsConfig,
         context: RegistrationContext,
-    ):
+    ) -> list[str]:
         return self._register(config, context)
 
-    def _register(self, config, context: RegistrationContext):
+    def _register(self, config, context: RegistrationContext) -> list[str]:
         conn = context.connection
         existing_ids = self._replace_duplicates(config, context)
         self._check_records_against_dimension_records(conn, config)

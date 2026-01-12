@@ -1,26 +1,19 @@
 # Working with Published Data
 
-Learn how to access and analyze published dsgrid datasets using Python.
+This section covers how to query published dsgrid datasets and analyze the results using various tools.
 
-## Quick Start
+- **[Query a Dataset with Python](tutorial.md)** - Step-by-step tutorial for loading, filtering, and exporting data from [OEDI](https://data.openei.org/)[^oedi] S3 buckets or NREL[^nrel] HPC[^hpc] using Python and DuckDB.
 
-Follow our step-by-step tutorial to start querying dsgrid data immediately:
+- **[Visualize Data with Tableau](visualize_with_tableau.md)** - Create interactive visualizations and dashboards from dsgrid query results.
 
-- **[Query a Dataset with Python](tutorial.md)** - Complete hands-on tutorial using DuckDB
-
-## Additional Information
+[^oedi]: Open Energy Data Initiative
+[^nrel]: National Renewable Energy Laboratory
+[^hpc]: High-Performance Computing
 
 ```{toctree}
 :maxdepth: 1
+:hidden:
 
-Tutorial <tutorial>
-prerequisites
-Visualize Data with Tableau <visualize_with_tableau>
+tutorial
+visualize_with_tableau
 ```
-
-This section covers:
-
-- Loading data from NREL's Kestrel HPC or OEDI S3 buckets
-- Filtering and aggregating energy demand data
-- Using dataset metadata for flexible queries
-- Exporting results to pandas DataFrames or CSV files

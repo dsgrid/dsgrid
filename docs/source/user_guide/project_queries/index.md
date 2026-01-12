@@ -11,7 +11,6 @@ Understand how dsgrid processes queries and transforms data.
 
 concepts
 how_to_filter
-visualize_with_tableau
 query_concepts
 aggregations
 filters
@@ -22,5 +21,5 @@ output_formats
 Legacy detailed guides available at:
 - [Queries (detailed)](../../explanations/queries)
 - [Filter Queries (detailed)](../../how_tos/filter_a_query)
-- [Visualize Data with Tableau (detailed)](../../how_tos/visualize_data_with_tableau)
+- [Visualize Data with Tableau](../../published_data/working_with_published_data/visualize_with_tableau)
 :::

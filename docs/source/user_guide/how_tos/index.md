@@ -15,7 +15,6 @@ Quick reference guides for specific tasks and operations.
 :caption: Dataset Operations
 
 ../dataset_registration/how_to_dimensions
-../project_queries/visualize_with_tableau
 ```
 
 ```{toctree}

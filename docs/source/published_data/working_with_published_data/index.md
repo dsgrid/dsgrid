@@ -15,6 +15,7 @@ Follow our step-by-step tutorial to start querying dsgrid data immediately:
 
 Tutorial <tutorial>
 prerequisites
+Visualize Data with Tableau <visualize_with_tableau>
 ```
 
 This section covers:

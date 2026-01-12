@@ -3,7 +3,7 @@
 :::{admonition} Active Development
 :class: warning
 
-dsgrid is under active development and details are subject to change. Please reach out to the [dsgrid team](mailto:dsgrid.info@nrel.gov) with questions or feedback.
+The dsgrid toolkit is under active development and details are subject to change. Please reach out to the [dsgrid team](mailto:dsgrid.info@nrel.gov) with questions or feedback.
 :::
 
 ## What is dsgrid?

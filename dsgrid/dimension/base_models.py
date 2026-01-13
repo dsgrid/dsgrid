@@ -115,6 +115,14 @@ _DIMENSION_TO_MODEL = {
 }
 
 
+class DatasetDimensionRequirements(DSGBaseModel):
+    """Defines the requirements for checking a dataset prior to registration."""
+
+    check_time_consistency: bool = True
+    check_dimension_associations: bool = True
+    require_all_dimension_types: bool = True
+
+
 def get_record_base_model(type_enum):
     """Return the dimension model class for a DimensionType."""
     dim_model = _DIMENSION_TO_MODEL.get(type_enum)
@@ -150,7 +158,7 @@ def check_required_dimensions(dimensions, tag):
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
 
-def check_required_dataset_dimensions(dimensions, tag):
+def check_required_dataset_dimensions(dimensions, requirements: DatasetDimensionRequirements, tag):
     """Check that a dataset config contains all required dimensions.
 
     Parameters
@@ -166,17 +174,13 @@ def check_required_dataset_dimensions(dimensions, tag):
         Raised if a required dimension is not provided.
 
     """
-    # dimension_types = {x.dimension_type for x in dimensions}
-    # TODO: stride
-    # required_dim_types = {
-    #     DimensionType.GEOGRAPHY,
-    #     DimensionType.MODEL_YEAR,
-    #     DimensionType.SCENARIO,
-    #     DimensionType.SECTOR,
-    # }
-    # missing = required_dim_types.difference(dimension_types)
-    # if missing:
-    #     raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+    dimension_types = {x.dimension_type for x in dimensions}
+    if requirements.require_all_dimension_types:
+        required_dim_types = set(DimensionType)
+        missing = required_dim_types.difference(dimension_types)
+        if missing:
+            msg = f"Required dimension(s) {missing} are not in {tag}."
+            raise ValueError(msg)
 
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 

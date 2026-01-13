@@ -29,6 +29,7 @@ from dsgrid.config.file_schema import Column, read_data_file
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import (
+    DatasetDimensionRequirements,
     DimensionType,
     check_required_dataset_dimensions,
 )
@@ -128,9 +129,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         logger.info("Run dataset registration checks.")
-        check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
+        check_required_dataset_dimensions(
+            config.model.dimension_references, requirements, "dataset dimensions"
+        )
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
             self._check_dataset_consistency(
@@ -138,6 +142,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 config,
                 missing_dimension_associations,
                 scratch_dir_context,
+                requirements,
             )
 
     def _check_dataset_consistency(
@@ -146,6 +151,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         schema_handler = make_dataset_schema_handler(
             conn,
@@ -154,7 +160,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._dimension_mapping_mgr,
             store=self._store,
         )
-        schema_handler.check_consistency(missing_dimension_associations, scratch_dir_context)
+        schema_handler.check_consistency(
+            missing_dimension_associations, scratch_dir_context, requirements
+        )
 
     @property
     def dimension_manager(self) -> DimensionRegistryManager:
@@ -254,6 +262,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         context: RegistrationContext | None = None,
         data_base_dir: Path | None = None,
         missing_associations_base_dir: Path | None = None,
+        requirements: DatasetDimensionRequirements | None = None,
     ):
         config = DatasetConfig.load_from_user_path(
             config_file,
@@ -269,6 +278,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 return self.register_from_config(
                     config,
                     context,
+                    requirements=requirements,
                 )
         else:
             return self.register_from_config(
@@ -281,17 +291,20 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config: DatasetConfig,
         context: RegistrationContext,
+        requirements: DatasetDimensionRequirements | None = None,
     ):
         self._update_dimensions(context.connection, config)
         self._register_dataset_and_dimensions(
             config,
             context,
+            requirements,
         )
 
     def _register_dataset_and_dimensions(
         self,
         config: DatasetConfig,
         context: RegistrationContext,
+        requirements: DatasetDimensionRequirements | None = None,
     ):
         logger.info("Start registration of dataset %s", config.model.dataset_id)
 
@@ -311,6 +324,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._register(
             config,
             context,
+            requirements=requirements,
         )
         context.add_id(RegistryType.DATASET, config.model.dataset_id, self)
 
@@ -318,7 +332,9 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config: DatasetConfig,
         context: RegistrationContext,
+        requirements: DatasetDimensionRequirements | None = None,
     ):
+        reqs = requirements or DatasetDimensionRequirements()
         config.model.version = "1.0.0"
         # Explanation for this order of operations:
         # 1. Check time consistency in the original dataset format.
@@ -344,7 +360,10 @@ class DatasetRegistryManager(RegistryManagerBase):
                 scratch_dir_context=scratch_dir_context,
             )
             self._convert_time_format_if_necessary(config, schema_handler, scratch_dir_context)
-            schema_handler.check_time_consistency()
+            if reqs.check_time_consistency:
+                schema_handler.check_time_consistency()
+            else:
+                logger.info("Skip dataset time checks for %s", config.model.dataset_id)
             self._write_to_registry(config, scratch_dir_context=scratch_dir_context)
 
             assoc_dfs = self._store.read_missing_associations_tables(
@@ -356,6 +375,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     config,
                     assoc_dfs,
                     scratch_dir_context,
+                    reqs,
                 )
             except Exception:
                 self._store.remove_tables(config.model.dataset_id, config.model.version)
@@ -762,7 +782,9 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config: DatasetConfig,
         context: RegistrationContext,
+        requirements: DatasetDimensionRequirements | None = None,
     ) -> DatasetConfig:
+        reqs = requirements or DatasetDimensionRequirements()
         conn = context.connection
         dataset_id = config.model.dataset_id
         cur_config = self.get_by_id(dataset_id, conn=conn)
@@ -785,7 +807,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 updated_config.model.dataset_id, updated_config.model.version
             )
             try:
-                self._run_checks(conn, updated_config, assoc_df, scratch_dir_context)
+                self._run_checks(conn, updated_config, assoc_df, scratch_dir_context, reqs)
             except Exception:
                 self._store.remove_tables(
                     updated_config.model.dataset_id, updated_config.model.version

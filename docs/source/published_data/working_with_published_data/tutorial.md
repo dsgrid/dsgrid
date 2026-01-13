@@ -1,14 +1,10 @@
 # Query a Dataset with Python
 
-In this tutorial you will learn how to query data from a published dsgrid dataset using DuckDB and Python. We'll show you how to access data from NREL's HPC Kestrel cluster and from [OEDI](https://data.openei.org/).
+In this tutorial you will learn how to query data from a published dsgrid dataset using DuckDB and Python. We'll show you how to access data from from [OEDI](https://data.openei.org/) and from [NLR's HPC](https://www.nrel.gov/hpc/).
 
-This tutorial uses the `state_level_simplified` dataset from the [tempo project](https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project) as an example.
+This tutorial uses the `state_level_simplified` dataset from the [tempo project](https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project) as an example and accomplishes the following:
 
-## Query Objectives
-
-This query will accomplish the following:
-
-- Read data from Kestrel filesystem and OEDI S3 bucket
+- Reads data from an OEDI S3 bucket or the NLR HPC filesystem
 - Filter data for given model years, geography, scenario, and other dimensions
 - Export the query results to a pandas DataFrame or CSV
 
@@ -18,33 +14,35 @@ This query will accomplish the following:
 - How to install Python modules
 - How to use a Jupyter notebook or Python interpreter
 
-## Setup Environment
+## Setup Python Environment
 
-### 1. Set up Python environment
-
-From a terminal run:
+From a terminal run the following commands to set up a virtual environment, activate it, and install the requisite packages:
 
 ````{tab-set}
 
-```{tab-item} Kestrel
+```{tab-item} NLR HPC
+```bash
 module load python
 python -m venv dsgrid-tutorial
 source dsgrid-tutorial/bin/activate
+pip install duckdb pandas
 ```
 
-```{tab-item} Local/Other
+```{tab-item} MAC/Linux
+```bash
 python -m venv dsgrid-tutorial
-source dsgrid-tutorial/bin/activate  # On Windows: dsgrid-tutorial\Scripts\activate
+source dsgrid-tutorial/bin/activate
+pip install duckdb pandas
+```
+
+```{tab-item} Windows
+```bash
+python -m venv dsgrid-tutorial
+dsgrid-tutorial\Scripts\activate # For Powershell: dsgrid-tutorial\Scripts\Activate.ps1
+pip install duckdb pandas
 ```
 
 ````
-
-### 2. Install required packages
-
-```bash
-pip install duckdb
-pip install pandas
-```
 
 ## Load Data
 
@@ -58,23 +56,8 @@ python
 
 ````{tab-set}
 
-```{tab-item} Kestrel
-import duckdb
-
-tablename = "tbl"
-data_dir = "/datasets/dsgrid/dsgrid-tempo-v2022"
-dataset_name = "state_level_simplified"
-filepath = f"{data_dir}/{dataset_name}"
-
-duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT *
-           FROM read_parquet("{filepath}/table.parquet/**/*.parquet",
-           hive_partitioning=true, hive_types_autocast=false)""")
-
-duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
-duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").to_df()  # shows first 5 rows
-```
-
 ```{tab-item} OEDI
+```python
 import duckdb
 
 tablename = "tbl"
@@ -90,11 +73,28 @@ duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
 duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").to_df()  # shows first 5 rows
 ```
 
+```{tab-item} NLR HPC (currently Kestrel)
+```python
+import duckdb
+
+tablename = "tbl"
+data_dir = "/datasets/dsgrid/dsgrid-tempo-v2022"
+dataset_name = "state_level_simplified"
+filepath = f"{data_dir}/{dataset_name}"
+
+duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT *
+           FROM read_parquet("{filepath}/table.parquet/**/*.parquet",
+           hive_partitioning=true, hive_types_autocast=false)""")
+
+duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
+duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").to_df()  # shows first 5 rows
+```
+
 ````
 
 ## Filter Data with DuckDB
 
-One of the main advantages to using DuckDB is the ability to filter data while loading. If a table is created with a filter, DuckDB will not have to read all of the data to generate the requested table. This can make queries much more efficient.
+One of the main advantages of using DuckDB is the ability to filter data while loading. If a table is created with a filter, DuckDB will not have to read all of the data to generate the requested table. This can make queries much more efficient.
 
 Using the same `tablename` and `filepath` from the sections above:
 
@@ -121,12 +121,14 @@ To load the table_metadata script, either copy it from GitHub into a directory t
 
 ````{tab-set}
 
-```{tab-item} Kestrel
-pip install pydantic
+```{tab-item} OEDI
+```bash
+pip install pydantic pyarrow
 ```
 
-```{tab-item} OEDI
-pip install pydantic pyarrow
+```{tab-item} NLR HPC
+```bash
+pip install pydantic
 ```
 
 ````
@@ -135,7 +137,8 @@ pip install pydantic pyarrow
 
 ````{tab-set}
 
-```{tab-item} Kestrel
+```{tab-item} NLR HPC
+```python
 from pathlib import Path
 import sys
 
@@ -150,6 +153,7 @@ table_metadata = TableMetadata.from_file(metadata_path)
 ```
 
 ```{tab-item} OEDI
+```python
 from pathlib import Path
 import sys
 
@@ -208,6 +212,4 @@ dataframe.to_csv('mydata.csv')
 
 ## Next Steps
 
-- Learn more about [dataset dimensions and structure](../../user_guide/dataset_registration/index.md)
-- Explore [advanced filtering techniques](../../user_guide/project_queries/filters.md)
 - See [how to work with Apache Spark](../../apache_spark/index.md) for larger datasets

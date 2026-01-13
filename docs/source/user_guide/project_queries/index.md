@@ -21,5 +21,5 @@ output_formats
 Legacy detailed guides available at:
 - [Queries (detailed)](../../explanations/queries)
 - [Filter Queries (detailed)](../../how_tos/filter_a_query)
-- [Visualize Data with Tableau](../../published_data/working_with_published_data/visualize_with_tableau)
+
 :::

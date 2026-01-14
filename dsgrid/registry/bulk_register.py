@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
+from dsgrid.dimension.base_models import DatasetDimensionRequirements
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
@@ -25,6 +26,7 @@ def bulk_register(
     missing_associations_base_dir: Path | None = None,
     repo_base_dir: Path | None = None,
     journal_file: Path | None = None,
+    dataset_dimension_requirements: DatasetDimensionRequirements | None = None,
 ):
     """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
     records successfully registered project and dataset IDs to a journal file and prints its
@@ -53,6 +55,7 @@ def bulk_register(
             missing_associations_base_dir,
             repo_base_dir,
             journal,
+            dataset_dimension_requirements,
         )
     except Exception:
         failure_occurred = True
@@ -81,6 +84,7 @@ def _run_bulk_registration(
     missing_associations_base_dir: Path | None,
     base_repo_dir: Path | None,
     journal: RegistrationJournal,
+    dataset_dimension_requirements: DatasetDimensionRequirements | None,
 ):
     user = getpass.getuser()
     project_mgr = mgr.project_manager
@@ -128,6 +132,7 @@ def _run_bulk_registration(
             dataset.log_message,
             data_base_dir=data_base_dir,
             missing_associations_base_dir=missing_associations_base_dir,
+            requirements=dataset_dimension_requirements,
         )
         journal.add_dataset(dataset.dataset_id)
 

@@ -21,7 +21,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
 
@@ -60,9 +60,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self,
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         self._check_one_table_data_consistency()
-        self._check_dimension_associations(missing_dimension_associations, scratch_dir_context)
+        self._check_dimension_associations(
+            missing_dimension_associations, scratch_dir_context, requirements
+        )
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):

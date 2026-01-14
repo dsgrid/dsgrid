@@ -37,7 +37,7 @@ from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.config.file_schema import read_data_file
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
     DaylightSavingAdjustmentModel,
@@ -130,6 +130,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self,
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
@@ -169,9 +170,20 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
-        self, missing_dimension_associations: dict[str, DataFrame], context: ScratchDirContext
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
+
+        if not requirements.check_dimension_associations:
+            logger.info(
+                "Skip checks of dataset dimension associations for %s",
+                self._config.model.dataset_id,
+            )
+            return
+
         logger.info("Check dimension associations")
         assoc_by_records = self._make_expected_dimension_association_table_from_records(
             [x for x in DimensionType if x != DimensionType.TIME], context

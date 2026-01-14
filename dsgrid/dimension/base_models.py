@@ -165,6 +165,8 @@ def check_required_dataset_dimensions(dimensions, requirements: DatasetDimension
     ----------
     dimensions : list
         list of DimensionReferenceModel
+    requirements : DatasetDimensionRequirements
+        Defines the dimension requirements in the dataset that must be checked.
     tag : str
         User-defined string to include in exception messages
 

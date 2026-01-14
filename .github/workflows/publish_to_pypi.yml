@@ -20,7 +20,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -47,7 +47,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build sdist
         uses: PyO3/maturin-action@v1

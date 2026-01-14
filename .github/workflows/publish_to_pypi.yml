@@ -9,8 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
-        # macos-13 is x86_64, macos-14 is arm64
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
     steps:
       - uses: actions/checkout@v6
 
@@ -28,6 +27,8 @@ jobs:
           args: --release --out dist --find-interpreter
           manylinux: auto
           working-directory: .
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -54,6 +55,8 @@ jobs:
         with:
           command: sdist
           args: --out dist
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
 
       - name: Upload sdist
         uses: actions/upload-artifact@v4

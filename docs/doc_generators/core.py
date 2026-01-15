@@ -6,7 +6,7 @@ documentation from Pydantic models and Python enumerations.
 
 import importlib
 import inspect
-import sys
+import types
 from enum import Enum
 from typing import Any, Union, get_args, get_origin
 
@@ -41,13 +41,7 @@ def get_type_string(field_type: Any, documented_models: dict = None) -> str:
     args = get_args(field_type)
 
     # Handle Union types (including Optional which is Union[T, None])
-    # Python 3.10+ uses X | Y syntax which creates types.UnionType
-    # typing.Union uses get_origin(), while types.UnionType is the type itself
-    is_union = origin is Union
-    if sys.version_info >= (3, 10):
-        import types
-
-        is_union = is_union or isinstance(field_type, types.UnionType)
+    is_union = origin is Union or isinstance(field_type, types.UnionType)
 
     if is_union:
         # Handle Union types

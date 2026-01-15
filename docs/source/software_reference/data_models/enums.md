@@ -8,6 +8,8 @@ Enumeration types used in dsgrid configuration models.
 
 Dimension types
 
+<div class="enum-table">
+
 | Constant | Value |
 |----------|-------|
 | `METRIC` | `'metric'` |
@@ -19,11 +21,15 @@ Dimension types
 | `MODEL_YEAR` | `'model_year'` |
 | `SCENARIO` | `'scenario'` |
 
+</div>
+
 ## TimeDimensionType
 
 *dsgrid.dimension.time.TimeDimensionType*
 
 Defines the supported time formats in the load data.
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
@@ -34,22 +40,30 @@ Defines the supported time formats in the load data.
 | `INDEX` | `'index'` |
 | `NOOP` | `'noop'` |
 
+</div>
+
 ## RepresentativePeriodFormat
 
 *dsgrid.dimension.time.RepresentativePeriodFormat*
 
 Defines the supported formats for representative period data.
 
+<div class="enum-table">
+
 | Constant | Value | Description | frequency |
 |----------|-------|-------------|-----------|
 | `ONE_WEEK_PER_MONTH_BY_HOUR` | `'one_week_per_month_by_hour'` | load_data columns use 'month', 'day_of_week', 'hour' to specify time | 1:00:00 |
 | `ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR` | `'one_weekday_day_and_one_weekend_day_per_month_by_hour'` | load_data columns use 'month', 'hour', 'is_weekday' to specify time | 1:00:00 |
+
+</div>
 
 ## LeapDayAdjustmentType
 
 *dsgrid.dimension.time.LeapDayAdjustmentType*
 
 Leap day adjustment enum types
+
+<div class="enum-table">
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -58,11 +72,15 @@ Leap day adjustment enum types
 | `DROP_JAN1` | `'drop_jan1'` | To adjust for leap years, January 1st timestamps and data get dropped. |
 | `NONE` | `'none'` | No leap day adjustment made. |
 
+</div>
+
 ## TimeIntervalType
 
 *dsgrid.dimension.time.TimeIntervalType*
 
 Time interval enum types
+
+<div class="enum-table">
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -70,11 +88,15 @@ Time interval enum types
 | `PERIOD_BEGINNING` | `'period_beginning'` | A time interval that is period beginning is coded by the beginning time. E.g., 2pm (with freq=01:00:00) represents a period of time between 2-3pm. This is the dsgrid default. |
 | `INSTANTANEOUS` | `'instantaneous'` | The time record value represents measured, instantaneous time |
 
+</div>
+
 ## MeasurementType
 
 *dsgrid.dimension.time.MeasurementType*
 
 Time value measurement enum types
+
+<div class="enum-table">
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -84,22 +106,30 @@ Time value measurement enum types
 | `MEASURED` | `'measured'` | Data values represent the measured value at that reported time |
 | `TOTAL` | `'total'` | Data values represent the sum of values in a time range |
 
+</div>
+
 ## DatasetRegistryStatus
 
 *dsgrid.registry.common.DatasetRegistryStatus*
 
 Statuses for a dataset within a project
 
+<div class="enum-table">
+
 | Constant | Value |
 |----------|-------|
 | `UNREGISTERED` | `'Unregistered'` |
 | `REGISTERED` | `'Registered'` |
+
+</div>
 
 ## ProjectRegistryStatus
 
 *dsgrid.registry.common.ProjectRegistryStatus*
 
 Statuses for a project within the DSGRID registry
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
@@ -109,11 +139,15 @@ Statuses for a project within the DSGRID registry
 | `PUBLISHED` | `'Published'` |
 | `DEPRECATED` | `'Deprecated'` |
 
+</div>
+
 ## InputDatasetType
 
 *dsgrid.config.dataset_config.InputDatasetType*
 
 dsgrid Enum class
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
@@ -121,6 +155,8 @@ dsgrid Enum class
 | `HISTORICAL` | `'historical'` |
 | `BENCHMARK` | `'benchmark'` |
 | `UNSPECIFIED` | `'unspecified'` |
+
+</div>
 
 ## DataClassificationType
 
@@ -133,34 +169,48 @@ for more information. In general these classifications describe potential impact
 organizations and individuals. In more detailed schemes a separate classification could
 be applied to confidentiality, integrity, and availability.
 
+<div class="enum-table">
+
 | Constant | Value | Description |
 |----------|-------|-------------|
 | `LOW` | `'low'` | The loss of confidentiality, integrity, or availability could be expected to have a limited adverse effect on organizational operations, organizational assets, or individuals. |
 | `MODERATE` | `'moderate'` | The loss of confidentiality, integrity, or availability could be expected to have a serious adverse effect on organizational operations, organizational assets, or individuals. |
 
+</div>
+
 ## DatasetQualifierType
 
 *dsgrid.config.dataset_config.DatasetQualifierType*
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
 | `QUANTITY` | `'quantity'` |
 | `GROWTH_RATE` | `'growth_rate'` |
 
+</div>
+
 ## GrowthRateType
 
 *dsgrid.config.dataset_config.GrowthRateType*
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
 | `EXPONENTIAL_ANNUAL` | `'exponential_annual'` |
 | `EXPONENTIAL_MONTHLY` | `'exponential_monthly'` |
 
+</div>
+
 ## DimensionMappingType
 
 *dsgrid.config.dimension_mapping_base.DimensionMappingType*
 
 Defines the operation dsgrid will apply to the data during a mapping.
+
+<div class="enum-table">
 
 | Constant | Value |
 |----------|-------|
@@ -179,12 +229,16 @@ Defines the operation dsgrid will apply to the data during a mapping.
 | `MANY_TO_ONE_EXPLICIT_MULTIPLIERS` | `'many_to_one_explicit_multipliers'` |
 | `MANY_TO_MANY_EXPLICIT_MULTIPLIERS` | `'many_to_many_explicit_multipliers'` |
 
+</div>
+
 ## DimensionMappingArchetype
 
 *dsgrid.config.dimension_mapping_base.DimensionMappingArchetype*
 
 Dimension mapping archetype, used to check whether duplicates are allowed in from/to
 dimensions and apply rules about the sum of the from_fraction column.
+
+<div class="enum-table">
 
 | Constant | Value | Description | allow_dup_from_records | allow_dup_to_records | check_fraction_sum_eq1_from_id | check_fraction_sum_eq1_to_id |
 |----------|-------|-------------|------------------------|----------------------|--------------------------------|------------------------------|
@@ -200,3 +254,5 @@ dimensions and apply rules about the sum of the from_fraction column.
 | `ONE_TO_MANY_MAP` | `'one_to_many_map'` | One-to-many dimension mapping with no from_fraction sum check | True | False | False | False |
 | `MANY_TO_ONE_MAP` | `'many_to_one_map'` | Many-to-one dimension mapping with no from_fraction sum check | False | True | False | False |
 | `MANY_TO_MANY_MAP` | `'many_to_many_map'` | Many-to-many dimension mapping with no from_fraction sum check | True | True | False | False |
+
+</div>

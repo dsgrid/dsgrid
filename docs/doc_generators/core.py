@@ -6,8 +6,9 @@ documentation from Pydantic models and Python enumerations.
 
 import importlib
 import inspect
+import sys
 from enum import Enum
-from typing import Any, get_args, get_origin
+from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -39,7 +40,16 @@ def get_type_string(field_type: Any, documented_models: dict = None) -> str:
     origin = get_origin(field_type)
     args = get_args(field_type)
 
-    if origin is type(None) or origin is type(type(None)):
+    # Handle Union types (including Optional which is Union[T, None])
+    # Python 3.10+ uses X | Y syntax which creates types.UnionType
+    # typing.Union uses get_origin(), while types.UnionType is the type itself
+    is_union = origin is Union
+    if sys.version_info >= (3, 10):
+        import types
+
+        is_union = is_union or isinstance(field_type, types.UnionType)
+
+    if is_union:
         # Handle Union types
         type_strs = [get_type_string(arg, documented_models) for arg in args]
         # Escape pipes for markdown tables
@@ -231,7 +241,13 @@ def generate_fields_table(model: type[BaseModel], documented_models: dict = None
     if documented_models is None:
         documented_models = {}
 
-    lines = ["| Name | Type | Default | Description |", "|------|------|---------|-------------|"]
+    # Wrap table in a div with a CSS class for targeted styling
+    lines = [
+        '<div class="model-fields-table">',
+        "",
+        "| Name | Type | Default | Description |",
+        "|------|------|---------|-------------|",
+    ]
 
     for field_name, field_info in model.model_fields.items():
         # Skip internal fields
@@ -248,6 +264,7 @@ def generate_fields_table(model: type[BaseModel], documented_models: dict = None
 
         lines.append(f"| `{field_name}` | {type_str} | {default_str} | {desc} |")
 
+    lines.extend(["", "</div>"])
     return "\n".join(lines)
 
 
@@ -322,6 +339,8 @@ def generate_validators_table(model: type[BaseModel], heading_level: int = 2) ->
         "",
         f"{'#' * heading_level} Validators",
         "",
+        '<div class="model-validators-table">',
+        "",
         "| Name | Applies To | Description |",
         "|------|------------|-------------|",
     ]
@@ -331,6 +350,7 @@ def generate_validators_table(model: type[BaseModel], heading_level: int = 2) ->
         description = description.replace("|", "\\|")
         lines.append(f"| `{name}` | `{applies_to}` | {description} |")
 
+    lines.extend(["", "</div>"])
     return "\n".join(lines)
 
 
@@ -515,9 +535,11 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
         # Just Constant and Value (basic enum)
         header_cols = ["Constant", "Value"]
 
-    # Create table header
+    # Create table header wrapped in a div for CSS targeting
     lines.extend(
         [
+            '<div class="enum-table">',
+            "",
             "| " + " | ".join(header_cols) + " |",
             "|" + "|".join(["-" * (len(col) + 2) for col in header_cols]) + "|",
         ]
@@ -559,7 +581,7 @@ def generate_enum_documentation(enum_class: type[Enum]) -> str:
 
         lines.append("| " + " | ".join(row) + " |")
 
-    lines.append("")
+    lines.extend(["", "</div>", ""])
     return "\n".join(lines)
 
 

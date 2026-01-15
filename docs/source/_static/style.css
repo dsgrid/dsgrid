@@ -156,3 +156,97 @@ article[role="main"] table td,
 article[role="main"] table th {
     padding: 0.5rem 0.75rem;
 }
+
+/* Increase content width for better table readability - Furo theme specific */
+.content {
+    max-width: none !important;
+}
+
+/* Reduce right sidebar to give more space to content */
+aside.toc-drawer {
+    width: 15rem !important;
+}
+
+/* Set specific column widths for data model tables using colgroup */
+/* This is more reliable than nth-child for complex tables */
+article[role="main"] table {
+    width: 100% !important;
+    table-layout: auto !important;
+}
+
+/* Target all table cells for proper wrapping */
+article[role="main"] table td,
+article[role="main"] table th {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Allow code blocks in tables to wrap */
+article[role="main"] table td code {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+}
+
+/* Allow links in tables to break properly */
+article[role="main"] table td a {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/* Data Model FIELDS tables - 4 columns: Name, Type, Default, Description */
+/* Use the explicit CSS class added to the generated markdown */
+.model-fields-table table thead th:nth-child(1),
+.model-fields-table table tbody td:nth-child(1) {
+    width: auto;
+    min-width: 15%;
+    max-width: 20%;
+}
+
+.model-fields-table table thead th:nth-child(2),
+.model-fields-table table tbody td:nth-child(2) {
+    width: auto;
+    min-width: 15%;
+    max-width: 20% !important;
+}
+
+.model-fields-table table thead th:nth-child(3),
+.model-fields-table table tbody td:nth-child(3) {
+    width: auto;
+    min-width: 15%;
+    max-width: 20%;
+}
+
+.model-fields-table table thead th:nth-child(4),
+.model-fields-table table tbody td:nth-child(4) {
+    width: auto;
+    min-width: 40% !important;
+}
+
+/* Data Model VALIDATORS tables - 3 columns: Name, Applies To, Description */
+/* Use the explicit CSS class added to the generated markdown */
+.model-validators-table table thead th:nth-child(1),
+.model-validators-table table tbody td:nth-child(1) {
+    width: auto;
+    min-width: 15%;
+    max-width: 30%;
+}
+
+.model-validators-table table thead th:nth-child(2),
+.model-validators-table table tbody td:nth-child(2) {
+    width: auto;
+    min-width: 15%;
+    max-width: 30%;
+}
+
+.model-validators-table table thead th:nth-child(3),
+.model-validators-table table tbody td:nth-child(3) {
+    width: auto;
+    min-width: 35%;
+}
+
+/* Enum tables - variable columns, let them auto-size but ensure wrapping works */
+.enum-table table {
+    width: 100% !important;
+    table-layout: auto !important;
+}

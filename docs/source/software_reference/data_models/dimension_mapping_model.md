@@ -1,5 +1,7 @@
 # Dimension Mappings
 
+---
+
 ## DimensionMappingBaseModel
 
 *dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel*
@@ -27,6 +29,8 @@ Base class for mapping dimensions
 |------|------------|-------------|
 | `check_archetype` | `check_archetype` | No description |
 
+
+---
 
 ## DimensionMappingReferenceModel
 

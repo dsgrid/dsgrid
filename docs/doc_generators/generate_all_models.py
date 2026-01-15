@@ -5,7 +5,7 @@ This script generates markdown documentation for all dsgrid configuration models
 
 from pathlib import Path
 
-from .core import generate_model_documentation, import_model
+from .core import extract_all_nested_models, generate_model_documentation, import_model
 
 # Models to document with their output paths
 # Format: (page_title, model_path, output_file, additional_models_to_include)
@@ -56,48 +56,86 @@ def main():
 
     # Build a mapping of models to their documentation paths
     # This allows us to link to already-documented models instead of duplicating
+    # First occurrence wins - if a model is documented on one page, all other
+    # pages will link to it instead of re-documenting it
     documented_models = {}
 
-    # First pass: collect all models that will be documented
+    # First pass: collect all models that will be documented (including nested)
     for page_title, model_path, output_file, additional_models in MODELS:
         doc_filename = Path(output_file).name
 
-        # Add main model
+        # Add main model and all its nested models (only if not already documented)
         model = import_model(model_path)
-        documented_models[model] = doc_filename
+        if model not in documented_models:
+            documented_models[model] = doc_filename
+        for nested_model in extract_all_nested_models(model):
+            if nested_model not in documented_models:
+                documented_models[nested_model] = doc_filename
 
-        # Add additional models that will be on the same page
+        # Add additional models and all their nested models (only if not already documented)
         for additional_model_path in additional_models:
             additional_model = import_model(additional_model_path)
-            documented_models[additional_model] = doc_filename
+            if additional_model not in documented_models:
+                documented_models[additional_model] = doc_filename
+            for nested_model in extract_all_nested_models(additional_model):
+                if nested_model not in documented_models:
+                    documented_models[nested_model] = doc_filename
 
     # Second pass: generate documentation for each page
     for page_title, model_path, output_file, additional_models in MODELS:
         output_path = docs_dir / output_file
+        doc_filename = Path(output_file).name
         print(f"Generating documentation for {model_path}...")
 
         try:
-            # Start with page title
-            documentation = f"# {page_title}\n\n"
+            # Start with page title and horizontal line
+            documentation = f"# {page_title}\n\n---\n\n"
 
-            # Generate main model documentation at H2 level
+            # Collect all unique models to document on this page in order encountered
+            # Only include models that should be documented on THIS page
+            models_to_document = []
+            seen = set()
+
+            def add_model_if_new(m):
+                """Add model to list if not already seen AND if it belongs on this page."""
+                if m not in seen and documented_models.get(m) == doc_filename:
+                    models_to_document.append(m)
+                    seen.add(m)
+
+            # Add main model first
             model = import_model(model_path)
-            model_doc = generate_model_documentation(
-                model, include_nested=True, documented_models=documented_models, heading_level=2
-            )
-            documentation += model_doc
+            add_model_if_new(model)
 
-            # Add additional models to the same page (also at H2 level)
+            # Then all its nested models (in alphabetical order for consistency)
+            for nested_model in sorted(extract_all_nested_models(model), key=lambda m: m.__name__):
+                add_model_if_new(nested_model)
+
+            # Add additional models and their nested models
             for additional_model_path in additional_models:
-                print(f"  + Including {additional_model_path}")
                 additional_model = import_model(additional_model_path)
-                additional_doc = generate_model_documentation(
-                    additional_model,
-                    include_nested=True,
+                add_model_if_new(additional_model)
+
+                # Then its nested models (in alphabetical order)
+                for nested_model in sorted(
+                    extract_all_nested_models(additional_model), key=lambda m: m.__name__
+                ):
+                    add_model_if_new(nested_model)
+
+            # Generate documentation for each model (flat, at H2 level, no nested)
+            # The documented_models dict ensures nested models link to their documentation
+            # instead of being duplicated
+            model_docs = []
+            for model_to_doc in models_to_document:
+                model_doc = generate_model_documentation(
+                    model_to_doc,
+                    include_nested=False,  # Flat structure - no nested tables
                     documented_models=documented_models,
                     heading_level=2,
                 )
-                documentation += "\n\n" + additional_doc
+                model_docs.append(model_doc)
+
+            # Join all model docs with horizontal bars
+            documentation += "\n\n---\n\n".join(model_docs)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text(documentation, encoding="utf-8")
@@ -109,8 +147,7 @@ def main():
             traceback.print_exc()
             return 1
 
-    total_models = sum(1 + len(additional) for _, _, _, additional in MODELS)
-    print(f"\nGenerated documentation for {total_models} models across {len(MODELS)} pages")
+    print(f"\nGenerated documentation for {len(MODELS)} pages")
     return 0
 
 

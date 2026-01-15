@@ -1,5 +1,7 @@
 # Dataset Config
 
+---
+
 ## DatasetConfigModel
 
 *dsgrid.config.dataset_config.DatasetConfigModel*
@@ -48,89 +50,16 @@ Represents dataset configurations.
 | `check_layout_fields` | `*(model)*` | Ensure data_layout and registry_data_layout are mutually exclusive. |
 | `check_time_zone` | `*(model)*` | Validate whether required time zone information is present. |
 
-### GrowthRateModel
+
+---
+
+## Column
+
+*dsgrid.config.file_schema.Column*
 
 Base data model for all dsgrid data models
 
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `dataset_qualifier_type` | `Literal` | `"DatasetQualifierType.GROWTH_RATE"` |  |
-| `growth_rate_type` | [GrowthRateType](enums.md#growthratetype) | *(required)* | Type of growth rates, e.g., exponential_annual |
-
-### QuantityModel
-
-Base data model for all dsgrid data models
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `dataset_qualifier_type` | `Literal` | `"DatasetQualifierType.QUANTITY"` |  |
-
-### RegistryDataLayout
-
-Data layout stored in the dsgrid registry (without file paths).
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `table_format` | [TableFormat](enums.md#tableformat) | *(required)* | Table structure: one_table or two_table. |
-| `value_format` | [ValueFormat](enums.md#valueformat) | *(required)* | Value column format: stacked or pivoted. |
-| `pivoted_dimension_type` | dsgrid.dimension.base_models.DimensionType | None | `None` | The dimension type whose records are columns when pivoted. |
-
-#### Validators
-
-| Name | Applies To | Description |
-|------|------------|-------------|
-| `validate_layout` | `*(model)*` | Validate data layout consistency. |
-
-### UserDataLayout
-
-User-defined data layout for dataset registration.
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `data_file` | [FileSchema](#fileschema) | *(required)* | Defines the data file |
-| `lookup_data_file` | dsgrid.config.file_schema.FileSchema | None | `None` | Defines the lookup data file. Required if the table format is 'two_table'. |
-| `missing_associations` | list[`str`] | `[]` | List of paths to missing associations files (e.g., missing_associations.parquet) or directories of files containing missing combinations by dimension type (e.g., geography__subsector.csv, subsector__metric.csv). |
-| `table_format` | [TableFormat](enums.md#tableformat) | *(required)* | Table structure: one_table (all data in single table) or two_table (time series data separate from lookup metadata). |
-| `value_format` | [ValueFormat](enums.md#valueformat) | *(required)* | Value column format: stacked (single value column) or pivoted (one dimension's records as columns). |
-| `pivoted_dimension_type` | dsgrid.dimension.base_models.DimensionType | None | `None` | The dimension type whose records are columns (pivoted) that contain data values. Required when value_format is 'pivoted'. |
-
-#### Validators
-
-| Name | Applies To | Description |
-|------|------------|-------------|
-| `validate_layout` | `*(model)*` | Validate data layout consistency. |
-
-#### FileSchema
-
-Defines the format of a data file (CSV, JSON, Parquet).
-
-##### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `path` | str | None | *(required)* | Path to the file. Must be assigned during registration. |
-| `columns` | list[[Column](#column)] | `[]` | Custom schema for the columns in the file. |
-| `ignore_columns` | list[`str`] | `[]` | List of column names to ignore (drop) when reading the file. |
-
-##### Validators
-
-| Name | Applies To | Description |
-|------|------------|-------------|
-| `check_consistency` | `*(model)*` | No description |
-
-##### Column
-
-Base data model for all dsgrid data models
-
-###### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -138,8 +67,111 @@ Base data model for all dsgrid data models
 | `dimension_type` | dsgrid.dimension.base_models.DimensionType | None | `None` | Dimension represented by the data in the column. Optional if this is a time column or pivoted column. Required if the column represents a stacked dimension but an alternate name is being used, such as 'county' instead of 'geography'. dsgrid will rename any column that is set at runtime, writing out the result to the registry's data directory. The original dataset is not modified. |
 | `data_type` | str | None | *(required)* | Type of the data in the column. If None, infer the type. |
 
-###### Validators
+### Validators
 
 | Name | Applies To | Description |
 |------|------------|-------------|
 | `check_data_type` | `check_data_type` | No description |
+
+
+---
+
+## FileSchema
+
+*dsgrid.config.file_schema.FileSchema*
+
+Defines the format of a data file (CSV, JSON, Parquet).
+
+### Fields
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `path` | str | None | *(required)* | Path to the file. Must be assigned during registration. |
+| `columns` | list[[Column](dataset_model.md#column)] | `[]` | Custom schema for the columns in the file. |
+| `ignore_columns` | list[`str`] | `[]` | List of column names to ignore (drop) when reading the file. |
+
+### Validators
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `check_consistency` | `*(model)*` | No description |
+
+
+---
+
+## GrowthRateModel
+
+*dsgrid.config.dataset_config.GrowthRateModel*
+
+Base data model for all dsgrid data models
+
+### Fields
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_qualifier_type` | `Literal` | `"DatasetQualifierType.GROWTH_RATE"` |  |
+| `growth_rate_type` | [GrowthRateType](enums.md#growthratetype) | *(required)* | Type of growth rates, e.g., exponential_annual |
+
+
+---
+
+## QuantityModel
+
+*dsgrid.config.dataset_config.QuantityModel*
+
+Base data model for all dsgrid data models
+
+### Fields
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_qualifier_type` | `Literal` | `"DatasetQualifierType.QUANTITY"` |  |
+
+
+---
+
+## RegistryDataLayout
+
+*dsgrid.config.dataset_config.RegistryDataLayout*
+
+Data layout stored in the dsgrid registry (without file paths).
+
+### Fields
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `table_format` | [TableFormat](enums.md#tableformat) | *(required)* | Table structure: one_table or two_table. |
+| `value_format` | [ValueFormat](enums.md#valueformat) | *(required)* | Value column format: stacked or pivoted. |
+| `pivoted_dimension_type` | dsgrid.dimension.base_models.DimensionType | None | `None` | The dimension type whose records are columns when pivoted. |
+
+### Validators
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `validate_layout` | `*(model)*` | Validate data layout consistency. |
+
+
+---
+
+## UserDataLayout
+
+*dsgrid.config.dataset_config.UserDataLayout*
+
+User-defined data layout for dataset registration.
+
+### Fields
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `data_file` | [FileSchema](dataset_model.md#fileschema) | *(required)* | Defines the data file |
+| `lookup_data_file` | dsgrid.config.file_schema.FileSchema | None | `None` | Defines the lookup data file. Required if the table format is 'two_table'. |
+| `missing_associations` | list[`str`] | `[]` | List of paths to missing associations files (e.g., missing_associations.parquet) or directories of files containing missing combinations by dimension type (e.g., geography__subsector.csv, subsector__metric.csv). |
+| `table_format` | [TableFormat](enums.md#tableformat) | *(required)* | Table structure: one_table (all data in single table) or two_table (time series data separate from lookup metadata). |
+| `value_format` | [ValueFormat](enums.md#valueformat) | *(required)* | Value column format: stacked (single value column) or pivoted (one dimension's records as columns). |
+| `pivoted_dimension_type` | dsgrid.dimension.base_models.DimensionType | None | `None` | The dimension type whose records are columns (pivoted) that contain data values. Required when value_format is 'pivoted'. |
+
+### Validators
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `validate_layout` | `*(model)*` | Validate data layout consistency. |

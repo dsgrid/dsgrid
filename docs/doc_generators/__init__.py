@@ -5,6 +5,7 @@ from Pydantic models and Python enumerations.
 """
 
 from .core import (
+    extract_all_nested_models,
     generate_enum_documentation,
     generate_model_documentation,
     import_enum,
@@ -12,6 +13,7 @@ from .core import (
 )
 
 __all__ = [
+    "extract_all_nested_models",
     "generate_enum_documentation",
     "generate_model_documentation",
     "import_enum",

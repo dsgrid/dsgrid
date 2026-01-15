@@ -180,6 +180,39 @@ def extract_nested_models(model: type[BaseModel]) -> set[type[BaseModel]]:
     return nested
 
 
+def extract_all_nested_models(model: type[BaseModel]) -> set[type[BaseModel]]:
+    """Recursively extract ALL nested Pydantic models from a model.
+
+    Parameters
+    ----------
+    model : type[BaseModel]
+        The Pydantic model to analyze
+
+    Returns
+    -------
+    set[type[BaseModel]]
+        Set of all nested Pydantic model classes (including deeply nested)
+    """
+    all_nested = set()
+    to_process = {model}
+    processed = set()
+
+    while to_process:
+        current = to_process.pop()
+        if current in processed:
+            continue
+        processed.add(current)
+
+        # Get direct nested models
+        direct_nested = extract_nested_models(current)
+        for nested in direct_nested:
+            if nested not in all_nested and nested != model:
+                all_nested.add(nested)
+                to_process.add(nested)
+
+    return all_nested
+
+
 def generate_fields_table(model: type[BaseModel], documented_models: dict = None) -> str:
     """Generate a markdown table for a model's fields.
 

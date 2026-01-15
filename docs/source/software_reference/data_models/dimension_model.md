@@ -1,5 +1,7 @@
 # Dimensions
 
+---
+
 ## DimensionModel
 
 *dsgrid.config.dimensions.DimensionModel*
@@ -36,6 +38,8 @@ Defines a non-time dimension
 | `add_records` | `add_records` | Add records from the file. |
 
 
+---
+
 ## DateTimeDimensionModel
 
 *dsgrid.config.dimensions.DateTimeDimensionModel*
@@ -58,7 +62,7 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME` | Type of time dimension |
 | `time_zone_format` | `Union` | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: mean, min, max, measured, total |
-| `ranges` | list[[TimeRangeModel](#timerangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
+| `ranges` | list[[TimeRangeModel](dimension_model.md#timerangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
 | `time_column` | `str` | `"timestamp"` | Name of time column in the dataframe. It should be updated during the query process to reflect any changes to the dataframe time column. |
 | `localize_to_time_zone` | `bool` | `True` | Whether to localize timestamps to time zone(s). If True, timestamps in the dataframe must be tz-naive. |
@@ -74,27 +78,37 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `check_times` | `check_times` | No description |
 | `handle_legacy_fields` | `*(model)*` | No description |
 
-### AlignedTimeSingleTimeZone
+
+---
+
+## AlignedTimeSingleTimeZone
+
+*dsgrid.config.dimensions.AlignedTimeSingleTimeZone*
 
 For each geography, data has the same set of timestamps in absolute time.
 Timestamps in the data must be tz-aware.
 
 E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME"` |  |
 | `time_zone` | `str` | *(required)* | Time zone of data |
 
-#### Validators
+### Validators
 
 | Name | Applies To | Description |
 |------|------------|-------------|
 | `handle_legacy_fields` | `*(model)*` | No description |
 
-### LocalTimeMultipleTimeZones
+
+---
+
+## LocalTimeMultipleTimeZones
+
+*dsgrid.config.dimensions.LocalTimeMultipleTimeZones*
 
 For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
 for the time zone of each geography.
@@ -103,18 +117,23 @@ Timestamps in the data must be tz-aware.
 E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
 They are aligned in clock time but not in absolute time.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_CLOCK_TIME"` |  |
 | `time_zones` | list[`str`] | *(required)* | List of unique time zones in the dataset |
 
-### TimeRangeModel
+
+---
+
+## TimeRangeModel
+
+*dsgrid.config.dimensions.TimeRangeModel*
 
 Defines a continuous range of time.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -123,6 +142,8 @@ Defines a continuous range of time.
 | `str_format` | `str` | `"%Y-%m-%d %H:%M:%S"` | Timestamp string format (for parsing the time ranges). The string format is used to parse the timestamps provided in the time ranges.Cheatsheet reference: `<https://strftime.org/>`_. |
 | `frequency` | `timedelta` | `1:00:00` | Resolution of the timestamps |
 
+
+---
 
 ## AnnualTimeDimensionModel
 
@@ -147,7 +168,7 @@ i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not o
 | `description` | str | None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.ANNUAL` |  |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with an annual time: e.g., total |
-| `ranges` | list[[AnnualRangeModel](#annualrangemodel)] | `[]` | Defines the contiguous ranges of annual time in the data, inclusive of start and end time. |
+| `ranges` | list[[AnnualRangeModel](dimension_model.md#annualrangemodel)] | `[]` | Defines the contiguous ranges of annual time in the data, inclusive of start and end time. |
 | `include_leap_day` | `bool` | `False` | Whether annual time includes leap day. |
 
 ### Validators
@@ -162,11 +183,16 @@ i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not o
 | `check_measurement_type` | `check_measurement_type` | No description |
 | `handle_legacy_fields` | `*(model)*` | No description |
 
-### AnnualRangeModel
+
+---
+
+## AnnualRangeModel
+
+*dsgrid.config.dimensions.AnnualRangeModel*
 
 Defines a continuous range of annual time.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -175,6 +201,8 @@ Defines a continuous range of annual time.
 | `str_format` | `str` | `"%Y"` | Timestamp string format. The string format is used to parse the timestamps provided in the time ranges. Cheatsheet reference: `<https://strftime.org/>`_. |
 | `frequency` | `int` | `1` | Resolution of the annual time in number of years |
 
+
+---
 
 ## RepresentativePeriodTimeDimensionModel
 
@@ -198,7 +226,7 @@ Defines a representative time dimension.
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.REPRESENTATIVE_PERIOD` |  |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: e.g., mean, total |
 | `format` | [RepresentativePeriodFormat](enums.md#representativeperiodformat) | *(required)* | Format of the timestamps in the load data |
-| `ranges` | list[[MonthRangeModel](#monthrangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
+| `ranges` | list[[MonthRangeModel](dimension_model.md#monthrangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents |
 
 ### Validators
@@ -210,17 +238,24 @@ Defines a representative time dimension.
 | `get_dimension_class_name` | `get_dimension_class_name` | Set class_name based on inputs. |
 | `get_dimension_class` | `get_dimension_class` | No description |
 
-### MonthRangeModel
+
+---
+
+## MonthRangeModel
+
+*dsgrid.config.dimensions.MonthRangeModel*
 
 Defines a continuous range of time.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `start` | `int` | *(required)* | First month in the data (January is 1, December is 12) |
 | `end` | `int` | *(required)* | Last month in the data (inclusive) |
 
+
+---
 
 ## DatetimeExternalTimeZoneDimensionModel
 
@@ -245,7 +280,7 @@ using a time zone column.
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME_EXTERNAL_TZ` |  |
 | `time_zone_format` | `Union` | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: e.g., mean, total |
-| `ranges` | list[[TimeRangeModel](#timerangemodel)] | *(required)* | Defines the continuous ranges of time in the data, inclusive of start and end time. If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records. |
+| `ranges` | list[[TimeRangeModel](dimension_model.md#timerangemodel)] | *(required)* | Defines the continuous ranges of time in the data, inclusive of start and end time. If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
 
 ### Validators
@@ -258,55 +293,8 @@ using a time zone column.
 | `get_dimension_class` | `get_dimension_class` | No description |
 | `check_times` | `check_times` | No description |
 
-### AlignedTimeSingleTimeZone
 
-For each geography, data has the same set of timestamps in absolute time.
-Timestamps in the data must be tz-aware.
-
-E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME"` |  |
-| `time_zone` | `str` | *(required)* | Time zone of data |
-
-#### Validators
-
-| Name | Applies To | Description |
-|------|------------|-------------|
-| `handle_legacy_fields` | `*(model)*` | No description |
-
-### LocalTimeMultipleTimeZones
-
-For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
-for the time zone of each geography.
-Timestamps in the data must be tz-aware.
-
-E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
-They are aligned in clock time but not in absolute time.
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_CLOCK_TIME"` |  |
-| `time_zones` | list[`str`] | *(required)* | List of unique time zones in the dataset |
-
-### TimeRangeModel
-
-Defines a continuous range of time.
-
-#### Fields
-
-| Name | Type | Default | Description |
-|------|------|---------|-------------|
-| `start` | `str` | *(required)* | First timestamp in the data |
-| `end` | `str` | *(required)* | Last timestamp in the data (inclusive) |
-| `str_format` | `str` | `"%Y-%m-%d %H:%M:%S"` | Timestamp string format (for parsing the time ranges). The string format is used to parse the timestamps provided in the time ranges.Cheatsheet reference: `<https://strftime.org/>`_. |
-| `frequency` | `timedelta` | `1:00:00` | Resolution of the timestamps |
-
+---
 
 ## IndexTimeDimensionModel
 
@@ -329,7 +317,7 @@ Defines a time dimension where timestamps are indices and requires converting to
 | `description` | str | None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.INDEX` |  |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: e.g., mean, total |
-| `ranges` | list[[IndexRangeModel](#indexrangemodel)] | *(required)* | Defines the continuous ranges of indices of the data, inclusive of start and end index. |
+| `ranges` | list[[IndexRangeModel](dimension_model.md#indexrangemodel)] | *(required)* | Defines the continuous ranges of indices of the data, inclusive of start and end index. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
 
 ### Validators
@@ -343,11 +331,16 @@ Defines a time dimension where timestamps are indices and requires converting to
 | `check_indices` | `check_indices` | No description |
 | `handle_legacy_fields` | `*(model)*` | No description |
 
-### IndexRangeModel
+
+---
+
+## IndexRangeModel
+
+*dsgrid.config.dimensions.IndexRangeModel*
 
 Defines a continuous range of indices.
 
-#### Fields
+### Fields
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
@@ -357,6 +350,8 @@ Defines a continuous range of indices.
 | `str_format` | `str` | `"%Y-%m-%d %H:%M:%S"` | Timestamp string format. The string format is used to parse the starting timestamp provided. Cheatsheet reference: `<https://strftime.org/>`_. |
 | `frequency` | `timedelta` | `1:00:00` | Resolution of the timestamps for which the index range represents. |
 
+
+---
 
 ## NoOpTimeDimensionModel
 
@@ -388,6 +383,8 @@ Defines a NoOp time dimension.
 | `get_dimension_class_name` | `get_dimension_class_name` | Set class_name based on inputs. |
 | `get_dimension_class` | `get_dimension_class` | No description |
 
+
+---
 
 ## DimensionReferenceModel
 

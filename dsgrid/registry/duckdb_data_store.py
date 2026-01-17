@@ -3,14 +3,14 @@ from pathlib import Path
 from typing import Literal, Self
 
 import duckdb
+import ibis
 from duckdb import DuckDBPyConnection
 
 import dsgrid
 from dsgrid.common import BackendEngine
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.functions import get_spark_session
-from dsgrid.spark.types import DataFrame
+import ibis.expr.types as ir
 
 
 DATABASE_FILENAME = "data.duckdb"
@@ -63,44 +63,44 @@ class DuckDbDataStore(DataStoreInterface):
 
         return cls(base_path)
 
-    def read_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_table(self, dataset_id: str, version: str) -> ir.Table:
         con = self._get_connection()
         table_name = _make_table_full_name("data", dataset_id, version)
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
-        return get_spark_session().createDataFrame(df)
+        return ibis.memtable(df)
 
-    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_table(self, df: ir.Table, dataset_id: str, version: str) -> None:
         schema = TABLE_TYPE_TO_SCHEMA["data"]
         short_name = _make_table_short_name(dataset_id, version)
         self._replace_table(df, schema, short_name)
 
-    def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_lookup_table(self, dataset_id: str, version: str) -> ir.Table:
         con = self._get_connection()
         table_name = _make_table_full_name("lookup", dataset_id, version)
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
-        return get_spark_session().createDataFrame(df)
+        return ibis.memtable(df)
 
-    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_lookup_table(self, df: ir.Table, dataset_id: str, version: str) -> None:
         schema = TABLE_TYPE_TO_SCHEMA["lookup"]
         short_name = _make_table_short_name(dataset_id, version)
         self._replace_table(df, schema, short_name)
 
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ir.Table]:
         con = self._get_connection()
-        dfs: dict[str, DataFrame] = {}
+        dfs: dict[str, ir.Table] = {}
         names = self._list_dim_associations_table_names(dataset_id, version)
         if not names:
             return dfs
         for name in names:
             full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
             df = con.sql(f"SELECT * FROM {full_name}").to_df()
-            dfs[name] = get_spark_session().createDataFrame(df)
+            dfs[name] = ibis.memtable(df)
         return dfs
 
     def write_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ir.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
         table_name = _make_table_full_name("data", dataset_id, version)
@@ -109,7 +109,7 @@ class DuckDbDataStore(DataStoreInterface):
         _create_table_from_dataframe(con, df, table_name)
 
     def write_lookup_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ir.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
         table_name = _make_table_full_name("lookup", dataset_id, version)
@@ -118,7 +118,7 @@ class DuckDbDataStore(DataStoreInterface):
         _create_table_from_dataframe(con, df, table_name)
 
     def write_missing_associations_tables(
-        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+        self, dfs: dict[str, ir.Table], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
         for tag, df in dfs.items():
@@ -162,7 +162,7 @@ class DuckDbDataStore(DataStoreInterface):
             > 0
         )
 
-    def _replace_table(self, df: DataFrame, schema: str, table_name: str) -> None:
+    def _replace_table(self, df: ir.Table, schema: str, table_name: str) -> None:
         con = self._get_connection()
         if not self._has_table(con, schema, table_name):
             _create_table_from_dataframe(con, df, table_name)
@@ -185,9 +185,9 @@ class DuckDbDataStore(DataStoreInterface):
 
 
 def _create_table_from_dataframe(
-    con: DuckDBPyConnection, df: DataFrame, full_table_name: str
+    con: DuckDBPyConnection, df: ir.Table, full_table_name: str
 ) -> None:
-    pdf = df.toPandas()  # noqa: F841
+    pdf = df.to_pandas()  # noqa: F841
     con.sql(f"CREATE TABLE {full_table_name} AS SELECT * from pdf")
 
 

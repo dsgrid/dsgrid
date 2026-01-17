@@ -12,16 +12,16 @@ from click.testing import CliRunner
 from dsgrid.cli.dsgrid import cli
 from dsgrid.registry.common import DataStoreType, DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import (
-    drop_temp_tables_and_views,
-    get_current_time_zone,
-    set_current_time_zone,
-)
-from dsgrid.spark.types import use_duckdb
+from dsgrid.tests.utils import use_duckdb
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import init_spark
+from dsgrid.ibis_api import (
+    drop_temp_tables_and_views,
+    get_current_time_zone,
+    set_current_time_zone,
+    init_spark_session as init_spark,
+)
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,

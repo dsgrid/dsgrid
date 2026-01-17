@@ -2,15 +2,14 @@ import logging
 from pathlib import Path
 from typing import Self
 
+import ibis.expr.types as ir
 from pydantic import Field, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
-from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
-from dsgrid.spark.types import DataFrame, DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import write_dataframe
+from dsgrid.spark.types import DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
+from dsgrid.ibis_api import read_csv, read_json, read_parquet
 from dsgrid.utils.utilities import check_uniqueness
 
 
@@ -77,22 +76,18 @@ class FileSchema(DSGBaseModel):
         return {x.name: x.data_type for x in self.columns if x.data_type is not None}
 
 
-def read_data_file(
-    schema: FileSchema, scratch_dir_context: ScratchDirContext | None = None
-) -> DataFrame:
+def read_data_file(schema: FileSchema) -> ir.Table:
     """Read a data file from a schema.
 
     Parameters
     ----------
     schema : FileSchema
         Schema defining the file path and column types.
-    scratch_dir_context : ScratchDirContext
-        Optional location to write temporary files.
 
     Returns
     -------
-    DataFrame
-        A Spark DataFrame containing the file data.
+    ir.Table
+        A table containing the file data.
     """
     if schema.path is None:
         msg = "File path is not assigned"
@@ -110,7 +105,7 @@ def read_data_file(
             df = read_parquet(path)
         case ".csv":
             column_schema = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
-            df = read_csv_duckdb(path, schema=column_schema)
+            df = read_csv(path, schema=column_schema)
         case ".json":
             df = read_json(path)
         case _:
@@ -127,16 +122,6 @@ def read_data_file(
     renames = _get_column_renames(schema)
     if renames:
         df = _rename_columns(df, renames)
-        if scratch_dir_context is None:
-            renamed_path = path.with_stem(path.stem + "_renamed")
-            logger.warning(
-                "Creating temporary file at %s. Pass scratch_dir_context to avoid this.",
-                renamed_path,
-            )
-        else:
-            renamed_path = scratch_dir_context.get_temp_filename(suffix=path.suffix)
-        write_dataframe(df, renamed_path, overwrite=True)
-        schema.path = str(renamed_path)
         for column in schema.columns:
             if column.name in renames:
                 column.name = renames[column.name]
@@ -153,14 +138,14 @@ def _get_column_renames(schema: FileSchema) -> dict[str, str]:
     return mapping
 
 
-def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
+def _rename_columns(df: ir.Table, mapping: dict[str, str]) -> ir.Table:
     for old_name, new_name in mapping.items():
-        df = df.withColumnRenamed(old_name, new_name)
+        df = df.rename(**{new_name: old_name})
         logger.info("Renamed column %s to %s", old_name, new_name)
     return df
 
 
-def _drop_ignored_columns(df: DataFrame, ignore_columns: list[str]) -> DataFrame:
+def _drop_ignored_columns(df: ir.Table, ignore_columns: list[str]) -> ir.Table:
     if not ignore_columns:
         return df
 

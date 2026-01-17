@@ -18,10 +18,9 @@ from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGInvalidParameter,
 )
-from dsgrid.spark.types import F
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.ibis_api import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from .common import (
@@ -222,16 +221,26 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mapping_records, mapping_name, mapping_type, tolerance, group_by="from_id"
     ):
         mapping_df = models_to_dataframe(mapping_records)
+        # Ibis syntax
         mapping_sum_df = (
-            mapping_df.groupBy(group_by)
-            .agg(F.sum("from_fraction").alias("sum_fraction"))
-            .sort("sum_fraction", group_by)
+            mapping_df.group_by(group_by)
+            .aggregate(sum_fraction=mapping_df["from_fraction"].sum())
+            .order_by("sum_fraction", group_by)
         )
-        fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
-        fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)
-        if fracs_greater_than_one.count() > 0:
+        fracs_greater_than_one = mapping_sum_df.filter(
+            (mapping_sum_df["sum_fraction"] - 1.0) > tolerance
+        )
+        fracs_less_than_one = mapping_sum_df.filter(
+            1.0 - mapping_sum_df["sum_fraction"] > tolerance
+        )
+
+        if fracs_greater_than_one.count().execute() > 0:
             id_greater_than_one = {
-                x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
+                x[group_by]
+                for x in fracs_greater_than_one.select(group_by)
+                .distinct()
+                .to_pyarrow()
+                .to_pylist()
             }
             msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a "
@@ -239,9 +248,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
             )
             raise DSGInvalidDimensionMapping(msg)
-        elif fracs_less_than_one.count() > 0:
+        elif fracs_less_than_one.count().execute() > 0:
             id_less_than_one = {
-                x[group_by] for x in fracs_less_than_one[[group_by]].distinct().collect()
+                x[group_by]
+                for x in fracs_less_than_one.select(group_by).distinct().to_pyarrow().to_pylist()
             }
             msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"

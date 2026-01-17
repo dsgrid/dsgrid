@@ -3,6 +3,10 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
+import ibis
+import ibis.expr.types as ir
+import pandas as pd
+
 from dsgrid.dataset.models import (
     ValueFormat,
     StackedTableFormatModel,
@@ -13,9 +17,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperationCheckpoint
-from dsgrid.spark.functions import drop_temp_tables_and_views
-from dsgrid.spark.types import DataFrame
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.ibis_api import drop_temp_tables_and_views
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, QueryBaseModel
 
@@ -162,7 +164,8 @@ class QueryContext:
             name = getattr(base_dimension_names, dim_type.value)
             assert name is not None
             match (column_type, dim_type):
-                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                case (_, DimensionType.TIME):
+                    # Time columns are always the mapped time columns regardless of column_type
                     column_names = mapped_time_columns
                 case (ColumnType.DIMENSION_NAMES, _):
                     column_names = [name]
@@ -252,26 +255,26 @@ class QueryContext:
     def _get_metadata(self, dataset_id: str | None = None) -> DatasetMetadataModel:
         return self._metadata if dataset_id is None else self._dataset_metadata[dataset_id]
 
-    def get_record_ids(self) -> dict[DimensionType, DataFrame]:
-        spark = get_spark_session()
+    def get_record_ids(self) -> dict[DimensionType, ir.Table]:
         return {
-            k: spark.createDataFrame(v, ["id"])
+            k: ibis.memtable(pd.DataFrame(v, columns=["id"]))
             for k, v in self._record_ids_by_dimension_type.items()
         }
 
-    def try_get_record_ids_by_dimension_type(self, dim_type: DimensionType) -> DataFrame | None:
+    def try_get_record_ids_by_dimension_type(self, dim_type: DimensionType) -> ir.Table | None:
         records = self._record_ids_by_dimension_type.get(dim_type)
         if records is None:
             return records
 
-        spark = get_spark_session()
-        return spark.createDataFrame(records, [dim_type.value])
+        return ibis.memtable(pd.DataFrame(records, columns=[dim_type.value]))
 
     def set_record_ids_by_dimension_type(
-        self, dim_type: DimensionType, record_ids: DataFrame
+        self, dim_type: DimensionType, record_ids: ir.Table
     ) -> None:
         # Can't keep the dataframes in memory because of spark restarts.
-        self._record_ids_by_dimension_type[dim_type] = [(x.id,) for x in record_ids.collect()]
+        # Ensure we have strings.
+        vals = record_ids["id"].to_pyarrow().to_pylist()
+        self._record_ids_by_dimension_type[dim_type] = [(str(x),) for x in vals]
 
     @contextmanager
     def dataset_mapping_manager(

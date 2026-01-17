@@ -20,7 +20,7 @@ from dsgrid.query.models import ReportType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import run_command
-from dsgrid.utils.spark import init_spark, read_parquet
+from dsgrid.ibis_api import init_spark_session as init_spark, read_parquet
 from .api_manager import ApiManager
 from .models import (
     AsyncTaskStatus,
@@ -339,7 +339,7 @@ def get_async_task_data(async_task_id: int):
         # We should also check how much data we can read through the Spark driver.
         text = (
             read_parquet(str(task.result.data_file))
-            .toPandas()
+            .to_pandas()
             .to_json(orient="split", index=False)
         )
     else:

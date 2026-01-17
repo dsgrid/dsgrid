@@ -28,7 +28,6 @@ from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
 )
-from dsgrid.spark.types import F
 from dsgrid.utils.files import compute_hash
 
 
@@ -56,9 +55,7 @@ class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
     dimension_name: str
-    function: Any = Field(
-        default=None, description="Function or name of function in pyspark.sql.functions."
-    )
+    function: str | None = Field(default=None, description="Function name (e.g., sum, mean, max).")
     alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
@@ -67,13 +64,11 @@ class ColumnModel(DSGBaseModel):
         if function_name is None:
             return function_name
         if not isinstance(function_name, str):
-            return function_name
-
-        func = getattr(F, function_name, None)
-        if func is None:
-            msg = f"function={function_name} is not defined in pyspark.sql.functions"
+            if hasattr(function_name, "__name__"):
+                return function_name.__name__
+            msg = f"function must be a string: {function_name}"
             raise ValueError(msg)
-        return func
+        return function_name
 
     @field_validator("alias")
     @classmethod
@@ -83,14 +78,12 @@ class ColumnModel(DSGBaseModel):
         func = info.data.get("function")
         if func is not None:
             name = info.data["dimension_name"]
-            return f"{func.__name__}__{name}"
+            return f"{func}__{name}"
 
         return alias
 
     @field_serializer("function")
     def serialize_function(self, function, _):
-        if function is not None:
-            return function.__name__
         return function
 
     def get_column_name(self):
@@ -98,7 +91,7 @@ class ColumnModel(DSGBaseModel):
             return self.alias
         if self.function is None:
             return self.dimension_name
-        return f"{self.function.__name__}__{self.dimension_name})"
+        return f"{self.function}__{self.dimension_name}"
 
 
 class ColumnType(StrEnum):
@@ -138,22 +131,22 @@ class DimensionNamesModel(DSGBaseModel):
 class AggregationModel(DSGBaseModel):
     """Aggregate on one or more dimensions."""
 
-    aggregation_function: Any = Field(
+    aggregation_function: str = Field(
         default=None,
-        description="Must be a function name in pyspark.sql.functions",
+        description="Must be a function name (e.g., sum, mean, max).",
     )
     dimensions: DimensionNamesModel = Field(description="Dimensions on which to aggregate")
 
     @field_validator("aggregation_function")
     @classmethod
     def check_aggregation_function(cls, aggregation_function):
-        if isinstance(aggregation_function, str):
-            aggregation_function = getattr(F, aggregation_function, None)
-            if aggregation_function is None:
-                msg = f"{aggregation_function} is not defined in pyspark.sql.functions"
-                raise ValueError(msg)
-        elif aggregation_function is None:
+        if aggregation_function is None:
             msg = "aggregation_function cannot be None"
+            raise ValueError(msg)
+        if not isinstance(aggregation_function, str):
+            if hasattr(aggregation_function, "__name__"):
+                return aggregation_function.__name__
+            msg = f"aggregation_function must be a string: {aggregation_function}"
             raise ValueError(msg)
         return aggregation_function
 
@@ -167,7 +160,7 @@ class AggregationModel(DSGBaseModel):
 
     @field_serializer("aggregation_function")
     def serialize_aggregation_function(self, function, _):
-        return function.__name__
+        return function
 
     def iter_dimensions_to_keep(self) -> Generator[tuple[DimensionType, ColumnModel], None, None]:
         """Yield the dimension type and ColumnModel for each dimension to keep."""

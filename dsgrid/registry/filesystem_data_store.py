@@ -3,10 +3,13 @@ from pathlib import Path
 from typing import Self
 
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.functions import coalesce
-from dsgrid.spark.types import DataFrame
+import ibis.expr.types as ir
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.utils.spark import read_dataframe, write_dataframe, write_dataframe_and_auto_partition
+from dsgrid.ibis_api import (
+    read_dataframe,
+    write_dataframe,
+    write_dataframe_and_auto_partition,
+)
 
 
 TABLE_FILENAME = "table.parquet"
@@ -34,7 +37,7 @@ class FilesystemDataStore(DataStoreInterface):
             raise FileNotFoundError(msg)
         return cls(base_path)
 
-    def read_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_table(self, dataset_id: str, version: str) -> ir.Table:
         filename = self._table_filename(dataset_id, version)
         if not filename.exists():
             filename = self._alt_table_filename(dataset_id, version)
@@ -43,21 +46,21 @@ class FilesystemDataStore(DataStoreInterface):
             raise FileNotFoundError(msg)
         return read_dataframe(filename)
 
-    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_table(self, df: ir.Table, dataset_id: str, version: str) -> None:
         filename = self._get_existing_table_filename(dataset_id, version)
         if filename is None:
             self.write_table(df, dataset_id, version)
             return
         self._replace_table(df, filename)
 
-    def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_lookup_table(self, dataset_id: str, version: str) -> ir.Table:
         filename = self._get_existing_lookup_table_filename(dataset_id, version)
         if filename is None:
             msg = f"Table does not exist for dataset {dataset_id}, version {version}."
             raise FileNotFoundError(msg)
         return read_dataframe(filename)
 
-    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_lookup_table(self, df: ir.Table, dataset_id: str, version: str) -> None:
         filename = self._get_existing_lookup_table_filename(dataset_id, version)
         if filename is None:
             self.write_lookup_table(df, dataset_id, version)
@@ -66,28 +69,28 @@ class FilesystemDataStore(DataStoreInterface):
 
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ir.Table]:
         assoc_dir = self._missing_associations_dir(dataset_id, version)
         if not assoc_dir.exists():
             return {}
         return {x.stem: read_dataframe(x) for x in assoc_dir.iterdir()}
 
     def write_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ir.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         filename = self._table_filename(dataset_id, version)
         filename.parent.mkdir(parents=True, exist_ok=True)
         write_dataframe_and_auto_partition(df, filename)
 
     def write_lookup_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ir.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         filename = self._lookup_table_filename(dataset_id, version)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        write_dataframe(coalesce(df, 1), filename, overwrite=overwrite)
+        write_dataframe(df, filename, overwrite=overwrite)
 
     def write_missing_associations_tables(
-        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+        self, dfs: dict[str, ir.Table], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         for name, df in dfs.items():
             filename = self._missing_associations_table_filename(name, dataset_id, version)
@@ -143,7 +146,7 @@ class FilesystemDataStore(DataStoreInterface):
         return None
 
     @staticmethod
-    def _replace_table(df: DataFrame, filename: Path) -> None:
+    def _replace_table(df: ir.Table, filename: Path) -> None:
         tmp_name = filename.parent / f"{filename.stem}_tmp.parquet"
         write_dataframe(df, tmp_name)
         delete_if_exists(filename)

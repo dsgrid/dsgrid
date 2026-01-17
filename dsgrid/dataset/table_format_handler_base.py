@@ -2,6 +2,8 @@ import abc
 import logging
 from typing import Iterable
 
+import ibis.expr.types as ir
+
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.query.query_context import QueryContext
@@ -12,10 +14,18 @@ from dsgrid.query.models import (
     DatasetDimensionsMetadataModel,
     DimensionMetadataModel,
 )
-from dsgrid.spark.types import DataFrame
 from dsgrid.utils.dataset import map_stacked_dimension, remove_invalid_null_timestamps
-from dsgrid.utils.spark import persist_intermediate_query
+from dsgrid.ibis_api import persist_intermediate_query
 from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.common import BackendEngine
+import dsgrid
+import ibis
+import ibis.expr.datatypes as dt
+
+
+@ibis.udf.scalar.builtin
+def timezone(zone: str, ts: dt.timestamp) -> dt.timestamp:
+    ...
 
 
 logger = logging.getLogger(__name__)
@@ -30,17 +40,17 @@ class TableFormatHandlerBase(abc.ABC):
 
     def add_columns(
         self,
-        df: DataFrame,
+        df: ir.Table,
         column_models: list[ColumnModel],
         context: QueryContext,
         value_columns: Iterable[str],
-    ) -> DataFrame:
+    ) -> ir.Table:
         """Add columns to the dataframe. For example, suppose the geography dimension is at
         county resolution and the user wants to add a column for state.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.expr.types.Table
         column_models : list
         context : QueryContext
         value_columns: Iterable[str]
@@ -87,6 +97,11 @@ class TableFormatHandlerBase(abc.ABC):
                 msg = "Bug: Non-time dimensions cannot have more than one base dimension column"
                 raise Exception(msg)
             expected_base_dim_col = expected_base_dim_cols[0]
+            try:
+                c_before = df.count().to_pyarrow().as_py()
+            except Exception:
+                c_before = "unknown"
+
             df = map_stacked_dimension(
                 df,
                 records,
@@ -94,6 +109,18 @@ class TableFormatHandlerBase(abc.ABC):
                 drop_column=False,
                 to_column=name,
             )
+            try:
+                c_after = df.count().to_pyarrow().as_py()
+                print(
+                    f"DEBUG: add_columns {self._dataset_id}: {name} <- {expected_base_dim_col}. Rows: {c_before} -> {c_after}"
+                )
+                if name == "end_uses_by_fuel_type":
+                    print(
+                        f"DEBUG: Counts by {name}: {df.group_by(name).count().to_pyarrow().to_pylist()}"
+                    )
+            except Exception as e:
+                print(f"DEBUG: add_columns debug failed: {e}")
+
             if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
                 assert supp_dim.model.dimension_type != DimensionType.TIME
                 column_names = [name]
@@ -106,27 +133,28 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
+            mutations = {}
             for col in value_columns:
-                df = df.withColumn(col, df[col] * df["fraction"])
-            df = df.drop("fraction")
+                mutations[col] = df[col] * df["fraction"]
+            df = df.mutate(**mutations).drop("fraction")
 
         return df
 
     @abc.abstractmethod
     def process_aggregations(
-        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
-    ) -> DataFrame:
+        self, df: ir.Table, aggregations: list[AggregationModel], context: QueryContext
+    ) -> ir.Table:
         """Aggregate the dimensional data as specified by aggregations.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.expr.types.Table
         aggregations : AggregationModel
         context : QueryContext
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.expr.types.Table
 
         """
 
@@ -141,8 +169,8 @@ class TableFormatHandlerBase(abc.ABC):
         return self._dataset_id
 
     def convert_columns_to_query_names(
-        self, df: DataFrame, dataset_id: str, context: QueryContext
-    ) -> DataFrame:
+        self, df: ir.Table, dataset_id: str, context: QueryContext
+    ) -> ir.Table:
         """Convert columns from dimension types to dimension query names."""
         columns = set(df.columns)
         for dim_type in DimensionType:
@@ -155,15 +183,15 @@ class TableFormatHandlerBase(abc.ABC):
                 assert len(new_cols) == 1, f"{dim_type=} {new_cols=}"
                 new_col = next(iter(new_cols))
                 if existing_col != new_col:
-                    df = df.withColumnRenamed(existing_col, new_col)
+                    df = df.rename({new_col: existing_col})
                     logger.debug("Converted column from %s to %s", existing_col, new_col)
 
         return df
 
-    def replace_ids_with_names(self, df: DataFrame) -> DataFrame:
+    def replace_ids_with_names(self, df: ir.Table) -> ir.Table:
         """Replace dimension record IDs with names."""
         assert not {"id", "name"}.intersection(df.columns), df.columns
-        orig = df
+        orig_count = df.count().to_pyarrow().as_py()
         all_query_names = self._project_config.get_dimension_names_mapped_to_type()
         for name in set(df.columns).intersection(all_query_names.keys()):
             if all_query_names[name] != DimensionType.TIME:
@@ -171,11 +199,12 @@ class TableFormatHandlerBase(abc.ABC):
                 dim_config = self._project_config.get_dimension_with_records(name)
                 records = dim_config.get_records_dataframe().select("id", "name")
                 df = (
-                    df.join(records, on=df[name] == records["id"])
+                    df.join(records, df[name] == records["id"])
                     .drop("id", name)
-                    .withColumnRenamed("name", name)
+                    .rename({name: "name"})
                 )
-        assert df.count() == orig.count(), f"counts changed {df.count()} {orig.count()}"
+        new_count = df.count().to_pyarrow().as_py()
+        assert new_count == orig_count, f"counts changed {new_count} {orig_count}"
         return df
 
     @staticmethod
@@ -189,11 +218,12 @@ class TableFormatHandlerBase(abc.ABC):
 
     def _build_group_by_columns(
         self,
+        table: ir.Table,
         columns: list[ColumnModel],
         context: QueryContext,
         final_metadata: DatasetDimensionsMetadataModel,
     ):
-        group_by_cols: list[str] = []
+        group_by_cols = []
         for column in columns:
             dim = self._project_config.get_dimension(column.dimension_name)
             dim_type = dim.model.dimension_type
@@ -208,7 +238,7 @@ class TableFormatHandlerBase(abc.ABC):
                         group_by_cols.append(dim_type.value)
                 case ColumnType.DIMENSION_NAMES:
                     column_names = [column.get_column_name()]
-                    expr = self._make_group_by_column_expr(column)
+                    expr = self._make_group_by_column_expr(table, column, context)
                     group_by_cols.append(expr)
                     if not isinstance(expr, str) or expr != column.dimension_name:
                         # In this case we are replacing any existing query name with an expression
@@ -225,18 +255,44 @@ class TableFormatHandlerBase(abc.ABC):
             )
         return group_by_cols
 
-    @staticmethod
-    def _make_group_by_column_expr(column):
+    def _make_group_by_column_expr(self, table: ir.Table, column, context: QueryContext):
+        print(f"DEBUG: _make_group_by_column_expr calling for {column.dimension_name}")
         if column.function is None:
             expr = column.dimension_name
         else:
-            expr = column.function(column.dimension_name)
+            col_expr = table[column.dimension_name]
+            # Handle time zone conversion for time dimension functions
+            dim = self._project_config.get_dimension(column.dimension_name)
+            if dim.model.dimension_type == DimensionType.TIME:
+                tz = self._project_config.get_base_time_dimension().get_time_zone()
+                if tz:
+                    target_type = dt.Timestamp(timezone=tz)
+                    col_expr = col_expr.cast(target_type)
+
+                    # Handle time zone conversion to naive local time
+                    if dsgrid.ibis_api.get_backend_engine() == BackendEngine.DUCKDB:
+                        # DuckDB CAST(timestamptz AS timestamp) converts to UTC naive.
+                        # functionality we need is provided by the timezone() function.
+                        col_expr = timezone(tz, col_expr)
+                    else:
+                        # Spark and potentially other backends
+                        # Cast to the target timezone, and then to naive timestamp so that valid
+                        # local time is used for extraction functions like hour().
+                        col_expr = col_expr.cast(dt.Timestamp(timezone=None))
+
+            expr = getattr(col_expr, column.function)()
             if column.alias is not None:
-                expr = expr.alias(column.alias)
+                expr = expr.name(column.alias)
+
+        # DEBUG
+        # try:
+        #    print(f"DEBUG: SQL for {column.dimension_name}: {table.select(expr).compile()}")
+        # except Exception:
+        #    pass
         return expr
 
     @track_timing(timer_stats_collector)
-    def _remove_invalid_null_timestamps(self, df: DataFrame, orig_id, context: QueryContext):
+    def _remove_invalid_null_timestamps(self, df: ir.Table, orig_id, context: QueryContext):
         if id(df) != orig_id:
             # The table could have NULL timestamps that designate expected-missing data.
             # Those rows could be obsolete after aggregating stacked dimensions.

@@ -28,16 +28,12 @@ from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
-from dsgrid.spark.functions import (
-    is_dataframe_empty,
-)
-from dsgrid.spark.types import DataFrame
-from dsgrid.utils.spark import (
+import ibis.expr.types as ir
+from dsgrid.ibis_api import (
     read_dataframe,
     try_read_dataframe,
     restart_spark_with_custom_conf,
     write_dataframe_and_auto_partition,
-    get_active_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
@@ -57,7 +53,6 @@ class Project:
         dimension_mapping_mgr: DimensionMappingRegistryManager,
         dataset_mgr: DatasetRegistryManager,
     ):
-        self._spark = get_active_session()
         self._config = config
         self._version = version
         self._dataset_configs = dataset_configs
@@ -203,7 +198,7 @@ class Project:
         return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
-        record_ids: dict[DimensionType, DataFrame] = {}
+        record_ids: dict[DimensionType, ir.Table] = {}
         for dim_filter in context.model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
             if dim_type == DimensionType.TIME:
@@ -233,15 +228,15 @@ class Project:
                         base_dim, supp_dim
                     )
                     df = (
-                        mapping_records.join(df, on=mapping_records.to_id == df.id)
+                        mapping_records.join(df, mapping_records.to_id == df.id)
                         .select("from_id")
-                        .withColumnRenamed("from_id", "id")
+                        .rename(id="from_id")
                         .distinct()
                     )
 
             if dim_type in record_ids:
                 df = record_ids[dim_type].join(df, "id")
-            if is_dataframe_empty(df):
+            if df.count().execute() == 0:
                 msg = f"Query filter produced empty records: {dim_filter}"
                 raise DSGInvalidQuery(msg)
             record_ids[dim_type] = df
@@ -287,6 +282,9 @@ class Project:
                     dataset = self.load_dataset(dataset_id, conn=conn)
                     with Timer(timer_stats_collector, "build_project_mapped_dataset"):
                         df = dataset.make_project_dataframe(context, self._config)
+                        if not metadata_file.parent.exists():
+                            metadata_file.parent.mkdir(parents=True, exist_ok=True)
+
                         context.serialize_dataset_metadata_to_file(
                             dataset.dataset_id, metadata_file
                         )
@@ -407,7 +405,11 @@ class Project:
 
             time_dim = self._config.get_base_time_dimension()
             assert time_dim is not None
-            time_columns = time_dim.get_load_data_time_columns()
+            # Use dimension name for DIMENSION_NAMES, load data columns for DIMENSION_TYPES
+            if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
+                time_columns = [time_dim.model.name]
+            else:
+                time_columns = time_dim.get_load_data_time_columns()
             context.set_dataset_metadata(
                 dataset.dataset_id,
                 context.model.result.column_type,

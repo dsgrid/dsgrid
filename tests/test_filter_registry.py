@@ -67,19 +67,21 @@ def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> No
             dataset = project.get_dataset(DATASET_ID)
             load_data_df = dataset._handler._load_data
             load_data_lookup_df = dataset._handler._load_data_lookup
-            df = load_data_df.join(load_data_lookup_df, on="id").drop("id")
-            dataset_geos = df.select("geography").distinct().collect()
+            df = load_data_df.join(load_data_lookup_df, "id").drop("id")
+            dataset_geos = df.select("geography").distinct().to_pyarrow().to_pylist()
             assert len(dataset_geos) == 1
-            assert dataset_geos[0].geography == COUNTY_ID
+            assert dataset_geos[0]["geography"] == COUNTY_ID
 
             base_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)
-            records = base_dim.get_records_dataframe().collect()
+            records = base_dim.get_records_dataframe().to_pyarrow().to_pylist()
             assert len(records) == 1
-            assert records[0].id == COUNTY_ID
+            assert records[0]["id"] == COUNTY_ID
 
-            supp_dim = project.config.get_dimension_records(DIMENSION_NAME).collect()
+            supp_dim = (
+                project.config.get_dimension_records(DIMENSION_NAME).to_pyarrow().to_pylist()
+            )
             assert len(supp_dim) == 1
-            assert supp_dim[0].id == STATE_ID
+            assert supp_dim[0]["id"] == STATE_ID
 
             found_mapping_records = False
             for dim in project.config.list_supplemental_dimensions(DimensionType.GEOGRAPHY):
@@ -90,9 +92,12 @@ def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> No
                         DimensionType.GEOGRAPHY
                     ):
                         if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
-                            records = mapping.get_records_dataframe().collect()
+                            records = mapping.get_records_dataframe().to_pyarrow().to_pylist()
                             assert len(records) == 1
-                            assert records[0].from_id == COUNTY_ID and records[0].to_id == STATE_ID
+                            assert (
+                                records[0]["from_id"] == COUNTY_ID
+                                and records[0]["to_id"] == STATE_ID
+                            )
                             found_mapping_records = True
             assert found_mapping_records
     finally:

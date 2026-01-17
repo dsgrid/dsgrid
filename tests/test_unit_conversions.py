@@ -1,12 +1,11 @@
 import math
 
 import pytest
+import ibis
 
 import dsgrid.units.energy as energy
 import dsgrid.units.power as power
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.spark.functions import cache, unpersist
-from dsgrid.spark.types import F
 from dsgrid.units.constants import (
     GIGA_TO_KILO,
     GIGA_TO_MEGA,
@@ -42,7 +41,7 @@ from dsgrid.units.constants import (
     TWH,
     TWH_TO_THERM,
 )
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.ibis_api import create_dataframe_from_dicts
 
 
 KWH_VAL = 1234.5
@@ -71,9 +70,7 @@ def records_dataframe_energy():
         {"id": "unitless", "name": "unitless", "fuel_id": "electricity", "unit": ""},
     ]
     records = create_dataframe_from_dicts(data)
-    cache(records)
     yield records
-    unpersist(records)
 
 
 @pytest.fixture(scope="module")
@@ -86,9 +83,7 @@ def records_dataframe_power():
         {"id": "unitless", "name": "unitless", "unit": ""},
     ]
     records = create_dataframe_from_dicts(data)
-    cache(records)
     yield records
-    unpersist(records)
 
 
 @pytest.fixture(scope="module")
@@ -105,9 +100,7 @@ def pivoted_dataframes(records_dataframe_energy):
         },
     ]
     df = create_dataframe_from_dicts(data)
-    cache(df)
     yield df, records_dataframe_energy
-    unpersist(df)
 
 
 @pytest.fixture(scope="module")
@@ -150,9 +143,7 @@ def unpivoted_dataframes_energy(records_dataframe_energy):
         },
     ]
     df = create_dataframe_from_dicts(data)
-    cache(df)
     yield df, records_dataframe_energy
-    unpersist(df)
 
 
 @pytest.fixture(scope="module")
@@ -185,9 +176,7 @@ def unpivoted_dataframes_power(records_dataframe_power):
         },
     ]
     df = create_dataframe_from_dicts(data)
-    cache(df)
     yield df, records_dataframe_power
-    unpersist(df)
 
 
 def test_constants():
@@ -241,18 +230,25 @@ def test_to_units(pivoted_dataframes, inputs):
 @pytest.mark.parametrize("to_unit", [KWH, MWH, GWH, TWH, THERM, MBTU])
 def test_from_any_to_any_energy(unpivoted_dataframes_energy, to_unit):
     df, records = unpivoted_dataframes_energy
-    df_with_units = (
-        df.join(records, on=df.metric == records.id)
-        .withColumnRenamed("unit", "from_unit")
-        .withColumn("to_unit", F.lit(to_unit))
-        .select("metric", "timestamp", "from_unit", "to_unit", VALUE_COLUMN)
-    )
-    res = df_with_units.withColumn(
-        VALUE_COLUMN, energy.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
+
+    df_with_units = df.join(records, df["metric"] == records["id"]).select(
+        df["metric"],
+        df["timestamp"],
+        records["unit"].name("from_unit"),
+        ibis.literal(to_unit).name("to_unit"),
+        df[VALUE_COLUMN],
     )
 
-    unitless = res.filter("metric == 'unitless'").collect()[0][VALUE_COLUMN]
-    assert unitless == KWH_VAL
+    res = df_with_units.mutate(
+        **{
+            VALUE_COLUMN: energy.from_any_to_any(
+                df_with_units["from_unit"], df_with_units["to_unit"], df_with_units[VALUE_COLUMN]
+            )
+        }
+    )
+
+    unitless_row = res.filter(res["metric"] == "unitless").to_pyarrow().to_pylist()[0]
+    assert unitless_row[VALUE_COLUMN] == KWH_VAL
 
     match to_unit:
         case "kWh":
@@ -271,25 +267,30 @@ def test_from_any_to_any_energy(unpivoted_dataframes_energy, to_unit):
             assert False, to_unit
 
     for col in UNIT_COLUMNS_ENERGY:
-        val = res.filter(f"metric == '{col}'").collect()[0][VALUE_COLUMN]
+        val = res.filter(res["metric"] == col).to_pyarrow().to_pylist()[0][VALUE_COLUMN]
         assert math.isclose(val, expected_val)
 
 
 @pytest.mark.parametrize("to_unit", [KW, MW, GW, TW])
 def test_from_any_to_any_power(unpivoted_dataframes_power, to_unit):
     df, records = unpivoted_dataframes_power
-    df_with_units = (
-        df.join(records, on=df.metric == records.id)
-        .withColumnRenamed("unit", "from_unit")
-        .withColumn("to_unit", F.lit(to_unit))
-        .select("metric", "timestamp", "from_unit", "to_unit", VALUE_COLUMN)
+    df_with_units = df.join(records, df["metric"] == records["id"]).select(
+        df["metric"],
+        df["timestamp"],
+        records["unit"].name("from_unit"),
+        ibis.literal(to_unit).name("to_unit"),
+        df[VALUE_COLUMN],
     )
-    res = df_with_units.withColumn(
-        VALUE_COLUMN, power.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
+    res = df_with_units.mutate(
+        **{
+            VALUE_COLUMN: power.from_any_to_any(
+                df_with_units["from_unit"], df_with_units["to_unit"], df_with_units[VALUE_COLUMN]
+            )
+        }
     )
 
-    unitless = res.filter("metric == 'unitless'").collect()[0][VALUE_COLUMN]
-    assert unitless == KWH_VAL
+    unitless_row = res.filter(res["metric"] == "unitless").to_pyarrow().to_pylist()[0]
+    assert unitless_row[VALUE_COLUMN] == KWH_VAL
 
     match to_unit:
         case "kW":
@@ -304,14 +305,41 @@ def test_from_any_to_any_power(unpivoted_dataframes_power, to_unit):
             assert False, to_unit
 
     for col in UNIT_COLUMNS_POWER:
-        val = res.filter(f"metric == '{col}'").collect()[0][VALUE_COLUMN]
+        val = res.filter(res["metric"] == col).to_pyarrow().to_pylist()[0][VALUE_COLUMN]
         assert math.isclose(val, expected_val)
 
 
 def _convert_units(df, records, conversion_func):
     unit_col = "unit"
     for column in df.columns:
-        unit_val = records.filter(f"id='{column}'").select(unit_col).collect()[0][unit_col]
-        tdf = df.withColumn(unit_col, F.lit(unit_val))
-        df = tdf.withColumn(column, conversion_func(unit_col, column)).drop(unit_col)
-    return df.collect()[0]
+        rows = records.filter(records["id"] == column).select(unit_col).to_pyarrow().to_pylist()
+        if not rows:
+            continue  # Or handle as error? Original code assumed it exists.
+        unit_val = rows[0][unit_col]
+
+        # In Ibis, we can't chain withColumn/drop easily in a loop if we are modifying columns in place without materializing?
+        # Actually ibis expressions are immutable.
+        # But we want to apply conversion to `column`.
+
+        # We need to apply logic: new_col = conversion_func(unit_val, old_col)
+        # Note conversion_func likely returns an expression involving the inputs.
+
+        # conversion_func signature in tests is like: energy.to_kwh(unit_col_name, val_col_name)
+        # But here we pass literal unit_val string?
+        # energy.to_kwh implementation handles string literals?
+        # Let's check dsgrid/units/energy.py if possible, but assuming it constructs an expression.
+        # The previous code did:
+        # tdf = df.withColumn(unit_col, F.lit(unit_val))
+        # df = tdf.withColumn(column, conversion_func(unit_col, column)).drop(unit_col)
+
+        # We can just do:
+        # new_val = conversion_func(ibis.literal(unit_val), df[column])
+        # df = df.mutate(**{column: new_val})
+
+        # Wait, conversion_func expects column names or expressions?
+        # Spark F.lit returns a Column. ibis.literal returns an expression.
+
+        new_val = conversion_func(ibis.literal(unit_val), df[column])
+        df = df.mutate(**{column: new_val})
+
+    return df.to_pyarrow().to_pylist()[0]

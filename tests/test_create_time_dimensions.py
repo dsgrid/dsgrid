@@ -2,6 +2,7 @@ import datetime
 import logging
 from zoneinfo import ZoneInfo
 
+import ibis
 import pandas as pd
 import pytest
 import numpy as np
@@ -25,17 +26,6 @@ from dsgrid.dimension.time_utils import (
     get_time_ranges,
 )
 
-from dsgrid.spark.types import (
-    DoubleType,
-    F,
-    IntegerType,
-    StringType,
-    StructField,
-    StructType,
-)
-from dsgrid.utils.spark import (
-    get_spark_session,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -125,15 +115,6 @@ def datetime_eq_index_time_model_subhourly():
 
 def create_index_time_dataframe(interval="1h"):
     # mock index time dataframe
-    schema = StructType(
-        [
-            StructField("geography", StringType(), False),
-            StructField("time_index", IntegerType(), False),
-            StructField("value", DoubleType(), False),
-            StructField("time_zone", StringType(), False),
-        ]
-    )
-    df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     if interval == "1h":
@@ -145,14 +126,20 @@ def create_index_time_dataframe(interval="1h"):
     else:
         msg = f"Unsupported {interval=}"
         raise ValueError(msg)
-    df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
+
+    dfs = []
     for geo, tz in zip(geography, time_zones):
-        df = df.union(
-            df_tz.withColumn("geography", F.lit(geo))
-            .withColumn("time_zone", F.lit(tz))
-            .select(schema.names)
-        )
-    return df
+        df = pd.DataFrame({"time_index": indices, "value": values})
+        df["geography"] = geo
+        df["time_zone"] = tz
+        dfs.append(df)
+
+    pdf = pd.concat(dfs, ignore_index=True)
+    # Reorder columns to match original schema order if needed, but Spark union by name usually?
+    # Schema was: geography, time_index, value, time_zone
+    pdf = pdf[["geography", "time_index", "value", "time_zone"]]
+
+    return ibis.memtable(pdf)
 
 
 @pytest.fixture
@@ -168,15 +155,6 @@ def df_index_time_subhourly():
 @pytest.fixture
 def df_date_time():
     # datetime version of df_index_time
-    schema = StructType(
-        [
-            StructField("geography", StringType(), False),
-            StructField("timestamp", StringType(), False),
-            StructField("value", DoubleType(), False),
-            StructField("time_zone", StringType(), False),
-        ]
-    )
-    df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     ts_pt = pd.date_range(
@@ -189,20 +167,17 @@ def df_date_time():
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]
     values = np.arange(0.0, 8784.0).tolist()  # daylight saving transition [1680:7396]
-    sch = StructType(
-        [
-            StructField("timestamp", StringType(), False),
-            StructField("value", DoubleType(), False),
-        ]
-    )
+
+    dfs = []
     for geo, tz, ts in zip(geography, time_zones, timestamps):
-        df_tz = get_spark_session().createDataFrame(zip(ts, values), schema=sch)
-        df = df.union(
-            df_tz.withColumn("geography", F.lit(geo))
-            .withColumn("time_zone", F.lit(tz))
-            .select(schema.names)
-        )
-    yield df
+        df = pd.DataFrame({"timestamp": ts, "value": values})
+        df["geography"] = geo
+        df["time_zone"] = tz
+        dfs.append(df)
+
+    pdf = pd.concat(dfs, ignore_index=True)
+    pdf = pdf[["geography", "timestamp", "value", "time_zone"]]
+    yield ibis.memtable(pdf)
 
 
 def check_start_time_and_length(time_dimension_model):

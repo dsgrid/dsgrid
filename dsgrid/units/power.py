@@ -2,7 +2,8 @@
 
 import logging
 
-from dsgrid.spark.types import DataFrame, F
+import ibis
+
 from dsgrid.units.constants import (
     GIGA_TO_KILO,
     GIGA_TO_MEGA,
@@ -26,62 +27,62 @@ from dsgrid.units.constants import (
 logger = logging.getLogger(__name__)
 
 
-def to_kw(unit_col: str, value_col: str) -> DataFrame:
+def to_kw(unit_col, value_col):
     """Convert a column to kW."""
-    return (
-        F.when(F.col(unit_col) == KW, F.col(value_col))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_KILO))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_KILO))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_KILO))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KW, value_col),
+        (unit_col == MW, value_col * MEGA_TO_KILO),
+        (unit_col == GW, value_col * GIGA_TO_KILO),
+        (unit_col == TW, value_col * TERA_TO_KILO),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_mw(unit_col: str, value_col: str) -> DataFrame:
+def to_mw(unit_col, value_col):
     """Convert a column to MW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_MEGA))
-        .when(F.col(unit_col) == MW, F.col(value_col))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_MEGA))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_MEGA))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KW, value_col * KILO_TO_MEGA),
+        (unit_col == MW, value_col),
+        (unit_col == GW, value_col * GIGA_TO_MEGA),
+        (unit_col == TW, value_col * TERA_TO_MEGA),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_gw(unit_col: str, value_col: str) -> DataFrame:
+def to_gw(unit_col, value_col):
     """Convert a column to GW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_GIGA))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_GIGA))
-        .when(F.col(unit_col) == GW, F.col(value_col))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_GIGA))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KW, value_col * KILO_TO_GIGA),
+        (unit_col == MW, value_col * MEGA_TO_GIGA),
+        (unit_col == GW, value_col),
+        (unit_col == TW, value_col * TERA_TO_GIGA),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_tw(unit_col: str, value_col: str) -> DataFrame:
+def to_tw(unit_col, value_col):
     """Convert a column to TW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_TERA))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_TERA))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_TERA))
-        .when(F.col(unit_col) == TW, F.col(value_col))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KW, value_col * KILO_TO_TERA),
+        (unit_col == MW, value_col * MEGA_TO_TERA),
+        (unit_col == GW, value_col * GIGA_TO_TERA),
+        (unit_col == TW, value_col),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def from_any_to_any(from_unit_col: str, to_unit_col: str, value_col: str) -> DataFrame:
+def from_any_to_any(from_unit_col, to_unit_col, value_col):
     """Convert a column of power based on from/to columns."""
-    return (
-        F.when(F.col(from_unit_col) == F.col(to_unit_col), F.col(value_col))
-        .when(F.col(from_unit_col) == "", F.col(value_col))
-        .when(F.col(to_unit_col) == KW, to_kw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == MW, to_mw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == GW, to_gw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == TW, to_tw(from_unit_col, value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (from_unit_col == to_unit_col, value_col),
+        (from_unit_col == "", value_col),
+        (to_unit_col == KW, to_kw(from_unit_col, value_col)),
+        (to_unit_col == MW, to_mw(from_unit_col, value_col)),
+        (to_unit_col == GW, to_gw(from_unit_col, value_col)),
+        (to_unit_col == TW, to_tw(from_unit_col, value_col)),
+        else_=ibis.null(),
     )

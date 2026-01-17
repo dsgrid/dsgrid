@@ -18,8 +18,8 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
-from dsgrid.spark.types import F, use_duckdb
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.tests.utils import use_duckdb
+from dsgrid.ibis_api import create_dataframe_from_dicts
 
 
 @pytest.fixture(scope="module")
@@ -166,26 +166,30 @@ def test_map_annual_time_total_to_datetime(
         date_time_dimension,
         value_columns,
     )
-    expected_by_year = {
-        x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
-    }
-    num_rows = annual_dataframe.count()
+
+    annual_data = annual_dataframe.to_pyarrow().to_pylist()
+    expected_by_year = {x["time_year"]: x["electricity_sales"] / (366 * 24) for x in annual_data}
+
+    num_rows = annual_dataframe.count().execute()
     num_timestamps = 24 * 7
-    assert df.count() == num_rows * num_timestamps
-    values = df.select("model_year", "electricity_sales").distinct().collect()
+    assert df.count().execute() == num_rows * num_timestamps
+
+    values = df.select("model_year", "electricity_sales").distinct().to_pyarrow().to_pylist()
     assert len(values) == num_rows
-    by_year = {x.model_year: x.electricity_sales for x in values}
+    by_year = {x["model_year"]: x["electricity_sales"] for x in values}
     assert len(by_year) == len(expected_by_year)
     for year in by_year:
         assert by_year[year] == expected_by_year[int(year)]
 
     time_col = date_time_dimension.get_load_data_time_columns()[0]
+    # Ibis groupby aggregation
     count_timestamps_per_model_year = (
-        df.groupBy("model_year")
-        .agg(F.count(time_col).alias("count_timestamps"))
+        df.group_by("model_year")
+        .aggregate(count_timestamps=df[time_col].count())
         .select("count_timestamps")
         .distinct()
-        .collect()
+        .to_pyarrow()
+        .to_pylist()
     )
     assert len(count_timestamps_per_model_year) == 1
     assert count_timestamps_per_model_year[0]["count_timestamps"] == num_timestamps

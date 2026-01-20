@@ -27,7 +27,7 @@ class TimeZoneFormat(str, Enum):
     """Defines the time format of the datetime config model"""
 
     ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"
-    ALIGNED_IN_CLOCK_TIME = "aligned_in_clock_time"
+    ALIGNED_IN_LOCAL_STD_TIME = "aligned_in_local_std_time"
     LOCAL_AS_STRINGS = "local_as_strings"
 
 

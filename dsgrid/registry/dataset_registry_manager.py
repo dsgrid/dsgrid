@@ -433,13 +433,22 @@ class DatasetRegistryManager(RegistryManagerBase):
         """Build SQL expression that creates a timestamp string from time-in-parts columns."""
         str_type = get_str_type()
         hour_col = col_format.hour_column
-        hour_expr = f"lpad(cast({hour_col} as {str_type}), 2, '0')" if hour_col else "'00'"
+        hour_expr = f"LPAD(CAST({hour_col} AS {str_type}), 2, '0')" if hour_col else "'00'"
+        offset_col = col_format.offset_column
+        if offset_col:
+            offset_expr = (
+                f"|| CASE WHEN {offset_col} >= 0 THEN '+' || LPAD(CAST({offset_col} AS {str_type}), 2, '0') || ':00' "
+                f"WHEN {offset_col} < 0 THEN '-' || LPAD(CAST(ABS({offset_col}) AS {str_type}), 2, '0') || ':00' "
+                f"ELSE {offset_col} END"
+            )
+        else:
+            offset_expr = ""
 
         return (
-            f"cast({col_format.year_column} as {str_type}) || '-' || "
-            f"lpad(cast({col_format.month_column} as {str_type}), 2, '0') || '-' || "
-            f"lpad(cast({col_format.day_column} as {str_type}), 2, '0') || ' ' || "
-            f"{hour_expr} || ':00:00'"
+            f"CAST({col_format.year_column} AS {str_type}) || '-' || "
+            f"LPAD(CAST({col_format.month_column} AS {str_type}), 2, '0') || '-' || "
+            f"LPAD(CAST({col_format.day_column} AS {str_type}), 2, '0') || ' ' || "
+            f"{hour_expr} || ':00:00' {offset_expr}"
         )
 
     @staticmethod

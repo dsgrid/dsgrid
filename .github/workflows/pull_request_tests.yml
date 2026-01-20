@@ -22,13 +22,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    #- name: Cache Spark
-    #  id: cache-spark
-    #  uses: actions/cache@v4
-    #  with:
-    #    path: spark-4.0.0-bin-hadoop3
-    #    key: spark-4.0.0-bin-hadoop3
-
     - name: Install dependencies
       run: |
         python -m venv .venv
@@ -36,18 +29,6 @@ jobs:
         pip install --upgrade pip
         pip install maturin
         pip install -e '.[dev,spark]'
-
-        # Only download if cache miss
-        #if [ ! -d "spark-4.0.0-bin-hadoop3" ]; then
-        #  echo "Spark cache missed, downloading..."
-        #  wget -q https://archive.apache.org/dist/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
-        #  tar -xzf spark-4.0.0-bin-hadoop3.tgz
-        #else
-        #  echo "Spark restored from cache."
-        #fi
-
-        # export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        # ${SPARK_HOME}/sbin/start-thriftserver.sh
 
     - name: Run tests
       run: |
@@ -59,8 +40,7 @@ jobs:
         DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
         # Restart from scratch.
         rm -rf tests/data/registry
-        #DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests/test_spark_utils.py
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0

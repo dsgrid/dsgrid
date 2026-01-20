@@ -9,6 +9,7 @@ import chronify
 from dsgrid.dimension.time import TimeZoneFormat, TimeIntervalType
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.common import TIME_ZONE_COLUMN
 
 logger = logging.getLogger(__name__)
 
@@ -30,36 +31,28 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: issue #341: this is actually tied to the weather_year problem #340
         # If there are no ranges, all of this must be dynamic.
         # The two issues should be solved together.
-        datetime_type = self._get_datetime_type()
 
-        if datetime_type == "tz_aware_datetime_single_tz":
-            return chronify.DatetimeRange(
-                time_column=time_cols[0],
-                start=pd.Timestamp(self.get_start_times()[0]),
-                length=self.get_lengths()[0],
-                resolution=self.get_frequency(),
-                measurement_type=self._model.measurement_type,
-                interval_type=self._model.time_interval_type,
-            )
-        if datetime_type == "tz_naive_datetime_single_tz":
-            # localize to time zones, may do this outside of Chronify
-            msg = "dsgrid does not support NTZ datetime in dataframe yet"
-            raise NotImplementedError(msg)
-        if datetime_type == "tz_aware_datetime_multiple_tz":
-            return chronify.DatetimeRangeWithTZColumn(
-                time_column=time_cols[0],
-                start=pd.Timestamp(self.get_start_times()[0]),
-                length=self.get_lengths()[0],
-                resolution=self.get_frequency(),
-                time_zone_column="time_zone",
-                time_zones=self.get_time_zones(),
-                measurement_type=self._model.measurement_type,
-                interval_type=self._model.time_interval_type,
-            )
-        if datetime_type == "tz_naive_datetime_multiple_tz":
-            # localize to time zones, may do this outside of Chronify
-            msg = "dsgrid does not support NTZ datetime in dataframe yet"
-            raise NotImplementedError(msg)
+        match self.model.time_zone_format.format_type:
+            case TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
+                return chronify.DatetimeRange(
+                    time_column=time_cols[0],
+                    start=pd.Timestamp(self.get_start_times()[0]),
+                    length=self.get_lengths()[0],
+                    resolution=self.get_frequency(),
+                    measurement_type=self._model.measurement_type,
+                    interval_type=self._model.time_interval_type,
+                )
+            case TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME:
+                return chronify.DatetimeRangeWithTZColumn(
+                    time_column=time_cols[0],
+                    start=pd.Timestamp(self.get_start_times()[0]),
+                    length=self.get_lengths()[0],
+                    resolution=self.get_frequency(),
+                    time_zone_column=TIME_ZONE_COLUMN,
+                    time_zones=self.get_time_zones(),
+                    measurement_type=self._model.measurement_type,
+                    interval_type=self._model.time_interval_type,
+                )
 
     def get_frequency(self) -> timedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
@@ -97,16 +90,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return [self.model.time_column]
 
     def get_time_zone(self) -> str | None:
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return self.model.time_zone_format.time_zone
-        return None
+        time_zones = self.get_time_zones()
+        return time_zones[0] if len(time_zones) == 1 else None
 
     def get_time_zones(self) -> list[str]:
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return [self.model.time_zone_format.time_zone]
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
-            return self.model.time_zone_format.time_zones
-        return []
+        return self.model.time_zone_format.get_time_zones()
 
     def get_tzinfo(self) -> tzinfo | None:
         time_zone = self.get_time_zone()
@@ -117,20 +105,24 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def _get_datetime_type(self) -> str:
-        """Return a string representing the datetime type for this dimension."""
-        match (self.model.time_zone_format.format_type, self.model.localize_to_time_zone):
+    def _get_reformat_plan(self) -> str | None:
+        """Return a plan for reformatting TIMESTAMP_NTZ datetime data."""
+        assert self.model.column_format.dtype == "TIMESTAMP_NTZ"
+
+        tz_aware_post_reformat = len(self.get_time_zones()) > 0
+        match (self.model.time_zone_format.format_type, tz_aware_post_reformat):
             case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, True):
-                return "tz_aware_datetime_single_tz"
+                return "localize_to_single_tz"
             case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, False):
-                return "tz_naive_datetime_single_tz"
-            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, True):
-                return "tz_aware_datetime_multiple_tz"
-            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, False):
-                return "tz_naive_datetime_multiple_tz"
+                return None
+            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, True):
+                return "localize_to_multi_tz"
+            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, False):
+                return None
+
             case _:
                 msg = (
-                    f"Unsupported combination of format_type {self.model.time_zone_format.format_type} "
-                    f"and localize_to_time_zone {self.model.localize_to_time_zone}"
+                    f"Unsupported combination of time zone format: {self.model.time_zone_format.format_type}, and "
+                    f"time zone(s): {self.model.time_zone_format.get_time_zones()}"
                 )
                 raise ValueError(msg)

@@ -151,7 +151,7 @@
         },
       ],
       time_zone_format: {
-        format_type: "aligned_in_clock_time",
+        format_type: "aligned_in_local_std_time",
         time_zones: ["EasternPrevailing", "CentralPrevailing", "MountainPrevailing", "PacificPrevailing"]
         },
       measurement_type: "total",

@@ -11,7 +11,7 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN, TIME_ZONE_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
@@ -48,7 +48,12 @@ from dsgrid.spark.functions import (
 )
 from dsgrid.spark.types import get_str_type
 from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.dataset import (
+    add_time_zone,
+    split_expected_missing_rows,
+    unpivot_dataframe,
+    localize_timestamps_if_necessary,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -429,6 +434,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         handler: DatasetSchemaHandlerBase,
         scratch_dir_context: ScratchDirContext,
     ) -> None:
+        """Convert time-in-parts format to timestamp format."""
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
 
@@ -451,15 +457,15 @@ class DatasetRegistryManager(RegistryManagerBase):
         handler: DatasetSchemaHandlerBase,
         scratch_dir_context: ScratchDirContext,
     ) -> None:
-        """Use Chronify to localize timestamps if necessary."""
-        localized = handler._localize_timestamps_with_chronify_if_necessary(
-            scratch_dir_context=scratch_dir_context
-        )
+        """Localize tz-naive timestamps to time zone(s) if necessary."""
+        df = handler.get_base_load_data_table()
+        df, localized = localize_timestamps_if_necessary(df, config, scratch_dir_context)
+
         if localized:
-            config = handler._config
-            time_dim = config.get_dimension(DimensionType.TIME)
-            time_column = time_dim.model.column_format.time_column
-            logger.info("Localized time column %s to timezone(s)", time_column)
+            self._write_data_and_update_config_after_localization(
+                time_dim, config, df, scratch_dir_context
+            )
+            logger.info("Localized time column to timezone(s)")
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
@@ -564,6 +570,32 @@ class DatasetRegistryManager(RegistryManagerBase):
         if hour_col is None:
             for time_range in time_dim.model.ranges:
                 time_range.frequency = timedelta(days=1)
+
+    @staticmethod
+    def _write_data_and_update_config_after_localization(
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        df: DataFrame,
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
+        """Write localized dataframe and update config paths and columns."""
+        # write dataframe
+        path = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        write_dataframe(df, path)
+
+        # update config
+        config.model.data_layout.data_file.path = str(path)
+
+        data_columns = config.model.data_layout.data_file.columns
+        if data_columns:
+            if not any(c.name == TIME_ZONE_COLUMN for c in data_columns):
+                updated_columns = data_columns.copy()
+                updated_columns.append(Column(name=TIME_ZONE_COLUMN, data_type="STRING"))
+                config.model.data_layout.data_file.columns = updated_columns
+
+        # update time_dim
+        time_column = time_dim.model.column_format.time_column
+        time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=time_column)
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None

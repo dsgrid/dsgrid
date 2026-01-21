@@ -458,7 +458,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     ):
         """Localize timestamps using Chronify based on the dataset's time dimension."""
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        # Determine localization plan from the time dimension config (not the model).
+        # Determine localization plan from the time dimension config.
         localization_plan = time_dim._get_localization_plan()
         if not localization_plan:
             return False

@@ -429,8 +429,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         handler: DatasetSchemaHandlerBase,
         scratch_dir_context: ScratchDirContext,
     ) -> None:
-        # This code only exists because we lack full support for time zone naive timestamps.
-        # Refactor when the existing chronify work is complete.
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
 
@@ -454,29 +452,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         scratch_dir_context: ScratchDirContext,
     ) -> None:
         """Use Chronify to localize timestamps if necessary."""
-        localized = handler._localize_timestamps_with_chronify(
+        localized = handler._localize_timestamps_with_chronify_if_necessary(
             scratch_dir_context=scratch_dir_context
         )
         if localized:
-            self._update_config_after_time_localization(time_dim, config, handler)
-            logger.info("Localized time column %s to timezone(s)", TIME_COLUMN)
-
-    def _update_config_after_time_localization(
-        self,
-        time_dim: DateTimeDimensionConfig,
-        config: DatasetConfig,
-        handler: DatasetSchemaHandlerBase,
-    ) -> None:
-        """Update the time dimension model and dataset config after time localization."""
-        time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
-        config.model.data_layout.data_file.path = handler._config.model.data_layout.data_file.path
-
-        if config.model.data_layout.data_file.columns is not None:
-            updated_columns = [
-                c for c in config.model.data_layout.data_file.columns if c.name != TIME_COLUMN
-            ]
-            updated_columns.append(Column(name=TIME_COLUMN, data_type="TIMESTAMP_TZ"))
-            config.model.data_layout.data_file.columns = updated_columns
+            config = handler._config
+            time_dim = config.get_dimension(DimensionType.TIME)
+            time_column = time_dim.model.column_format.time_column
+            logger.info("Localized time column %s to timezone(s)", time_column)
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:

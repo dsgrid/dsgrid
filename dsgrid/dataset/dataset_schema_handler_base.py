@@ -36,7 +36,7 @@ from dsgrid.config.dimension_mapping_base import (
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
-from dsgrid.config.file_schema import read_data_file
+from dsgrid.config.file_schema import read_data_file, Column
 from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
@@ -86,6 +86,7 @@ from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
     DimensionMappingRegistryManager,
 )
+from dsgrid.config.dimensions import TimeFormatDateTimeTZModel
 
 logger = logging.getLogger(__name__)
 
@@ -452,12 +453,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
             raise DSGInvalidDataset(msg)
 
     @track_timing(timer_stats_collector)
-    def _localize_timestamps_with_chronify(
+    def _localize_timestamps_with_chronify_if_necessary(
         self, scratch_dir_context: ScratchDirContext | None = None
     ):
         """Localize timestamps using Chronify based on the dataset's time dimension."""
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        localization_plan = time_dim.model._get_localization_plan()
+        # Determine localization plan from the time dimension config (not the model).
+        localization_plan = time_dim._get_localization_plan()
         if not localization_plan:
             return False
 
@@ -527,8 +529,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     store.drop_table(chronify_schema.name)
                     store.drop_table(new_chronify_schema.name)
 
-        # Update the data file path in the file schema.
+        # Update the time dimension and dataset config.
         self._config.model.data_layout.data_file.path = str(output_data_file_path)
+
+        time_column = time_dim.model.column_format.time_column
+        time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=time_column)
+        self._config.dimensions[DimensionType.TIME] = time_dim
+
+        data_columns = self._config.model.data_layout.data_file.columns
+        if data_columns:
+            updated_columns = [c for c in data_columns if c.name != time_column]
+            updated_columns.append(Column(name=time_column, data_type="TIMESTAMP_TZ"))
+            self._config.model.data_layout.data_file.columns = updated_columns
+
         return True
 
     def _check_load_data_unpivoted_value_column(self, df):

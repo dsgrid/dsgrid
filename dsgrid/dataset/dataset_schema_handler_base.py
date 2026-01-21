@@ -24,7 +24,7 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.common import VALUE_COLUMN, BackendEngine
+from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
@@ -450,6 +450,86 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 f"unique time array lengths = {len(distinct_ta_counts)}"
             )
             raise DSGInvalidDataset(msg)
+
+    @track_timing(timer_stats_collector)
+    def _localize_timestamps_with_chronify(
+        self, scratch_dir_context: ScratchDirContext | None = None
+    ):
+        """Localize timestamps using Chronify based on the dataset's time dimension."""
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        localization_plan = time_dim.model._get_localization_plan()
+        if not localization_plan:
+            return False
+
+        logger.info("Localize dataset timestamps using Chronify.")
+        assert isinstance(self._config.model.data_layout, UserDataLayout)
+        file_schema = self._config.model.data_layout.data_file
+
+        if not scratch_dir_context:
+            scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+            scratch_dir_context = ScratchDirContext(scratch_dir)
+
+        with scratch_dir_context as context:
+            load_data_df = read_data_file(file_schema, scratch_dir_context=context)
+            chronify_schema = self._get_chronify_schema(load_data_df)
+            assert file_schema.path is not None
+            data_file_path = Path(file_schema.path)
+            output_data_file_path = (
+                data_file_path.parent / f"{data_file_path.stem}_localized{data_file_path.suffix}"
+            )
+            if data_file_path.suffix == ".parquet" or not use_duckdb():
+                if data_file_path.suffix == ".csv":
+                    # This is a workaround for time zone issues between Spark, Pandas,
+                    # and Chronify when reading CSV files.
+                    # Chronify can ingest them correctly when we go to Parquet first.
+                    # This is really only a test issue because normal dsgrid users will not
+                    # use Spark with CSV data files.
+                    src_path = context.get_temp_filename(suffix=".parquet")
+                    write_dataframe(load_data_df, src_path)
+                else:
+                    src_path = data_file_path
+                store_file = context.get_temp_filename(suffix=".db")
+                with create_store(store_file) as store:
+                    # This performs all of the checks.
+                    store.create_view_from_parquet(src_path, chronify_schema)
+                    if localization_plan == "localize_to_single_tz":
+                        to_time_zone = time_dim.get_time_zone()
+                        assert to_time_zone is not None
+                        new_chronify_schema = store.localize_time_zone(
+                            chronify_schema.name, to_time_zone, output_file=output_data_file_path
+                        )
+                    if localization_plan == "localize_to_multi_tz":
+                        new_chronify_schema = store.localize_time_zone_by_column(
+                            chronify_schema.name,
+                            TIME_ZONE_COLUMN,
+                            output_file=output_data_file_path,
+                        )
+                    store.drop_view(chronify_schema.name)
+                    store.drop_view(new_chronify_schema.name)
+            else:
+                # For CSV and JSON files, use in-memory store with ingest_table.
+                # This avoids the complexity of converting to parquet.
+                with create_in_memory_store() as store:
+                    # ingest_table performs all of the time checks.
+                    store.ingest_table(load_data_df.toPandas(), chronify_schema)
+                    if localization_plan == "localize_to_single_tz":
+                        to_time_zone = time_dim.get_time_zone()
+                        assert to_time_zone is not None
+                        new_chronify_schema = store.localize_time_zone(
+                            chronify_schema.name, to_time_zone, output_file=output_data_file_path
+                        )
+                    if localization_plan == "localize_to_multi_tz":
+                        new_chronify_schema = store.localize_time_zone_by_column(
+                            chronify_schema.name,
+                            TIME_ZONE_COLUMN,
+                            output_file=output_data_file_path,
+                        )
+                    store.drop_table(chronify_schema.name)
+                    store.drop_table(new_chronify_schema.name)
+
+        # Update the data file path in the file schema.
+        self._config.model.data_layout.data_file.path = str(output_data_file_path)
+        return True
 
     def _check_load_data_unpivoted_value_column(self, df):
         logger.info("Check load data unpivoted columns.")

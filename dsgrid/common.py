@@ -27,6 +27,7 @@ SCALING_FACTOR_COLUMN = "scaling_factor"
 SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]
 TIME_ZONE_COLUMN = "time_zone"
 VALUE_COLUMN = "value"
+TIME_COLUMN = "timestamp"
 
 
 class BackendEngine(enum.StrEnum):

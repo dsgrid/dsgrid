@@ -8,7 +8,7 @@ import chronify
 from chronify.models import TableSchema
 
 import dsgrid
-from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
@@ -104,7 +104,7 @@ def add_time_zone(
         raise ValueError(msg)
 
     df = add_column_from_records(
-        load_data_df, geo_records, "time_zone", df_key, record_key=dim_key
+        load_data_df, geo_records, TIME_ZONE_COLUMN, df_key, record_key=dim_key
     )
     return df
 

@@ -105,9 +105,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def _get_reformat_plan(self) -> str | None:
-        """Return a plan for reformatting TIMESTAMP_NTZ datetime data."""
-        assert self.model.column_format.dtype == "TIMESTAMP_NTZ"
+    def _get_localization_plan(self) -> str | None:
+        """Return a plan for localizing TIMESTAMP_NTZ datetime data."""
+        if self.model.column_format.dtype == "TIMESTAMP_TZ":
+            return None
 
         tz_aware_post_reformat = len(self.get_time_zones()) > 0
         match (self.model.time_zone_format.format_type, tz_aware_post_reformat):

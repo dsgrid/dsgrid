@@ -2,16 +2,16 @@
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Self, Type, Union
-from zoneinfo import ZoneInfo
 
 import pandas as pd
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
@@ -46,7 +46,7 @@ from dsgrid.spark.functions import (
     is_dataframe_empty,
     select_expr,
 )
-from dsgrid.spark.types import get_str_type, use_duckdb
+from dsgrid.spark.types import get_str_type
 from dsgrid.spark.types import DataFrame, F, StringType
 from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -404,20 +404,38 @@ class DatasetRegistryManager(RegistryManagerBase):
         if time_dim is None:
             return
 
-        if not isinstance(time_dim.model, DateTimeDimensionModel) or not isinstance(
+        if isinstance(time_dim.model, DateTimeDimensionModel) and isinstance(
             time_dim.model.column_format, TimeFormatInPartsModel
         ):
-            return
+            self._convert_time_format_in_parts_to_datetime(
+                time_dim,
+                config,
+                handler,
+                scratch_dir_context,
+            )
 
-        # TEMPORARY
+        if isinstance(time_dim.model, DateTimeDimensionModel):
+            self._localize_timestamps_if_necessary(
+                time_dim,
+                config,
+                handler,
+                scratch_dir_context,
+            )
+
+    def _convert_time_format_in_parts_to_datetime(
+        self,
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        handler: DatasetSchemaHandlerBase,
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
         # This code only exists because we lack full support for time zone naive timestamps.
         # Refactor when the existing chronify work is complete.
         df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
 
         timestamp_str_expr = self._build_timestamp_string_expr(col_format)
-        df, fixed_tz = self._resolve_timezone(df, config, col_format)
-        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, fixed_tz)
+        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, col_format)
 
         cols_to_drop = self._get_time_columns_to_drop(col_format)
         reformatted_df = self._apply_timestamp_transformation(df, cols_to_drop, timestamp_sql)
@@ -427,6 +445,38 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
         logger.info("Replaced time columns %s with %s", cols_to_drop, new_col_format.time_column)
+
+    def _localize_timestamps_if_necessary(
+        self,
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        handler: DatasetSchemaHandlerBase,
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
+        """Use Chronify to localize timestamps if necessary."""
+        localized = handler._localize_timestamps_with_chronify(
+            scratch_dir_context=scratch_dir_context
+        )
+        if localized:
+            self._update_config_after_time_localization(time_dim, config, handler)
+            logger.info("Localized time column %s to timezone(s)", TIME_COLUMN)
+
+    def _update_config_after_time_localization(
+        self,
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        handler: DatasetSchemaHandlerBase,
+    ) -> None:
+        """Update the time dimension model and dataset config after time localization."""
+        time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
+        config.model.data_layout.data_file.path = handler._config.model.data_layout.data_file.path
+
+        if config.model.data_layout.data_file.columns is not None:
+            updated_columns = [
+                c for c in config.model.data_layout.data_file.columns if c.name != TIME_COLUMN
+            ]
+            updated_columns.append(Column(name=TIME_COLUMN, data_type="TIMESTAMP_TZ"))
+            config.model.data_layout.data_file.columns = updated_columns
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
@@ -469,31 +519,23 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _build_timestamp_sql(
-        timestamp_str_expr: str, fixed_tz: str | None
+        timestamp_str_expr: str, col_format: TimeFormatInPartsModel
     ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
         """Build the final timestamp SQL expression and determine the column format."""
-        if fixed_tz is not None:
-            if use_duckdb():
-                sql = f"cast({timestamp_str_expr} || ' {fixed_tz}' as timestamptz) as timestamp"
-            else:
-                tz = ZoneInfo(fixed_tz)
-                offset = datetime(2012, 1, 1, tzinfo=tz).strftime("%z")
-                offset_formatted = f"{offset[:3]}:{offset[3:]}"
-                sql = (
-                    f"cast({timestamp_str_expr} || '{offset_formatted}' as timestamp) as timestamp"
-                )
-            return sql, TimeFormatDateTimeTZModel(time_column="timestamp")
-
-        # Multi-timezone: create naive timestamp, keep time_zone column
-        sql = f"cast({timestamp_str_expr} as timestamp) as timestamp"
-        return sql, TimeFormatDateTimeNTZModel(time_column="timestamp")
+        sql = f"CAST({timestamp_str_expr} AS TIMESTAMP) AS {TIME_COLUMN}"
+        if col_format.offset_column:
+            new_col_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
+        else:
+            new_col_format = TimeFormatDateTimeNTZModel(time_column=TIME_COLUMN)
+        return sql, new_col_format
 
     @staticmethod
     def _get_time_columns_to_drop(col_format: TimeFormatInPartsModel) -> set[str]:
         """Get the set of time-in-parts columns to drop, excluding dimension columns."""
         cols_to_drop = {col_format.year_column, col_format.month_column, col_format.day_column}
-        if col_format.hour_column:
-            cols_to_drop.add(col_format.hour_column)
+        for col in [col_format.hour_column, col_format.offset_column]:
+            if col:
+                cols_to_drop.add(col)
         return cols_to_drop - DimensionType.get_allowed_dimension_column_names()
 
     @staticmethod
@@ -522,22 +564,20 @@ class DatasetRegistryManager(RegistryManagerBase):
                 c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
             ]
             timestamp_data_type = (
-                "TIMESTAMP_TZ"
-                if isinstance(new_col_format, TimeFormatDateTimeTZModel)
-                else "TIMESTAMP_NTZ"
+                "TIMESTAMP_TZ" if new_col_format.dtype == "TIMESTAMP_TZ" else "TIMESTAMP_NTZ"
             )
-            updated_columns.append(Column(name="timestamp", data_type=timestamp_data_type))
+            updated_columns.append(Column(name=TIME_COLUMN, data_type=timestamp_data_type))
             config.model.data_layout.data_file.columns = updated_columns
 
     @staticmethod
     def _update_time_dimension(
-        time_dim,
+        time_dim: DateTimeDimensionConfig,
         new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
         hour_col: str | None,
     ) -> None:
         """Update the time dimension model with the new format."""
         time_dim.model.column_format = new_col_format
-        time_dim.model.time_column = "timestamp"
+        time_dim.model.time_column = TIME_COLUMN
         if hour_col is None:
             for time_range in time_dim.model.ranges:
                 time_range.frequency = timedelta(days=1)

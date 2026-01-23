@@ -476,8 +476,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         offset_col = col_format.offset_column
         if offset_col:
             offset_expr = (
-                f"|| CASE WHEN {offset_col} >= 0 THEN '+' || LPAD(CAST({offset_col} AS {str_type}), 2, '0') || ':00' "
-                f"WHEN {offset_col} < 0 THEN '-' || LPAD(CAST(ABS({offset_col}) AS {str_type}), 2, '0') || ':00' "
+                f"|| CASE WHEN {offset_col} >= 0 THEN '+' || LPAD(CAST(FLOOR({offset_col} / 1) AS {str_type}), 2, '0')"
+                f" || ':' || CAST(ROUND({offset_col} % 1 * 60) AS {str_type}) "
+                f"WHEN {offset_col} < 0 THEN '-' || LPAD(CAST(ABS(FLOOR({offset_col} / 1)) AS {str_type}), 2, '0')"
+                f" || ':' || CAST(ROUND(ABS({offset_col} % 1 * 60)) AS {str_type}) "
                 f"ELSE {offset_col} END"
             )
         else:

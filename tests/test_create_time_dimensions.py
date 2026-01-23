@@ -259,21 +259,22 @@ def check_date_range_creation(time_dimension_model, time_based_data_adjustment=N
     ts_to_drop, ts_to_add = [], []
 
     years = set([t.year for t in ts])
+    periods = int(24 / hours)
     for yr in years:
         if ld_adj == LeapDayAdjustmentType.NONE:
             pass
         elif ld_adj == LeapDayAdjustmentType.DROP_JAN1:
             ts_to_drop += pd.date_range(
-                start=f"{yr}-01-01", freq=freq, periods=24 / hours, tz=tz
+                start=f"{yr}-01-01", freq=freq, periods=periods, tz=tz
             ).to_list()
         elif ld_adj == LeapDayAdjustmentType.DROP_DEC31:
             ts_to_drop += pd.date_range(
-                start=f"{yr}-12-31", freq=freq, periods=24 / hours, tz=tz
+                start=f"{yr}-12-31", freq=freq, periods=periods, tz=tz
             ).to_list()
         elif ld_adj == LeapDayAdjustmentType.DROP_FEB29:
             if yr % 4 == 0:
                 ts_to_drop += pd.date_range(
-                    start=f"{yr}-02-29", freq=freq, periods=24 / hours, tz=tz
+                    start=f"{yr}-02-29", freq=freq, periods=periods, tz=tz
                 ).to_list()
             else:
                 logger.info(f" {yr} is not a leap year, no Feb 29 to drop")

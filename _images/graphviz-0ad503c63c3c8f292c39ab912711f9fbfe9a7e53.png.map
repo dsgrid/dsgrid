@@ -1,0 +1,106 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AlignedTimeSingleTimeZone
+
+For each geography, data has the same set of timestamps in absolute time.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA and NY both start in 2018&#45;01&#45;01 00:00 EST.
+" alt="" coords="3229,2778,3795,2862"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.AnnualRangeModel
+
+Defines a continuous range of annual time.
+" alt="" coords="3429,342,3595,482"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.
+" alt="" coords="2476,5,2812,397"/>
+<area shape="rect" id="node4" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="2203,2124,3085,2628"/>
+<area shape="rect" id="node5" title="dsgrid.config.dimensions.LocalTimeMultipleTimeZones
+
+For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
+for the time zone of each geography.
+Timestamps in the data must be tz&#45;aware.
+
+E.g., data in CA may start in 2018&#45;01&#45;01 00:00 PST while data in NY may start in 2018&#45;01&#45;01 00:00 EST.
+They are aligned in clock time but not in absolute time.
+" alt="" coords="3246,2910,3778,2994"/>
+<area shape="rect" id="node6" title="dsgrid.config.dimensions.TimeFormatDateTimeNTZModel
+
+Format of timestamps in a dataset is timezone&#45;naive datetime,
+requiring localization to time zones.
+" alt="" coords="3347,2646,3677,2730"/>
+<area shape="rect" id="node7" title="dsgrid.config.dimensions.TimeFormatDateTimeTZModel
+
+Format of timestamps in a dataset is timezone&#45;aware datetime.
+" alt="" coords="3354,2270,3670,2354"/>
+<area shape="rect" id="node8" title="dsgrid.config.dimensions.TimeFormatInPartsModel
+
+Format of timestamps in a dataset is in parts, e.g., month&#45;day&#45;hour format,
+requiring conversion to datetime.
+" alt="" coords="3335,2402,3689,2598"/>
+<area shape="rect" id="node9" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3431,3042,3593,3182"/>
+<area shape="rect" id="node10" title="dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel
+
+Defines a time dimension where timestamps are tz&#45;naive and require localizing to a time zone
+using a time zone column.
+" alt="" coords="2310,2677,2978,3097"/>
+<area shape="rect" id="node11" title="dsgrid.config.dimensions.DimensionModel
+
+Defines a non&#45;time dimension
+" alt="" coords="2519,446,2769,810"/>
+<area shape="rect" id="node12" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+" alt="" coords="3387,3496,3637,3608"/>
+<area shape="rect" id="node13" title="dsgrid.config.dimensions.IndexRangeModel
+
+Defines a continuous range of indices.
+" alt="" coords="3399,1196,3625,1364"/>
+<area shape="rect" id="node14" title="dsgrid.config.dimensions.IndexTimeDimensionModel
+
+Defines a time dimension where timestamps are indices and requires converting to datetime.
+" alt="" coords="2482,859,2806,1251"/>
+<area shape="rect" id="node15" title="dsgrid.config.dimensions.MonthRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3431,2021,3593,2105"/>
+<area shape="rect" id="node16" title="dsgrid.config.dimensions.NoOpTimeDimensionModel
+
+Defines a NoOp time dimension.
+" alt="" coords="2499,1299,2789,1607"/>
+<area shape="rect" id="node17" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel
+
+Defines a representative time dimension.
+" alt="" coords="2463,1655,2825,2075"/>
+<area shape="rect" id="node18" title="dsgrid.config.mapping_tables.MappingTableByNameModel
+
+Attributes for a dimension mapping table for soon&#45;to&#45;be registered dimensions by name.
+This will be converted to a MappingTableModel as soon as the dimensions are registered.
+" alt="" coords="3254,3937,3770,4161"/>
+<area shape="rect" id="node19" title="dsgrid.config.project_config.DimensionsModel
+
+Contains dimensions defined by a project
+" alt="" coords="5,2096,2059,2264"/>
+<area shape="rect" id="node20" title="dsgrid.config.project_config.SubsetDimensionGroupModel
+
+Defines one or more subset dimension selectors for a dimension type.
+" alt="" coords="2384,3244,2904,3524"/>
+<area shape="rect" id="node21" title="dsgrid.config.supplemental_dimension.SupplementalDimensionModel
+
+Defines a supplemental dimension.
+" alt="" coords="2467,3572,2821,3964"/>
+<area shape="rect" id="node22" title="dsgrid.config.project_config.SubsetDimensionSelectorModel
+
+Defines a subset dimension selector inclusive of the subset&#39;s records and information
+required to define the selector as a record within the supplemental dimension defined by the
+subset dimension group.
+" alt="" coords="3385,3307,3639,3447"/>
+</map>

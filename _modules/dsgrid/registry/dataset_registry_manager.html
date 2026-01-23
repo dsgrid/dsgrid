@@ -1,0 +1,1284 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../../genindex.html"><link rel="search" title="Search" href="../../../search.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>dsgrid.registry.dataset_registry_manager - dsgrid 0.3.3 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../../index.html"><div class="brand">dsgrid 0.3.3 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.3.3 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/map_dataset.html">Map a dataset to a project’s dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../tutorials/query_dataset.html">Query a Dataset with Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/create_dataset_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/filter_a_query.html">How to Filter a Query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/run_dsgrid_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../how_tos/visualize_data_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../explanations/index.html">Explanations</a><input aria-label="Toggle navigation of Explanations" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../explanations/components/index.html">Components</a><input aria-label="Toggle navigation of Components" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../reference/dataset_formats.html">Dataset Formats</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/project.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/dataset.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/dimension.html">Dimension Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/dimension_mapping.html">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/dataset_mapping_plan.html">Dataset Mapping Plan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../reference/dsgrid_api/index.html">dsgrid API</a><input aria-label="Toggle navigation of dsgrid API" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../reference/dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../reference/architecture.html">Architecture</a><input aria-label="Toggle navigation of Architecture" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for dsgrid.registry.dataset_registry_manager</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Manages the registry for dimension datasets&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Self</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">zoneinfo</span><span class="w"> </span><span class="kn">import</span> <span class="n">ZoneInfo</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prettytable</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrettyTable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Connection</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">SCALING_FACTOR_COLUMN</span><span class="p">,</span> <span class="n">SYNC_EXCLUDE_LIST</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.config.dataset_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DatasetConfig</span><span class="p">,</span>
+    <span class="n">DatasetConfigModel</span><span class="p">,</span>
+    <span class="n">user_layout_to_registry_layout</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.config.dimensions</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DateTimeDimensionModel</span><span class="p">,</span>
+    <span class="n">TimeFormatDateTimeNTZModel</span><span class="p">,</span>
+    <span class="n">TimeFormatDateTimeTZModel</span><span class="p">,</span>
+    <span class="n">TimeFormatInPartsModel</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.dataset.dataset_schema_handler_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetSchemaHandlerBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.dataset.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">TableFormat</span><span class="p">,</span> <span class="n">ValueFormat</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.config.file_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">Column</span><span class="p">,</span> <span class="n">read_data_file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.config.dataset_schema_handler_factory</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_dataset_schema_handler</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.config.dimensions_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">DimensionsConfig</span><span class="p">,</span> <span class="n">DimensionsConfigModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.dimension.base_models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DatasetDimensionRequirements</span><span class="p">,</span>
+    <span class="n">DimensionType</span><span class="p">,</span>
+    <span class="n">check_required_dataset_dimensions</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.dsgrid_rc</span><span class="w"> </span><span class="kn">import</span> <span class="n">DsgridRuntimeConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.exceptions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DSGInvalidDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.dimension_registry_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">DimensionRegistryManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.dimension_mapping_registry_manager</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DimensionMappingRegistryManager</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.data_store_interface</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataStoreInterface</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.registry_interface</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasetRegistryInterface</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.spark.functions</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">get_spark_session</span><span class="p">,</span>
+    <span class="n">is_dataframe_empty</span><span class="p">,</span>
+    <span class="n">select_expr</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.spark.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_str_type</span><span class="p">,</span> <span class="n">use_duckdb</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.spark.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">StringType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">add_time_zone</span><span class="p">,</span> <span class="n">split_expected_missing_rows</span><span class="p">,</span> <span class="n">unpivot_dataframe</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.scratch_dir_context</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScratchDirContext</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.spark</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">read_dataframe</span><span class="p">,</span>
+    <span class="n">write_dataframe</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.timing</span><span class="w"> </span><span class="kn">import</span> <span class="n">timer_stats_collector</span><span class="p">,</span> <span class="n">track_timing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.filters</span><span class="w"> </span><span class="kn">import</span> <span class="n">transform_and_validate_filters</span><span class="p">,</span> <span class="n">matches_filters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.utils.utilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_uniqueness</span><span class="p">,</span> <span class="n">display_table</span><span class="p">,</span> <span class="n">make_unique_key</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">VersionUpdateType</span><span class="p">,</span>
+    <span class="n">ConfigKey</span><span class="p">,</span>
+    <span class="n">RegistryType</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.registration_context</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegistrationContext</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.registry_manager_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegistryManagerBase</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DatasetRegistryManager">
+<a class="viewcode-back" href="../../../reference/dsgrid_api/registry.html#dsgrid.registry.dataset_registry_manager.DatasetRegistryManager">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DatasetRegistryManager</span><span class="p">(</span><span class="n">RegistryManagerBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Manages registered dimension datasets.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">,</span>
+        <span class="n">fs_interface</span><span class="p">,</span>
+        <span class="n">dimension_manager</span><span class="p">:</span> <span class="n">DimensionRegistryManager</span><span class="p">,</span>
+        <span class="n">dimension_mapping_manager</span><span class="p">:</span> <span class="n">DimensionMappingRegistryManager</span><span class="p">,</span>
+        <span class="n">db</span><span class="p">:</span> <span class="n">DatasetRegistryInterface</span><span class="p">,</span>
+        <span class="n">store</span><span class="p">:</span> <span class="n">DataStoreInterface</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">fs_interface</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ConfigKey</span><span class="p">,</span> <span class="n">DatasetConfig</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span> <span class="o">=</span> <span class="n">dimension_manager</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mapping_mgr</span> <span class="o">=</span> <span class="n">dimension_mapping_manager</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_db</span> <span class="o">=</span> <span class="n">db</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span> <span class="o">=</span> <span class="n">store</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="n">dimension_manager</span><span class="p">:</span> <span class="n">DimensionRegistryManager</span><span class="p">,</span>
+        <span class="n">dimension_mapping_manager</span><span class="p">:</span> <span class="n">DimensionMappingRegistryManager</span><span class="p">,</span>
+        <span class="n">db</span><span class="p">:</span> <span class="n">DatasetRegistryInterface</span><span class="p">,</span>
+        <span class="n">store</span><span class="p">:</span> <span class="n">DataStoreInterface</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">dimension_manager</span><span class="p">,</span> <span class="n">dimension_mapping_manager</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">store</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">config_class</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DatasetConfig</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">db</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetRegistryInterface</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">store</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataStoreInterface</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;Datasets&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_registry_data_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="o">.</span><span class="n">use_remote_data</span><span class="p">:</span>
+            <span class="n">dataset_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="o">.</span><span class="n">remote_path</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dataset_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_params</span><span class="o">.</span><span class="n">base_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataset_path</span>
+
+    <span class="nd">@track_timing</span><span class="p">(</span><span class="n">timer_stats_collector</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_checks</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">missing_dimension_associations</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">],</span>
+        <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Run dataset registration checks.&quot;</span><span class="p">)</span>
+        <span class="n">check_required_dataset_dimensions</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimension_references</span><span class="p">,</span> <span class="n">requirements</span><span class="p">,</span> <span class="s2">&quot;dataset dimensions&quot;</span>
+        <span class="p">)</span>
+        <span class="n">check_uniqueness</span><span class="p">((</span><span class="n">x</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimensions</span><span class="p">),</span> <span class="s2">&quot;dimension name&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_dataset_consistency</span><span class="p">(</span>
+                <span class="n">conn</span><span class="p">,</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="n">missing_dimension_associations</span><span class="p">,</span>
+                <span class="n">scratch_dir_context</span><span class="p">,</span>
+                <span class="n">requirements</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_dataset_consistency</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">missing_dimension_associations</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">],</span>
+        <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">schema_handler</span> <span class="o">=</span> <span class="n">make_dataset_schema_handler</span><span class="p">(</span>
+            <span class="n">conn</span><span class="p">,</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mapping_mgr</span><span class="p">,</span>
+            <span class="n">store</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">schema_handler</span><span class="o">.</span><span class="n">check_consistency</span><span class="p">(</span>
+            <span class="n">missing_dimension_associations</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">,</span> <span class="n">requirements</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dimension_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimensionRegistryManager</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dimension_mapping_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DimensionMappingRegistryManager</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mapping_mgr</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">finalize_registration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span><span class="p">,</span> <span class="n">config_ids</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">error_occurred</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">config_ids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="n">config_ids</span>
+        <span class="k">if</span> <span class="n">error_occurred</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">dataset_id</span> <span class="ow">in</span> <span class="n">config_ids</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Remove intermediate dataset after error&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">remove_data</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="s2">&quot;1.0.0&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="n">config_ids</span><span class="p">]:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">offline_mode</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">dataset_id</span> <span class="ow">in</span> <span class="n">config_ids</span><span class="p">:</span>
+                <span class="n">lock_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_registry_lock_file</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">check_lock_file</span><span class="p">(</span><span class="n">lock_file</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">error_occurred</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sync_push</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_registry_data_directory</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">remove_lock_file</span><span class="p">(</span><span class="n">lock_file</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DatasetRegistryManager.get_by_id">
+<a class="viewcode-back" href="../../../reference/dsgrid_api/registry.html#dsgrid.registry.dataset_registry_manager.DatasetRegistryManager.get_by_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_by_id</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">config_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetConfig</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">get_latest_version</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config_id</span><span class="p">)</span>
+
+        <span class="n">key</span> <span class="o">=</span> <span class="n">ConfigKey</span><span class="p">(</span><span class="n">config_id</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dataset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dataset</span>
+
+        <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get_latest</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get_by_version</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config_id</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+
+        <span class="n">config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Dataset </span><span class="si">{</span><span class="n">config_id</span><span class="si">}</span><span class="s2"> loaded from registry has data_layout set; expected None&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">registry_data_layout</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Dataset </span><span class="si">{</span><span class="n">config_id</span><span class="si">}</span><span class="s2"> loaded from registry has registry_data_layout=None; expected a value&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="k">return</span> <span class="n">config</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">acquire_registry_locks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Acquire lock(s) on the registry for all config_ids.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config_ids : list[str]</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        DSGRegistryLockError</span>
+<span class="sd">            Raised if a lock cannot be acquired.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">dataset_id</span> <span class="ow">in</span> <span class="n">config_ids</span><span class="p">:</span>
+            <span class="n">lock_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_registry_lock_file</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">make_lock_file</span><span class="p">(</span><span class="n">lock_file</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_registry_lock_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return registry lock file path.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config_id : str</span>
+<span class="sd">            Config ID</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            Lock file path</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;configs/.locks/</span><span class="si">{</span><span class="n">config_id</span><span class="si">}</span><span class="s2">.lock&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_dimensions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">):</span>
+        <span class="n">dimensions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span><span class="o">.</span><span class="n">load_dimensions</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimension_references</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="n">conn</span>
+        <span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">update_dimensions</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">submitter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">log_message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">RegistrationContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">data_base_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">missing_associations_base_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="o">.</span><span class="n">load_from_user_path</span><span class="p">(</span>
+            <span class="n">config_file</span><span class="p">,</span>
+            <span class="n">data_base_dir</span><span class="o">=</span><span class="n">data_base_dir</span><span class="p">,</span>
+            <span class="n">missing_associations_base_dir</span><span class="o">=</span><span class="n">missing_associations_base_dir</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">submitter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">assert</span> <span class="n">log_message</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">with</span> <span class="n">RegistrationContext</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">,</span> <span class="n">log_message</span><span class="p">,</span> <span class="n">VersionUpdateType</span><span class="o">.</span><span class="n">MAJOR</span><span class="p">,</span> <span class="n">submitter</span>
+            <span class="p">)</span> <span class="k">as</span> <span class="n">context</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">register_from_config</span><span class="p">(</span>
+                    <span class="n">config</span><span class="p">,</span>
+                    <span class="n">context</span><span class="p">,</span>
+                    <span class="n">requirements</span><span class="o">=</span><span class="n">requirements</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">register_from_config</span><span class="p">(</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="n">context</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="nd">@track_timing</span><span class="p">(</span><span class="n">timer_stats_collector</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_from_config</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">RegistrationContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_register_dataset_and_dimensions</span><span class="p">(</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="n">context</span><span class="p">,</span>
+            <span class="n">requirements</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_register_dataset_and_dimensions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">RegistrationContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Start registration of dataset </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">)</span>
+
+        <span class="n">conn</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">connection</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_if_already_registered</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimensions</span><span class="p">:</span>
+            <span class="n">dim_model</span> <span class="o">=</span> <span class="n">DimensionsConfigModel</span><span class="p">(</span><span class="n">dimensions</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+            <span class="n">dims_config</span> <span class="o">=</span> <span class="n">DimensionsConfig</span><span class="o">.</span><span class="n">load_from_model</span><span class="p">(</span><span class="n">dim_model</span><span class="p">)</span>
+            <span class="n">dimension_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span><span class="o">.</span><span class="n">register_from_config</span><span class="p">(</span><span class="n">dims_config</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">context</span><span class="p">)</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimension_references</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span><span class="o">.</span><span class="n">make_dimension_references</span><span class="p">(</span>
+                <span class="n">conn</span><span class="p">,</span> <span class="n">dimension_ids</span>
+            <span class="p">)</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_register</span><span class="p">(</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="n">context</span><span class="p">,</span>
+            <span class="n">requirements</span><span class="o">=</span><span class="n">requirements</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">context</span><span class="o">.</span><span class="n">add_id</span><span class="p">(</span><span class="n">RegistryType</span><span class="o">.</span><span class="n">DATASET</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_register</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">RegistrationContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">reqs</span> <span class="o">=</span> <span class="n">requirements</span> <span class="ow">or</span> <span class="n">DatasetDimensionRequirements</span><span class="p">()</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;1.0.0&quot;</span>
+        <span class="c1"># Explanation for this order of operations:</span>
+        <span class="c1"># 1. Check time consistency in the original dataset format.</span>
+        <span class="c1">#    Many datasets are stored in pivoted format and have many value columns. If we</span>
+        <span class="c1">#    check timestamps after unpivoting the dataset, we will multiply the required work</span>
+        <span class="c1">#    by the number of columns.</span>
+        <span class="c1"># 2. Write to the registry in unpivoted format before running the other checks.</span>
+        <span class="c1">#    The final data is always stored in unpivoted format. We can reduce code if we</span>
+        <span class="c1">#    transform pivoted tables first.</span>
+        <span class="c1">#    In the nominal case where the dataset is valid, there is no difference in performance.</span>
+        <span class="c1">#    In the failure case where the dataset is invalid, it will take longer to detect the</span>
+        <span class="c1">#    errors.</span>
+        <span class="n">dsgrid_config</span> <span class="o">=</span> <span class="n">DsgridRuntimeConfig</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+        <span class="n">scratch_dir</span> <span class="o">=</span> <span class="n">dsgrid_config</span><span class="o">.</span><span class="n">get_scratch_dir</span><span class="p">()</span>
+        <span class="n">scratch_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">ScratchDirContext</span><span class="p">(</span><span class="n">scratch_dir</span><span class="p">)</span> <span class="k">as</span> <span class="n">scratch_dir_context</span><span class="p">:</span>
+            <span class="n">schema_handler</span> <span class="o">=</span> <span class="n">make_dataset_schema_handler</span><span class="p">(</span>
+                <span class="n">context</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mgr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dimension_mapping_mgr</span><span class="p">,</span>
+                <span class="n">store</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_convert_time_format_if_necessary</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">schema_handler</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">reqs</span><span class="o">.</span><span class="n">check_time_consistency</span><span class="p">:</span>
+                <span class="n">schema_handler</span><span class="o">.</span><span class="n">check_time_consistency</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skip dataset time checks for </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_to_registry</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span><span class="p">)</span>
+
+            <span class="n">assoc_dfs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_missing_associations_tables</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span>
+            <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_run_checks</span><span class="p">(</span>
+                    <span class="n">context</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span>
+                    <span class="n">config</span><span class="p">,</span>
+                    <span class="n">assoc_dfs</span><span class="p">,</span>
+                    <span class="n">scratch_dir_context</span><span class="p">,</span>
+                    <span class="n">reqs</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">remove_tables</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+                <span class="k">raise</span>
+
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">registry_layout</span> <span class="o">=</span> <span class="n">user_layout_to_registry_layout</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="p">)</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">registry_data_layout</span> <span class="o">=</span> <span class="n">registry_layout</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">context</span><span class="o">.</span><span class="n">registration</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> Registered dataset </span><span class="si">%s</span><span class="s2"> with version=</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_log_offline_mode_prefix</span><span class="p">(),</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_time_format_if_necessary</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">handler</span><span class="p">:</span> <span class="n">DatasetSchemaHandlerBase</span><span class="p">,</span>
+        <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert time-in-parts format to timestamp format if necessary.&quot;&quot;&quot;</span>
+        <span class="n">time_dim</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(</span><span class="n">DimensionType</span><span class="o">.</span><span class="n">TIME</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">time_dim</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">DateTimeDimensionModel</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">column_format</span><span class="p">,</span> <span class="n">TimeFormatInPartsModel</span>
+        <span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="c1"># TEMPORARY</span>
+        <span class="c1"># This code only exists because we lack full support for time zone naive timestamps.</span>
+        <span class="c1"># Refactor when the existing chronify work is complete.</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">handler</span><span class="o">.</span><span class="n">get_base_load_data_table</span><span class="p">()</span>
+        <span class="n">col_format</span> <span class="o">=</span> <span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">column_format</span>
+
+        <span class="n">timestamp_str_expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_timestamp_string_expr</span><span class="p">(</span><span class="n">col_format</span><span class="p">)</span>
+        <span class="n">df</span><span class="p">,</span> <span class="n">fixed_tz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_timezone</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">col_format</span><span class="p">)</span>
+        <span class="n">timestamp_sql</span><span class="p">,</span> <span class="n">new_col_format</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_timestamp_sql</span><span class="p">(</span><span class="n">timestamp_str_expr</span><span class="p">,</span> <span class="n">fixed_tz</span><span class="p">)</span>
+
+        <span class="n">cols_to_drop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_time_columns_to_drop</span><span class="p">(</span><span class="n">col_format</span><span class="p">)</span>
+        <span class="n">reformatted_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_timestamp_transformation</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">cols_to_drop</span><span class="p">,</span> <span class="n">timestamp_sql</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_config_for_timestamp</span><span class="p">(</span>
+            <span class="n">config</span><span class="p">,</span> <span class="n">reformatted_df</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">,</span> <span class="n">cols_to_drop</span><span class="p">,</span> <span class="n">new_col_format</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_time_dimension</span><span class="p">(</span><span class="n">time_dim</span><span class="p">,</span> <span class="n">new_col_format</span><span class="p">,</span> <span class="n">col_format</span><span class="o">.</span><span class="n">hour_column</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Replaced time columns </span><span class="si">%s</span><span class="s2"> with </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cols_to_drop</span><span class="p">,</span> <span class="n">new_col_format</span><span class="o">.</span><span class="n">time_column</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_timestamp_string_expr</span><span class="p">(</span><span class="n">col_format</span><span class="p">:</span> <span class="n">TimeFormatInPartsModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build SQL expression that creates a timestamp string from time-in-parts columns.&quot;&quot;&quot;</span>
+        <span class="n">str_type</span> <span class="o">=</span> <span class="n">get_str_type</span><span class="p">()</span>
+        <span class="n">hour_col</span> <span class="o">=</span> <span class="n">col_format</span><span class="o">.</span><span class="n">hour_column</span>
+        <span class="n">hour_expr</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;lpad(cast(</span><span class="si">{</span><span class="n">hour_col</span><span class="si">}</span><span class="s2"> as </span><span class="si">{</span><span class="n">str_type</span><span class="si">}</span><span class="s2">), 2, &#39;0&#39;)&quot;</span> <span class="k">if</span> <span class="n">hour_col</span> <span class="k">else</span> <span class="s2">&quot;&#39;00&#39;&quot;</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;cast(</span><span class="si">{</span><span class="n">col_format</span><span class="o">.</span><span class="n">year_column</span><span class="si">}</span><span class="s2"> as </span><span class="si">{</span><span class="n">str_type</span><span class="si">}</span><span class="s2">) || &#39;-&#39; || &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;lpad(cast(</span><span class="si">{</span><span class="n">col_format</span><span class="o">.</span><span class="n">month_column</span><span class="si">}</span><span class="s2"> as </span><span class="si">{</span><span class="n">str_type</span><span class="si">}</span><span class="s2">), 2, &#39;0&#39;) || &#39;-&#39; || &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;lpad(cast(</span><span class="si">{</span><span class="n">col_format</span><span class="o">.</span><span class="n">day_column</span><span class="si">}</span><span class="s2"> as </span><span class="si">{</span><span class="n">str_type</span><span class="si">}</span><span class="s2">), 2, &#39;0&#39;) || &#39; &#39; || &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">hour_expr</span><span class="si">}</span><span class="s2"> || &#39;:00:00&#39;&quot;</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_timezone</span><span class="p">(</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span> <span class="n">col_format</span><span class="p">:</span> <span class="n">TimeFormatInPartsModel</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">DataFrame</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve timezone from config or geography dimension.</span>
+
+<span class="sd">        Returns the (possibly modified) dataframe and the fixed timezone if single-tz,</span>
+<span class="sd">        or None if multi-timezone.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">col_format</span><span class="o">.</span><span class="n">time_zone</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">col_format</span><span class="o">.</span><span class="n">time_zone</span>
+
+        <span class="n">geo_dim</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(</span><span class="n">DimensionType</span><span class="o">.</span><span class="n">GEOGRAPHY</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">geo_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">add_time_zone</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">geo_dim</span><span class="p">),</span> <span class="kc">None</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_timestamp_sql</span><span class="p">(</span>
+        <span class="n">timestamp_str_expr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fixed_tz</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TimeFormatDateTimeTZModel</span> <span class="o">|</span> <span class="n">TimeFormatDateTimeNTZModel</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the final timestamp SQL expression and determine the column format.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">fixed_tz</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">use_duckdb</span><span class="p">():</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cast(</span><span class="si">{</span><span class="n">timestamp_str_expr</span><span class="si">}</span><span class="s2"> || &#39; </span><span class="si">{</span><span class="n">fixed_tz</span><span class="si">}</span><span class="s2">&#39; as timestamptz) as timestamp&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tz</span> <span class="o">=</span> <span class="n">ZoneInfo</span><span class="p">(</span><span class="n">fixed_tz</span><span class="p">)</span>
+                <span class="n">offset</span> <span class="o">=</span> <span class="n">datetime</span><span class="p">(</span><span class="mi">2012</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">tz</span><span class="p">)</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%z&quot;</span><span class="p">)</span>
+                <span class="n">offset_formatted</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">offset</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">offset</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;cast(</span><span class="si">{</span><span class="n">timestamp_str_expr</span><span class="si">}</span><span class="s2"> || &#39;</span><span class="si">{</span><span class="n">offset_formatted</span><span class="si">}</span><span class="s2">&#39; as timestamp) as timestamp&quot;</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">sql</span><span class="p">,</span> <span class="n">TimeFormatDateTimeTZModel</span><span class="p">(</span><span class="n">time_column</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Multi-timezone: create naive timestamp, keep time_zone column</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cast(</span><span class="si">{</span><span class="n">timestamp_str_expr</span><span class="si">}</span><span class="s2"> as timestamp) as timestamp&quot;</span>
+        <span class="k">return</span> <span class="n">sql</span><span class="p">,</span> <span class="n">TimeFormatDateTimeNTZModel</span><span class="p">(</span><span class="n">time_column</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_time_columns_to_drop</span><span class="p">(</span><span class="n">col_format</span><span class="p">:</span> <span class="n">TimeFormatInPartsModel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the set of time-in-parts columns to drop, excluding dimension columns.&quot;&quot;&quot;</span>
+        <span class="n">cols_to_drop</span> <span class="o">=</span> <span class="p">{</span><span class="n">col_format</span><span class="o">.</span><span class="n">year_column</span><span class="p">,</span> <span class="n">col_format</span><span class="o">.</span><span class="n">month_column</span><span class="p">,</span> <span class="n">col_format</span><span class="o">.</span><span class="n">day_column</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">col_format</span><span class="o">.</span><span class="n">hour_column</span><span class="p">:</span>
+            <span class="n">cols_to_drop</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">col_format</span><span class="o">.</span><span class="n">hour_column</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cols_to_drop</span> <span class="o">-</span> <span class="n">DimensionType</span><span class="o">.</span><span class="n">get_allowed_dimension_column_names</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_timestamp_transformation</span><span class="p">(</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">DataFrame</span><span class="p">,</span> <span class="n">cols_to_drop</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">timestamp_sql</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply the timestamp transformation to the dataframe.&quot;&quot;&quot;</span>
+        <span class="n">existing_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cols_to_drop</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">select_expr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">existing_cols</span> <span class="o">+</span> <span class="p">[</span><span class="n">timestamp_sql</span><span class="p">])</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_config_for_timestamp</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">DataFrame</span><span class="p">,</span>
+        <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span><span class="p">,</span>
+        <span class="n">cols_to_drop</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">new_col_format</span><span class="p">:</span> <span class="n">TimeFormatDateTimeTZModel</span> <span class="o">|</span> <span class="n">TimeFormatDateTimeNTZModel</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write the transformed dataframe and update config paths and columns.&quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">scratch_dir_context</span><span class="o">.</span><span class="n">get_temp_filename</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.parquet&quot;</span><span class="p">)</span>
+        <span class="n">write_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="o">.</span><span class="n">data_file</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="o">.</span><span class="n">data_file</span><span class="o">.</span><span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">updated_columns</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="o">.</span><span class="n">data_file</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cols_to_drop</span>
+            <span class="p">]</span>
+            <span class="n">timestamp_data_type</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;TIMESTAMP_TZ&quot;</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_col_format</span><span class="p">,</span> <span class="n">TimeFormatDateTimeTZModel</span><span class="p">)</span>
+                <span class="k">else</span> <span class="s2">&quot;TIMESTAMP_NTZ&quot;</span>
+            <span class="p">)</span>
+            <span class="n">updated_columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Column</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="n">data_type</span><span class="o">=</span><span class="n">timestamp_data_type</span><span class="p">))</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="o">.</span><span class="n">data_file</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="n">updated_columns</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_update_time_dimension</span><span class="p">(</span>
+        <span class="n">time_dim</span><span class="p">,</span>
+        <span class="n">new_col_format</span><span class="p">:</span> <span class="n">TimeFormatDateTimeTZModel</span> <span class="o">|</span> <span class="n">TimeFormatDateTimeNTZModel</span><span class="p">,</span>
+        <span class="n">hour_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the time dimension model with the new format.&quot;&quot;&quot;</span>
+        <span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">column_format</span> <span class="o">=</span> <span class="n">new_col_format</span>
+        <span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">time_column</span> <span class="o">=</span> <span class="s2">&quot;timestamp&quot;</span>
+        <span class="k">if</span> <span class="n">hour_col</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">time_range</span> <span class="ow">in</span> <span class="n">time_dim</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">ranges</span><span class="p">:</span>
+                <span class="n">time_range</span><span class="o">.</span><span class="n">frequency</span> <span class="o">=</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_lookup_table_from_user_path</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">lookup_file_schema</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot read lookup table without lookup file schema&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">read_data_file</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">lookup_file_schema</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;id&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;load_data_lookup does not include an &#39;id&#39; column&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">missing</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="s2">&quot;id IS NULL&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_dataframe_empty</span><span class="p">(</span><span class="n">missing</span><span class="p">):</span>
+            <span class="n">missing_df</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">missing_df</span> <span class="o">=</span> <span class="n">missing</span>
+            <span class="k">if</span> <span class="n">SCALING_FACTOR_COLUMN</span> <span class="ow">in</span> <span class="n">missing_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">missing_df</span> <span class="o">=</span> <span class="n">missing_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">SCALING_FACTOR_COLUMN</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">missing_df</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_missing_associations_tables_from_user_path</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return all missing association tables keyed by the file path stem.</span>
+<span class="sd">        Tables can be all-dimension-types-in-one or split by groups of dimension types.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dfs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">missing_paths</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">missing_associations_paths</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">missing_paths</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dfs</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">add_df</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_associations_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">make_unique_key</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">stem</span><span class="p">,</span> <span class="n">dfs</span><span class="p">)</span>
+            <span class="n">dfs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span>
+
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">missing_paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;.parquet&quot;</span><span class="p">:</span>
+                <span class="n">add_df</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">path</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">file_path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">,</span> <span class="s2">&quot;.parquet&quot;</span><span class="p">):</span>
+                        <span class="n">add_df</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">,</span> <span class="s2">&quot;.parquet&quot;</span><span class="p">):</span>
+                <span class="n">add_df</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dfs</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_associations_file</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">suffix</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;.csv&quot;</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">get_spark_session</span><span class="p">()</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;string&quot;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">read_dataframe</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">schema</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">dataType</span> <span class="o">!=</span> <span class="n">StringType</span><span class="p">():</span>
+                    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">withColumn</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">F</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">StringType</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_table_from_user_path</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Read a table from a user-provided path. Split expected-missing rows into a separate</span>
+<span class="sd">        DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        config : DatasetConfig</span>
+<span class="sd">            The dataset configuration.</span>
+<span class="sd">        scratch_dir_context : ScratchDirContext | None</span>
+<span class="sd">            Optional location to store temporary files</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple[DataFrame, DataFrame | None]</span>
+<span class="sd">            The first DataFrame contains the expected rows, and the second DataFrame contains the</span>
+<span class="sd">            missing rows or will be None if there are no missing rows.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">data_file_schema</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot read table without data file schema&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">read_data_file</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">data_file_schema</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get_value_format</span><span class="p">()</span> <span class="o">==</span> <span class="n">ValueFormat</span><span class="o">.</span><span class="n">PIVOTED</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Convert dataset </span><span class="si">%s</span><span class="s2"> from pivoted to stacked.&quot;</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">)</span>
+            <span class="n">needs_unpivot</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">pivoted_columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_pivoted_dimension_columns</span><span class="p">()</span>
+            <span class="n">pivoted_dimension_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_pivoted_dimension_type</span><span class="p">()</span>
+            <span class="c1"># Update both fields together to avoid validation errors from the model validator</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">data_layout</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span>
+                <span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;value_format&quot;</span><span class="p">:</span> <span class="n">ValueFormat</span><span class="o">.</span><span class="n">STACKED</span><span class="p">,</span> <span class="s2">&quot;pivoted_dimension_type&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">needs_unpivot</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">pivoted_columns</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">pivoted_dimension_type</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">time_columns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">time_dim</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get_time_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">time_dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">time_columns</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">time_dim</span><span class="o">.</span><span class="n">get_load_data_time_columns</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">needs_unpivot</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">pivoted_columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">assert</span> <span class="n">pivoted_dimension_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">existing_columns</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">diff</span> <span class="o">:=</span> <span class="nb">set</span><span class="p">(</span><span class="n">time_columns</span><span class="p">)</span> <span class="o">-</span> <span class="n">existing_columns</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Expected time columns are not present in the table: </span><span class="si">{</span><span class="n">diff</span><span class="si">=}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">diff</span> <span class="o">:=</span> <span class="nb">set</span><span class="p">(</span><span class="n">pivoted_columns</span><span class="p">)</span> <span class="o">-</span> <span class="n">existing_columns</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Expected pivoted_columns are not present in the table: </span><span class="si">{</span><span class="n">diff</span><span class="si">=}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">unpivot_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">pivoted_columns</span><span class="p">,</span> <span class="n">pivoted_dimension_type</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">time_columns</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">split_expected_missing_rows</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">time_columns</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_write_to_registry</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">orig_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">scratch_dir_context</span><span class="p">:</span> <span class="n">ScratchDirContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">lk_df</span><span class="p">:</span> <span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">missing_dfs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">match</span> <span class="n">config</span><span class="o">.</span><span class="n">get_table_format</span><span class="p">():</span>
+            <span class="k">case</span> <span class="n">TableFormat</span><span class="o">.</span><span class="n">ONE_TABLE</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">has_user_layout</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="p">(</span>
+                        <span class="n">orig_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="p">),</span> <span class="s2">&quot;orig_version must be set if config came from the registry&quot;</span>
+                    <span class="n">missing_dfs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_missing_associations_tables</span><span class="p">(</span>
+                            <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">orig_version</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">ld_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">orig_version</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Note: config will be updated if this is a pivoted table.</span>
+                    <span class="n">ld_df</span><span class="p">,</span> <span class="n">missing_df1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_table_from_user_path</span><span class="p">(</span>
+                        <span class="n">config</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span>
+                    <span class="p">)</span>
+                    <span class="n">missing_dfs2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_missing_associations_tables_from_user_path</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+                    <span class="n">missing_dfs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_check_duplicate_missing_associations</span><span class="p">(</span><span class="n">missing_df1</span><span class="p">,</span> <span class="n">missing_dfs2</span><span class="p">)</span>
+                    <span class="p">)</span>
+
+            <span class="k">case</span> <span class="n">TableFormat</span><span class="o">.</span><span class="n">TWO_TABLE</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">has_user_layout</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="p">(</span>
+                        <span class="n">orig_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="p">),</span> <span class="s2">&quot;orig_version must be set if config came from the registry&quot;</span>
+                    <span class="n">lk_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_lookup_table</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">orig_version</span><span class="p">)</span>
+                    <span class="n">ld_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">orig_version</span><span class="p">)</span>
+                    <span class="n">missing_dfs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_missing_associations_tables</span><span class="p">(</span>
+                        <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">orig_version</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Note: config will be updated if this is a pivoted table.</span>
+                    <span class="n">ld_df</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_table_from_user_path</span><span class="p">(</span>
+                        <span class="n">config</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="n">tmp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="s2">&quot;NULL rows cannot be present in the load_data table in standard format. &quot;</span>
+                            <span class="s2">&quot;They must be provided in the load_data_lookup table.&quot;</span>
+                        <span class="p">)</span>
+                        <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                    <span class="n">lk_df</span><span class="p">,</span> <span class="n">missing_df1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_lookup_table_from_user_path</span><span class="p">(</span>
+                        <span class="n">config</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span>
+                    <span class="p">)</span>
+                    <span class="n">missing_dfs2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_missing_associations_tables_from_user_path</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+                    <span class="n">missing_dfs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_check_duplicate_missing_associations</span><span class="p">(</span><span class="n">missing_df1</span><span class="p">,</span> <span class="n">missing_dfs2</span><span class="p">)</span>
+                    <span class="p">)</span>
+            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Unsupported table format: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">get_table_format</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">write_table</span><span class="p">(</span><span class="n">ld_df</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lk_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">write_lookup_table</span><span class="p">(</span><span class="n">lk_df</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">missing_dfs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">write_missing_associations_tables</span><span class="p">(</span>
+                <span class="n">missing_dfs</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span>
+            <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_duplicate_missing_associations</span><span class="p">(</span>
+        <span class="n">df1</span><span class="p">:</span> <span class="n">DataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">dfs2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DataFrame</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">df1</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dfs2</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;A dataset cannot have expected missing rows in the data and &quot;</span>
+            <span class="s2">&quot;provide a missing_associations file. Provide one or the other.&quot;</span>
+            <span class="k">raise</span> <span class="n">DSGInvalidDataset</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">df1</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;missing_associations&quot;</span><span class="p">:</span> <span class="n">df1</span><span class="p">}</span>
+        <span class="k">elif</span> <span class="n">dfs2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dfs2</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_copy_dataset_config</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetConfig</span><span class="p">:</span>
+        <span class="n">new_config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">new_config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_config</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_from_file</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config_file</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">submitter</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">update_type</span><span class="p">:</span> <span class="n">VersionUpdateType</span><span class="p">,</span>
+        <span class="n">log_message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">with</span> <span class="n">RegistrationContext</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">,</span> <span class="n">log_message</span><span class="p">,</span> <span class="n">update_type</span><span class="p">,</span> <span class="n">submitter</span><span class="p">)</span> <span class="k">as</span> <span class="n">context</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">connection</span>
+            <span class="c1"># If config has UserDataLayout, load with validation; otherwise just load</span>
+            <span class="n">config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">has_user_layout</span><span class="p">:</span>
+                <span class="n">config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="o">.</span><span class="n">load_from_user_path</span><span class="p">(</span><span class="n">config_file</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_update</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">dataset_id</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">update_with_context</span><span class="p">(</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="n">context</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="nd">@track_timing</span><span class="p">(</span><span class="n">timer_stats_collector</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">update_type</span><span class="p">:</span> <span class="n">VersionUpdateType</span><span class="p">,</span>
+        <span class="n">log_message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">submitter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetConfig</span><span class="p">:</span>
+        <span class="n">lock_file_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_registry_lock_file</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">make_lock_file_managed</span><span class="p">(</span><span class="n">lock_file_path</span><span class="p">):</span>
+            <span class="c1"># Note that projects will not pick up these changes until submit-dataset</span>
+            <span class="c1"># is called again.</span>
+            <span class="k">with</span> <span class="n">RegistrationContext</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="p">,</span> <span class="n">log_message</span><span class="p">,</span> <span class="n">update_type</span><span class="p">,</span> <span class="n">submitter</span><span class="p">)</span> <span class="k">as</span> <span class="n">context</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">update_with_context</span><span class="p">(</span>
+                    <span class="n">config</span><span class="p">,</span>
+                    <span class="n">context</span><span class="p">,</span>
+                <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_with_context</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">DatasetConfig</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">RegistrationContext</span><span class="p">,</span>
+        <span class="n">requirements</span><span class="p">:</span> <span class="n">DatasetDimensionRequirements</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DatasetConfig</span><span class="p">:</span>
+        <span class="n">reqs</span> <span class="o">=</span> <span class="n">requirements</span> <span class="ow">or</span> <span class="n">DatasetDimensionRequirements</span><span class="p">()</span>
+        <span class="n">conn</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">connection</span>
+        <span class="n">dataset_id</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span>
+        <span class="n">cur_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_by_id</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="n">conn</span><span class="p">)</span>
+        <span class="n">updated_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_update_config</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+        <span class="n">updated_config</span> <span class="o">=</span> <span class="n">DatasetConfig</span><span class="p">(</span><span class="n">updated_model</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_update_dimensions</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">updated_config</span><span class="p">)</span>
+
+        <span class="n">dsgrid_config</span> <span class="o">=</span> <span class="n">DsgridRuntimeConfig</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+        <span class="n">scratch_dir</span> <span class="o">=</span> <span class="n">dsgrid_config</span><span class="o">.</span><span class="n">get_scratch_dir</span><span class="p">()</span>
+        <span class="n">scratch_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">ScratchDirContext</span><span class="p">(</span><span class="n">scratch_dir</span><span class="p">)</span> <span class="k">as</span> <span class="n">scratch_dir_context</span><span class="p">:</span>
+            <span class="c1"># Note: this method mutates updated_config.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_to_registry</span><span class="p">(</span>
+                <span class="n">updated_config</span><span class="p">,</span>
+                <span class="n">orig_version</span><span class="o">=</span><span class="n">cur_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                <span class="n">scratch_dir_context</span><span class="o">=</span><span class="n">scratch_dir_context</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">assoc_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">read_missing_associations_tables</span><span class="p">(</span>
+                <span class="n">updated_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">updated_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span>
+            <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_run_checks</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">updated_config</span><span class="p">,</span> <span class="n">assoc_df</span><span class="p">,</span> <span class="n">scratch_dir_context</span><span class="p">,</span> <span class="n">reqs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">remove_tables</span><span class="p">(</span>
+                    <span class="n">updated_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">updated_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span>
+                <span class="p">)</span>
+                <span class="k">raise</span>
+
+            <span class="n">old_key</span> <span class="o">=</span> <span class="n">ConfigKey</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">cur_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+            <span class="n">new_key</span> <span class="o">=</span> <span class="n">ConfigKey</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">updated_config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">old_key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="p">[</span><span class="n">new_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">updated_config</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">offline_mode</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sync_push</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_registry_data_directory</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">updated_config</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">config_id</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">remove_data</span><span class="p">(</span><span class="n">config_id</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_datasets</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">delete_all</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">config_id</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Removed </span><span class="si">%s</span><span class="s2"> from the registry.&quot;</span><span class="p">,</span> <span class="n">config_id</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">remove_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">remove_tables</span><span class="p">(</span><span class="n">dataset_id</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Removed data for </span><span class="si">%s</span><span class="s2"> version=</span><span class="si">%s</span><span class="s2"> from the registry.&quot;</span><span class="p">,</span> <span class="n">dataset_id</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DatasetRegistryManager.show">
+<a class="viewcode-back" href="../../../reference/dsgrid_api/registry.html#dsgrid.registry.dataset_registry_manager.DatasetRegistryManager.show">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">conn</span><span class="p">:</span> <span class="n">Connection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">filters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_width</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">drop_fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_table</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Show registry in PrettyTable</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        filters : list or tuple</span>
+<span class="sd">            List of filter expressions for reigstry content (e.g., filters=[&quot;Submitter==USER&quot;, &quot;Description contains comstock&quot;])</span>
+<span class="sd">        max_width</span>
+<span class="sd">            Max column width in PrettyTable, specify as a single value or as a dict of values by field name</span>
+<span class="sd">        drop_fields</span>
+<span class="sd">            List of field names not to show</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">filters</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;List registry for: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">filters</span><span class="p">)</span>
+
+        <span class="n">table</span> <span class="o">=</span> <span class="n">PrettyTable</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">())</span>
+        <span class="n">all_field_names</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;ID&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Version&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Date&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Submitter&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Description&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">drop_fields</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">field_names</span> <span class="o">=</span> <span class="n">all_field_names</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">field_names</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">all_field_names</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">drop_fields</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">max_width</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">_max_width</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;ID&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+                <span class="s2">&quot;Date&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+                <span class="s2">&quot;Description&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_width</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">max_width</span> <span class="o">=</span> <span class="n">max_width</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">max_width</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">_max_width</span> <span class="o">=</span> <span class="n">max_width</span>
+
+        <span class="k">if</span> <span class="n">filters</span><span class="p">:</span>
+            <span class="n">transformed_filters</span> <span class="o">=</span> <span class="n">transform_and_validate_filters</span><span class="p">(</span><span class="n">filters</span><span class="p">)</span>
+        <span class="n">field_to_index</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">field_names</span><span class="p">)}</span>
+        <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">iter_models</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">all_versions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">DatasetConfigModel</span><span class="p">)</span>
+            <span class="n">registration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">get_registration</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+            <span class="n">all_fields</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">dataset_id</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                <span class="n">registration</span><span class="o">.</span><span class="n">timestamp</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2"> %H:%M:%S&quot;</span><span class="p">),</span>
+                <span class="n">registration</span><span class="o">.</span><span class="n">submitter</span><span class="p">,</span>
+                <span class="n">registration</span><span class="o">.</span><span class="n">log_message</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">drop_fields</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">row</span> <span class="o">=</span> <span class="n">all_fields</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">row</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                    <span class="n">y</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">all_field_names</span><span class="p">,</span> <span class="n">all_fields</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">drop_fields</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">filters</span> <span class="ow">or</span> <span class="n">matches_filters</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">field_to_index</span><span class="p">,</span> <span class="n">transformed_filters</span><span class="p">):</span>
+                <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+
+        <span class="n">rows</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">add_rows</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">align</span> <span class="o">=</span> <span class="s2">&quot;l&quot;</span>
+        <span class="k">if</span> <span class="n">return_table</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">table</span>
+        <span class="n">display_table</span><span class="p">(</span><span class="n">table</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">sync_pull</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Synchronizes files from the remote registry to local.</span>
+<span class="sd">        Deletes any files locally that do not exist on remote.</span>
+
+<span class="sd">        path : Path</span>
+<span class="sd">            Local path</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">remote_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">relative_remote_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">sync_pull</span><span class="p">(</span>
+            <span class="n">remote_path</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="n">SYNC_EXCLUDE_LIST</span><span class="p">,</span> <span class="n">delete_local</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">sync_push</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Synchronizes files from the local path to the remote registry.</span>
+
+<span class="sd">        path : Path</span>
+<span class="sd">            Local path</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">remote_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">relative_remote_path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">lock_file_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_registry_lock_file</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">check_lock_file</span><span class="p">(</span><span class="n">lock_file_path</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cloud_interface</span><span class="o">.</span><span class="n">sync_push</span><span class="p">(</span>
+                <span class="n">remote_path</span><span class="o">=</span><span class="n">remote_path</span><span class="p">,</span> <span class="n">local_path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span> <span class="n">exclude</span><span class="o">=</span><span class="n">SYNC_EXCLUDE_LIST</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                <span class="s2">&quot;Please report this error to the dsgrid team. The registry may need recovery.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">raise</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../../_static/documentation_options.js?v=d198571b"></script>
+    <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

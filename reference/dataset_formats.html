@@ -1,0 +1,1055 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Data Models" href="data_models/index.html"><link rel="prev" title="CLI Reference" href="cli.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Dataset Formats - dsgrid 0.3.3 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">dsgrid 0.3.3 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.3.3 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/map_dataset.html">Map a dataset to a project’s dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tutorials/query_dataset.html">Query a Dataset with Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/create_dataset_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/filter_a_query.html">How to Filter a Query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/run_dsgrid_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/visualize_data_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanations/index.html">Explanations</a><input aria-label="Toggle navigation of Explanations" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../explanations/components/index.html">Components</a><input aria-label="Toggle navigation of Components" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html">CLI Reference</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Dataset Formats</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_models/project.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_models/dataset.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_models/dimension.html">Dimension Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_models/dimension_mapping.html">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_models/dataset_mapping_plan.html">Dataset Mapping Plan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="dsgrid_api/index.html">dsgrid API</a><input aria-label="Toggle navigation of dsgrid API" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="architecture.html">Architecture</a><input aria-label="Toggle navigation of Architecture" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/reference/dataset_formats.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="dataset-formats">
+<span id="id1"></span><h1>Dataset Formats<a class="headerlink" href="#dataset-formats" title="Link to this heading">¶</a></h1>
+<p>dsgrid aims to support all dataset formats that users need for efficient queries and analysis. If
+you need a new format, please contact the dsgrid team to discuss it.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Metric data should usually be stored in Parquet files. CSV files are also supported. If you
+need or want another optimized columnar file format, please contact the dsgrid team.</p></li>
+<li><p>If the data tables contain time-series data, each unique time array must contain an identical
+range of timestamps.</p></li>
+<li><p>Values of dimension columns except <code class="docutils literal notranslate"><span class="pre">model_year</span></code> and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> must be strings.
+<code class="docutils literal notranslate"><span class="pre">model_year</span></code> and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> can be integers.</p></li>
+<li><p>Each dimension column name except time must match dsgrid dimension types (geography, sector,
+subsector, etc.) either directly or by specifying the mapping.</p></li>
+<li><p>The values in each dimension column must match the dataset’s dimension records.</p></li>
+</ol>
+</section>
+<section id="recommendations">
+<h2>Recommendations<a class="headerlink" href="#recommendations" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Enable compression in all Parquet files. <code class="docutils literal notranslate"><span class="pre">Snappy</span></code> is preferred.</p></li>
+<li><p>The recommended size of individual Parquet files is 128 MiB. Making the files too big can cause
+memory issues. Making them too small adds overhead and hurts performance.</p></li>
+<li><p>Trivial dimensions (one-element records) should not be stored in the data files. They should
+instead be defined in the dataset config. dsgrid will add them dynamically at runtime.</p></li>
+<li><p>Floating point data can be 64-bit or 32-bit. 64-bit floats provide more precision but require twice as much storage space as 32-bit floats.</p></li>
+</ol>
+</section>
+<section id="csv-files">
+<h2>CSV Files<a class="headerlink" href="#csv-files" title="Link to this heading">¶</a></h2>
+<p>While not generally recommended, dsgrid does support CSV data files. By default,
+dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be
+cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time
+zones, dsgrid provides a mechanism for defining column data types directly in the dataset
+configuration.</p>
+<p>Consider this example that uses county FIPS codes to identify the geography of each data point:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+----------------------+---------+------------------+--------------------+-------+</span>
+<span class="o">|</span>             <span class="n">timestamp</span><span class="o">|</span><span class="n">geography</span><span class="o">|</span>          <span class="n">scenario</span><span class="o">|</span>           <span class="n">subsector</span><span class="o">|</span>  <span class="n">value</span><span class="o">|</span>
+<span class="o">+----------------------+---------+------------------+--------------------+-------|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">07</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span><span class="n">full_service_rest</span><span class="o">...|</span> <span class="mf">1.234</span> <span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">07</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>      <span class="n">primary_school</span><span class="o">|</span> <span class="mf">2.345</span> <span class="o">|</span>
+<span class="o">+----------------------+---------+------------------+--------------------+-------|</span>
+</pre></div>
+</div>
+<p>The default behavior of IO libraries like Pandas, Spark, and DuckDB is to infer data types by
+inspecting the data. They will all decide that the geography column contains integers and drop
+the leading zeros. This will result in an invalid geography column, which is required to be a
+string data type, and will not match the project’s geography dimension (assuming that the project is
+also defined over county FIPS codes).</p>
+<p>Secondly, you may want to specify the minimum required size for each number. For example,
+if you don’t need the precision that comes with 8-byte floats, choose <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> and
+Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.</p>
+<section id="specifying-column-data-types">
+<span id="csv-data-types"></span><h3>Specifying Column Data Types<a class="headerlink" href="#specifying-column-data-types" title="Link to this heading">¶</a></h3>
+<p>To specify column data types, add a <code class="docutils literal notranslate"><span class="pre">columns</span></code> field to the <code class="docutils literal notranslate"><span class="pre">data_file</span></code> (or <code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>)
+section in your dataset configuration. You can specify types for all columns or just a subset -
+columns without explicit types will have their types inferred.</p>
+<p>The supported data types are (case-insensitive):</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>BOOLEAN: boolean</p></li>
+<li><p>INT: 4-byte integer</p></li>
+<li><p>INTEGER: 4-byte integer</p></li>
+<li><p>TINYINT: 1-byte integer</p></li>
+<li><p>SMALLINT: 2-byte integer</p></li>
+<li><p>BIGINT: 8-byte-integer</p></li>
+<li><p>FLOAT: 4-byte float</p></li>
+<li><p>DOUBLE: 8-byte float</p></li>
+<li><p>STRING: string</p></li>
+<li><p>TEXT: string</p></li>
+<li><p>VARCHAR: string</p></li>
+<li><p>TIMESTAMP_TZ: timestamp with time zone</p></li>
+<li><p>TIMESTAMP_NTZ: timestamp without time zone</p></li>
+</ul>
+</div></blockquote>
+<p>Example dataset configuration with column data types:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_table&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;stacked&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;TIMESTAMP_TZ&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;scenario&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;subsector&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;FLOAT&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can also specify types for only the columns that need explicit typing:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Prevent FIPS codes from being read as integers</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="custom-column-names">
+<h2>Custom Column Names<a class="headerlink" href="#custom-column-names" title="Link to this heading">¶</a></h2>
+<p>By default, dsgrid expects data files to have columns named after the standard dimension types
+(<code class="docutils literal notranslate"><span class="pre">geography</span></code>, <code class="docutils literal notranslate"><span class="pre">sector</span></code>, <code class="docutils literal notranslate"><span class="pre">subsector</span></code>, <code class="docutils literal notranslate"><span class="pre">metric</span></code>, etc.). Data files with value format “stacked” are also expected to have a <cite>value</cite> column. However, your data files may use
+different column names. dsgrid provides a mechanism to map custom column names to the expected
+dimension types.</p>
+<p>To rename columns, add the <code class="docutils literal notranslate"><span class="pre">dimension_type</span></code> field to the column definition. This tells dsgrid
+what dimension the column represents, and dsgrid will automatically rename it at runtime.</p>
+<p>This feature works for all file formats (Parquet, CSV), not just CSV files.</p>
+<p>Example with custom column names:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;county&quot;</span><span class="p">,</span><span class="w">           </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Will be renamed to &quot;geography&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;end_use&quot;</span><span class="p">,</span><span class="w">          </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;metric&quot;</span><span class="p">,</span><span class="w">     </span><span class="c1">// Will be renamed to &quot;metric&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;building_type&quot;</span><span class="p">,</span><span class="w">    </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;subsector&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Will be renamed to &quot;subsector&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can combine <code class="docutils literal notranslate"><span class="pre">dimension_type</span></code> with <code class="docutils literal notranslate"><span class="pre">data_type</span></code> when using CSV files:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;fips_code&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;DOUBLE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="ignoring-columns">
+<h2>Ignoring Columns<a class="headerlink" href="#ignoring-columns" title="Link to this heading">¶</a></h2>
+<p>Data files may contain columns that are not needed for dsgrid processing. Rather than
+modifying your source files, you can tell dsgrid to ignore (drop) specific columns when
+reading the data.</p>
+<p>To ignore columns, add an <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> field to the <code class="docutils literal notranslate"><span class="pre">data_file</span></code> (or <code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>)
+section in your dataset configuration. This field accepts a list of column names to drop.</p>
+<p>This feature works for all file formats (Parquet, CSV).</p>
+<p>Example with ignored columns:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;internal_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;notes&quot;</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can combine <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> with <code class="docutils literal notranslate"><span class="pre">columns</span></code> for type overrides and renaming:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;county&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;DOUBLE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;intenal_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;notes&quot;</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that a column cannot appear in both <code class="docutils literal notranslate"><span class="pre">columns</span></code> and <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> - dsgrid will
+raise an error if there is any overlap.</p>
+</section>
+<section id="time">
+<h2>Time<a class="headerlink" href="#time" title="Link to this heading">¶</a></h2>
+<section id="time-zones">
+<h3>Time zones<a class="headerlink" href="#time-zones" title="Link to this heading">¶</a></h3>
+<p>Timestamps must be converted to UTC when written to the Parquet files. Do not use the Pandas
+feature where it records time zone information into the Parquet metadata.</p>
+<p>We recommend that you use Spark to create the Parquet files, but that is not required.
+If you do use Spark, note the following:</p>
+<ul class="simple">
+<li><p>Spark implicitly interprets timestamps in the time zone of the current SQL session and converts
+them to UTC when writing dataframes to Parquet.</p></li>
+<li><p>You can override the SQL session time zone programmatically or in your Spark configuration file.
+The setting is <code class="docutils literal notranslate"><span class="pre">spark.sql.session.timeZone</span></code>.</p></li>
+</ul>
+<section id="time-zone-aware-timestamps">
+<h4>Time zone aware timestamps<a class="headerlink" href="#time-zone-aware-timestamps" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">dsgrid</span></code> can convert timestamps in data tables to the proper time zone looking up the time
+dimension.</p>
+</section>
+</section>
+<section id="time-zone-unaware-timestamps">
+<h3>Time zone unaware timestamps<a class="headerlink" href="#time-zone-unaware-timestamps" title="Link to this heading">¶</a></h3>
+<p>Time-zone-unaware timestamps that will be interpreted as local time should be written as UTC
+timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).</p>
+</section>
+</section>
+<section id="data-layout">
+<h2>Data Layout<a class="headerlink" href="#data-layout" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">data_layout</span></code> section of a dataset configuration defines the data file locations and
+table format. It has the following structure:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;two_table&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// or &quot;one_table&quot;</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;pivoted&quot;</span><span class="p">,</span><span class="w">        </span><span class="c1">// or &quot;stacked&quot;</span>
+<span class="w">    </span><span class="nx">pivoted_dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;metric&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// required if pivoted</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w">                     </span><span class="c1">// optional</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;column_name&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// actual name in the file</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// optional, for type override</span>
+<span class="w">        </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// optional, for column renaming</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;col1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;col2&quot;</span><span class="p">],</span><span class="w">  </span><span class="c1">// optional, columns to drop</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">lookup_data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// required for &quot;two_table&quot; format</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data_lookup.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w">                   </span><span class="c1">// optional, same structure as data_file</span>
+<span class="w">    </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w">            </span><span class="c1">// optional, same as data_file</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">missing_associations</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w">          </span><span class="c1">// optional, list of paths</span>
+<span class="w">    </span><span class="s2">&quot;missing_associations.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;additional_missing&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">table_format</span></code>: Defines the table structure - <code class="docutils literal notranslate"><span class="pre">&quot;two_table&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;one_table&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">value_format</span></code>: Defines whether values are pivoted or stacked.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_file</span></code>: Main data file configuration (required).</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">path</span></code>: Path to the data file. Can be absolute or relative to the config file. You can also use the <code class="docutils literal notranslate"><span class="pre">--data_base_dir</span></code> CLI option to specify a different base directory for resolving relative paths.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">columns</span></code>: Optional list of column definitions for type overrides and renaming.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: The actual column name in the file (required).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_type</span></code>: Data type override (optional). See <a class="reference internal" href="#csv-data-types"><span class="std std-ref">Specifying Column Data Types</span></a> for supported types.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code>: The dsgrid dimension type this column represents (optional).
+When specified, the column will be renamed to match the dimension type.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code>: Optional list of column names to drop when reading the file.
+Cannot overlap with columns defined in <code class="docutils literal notranslate"><span class="pre">columns</span></code>.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>: Lookup file configuration (required for <code class="docutils literal notranslate"><span class="pre">two_table</span></code> format).
+Has the same structure as <code class="docutils literal notranslate"><span class="pre">data_file</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">missing_associations</span></code>: List of paths to files or directories defining missing dimension
+combinations (optional, see <a class="reference internal" href="#missing-associations"><span class="std std-ref">Missing Associations</span></a>). Paths can be absolute or relative
+to the config file. You can also use the <code class="docutils literal notranslate"><span class="pre">--missing-associations-base-dir</span></code> CLI option to
+specify a different base directory for resolving relative paths.</p></li>
+</ul>
+</section>
+<section id="formats">
+<h2>Formats<a class="headerlink" href="#formats" title="Link to this heading">¶</a></h2>
+<p>Input datasets can use a one-table or two-table format as described below.</p>
+<p>Both formats support pivoting the record IDs of one dimension as an option.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Pivoted</span></code>: All dimensions except the pivoted dimension are columns in the table. The record IDs
+of the pivoted dimension are columns in the table. Several dsgrid datasets
+pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
+storage space but can make queries more complicated. dsgrid handles that complexity on the back
+end, but this point can still apply to users that inspect the raw datasets.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Stacked</span></code>: The table has one column per dimension (except time, which might have more than
+one column) and a column called <code class="docutils literal notranslate"><span class="pre">value</span></code> that contains the data values. This format
+makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.</p></li>
+</ul>
+<section id="one-table-format">
+<span id="id2"></span><h3>One Table Format<a class="headerlink" href="#one-table-format" title="Link to this heading">¶</a></h3>
+<p>All metric data and dimension records are stored in one Parquet file.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+-------------------+---------+------------------+--------------------+</span>
+<span class="o">|</span>          <span class="n">timestamp</span><span class="o">|</span><span class="n">geography</span><span class="o">|</span>          <span class="n">scenario</span><span class="o">|</span>           <span class="n">subsector</span><span class="o">|</span>
+<span class="o">+-------------------+---------+------------------+--------------------+</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span><span class="n">full_service_rest</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>      <span class="n">primary_school</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span><span class="n">quick_service_res</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>   <span class="n">retail_standalone</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>    <span class="n">retail_stripmall</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>         <span class="n">small_hotel</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>        <span class="n">small_office</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>      <span class="n">efs_high_ldv</span><span class="o">|</span>           <span class="n">warehouse</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span><span class="n">full_service_rest</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>      <span class="n">primary_school</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span><span class="n">quick_service_res</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>   <span class="n">retail_standalone</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>    <span class="n">retail_stripmall</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>         <span class="n">small_hotel</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>        <span class="n">small_office</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">ldv_sales_evs_2035</span><span class="o">|</span>           <span class="n">warehouse</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>         <span class="n">reference</span><span class="o">|</span><span class="n">full_service_rest</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>         <span class="n">reference</span><span class="o">|</span>      <span class="n">primary_school</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>         <span class="n">reference</span><span class="o">|</span><span class="n">quick_service_res</span><span class="o">...|</span>
+<span class="o">|</span><span class="mi">2011</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">22</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>         <span class="n">reference</span><span class="o">|</span>   <span class="n">retail_standalone</span><span class="o">|</span>
+<span class="o">+-------------------+---------+------------------+--------------------+</span>
+</pre></div>
+</div>
+</section>
+<section id="two-table-format">
+<span id="id3"></span><h3>Two Table Format<a class="headerlink" href="#two-table-format" title="Link to this heading">¶</a></h3>
+<p>Two Parquet files comprise the dataset:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code>: Metric data, usually with time-series data. This example pivots the metric
+dimension records.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+-------------------+----+-------------------+--------------------+--------------------+</span>
+<span class="o">|</span>          <span class="n">timestamp</span><span class="o">|</span>  <span class="nb">id</span><span class="o">|</span>            <span class="n">heating</span><span class="o">|</span>             <span class="n">cooling</span><span class="o">|</span>  <span class="n">interior_equipment</span><span class="o">|</span>
+<span class="o">+-------------------+----+-------------------+--------------------+--------------------+</span>
+<span class="o">|</span><span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span><span class="mi">9106</span><span class="o">|</span> <span class="mf">0.2143171631469727</span><span class="o">|</span><span class="mf">0.001987764734408426</span><span class="o">|</span><span class="mf">0.051049410357755676</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span><span class="mi">9106</span><span class="o">|</span> <span class="mf">0.3290653818000351</span><span class="o">|</span><span class="mf">9.035294172606012E-5</span><span class="o">|</span><span class="mf">0.051049410357755676</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">02</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span><span class="mi">9106</span><span class="o">|</span><span class="mf">0.36927244565896444</span><span class="o">|</span>                 <span class="mf">0.0</span><span class="o">|</span> <span class="mf">0.06622870555383997</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span><span class="mi">9106</span><span class="o">|</span> <span class="mf">0.3869816717726735</span><span class="o">|</span>                 <span class="mf">0.0</span><span class="o">|</span> <span class="mf">0.06622870555383997</span><span class="o">|</span>
+<span class="o">|</span><span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">04</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">|</span><span class="mi">9106</span><span class="o">|</span> <span class="mf">0.3872526947775441</span><span class="o">|</span>                 <span class="mf">0.0</span><span class="o">|</span> <span class="mf">0.06622870555383997</span><span class="o">|</span>
+<span class="o">+-------------------+----+-------------------+--------------------+--------------------+</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code>: Metadata that connects dimension records with the metric data. Must
+include a row with a null <code class="docutils literal notranslate"><span class="pre">id</span></code> for every combination of required dimensions that does not exist
+in <code class="docutils literal notranslate"><span class="pre">load_data</span></code>.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+---------+------+----------+-------+</span>
+<span class="o">|</span><span class="n">geography</span><span class="o">|</span><span class="n">sector</span><span class="o">|</span> <span class="n">subsector</span><span class="o">|</span>     <span class="nb">id</span><span class="o">|</span>
+<span class="o">+---------+------+----------+-------+</span>
+<span class="o">|</span>    <span class="mi">53061</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">Hospital</span><span class="o">|</span>      <span class="mi">1</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">53053</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">Hospital</span><span class="o">|</span>      <span class="mi">2</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">53005</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">Hospital</span><span class="o">|</span>      <span class="mi">3</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">53025</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">Hospital</span><span class="o">|</span>      <span class="mi">4</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">53045</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">Hospital</span><span class="o">|</span>      <span class="mi">5</span><span class="o">|</span>
+<span class="o">+---------+------+----------+-------+</span>
+</pre></div>
+</div>
+<p>Each unique time array in <code class="docutils literal notranslate"><span class="pre">load_data</span></code> must be denoted with an ID that corresponds to a record in
+<code class="docutils literal notranslate"><span class="pre">load_data_lookup</span></code>. The ID is user-defined. Users may want to use a sequentially-increasing
+integer or encode other information into specific bytes of each integer.</p>
+<p>The table may optionally include the column <code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> to account for cases where the value
+columns need to multiplied by a scaling factor. If <code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> does not apply, the value in
+the row can be <code class="docutils literal notranslate"><span class="pre">1.0</span></code> or <code class="docutils literal notranslate"><span class="pre">null</span></code>.</p>
+<p>This format minimizes file storage because</p>
+<ol class="arabic simple">
+<li><p>Time arrays can be shared across combinations of dimension records, possibly with different
+scaling factors.</p></li>
+<li><p>Dimension information is not repeated for every timestamp. (This could be minimal because of
+compression inside the Parquet files.)</p></li>
+</ol>
+</section>
+</section>
+<section id="time-formats">
+<h2>Time Formats<a class="headerlink" href="#time-formats" title="Link to this heading">¶</a></h2>
+<section id="datetime">
+<h3>DateTime<a class="headerlink" href="#datetime" title="Link to this heading">¶</a></h3>
+<p>The load data table has one column representing time, typically called <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>. When written
+to Parquet files the type should be the <code class="docutils literal notranslate"><span class="pre">TIMESTAMP</span></code> logical type (integer, not string) and be
+adjusted to UTC. When read into Spark the type should be <code class="docutils literal notranslate"><span class="pre">TimestampType</span></code> (not
+<code class="docutils literal notranslate"><span class="pre">TimestampNTZType</span></code>).</p>
+<p>Handling of no-time-zone timestamps (Spark type <code class="docutils literal notranslate"><span class="pre">TimestampNTZType</span></code>) is possible. Contact the
+dsgrid team if you need this.</p>
+</section>
+<section id="annual">
+<h3>Annual<a class="headerlink" href="#annual" title="Link to this heading">¶</a></h3>
+<p>Load data contains one value per model year.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="mi">2020</span><span class="p">,</span> <span class="mi">2021</span><span class="p">,</span> <span class="mi">2022</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+<section id="representative-period">
+<h3>Representative Period<a class="headerlink" href="#representative-period" title="Link to this heading">¶</a></h3>
+<p>Metric data contains timestamps that represent multiple periods. dsgrid supports the following
+formats:</p>
+<section id="one-week-per-month-by-hour">
+<h4>one_week_per_month_by_hour<a class="headerlink" href="#one-week-per-month-by-hour" title="Link to this heading">¶</a></h4>
+<p>Each time array contains one week of hourly data (24 hours per day) that
+applies to an entire month. The times represent local time (no time zone).
+There are no shifts, missing hours, or extra hours for daylight savings time.</p>
+<ul class="simple">
+<li><p>All time columns must be integers.</p></li>
+<li><p><cite>month</cite> is one-based, starting in January. <code class="docutils literal notranslate"><span class="pre">Jan</span></code> -&gt; 1, <code class="docutils literal notranslate"><span class="pre">Feb</span></code> -&gt; 2, etc.</p></li>
+<li><p><cite>day_of_week</cite> is zero-based, starting on Monday. <code class="docutils literal notranslate"><span class="pre">Mon</span></code> -&gt; 0, <code class="docutils literal notranslate"><span class="pre">Tue</span></code> -&gt; 1, etc.</p></li>
+<li><p><cite>hour</cite> is zero-based, starting at midnight.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+---+-----+-----------+----+--------+</span>
+<span class="o">|</span> <span class="nb">id</span><span class="o">|</span><span class="n">month</span><span class="o">|</span><span class="n">day_of_week</span><span class="o">|</span><span class="n">hour</span><span class="o">|</span><span class="n">dim_col1</span><span class="o">|</span>
+<span class="o">+---+-----+-----------+----+--------+</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">0</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">1</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">2</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">3</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">4</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">5</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">6</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">7</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">8</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>   <span class="mi">9</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">10</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">11</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">12</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">13</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">14</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">15</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">16</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">17</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">18</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">19</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">20</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">21</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">22</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">0</span><span class="o">|</span>  <span class="mi">23</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">|</span>  <span class="mi">1</span><span class="o">|</span>    <span class="mi">4</span><span class="o">|</span>          <span class="mi">1</span><span class="o">|</span>   <span class="mi">0</span><span class="o">|</span>     <span class="mf">1.0</span><span class="o">|</span>
+<span class="o">+---+-----+-----------+----+--------+</span>
+</pre></div>
+</div>
+<p>dsgrid can add support for other period formats. Please submit requests as
+needed.</p>
+</section>
+</section>
+</section>
+<section id="missing-associations">
+<span id="id4"></span><h2>Missing Associations<a class="headerlink" href="#missing-associations" title="Link to this heading">¶</a></h2>
+<p>Datasets may have missing dimension combinations (associations) - for example, a building model
+might not have data for certain geography-subsector combinations because those building types
+don’t exist in those regions.</p>
+<p>dsgrid validates that datasets provide data for all expected dimension combinations. When a
+dataset legitimately lacks data for certain combinations, you must explicitly declare these
+missing associations.</p>
+<section id="declaring-missing-associations">
+<h3>Declaring Missing Associations<a class="headerlink" href="#declaring-missing-associations" title="Link to this heading">¶</a></h3>
+<p>Specify missing associations in the <code class="docutils literal notranslate"><span class="pre">data_layout</span></code> section of your dataset config using
+the <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code> field. This field accepts a list of paths to files or directories:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_table&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;stacked&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">missing_associations</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;missing_associations.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;additional_missing&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Each entry in the list can be:</p>
+<ol class="arabic simple">
+<li><p><strong>A single file</strong> (CSV or Parquet) containing missing combinations</p></li>
+<li><p><strong>A directory</strong> containing multiple files, each for different dimension combinations</p></li>
+</ol>
+<p>Paths can be absolute or relative. Relative paths are resolved relative to the dataset
+configuration file by default. Alternatively, a different base directory can be specified using the <code class="docutils literal notranslate"><span class="pre">--missing-associations-base-dir</span></code> CLI option.</p>
+<section id="file-format">
+<h4>File Format<a class="headerlink" href="#file-format" title="Link to this heading">¶</a></h4>
+<p>Missing association files can be in CSV or Parquet format. They should contain columns for
+dimension types (all types except time). Each row represents a combination of dimension
+records that legitimately has no data.</p>
+<p>A file can contain any subset of the non-time dimension columns. During validation, dsgrid
+filters out rows from the expected associations that match the missing associations
+listed in the file.</p>
+<p>Example <code class="docutils literal notranslate"><span class="pre">missing_associations.parquet</span></code> with all non-time dimensions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+---------+------+-----------+--------+----------+------------+</span>
+<span class="o">|</span><span class="n">geography</span><span class="o">|</span><span class="n">sector</span><span class="o">|</span>  <span class="n">subsector</span><span class="o">|</span>  <span class="n">metric</span><span class="o">|</span><span class="n">model_year</span><span class="o">|</span><span class="n">weather_year</span><span class="o">|</span>
+<span class="o">+---------+------+-----------+--------+----------+------------+</span>
+<span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span><span class="n">large_hotel</span><span class="o">|</span><span class="n">heating</span> <span class="o">|</span>      <span class="mi">2020</span><span class="o">|</span>        <span class="mi">2018</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span>  <span class="n">warehouse</span><span class="o">|</span><span class="n">cooling</span> <span class="o">|</span>      <span class="mi">2020</span><span class="o">|</span>        <span class="mi">2018</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">01003</span><span class="o">|</span>   <span class="n">com</span><span class="o">|</span><span class="n">large_hotel</span><span class="o">|</span><span class="n">heating</span> <span class="o">|</span>      <span class="mi">2020</span><span class="o">|</span>        <span class="mi">2018</span><span class="o">|</span>
+<span class="o">+---------+------+-----------+--------+----------+------------+</span>
+</pre></div>
+</div>
+<p>Example <code class="docutils literal notranslate"><span class="pre">missing_associations.csv</span></code> with only two dimensions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+---------+-----------+</span>
+<span class="o">|</span><span class="n">geography</span><span class="o">|</span>  <span class="n">subsector</span><span class="o">|</span>
+<span class="o">+---------+-----------+</span>
+<span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span><span class="n">large_hotel</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">01001</span><span class="o">|</span>  <span class="n">warehouse</span><span class="o">|</span>
+<span class="o">|</span>    <span class="mi">01003</span><span class="o">|</span><span class="n">large_hotel</span><span class="o">|</span>
+<span class="o">+---------+-----------+</span>
+</pre></div>
+</div>
+<p>In this case, all metrics, model_years, and weather_years are expected to be missing for these combinations of (geography, subsector).
+Directory Format
+~~~~~~~~~~~~~~~~
+When using a directory, create separate files for different dimension combinations.</p>
+<p>Example directory structure:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>missing_associations/
+├── geography__subsector.csv
+├── geography__metric.csv
+└── subsector__metric.parquet
+</pre></div>
+</div>
+<p>Each file contains the relevant dimension columns:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># geography__subsector.csv</span>
+<span class="n">geography</span><span class="p">,</span><span class="n">subsector</span>
+<span class="mi">01001</span><span class="p">,</span><span class="n">large_hotel</span>
+<span class="mi">01001</span><span class="p">,</span><span class="n">warehouse</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="using-custom-base-directories">
+<h3>Using Custom Base Directories<a class="headerlink" href="#using-custom-base-directories" title="Link to this heading">¶</a></h3>
+<p>When registering a dataset, you can specify a custom base directory for resolving missing
+associations paths using the <code class="docutils literal notranslate"><span class="pre">--missing-associations-base-dir</span></code> (or <code class="docutils literal notranslate"><span class="pre">-M</span></code>) option:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>datasets<span class="w"> </span>register<span class="w"> </span>dataset.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-l<span class="w"> </span><span class="s2">&quot;Register my dataset&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-M<span class="w"> </span>/path/to/missing/files
+</pre></div>
+</div>
+<p>When this option is provided, any relative paths in the <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code> list will
+be resolved relative to the specified directory instead of the dataset configuration file’s
+directory.</p>
+<p>Similarly, you can use <code class="docutils literal notranslate"><span class="pre">--data-base-dir</span></code> (or <code class="docutils literal notranslate"><span class="pre">-D</span></code>) to specify a base directory for
+data files:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>datasets<span class="w"> </span>register<span class="w"> </span>dataset.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-l<span class="w"> </span><span class="s2">&quot;Register my dataset&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-D<span class="w"> </span>/path/to/data/files<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-M<span class="w"> </span>/path/to/missing/files
+</pre></div>
+</div>
+<p>These options are also available for the <code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>register-and-submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-c<span class="w"> </span>dataset.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-p<span class="w"> </span>my-project-id<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-l<span class="w"> </span><span class="s2">&quot;Register and submit dataset&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-D<span class="w"> </span>/path/to/data/files<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-M<span class="w"> </span>/path/to/missing/files
+</pre></div>
+</div>
+</section>
+<section id="iterative-workflow-for-identifying-missing-associations">
+<h3>Iterative Workflow for Identifying Missing Associations<a class="headerlink" href="#iterative-workflow-for-identifying-missing-associations" title="Link to this heading">¶</a></h3>
+<p>If you don’t know which dimension combinations are missing in your dataset, dsgrid provides
+an iterative workflow to help you identify them:</p>
+<ol class="arabic">
+<li><p><strong>Run registration without missing associations</strong></p>
+<p>Attempt to register your dataset without specifying <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code>. If there are
+missing combinations, registration will fail.</p>
+</li>
+<li><p><strong>Review generated outputs</strong></p>
+<p>When registration fails due to missing associations, dsgrid writes a Parquet file named
+<code class="docutils literal notranslate"><span class="pre">&lt;dataset_id&gt;__missing_dimension_record_combinations.parquet</span></code> to the current directory.
+This file contains all the missing dimension combinations with all dimensions. This file can
+contain huge numbers of rows.</p>
+<p>dsgrid also analyzes the missing data to identify minimal patterns that explain the gaps.
+These patterns are logged and can help you understand <em>why</em> data is missing. For example,
+you might see:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Pattern</span> <span class="mi">1</span><span class="p">:</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">subsector</span> <span class="o">=</span> <span class="mi">01001</span> <span class="o">|</span> <span class="n">large_hotel</span> <span class="p">(</span><span class="mi">150</span> <span class="n">missing</span> <span class="n">rows</span><span class="p">)</span>
+<span class="n">Pattern</span> <span class="mi">2</span><span class="p">:</span> <span class="n">subsector</span> <span class="o">=</span> <span class="n">warehouse</span> <span class="p">(</span><span class="mi">3000</span> <span class="n">missing</span> <span class="n">rows</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This tells you that all combinations involving county 01001 and large_hotel are missing,
+and all combinations involving warehouse are missing.</p>
+<p>dsgrid records these minimal patterns in the  <code class="docutils literal notranslate"><span class="pre">./missing_associations/</span></code> directory,
+in dimension-specific combination files such as <code class="docutils literal notranslate"><span class="pre">geography__subsector.csv</span></code> and
+<code class="docutils literal notranslate"><span class="pre">sector__subsector.csv</span></code>.</p>
+</li>
+<li><p><strong>Choose which output to use and revise as appropriate</strong></p>
+<p>You have several options for declaring missing associations:</p>
+<ul class="simple">
+<li><p><strong>Use the all-inclusive Parquet file</strong>: Reference the generated
+<code class="docutils literal notranslate"><span class="pre">&lt;dataset_id&gt;__missing_dimension_record_combinations.parquet</span></code> file directly. This
+contains every missing combination but may be very large.</p></li>
+<li><p><strong>Use the per-dimension CSV files</strong>: Reference the <code class="docutils literal notranslate"><span class="pre">./missing_associations/</span></code> directory
+containing the minimal pattern files. This is more compact and easier to review.</p></li>
+<li><p><strong>Create your own files</strong>: Create custom CSV or Parquet files based on your understanding
+of the data. This gives you full control over what is declared as missing.</p></li>
+</ul>
+<p>No matter which option you select, you may want to:</p>
+<ul class="simple">
+<li><p>Fix data errors revealed by the missing data analysis</p></li>
+<li><p>Remove rows corresponding to data errors that you fix</p></li>
+<li><p>Pick and choose or reorganize the information</p></li>
+<li><p>Combine multiple sources if needed.</p></li>
+</ul>
+</li>
+<li><p><strong>Re-run registration with missing associations</strong></p>
+<p>Add the <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code> field to your <code class="docutils literal notranslate"><span class="pre">data_layout</span></code> pointing to the files or
+directories:</p>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_table&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;stacked&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="c1">// Option 1: Use the all-inclusive Parquet file</span>
+<span class="w">  </span><span class="nx">missing_associations</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;./my_dataset__missing_dimension_record_combinations.parquet&quot;</span><span class="p">],</span>
+
+<span class="w">  </span><span class="c1">// Option 2: Use the per-dimension directory</span>
+<span class="w">  </span><span class="c1">// missing_associations: [&quot;./missing_associations&quot;],</span>
+
+<span class="w">  </span><span class="c1">// Option 3: Combine multiple sources</span>
+<span class="w">  </span><span class="c1">// missing_associations: [</span>
+<span class="w">  </span><span class="c1">//   &quot;./missing_associations&quot;,</span>
+<span class="w">  </span><span class="c1">//   &quot;./additional_missing.parquet&quot;,</span>
+<span class="w">  </span><span class="c1">// ],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Run registration again. If successful, the missing associations will be stored in the
+registry alongside your dataset.</p>
+</li>
+</ol>
+</section>
+<section id="validation-behavior">
+<h3>Validation Behavior<a class="headerlink" href="#validation-behavior" title="Link to this heading">¶</a></h3>
+<p>During dataset registration, dsgrid checks that:</p>
+<ol class="arabic simple">
+<li><p>All dimension combinations in the data files are valid (records match dimension definitions).</p></li>
+<li><p>All expected combinations either have data or are declared as missing.</p></li>
+</ol>
+<p>If dsgrid finds unexpected missing combinations, it will report an error and write the
+missing combinations to files as described above.</p>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="data_models/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Data Models</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="cli.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">CLI Reference</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dataset Formats</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements</a></li>
+<li><a class="reference internal" href="#recommendations">Recommendations</a></li>
+<li><a class="reference internal" href="#csv-files">CSV Files</a><ul>
+<li><a class="reference internal" href="#specifying-column-data-types">Specifying Column Data Types</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#custom-column-names">Custom Column Names</a></li>
+<li><a class="reference internal" href="#ignoring-columns">Ignoring Columns</a></li>
+<li><a class="reference internal" href="#time">Time</a><ul>
+<li><a class="reference internal" href="#time-zones">Time zones</a><ul>
+<li><a class="reference internal" href="#time-zone-aware-timestamps">Time zone aware timestamps</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#time-zone-unaware-timestamps">Time zone unaware timestamps</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#data-layout">Data Layout</a></li>
+<li><a class="reference internal" href="#formats">Formats</a><ul>
+<li><a class="reference internal" href="#one-table-format">One Table Format</a></li>
+<li><a class="reference internal" href="#two-table-format">Two Table Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#time-formats">Time Formats</a><ul>
+<li><a class="reference internal" href="#datetime">DateTime</a></li>
+<li><a class="reference internal" href="#annual">Annual</a></li>
+<li><a class="reference internal" href="#representative-period">Representative Period</a><ul>
+<li><a class="reference internal" href="#one-week-per-month-by-hour">one_week_per_month_by_hour</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#missing-associations">Missing Associations</a><ul>
+<li><a class="reference internal" href="#declaring-missing-associations">Declaring Missing Associations</a><ul>
+<li><a class="reference internal" href="#file-format">File Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#using-custom-base-directories">Using Custom Base Directories</a></li>
+<li><a class="reference internal" href="#iterative-workflow-for-identifying-missing-associations">Iterative Workflow for Identifying Missing Associations</a></li>
+<li><a class="reference internal" href="#validation-behavior">Validation Behavior</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=d198571b"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

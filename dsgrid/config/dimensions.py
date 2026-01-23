@@ -249,9 +249,6 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
 
-    def localize_timestamps(self) -> bool:
-        return False
-
 
 class TimeFormatDateTimeNTZModel(DSGBaseModel):
     """Format of timestamps in a dataset is timezone-naive datetime,
@@ -263,17 +260,9 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
         description="Name of the timestamp column in the dataset.",
         default=next(iter(DatetimeTimestampType._fields)),
     )
-    localize_to_time_zone: bool = Field(
-        title="localize_to_time_zone",
-        default=True,
-        description="Whether to localize timestamps to time zone(s) and transform format to TIMESTAMP_TZ.",
-    )
 
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
-
-    def localize_timestamps(self) -> bool:
-        return self.localize_to_time_zone
 
 
 class TimeFormatInPartsModel(DSGBaseModel):
@@ -316,9 +305,6 @@ class TimeFormatInPartsModel(DSGBaseModel):
             self.offset_column,
         ]
         return [col for col in cols if col is not None]
-
-    def localize_timestamps(self) -> bool:
-        return False
 
 
 DateTimeFormat = Annotated[

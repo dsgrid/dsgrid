@@ -33,6 +33,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Add aarch64 Rust target
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: rustup target add aarch64-unknown-linux-gnu
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:

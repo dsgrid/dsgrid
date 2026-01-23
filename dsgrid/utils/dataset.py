@@ -1003,7 +1003,7 @@ def localize_timestamps_if_necessary(
         msg = f"Only DateTimeDimensionConfig allowed for time zone localization. {time_dim.__class__.__name__}"
         raise DSGInvalidOperation(msg)
 
-    localization_plan = time_dim._get_localization_plan()
+    localization_plan = time_dim.get_localization_plan()
     if not localization_plan:
         return df, False
 

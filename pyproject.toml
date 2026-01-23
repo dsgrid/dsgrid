@@ -61,6 +61,7 @@ module-name = "dsgrid.minimal_patterns"
 python-source = "."
 features = ["pyo3/extension-module"]
 manifest-path = "rust/Cargo.toml"
+include = ["build_backend.py"]
 
 [tool.setuptools]
 # Used as fallback when Rust toolchain is not available

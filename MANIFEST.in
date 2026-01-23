@@ -1,4 +1,0 @@
-include build_backend.py
-include LICENSE
-include README.md
-recursive-include rust *

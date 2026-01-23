@@ -468,29 +468,64 @@ class DatasetRegistryManager(RegistryManagerBase):
         return df
 
     @staticmethod
-    def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
-        """Build SQL expression that creates a timestamp string from time-in-parts columns."""
+    def _build_timestamp_offset_string_expr(offset_col: str) -> str:
+        """Build SQL expression to convert offset column to ±HH:MM string.
+
+        Handles offsets in two formats:
+        - Numeric offsets (e.g., -8.0, 5.5): converted to a signed, zero-padded string (±HH:MM)
+            using CEIL/FLOOR for hours and ROUND for minutes.
+        - String offsets (e.g., "+05:00", "-07:30"): parsed directly via SUBSTR to extract
+            hours/minutes and reassembled as ±HH:MM.
+        """
+        assert offset_col, "Offset column is required for building offset string expression"
+        str_type = get_str_type()
+
+        # Build string-offset and numeric-offset fragments for readability.
+        offset_string_expr = (
+            f"(CASE WHEN SUBSTR(CAST({offset_col} AS {str_type}), 1, 1) = '-' THEN '-' ELSE '+' END) "
+            f"|| LPAD(CAST(CAST(SUBSTR(CAST({offset_col} AS {str_type}), 2, 2) AS INTEGER) AS {str_type}), 2, '0') "
+            f"|| ':' || LPAD(CAST(CAST(SUBSTR(CAST({offset_col} AS {str_type}), 5, 2) AS INTEGER) AS {str_type}), 2, '0')"
+        )
+        offset_numeric_pos_expr = (
+            f"'+' || LPAD(CAST(CAST(FLOOR(CAST({offset_col} AS DOUBLE)) AS INTEGER) AS {str_type}), 2, '0') "
+            f"|| ':' || LPAD(CAST(CAST(ROUND(CAST({offset_col} AS DOUBLE) % 1 * 60) AS INTEGER) AS {str_type}), 2, '0')"
+        )
+        offset_numeric_neg_expr = (
+            f"'-' || LPAD(CAST(CAST(ABS(CEIL(CAST({offset_col} AS DOUBLE))) AS INTEGER) AS {str_type}), 2, '0') "
+            f"|| ':' || LPAD(CAST(CAST(ROUND(ABS(CAST({offset_col} AS DOUBLE) % 1 * 60)) AS INTEGER) AS {str_type}), 2, '0')"
+        )
+
+        # Support both numeric offsets (e.g., -8.0, 5.5) and string offsets (e.g., "+05:00", "-07:30").
+        # Detect string offsets by presence of ':' and parse hours/minutes accordingly.
+        offset_expr = (
+            f"|| CASE WHEN CAST({offset_col} AS {str_type}) LIKE '%:%' THEN {offset_string_expr} "
+            f" WHEN CAST({offset_col} AS DOUBLE) >= 0 THEN {offset_numeric_pos_expr} "
+            f" WHEN CAST({offset_col} AS DOUBLE) < 0 THEN {offset_numeric_neg_expr} "
+            f" ELSE CAST({offset_col} AS {str_type}) END"
+        )
+        return offset_expr
+
+    def _build_timestamp_string_expr(self, col_format: TimeFormatInPartsModel) -> str:
+        """Build a timestamp string SQL expression from time-in-parts columns.
+        Returns:
+            str: SQL expression producing timestamp string
+        """
         str_type = get_str_type()
         hour_col = col_format.hour_column
         hour_expr = f"LPAD(CAST({hour_col} AS {str_type}), 2, '0')" if hour_col else "'00'"
         offset_col = col_format.offset_column
         if offset_col:
-            offset_expr = (
-                f"|| CASE WHEN {offset_col} >= 0 THEN '+' || LPAD(CAST(FLOOR({offset_col} / 1) AS {str_type}), 2, '0')"
-                f" || ':' || CAST(ROUND({offset_col} % 1 * 60) AS {str_type}) "
-                f"WHEN {offset_col} < 0 THEN '-' || LPAD(CAST(ABS(FLOOR({offset_col} / 1)) AS {str_type}), 2, '0')"
-                f" || ':' || CAST(ROUND(ABS({offset_col} % 1 * 60)) AS {str_type}) "
-                f"ELSE {offset_col} END"
-            )
+            offset_expr = self._build_timestamp_offset_string_expr(offset_col)
         else:
             offset_expr = ""
 
-        return (
+        timestamp_str_expr = (
             f"CAST({col_format.year_column} AS {str_type}) || '-' || "
             f"LPAD(CAST({col_format.month_column} AS {str_type}), 2, '0') || '-' || "
             f"LPAD(CAST({col_format.day_column} AS {str_type}), 2, '0') || ' ' || "
             f"{hour_expr} || ':00:00' {offset_expr}"
         )
+        return timestamp_str_expr
 
     @staticmethod
     def _build_timestamp_sql(

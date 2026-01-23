@@ -24,6 +24,22 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
+    def _get_chronify_start_time(self) -> pd.Timestamp:
+        """Modify start time for chronify depending on localization plan.
+        Modification is necessary only for TIMESTAMP_NTZ data localized to a single time zone.
+        because of the way self.get_start_times() works.
+        Returns:
+            pd.Timestamp: start time for chronify
+        """
+        start_times = self.get_start_times()
+        assert len(start_times) == 1
+        start_time = start_times[0]
+
+        if self._get_localization_plan() == "localize_to_single_tz":
+            # dtype is TIMESTAMP_NTZ, so drop tzinfo
+            return pd.Timestamp(start_time.replace(tzinfo=None))
+        return pd.Timestamp(start_time)
+
     def to_chronify(self) -> chronify.DatetimeRange:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
@@ -31,12 +47,15 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: issue #341: this is actually tied to the weather_year problem #340
         # If there are no ranges, all of this must be dynamic.
         # The two issues should be solved together.
+        col_dtype = self._get_chronify_dtype()
+        start = self._get_chronify_start_time()
 
         match self.model.time_zone_format.format_type:
             case TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
                 return chronify.DatetimeRange(
+                    dtype=col_dtype,
                     time_column=time_cols[0],
-                    start=pd.Timestamp(self.get_start_times()[0]),
+                    start=start,
                     length=self.get_lengths()[0],
                     resolution=self.get_frequency(),
                     measurement_type=self._model.measurement_type,
@@ -44,8 +63,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 )
             case TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME:
                 return chronify.DatetimeRangeWithTZColumn(
+                    dtype=col_dtype,
                     time_column=time_cols[0],
-                    start=pd.Timestamp(self.get_start_times()[0]),
+                    start=start,
                     length=self.get_lengths()[0],
                     resolution=self.get_frequency(),
                     time_zone_column=TIME_ZONE_COLUMN,
@@ -104,6 +124,16 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
+
+    def _get_chronify_dtype(self) -> chronify.TimeDataType:
+        match self.model.column_format.dtype:
+            case "TIMESTAMP_NTZ":
+                return chronify.TimeDataType.TIMESTAMP_NTZ
+            case "TIMESTAMP_TZ":
+                return chronify.TimeDataType.TIMESTAMP_TZ
+            case _:
+                msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
+                raise ValueError(msg)
 
     def _get_localization_plan(self) -> str | None:
         """Return a plan for localizing TIMESTAMP_NTZ datetime data."""

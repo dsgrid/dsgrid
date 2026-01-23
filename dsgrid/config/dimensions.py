@@ -306,12 +306,6 @@ class TimeFormatInPartsModel(DSGBaseModel):
         "If None, the offset will not be set.",
         default=None,
     )
-    time_zone: str | None = Field(
-        default=None,
-        title="time_zone",
-        description="IANA time zone of the timestamps. Use None for time zone-naive timestamps.",
-    )
-    # TODO: what about time_zone_column?
 
     def get_time_columns(self) -> list[str]:
         cols = [

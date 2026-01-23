@@ -31,12 +31,21 @@ def _warn_no_rust():
     sys.stderr.flush()
 
 
-# For wheel builds (CI), always use maturin
+# For wheel builds, use maturin if Rust is available, otherwise fall back to setuptools
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    """Build wheel - requires Rust for distribution builds."""
-    import maturin
+    """Build wheel - uses Rust if available, otherwise falls back to setuptools."""
+    if RUST_AVAILABLE:
+        import maturin
 
-    return maturin.build_wheel(wheel_directory, config_settings, metadata_directory)
+        return maturin.build_wheel(wheel_directory, config_settings, metadata_directory)
+    else:
+        _warn_no_rust()
+        # Fall back to setuptools for wheel build without Rust extension
+        import setuptools.build_meta
+
+        return setuptools.build_meta.build_wheel(
+            wheel_directory, config_settings, metadata_directory
+        )
 
 
 def build_sdist(sdist_directory, config_settings=None):
@@ -48,7 +57,10 @@ def build_sdist(sdist_directory, config_settings=None):
 
 def get_requires_for_build_wheel(config_settings=None):
     """Get requirements for building wheel."""
-    return ["maturin>=1.0,<2.0"]
+    if RUST_AVAILABLE:
+        return ["maturin>=1.0,<2.0"]
+    else:
+        return ["setuptools>=61.0"]
 
 
 def get_requires_for_build_sdist(config_settings=None):

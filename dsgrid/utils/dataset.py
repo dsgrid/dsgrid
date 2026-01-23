@@ -425,6 +425,7 @@ def localize_time_zone_with_chronify_duckdb(
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
+
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, skip_time_checks=True)
     zone_info_tz = ZoneInfo(time_zone)
@@ -565,6 +566,7 @@ def localize_time_zone_with_chronify_spark_hive(
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-localized table with chronify and Spark and a Hive Metastore."""
+
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     with store.engine.begin() as conn:
@@ -1005,14 +1007,20 @@ def localize_timestamps_if_necessary(
     if not localization_plan:
         return df, False
 
+    # This is a workaroud for pivoted tables to still use Chronify, which only supports stacked tables.
+    value_columns = config.get_value_columns()
+    assert len(value_columns) > 0, value_columns
+    value_column = next(iter(value_columns))
+
+    runtime_config = dsgrid.runtime_config
     match localization_plan:
         case "localize_to_single_tz":
             to_time_zone = time_dim.get_time_zone()
-            match (config.backend_engine, config.use_hive_metastore):
+            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):
                     df = localize_time_zone_with_chronify_spark_hive(
                         df=df,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
@@ -1026,7 +1034,7 @@ def localize_timestamps_if_necessary(
                     df = localize_time_zone_with_chronify_spark_path(
                         df=df,
                         filename=filename,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
@@ -1034,7 +1042,7 @@ def localize_timestamps_if_necessary(
                 case (BackendEngine.DUCKDB, _):
                     df = localize_time_zone_with_chronify_duckdb(
                         df=df,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
@@ -1044,11 +1052,11 @@ def localize_timestamps_if_necessary(
                 geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
                 df = add_time_zone(df, geo_dim)
 
-            match (config.backend_engine, config.use_hive_metastore):
+            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):
                     df = localize_time_zone_by_column_with_chronify_spark_hive(
                         df=df,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
@@ -1063,7 +1071,7 @@ def localize_timestamps_if_necessary(
                     df = localize_time_zone_by_column_with_chronify_spark_path(
                         df=df,
                         filename=filename,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
@@ -1072,7 +1080,7 @@ def localize_timestamps_if_necessary(
                 case (BackendEngine.DUCKDB, _):
                     df = localize_time_zone_by_column_with_chronify_duckdb(
                         df=df,
-                        value_column=VALUE_COLUMN,
+                        value_column=value_column,
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,

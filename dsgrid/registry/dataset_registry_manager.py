@@ -11,7 +11,7 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN, TIME_ZONE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
@@ -49,7 +49,6 @@ from dsgrid.spark.functions import (
 from dsgrid.spark.types import get_str_type
 from dsgrid.spark.types import DataFrame, F, StringType
 from dsgrid.utils.dataset import (
-    add_time_zone,
     split_expected_missing_rows,
     unpivot_dataframe,
     localize_timestamps_if_necessary,
@@ -274,6 +273,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             data_base_dir=data_base_dir,
             missing_associations_base_dir=missing_associations_base_dir,
         )
+
         if context is None:
             assert submitter is not None
             assert log_message is not None
@@ -409,33 +409,32 @@ class DatasetRegistryManager(RegistryManagerBase):
         if time_dim is None:
             return
 
+        df = handler.get_base_load_data_table()
         if isinstance(time_dim.model, DateTimeDimensionModel) and isinstance(
             time_dim.model.column_format, TimeFormatInPartsModel
         ):
-            self._convert_time_format_in_parts_to_datetime(
+            df = self._convert_time_format_in_parts_to_datetime(
+                df,
                 time_dim,
                 config,
-                handler,
                 scratch_dir_context,
             )
-
         if isinstance(time_dim.model, DateTimeDimensionModel):
-            self._localize_timestamps_if_necessary(
+            df = self._localize_timestamps_if_necessary(
+                df,
                 time_dim,
                 config,
-                handler,
                 scratch_dir_context,
             )
 
     def _convert_time_format_in_parts_to_datetime(
         self,
+        df: DataFrame,
         time_dim: DateTimeDimensionConfig,
         config: DatasetConfig,
-        handler: DatasetSchemaHandlerBase,
         scratch_dir_context: ScratchDirContext,
-    ) -> None:
+    ) -> DataFrame:
         """Convert time-in-parts format to timestamp format."""
-        df = handler.get_base_load_data_table()
         col_format = time_dim.model.column_format
 
         timestamp_str_expr = self._build_timestamp_string_expr(col_format)
@@ -449,16 +448,16 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
         logger.info("Replaced time columns %s with %s", cols_to_drop, new_col_format.time_column)
+        return reformatted_df
 
     def _localize_timestamps_if_necessary(
         self,
+        df: DataFrame,
         time_dim: DateTimeDimensionConfig,
         config: DatasetConfig,
-        handler: DatasetSchemaHandlerBase,
         scratch_dir_context: ScratchDirContext,
-    ) -> None:
+    ) -> DataFrame:
         """Localize tz-naive timestamps to time zone(s) if necessary."""
-        df = handler.get_base_load_data_table()
         df, localized = localize_timestamps_if_necessary(df, config, scratch_dir_context)
 
         if localized:
@@ -466,6 +465,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 time_dim, config, df, scratch_dir_context
             )
             logger.info("Localized time column to timezone(s)")
+        return df
 
     @staticmethod
     def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
@@ -489,22 +489,6 @@ class DatasetRegistryManager(RegistryManagerBase):
             f"LPAD(CAST({col_format.day_column} AS {str_type}), 2, '0') || ' ' || "
             f"{hour_expr} || ':00:00' {offset_expr}"
         )
-
-    @staticmethod
-    def _resolve_timezone(
-        df: DataFrame, config: DatasetConfig, col_format: TimeFormatInPartsModel
-    ) -> tuple[DataFrame, str | None]:
-        """Resolve timezone from config or geography dimension.
-
-        Returns the (possibly modified) dataframe and the fixed timezone if single-tz,
-        or None if multi-timezone.
-        """
-        if col_format.time_zone is not None:
-            return df, col_format.time_zone
-
-        geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
-        assert geo_dim is not None
-        return add_time_zone(df, geo_dim), None
 
     @staticmethod
     def _build_timestamp_sql(
@@ -585,13 +569,6 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         # update config
         config.model.data_layout.data_file.path = str(path)
-
-        data_columns = config.model.data_layout.data_file.columns
-        if data_columns:
-            if not any(c.name == TIME_ZONE_COLUMN for c in data_columns):
-                updated_columns = data_columns.copy()
-                updated_columns.append(Column(name=TIME_ZONE_COLUMN, data_type="STRING"))
-                config.model.data_layout.data_file.columns = updated_columns
 
         # update time_dim
         time_column = time_dim.model.column_format.time_column

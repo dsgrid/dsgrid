@@ -24,22 +24,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def _get_chronify_start_time(self) -> pd.Timestamp:
-        """Modify start time for chronify depending on localization plan.
-        Modification is necessary only for TIMESTAMP_NTZ data localized to a single time zone.
-        because of the way self.get_start_times() works.
-        Returns:
-            pd.Timestamp: start time for chronify
-        """
-        start_times = self.get_start_times()
-        assert len(start_times) == 1
-        start_time = start_times[0]
-
-        if self._get_localization_plan() == "localize_to_single_tz":
-            # dtype is TIMESTAMP_NTZ, so drop tzinfo
-            return pd.Timestamp(start_time.replace(tzinfo=None))
-        return pd.Timestamp(start_time)
-
     def to_chronify(self) -> chronify.DatetimeRange:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
@@ -125,17 +109,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def _get_chronify_dtype(self) -> chronify.TimeDataType:
-        match self.model.column_format.dtype:
-            case "TIMESTAMP_NTZ":
-                return chronify.TimeDataType.TIMESTAMP_NTZ
-            case "TIMESTAMP_TZ":
-                return chronify.TimeDataType.TIMESTAMP_TZ
-            case _:
-                msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
-                raise ValueError(msg)
-
-    def _get_localization_plan(self) -> str | None:
+    def get_localization_plan(self) -> str | None:
         """Return a plan for localizing TIMESTAMP_NTZ datetime data."""
         if self.model.column_format.dtype == "TIMESTAMP_TZ":
             return None
@@ -157,3 +131,29 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     f"time zone(s): {self.model.time_zone_format.get_time_zones()}"
                 )
                 raise ValueError(msg)
+
+    def _get_chronify_dtype(self) -> chronify.TimeDataType:
+        match self.model.column_format.dtype:
+            case "TIMESTAMP_NTZ":
+                return chronify.TimeDataType.TIMESTAMP_NTZ
+            case "TIMESTAMP_TZ":
+                return chronify.TimeDataType.TIMESTAMP_TZ
+            case _:
+                msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
+                raise ValueError(msg)
+
+    def _get_chronify_start_time(self) -> pd.Timestamp:
+        """Modify start time for chronify depending on localization plan.
+        Modification is necessary only for TIMESTAMP_NTZ data localized to a single time zone.
+        because of the way self.get_start_times() works.
+        Returns:
+            pd.Timestamp: start time for chronify
+        """
+        start_times = self.get_start_times()
+        assert len(start_times) == 1
+        start_time = start_times[0]
+
+        if self.get_localization_plan() == "localize_to_single_tz":
+            # dtype is TIMESTAMP_NTZ, so drop tzinfo
+            return pd.Timestamp(start_time.replace(tzinfo=None))
+        return pd.Timestamp(start_time)

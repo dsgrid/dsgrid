@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 import pandas as pd
+from pyspark.sql import SparkSession
 
 from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.dimension.base_models import DimensionType
@@ -38,6 +39,9 @@ import dsgrid
 
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from chronify.time_range_generator_factory import make_time_range_generator
+
+
+spark = SparkSession.builder.getOrCreate()
 
 
 def make_datetime_config_single_tz_ntz():
@@ -75,7 +79,10 @@ def make_dataframes_single_tz(time_dim):
     to_tz = time_dim.model.time_zone_format.time_zone
     called_df = df.copy()
     called_df[TIME_COLUMN] = called_df[TIME_COLUMN].dt.tz_localize(to_tz)
-    return df, called_df
+
+    sdf = spark.createDataFrame(df)
+    scalled_df = spark.createDataFrame(called_df)
+    return sdf, scalled_df
 
 
 def make_dataframes_multi_tz(time_dim):
@@ -92,7 +99,9 @@ def make_dataframes_multi_tz(time_dim):
         cond = called_df[TIME_ZONE_COLUMN] == tz
         called_df.loc[cond, TIME_COLUMN] = called_df.loc[cond, "ts"].dt.tz_localize(tz)
 
-    return df, called_df
+    sdf = spark.createDataFrame(df)
+    scalled_df = spark.createDataFrame(called_df)
+    return sdf, scalled_df
 
 
 def make_datetime_config_multi_tz_ntz():

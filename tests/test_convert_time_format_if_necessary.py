@@ -37,11 +37,11 @@ def make_manager():
 
 
 def test_offset_parsing_in_parts_builds_correct_timestamps():
-    mgr = make_manager()
     """Ensure offset_column is parsed into timestamp as +HH:MM/-HH:MM.
 
     Covers positive fractional, negative whole, negative fractional hours.
     """
+    mgr = make_manager()
     # Define time-in-parts format with an offset column
     col_format = TimeFormatInPartsModel(
         year_column="year",

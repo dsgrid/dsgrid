@@ -44,7 +44,8 @@ from chronify.time_range_generator_factory import make_time_range_generator
 spark = get_spark_session()
 
 
-def make_datetime_config_single_tz_ntz():
+def make_datetime_config_single_tz_ntz(time_zone="ETC/GMT+7"):
+    # default to Mountain Standard Time
     model = DateTimeDimensionModel(
         name="time",
         type=DimensionType.TIME,
@@ -53,7 +54,7 @@ def make_datetime_config_single_tz_ntz():
         column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=AlignedTimeSingleTimeZone(
             format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
-            time_zone="America/New_York",
+            time_zone=time_zone,
         ),
         measurement_type=MeasurementType.TOTAL,
         ranges=[
@@ -89,7 +90,7 @@ def make_dataframes_multi_tz(time_dim):
     df = pd.DataFrame({"ts": timestamps})
     df["geography"] = "dummy_geo"
     df[VALUE_COLUMN] = 1
-    time_zones = time_dim.model.time_zone_format.time_zones
+    time_zones = time_dim.model.time_zone_format.get_time_zones()
     df[TIME_ZONE_COLUMN] = time_zones * (len(df) // len(time_zones))
 
     assert time_dim.get_localization_plan() == "localize_to_multi_tz"
@@ -103,7 +104,8 @@ def make_dataframes_multi_tz(time_dim):
     return sdf, scalled_df
 
 
-def make_datetime_config_multi_tz_ntz():
+def make_datetime_config_multi_tz_ntz(time_zones=["ETC/GMT+5", "ETC/GMT+8"]):
+    # default to Eastern and Pacific Standard Time
     model = DateTimeDimensionModel(
         name="time",
         type=DimensionType.TIME,
@@ -112,7 +114,7 @@ def make_datetime_config_multi_tz_ntz():
         column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=LocalTimeMultipleTimeZones(
             format_type=TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME,
-            time_zones=["America/Los_Angeles", "America/New_York"],
+            time_zones=time_zones,
         ),
         measurement_type=MeasurementType.TOTAL,
         ranges=[

@@ -437,6 +437,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         """Convert time-in-parts format to timestamp format."""
         col_format = time_dim.model.column_format
 
+        # Validate UTC offset bounds if present
+        if col_format.offset_column:
+            self._validate_offset_bounds(df, col_format.offset_column)
+
         timestamp_str_expr = self._build_timestamp_string_expr(col_format)
         timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, col_format)
 
@@ -504,6 +508,38 @@ class DatasetRegistryManager(RegistryManagerBase):
             f" ELSE CAST({offset_col} AS {str_type}) END"
         )
         return offset_expr
+
+    def _validate_offset_bounds(self, df: DataFrame, offset_col: str) -> None:
+        """Ensure UTC offsets are within valid bounds and valid string format.
+
+        Rules:
+        - Numeric offsets: valid when `ABS(offset) <= 24`.
+        - String offsets: must match `^[+-]HH:MM` with `0 <= HH <= 24`, `0 <= MM < 60`,
+          and if `HH == 24` then `MM == 0`.
+        """
+        str_type = get_str_type()
+        str_cast = f"CAST({offset_col} AS {str_type})"
+        hours = f"CAST(SUBSTR({str_cast}, 2, 2) AS INTEGER)"
+        minutes = f"CAST(SUBSTR({str_cast}, 5, 2) AS INTEGER)"
+        # Invalid when format incorrect or bounds violated
+        invalid_expr = (
+            f"CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN CASE WHEN LENGTH({str_cast}) != 6 OR SUBSTR({str_cast}, 4, 1) != ':' "
+            f"          OR SUBSTR({str_cast}, 1, 1) NOT IN ('+','-') "
+            f"     THEN TRUE "
+            f"     WHEN {hours} > 24 OR {hours} < 0 THEN TRUE "
+            f"     WHEN {minutes} >= 60 OR {minutes} < 0 THEN TRUE "
+            f"     WHEN {hours} = 24 AND {minutes} > 0 THEN TRUE "
+            f"     ELSE FALSE END "
+            f"ELSE ABS(CAST({offset_col} AS DOUBLE)) > 24 END AS invalid_offset"
+        )
+        check_df = select_expr(df, [invalid_expr])
+        if not is_dataframe_empty(check_df.filter("invalid_offset")):
+            msg = (
+                "Invalid UTC offset detected. Offsets must be 24 hours or less "
+                f"in absolute value: column={offset_col}"
+            )
+            raise DSGInvalidDataset(msg)
 
     def _build_timestamp_string_expr(self, col_format: TimeFormatInPartsModel) -> str:
         """Build a timestamp string SQL expression from time-in-parts columns.

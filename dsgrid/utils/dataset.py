@@ -1060,7 +1060,6 @@ def localize_timestamps_if_necessary(
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
-                        wrap_time_allowed=False,
                     )
                 case (BackendEngine.SPARK, False):
                     filename = persist_table(
@@ -1075,7 +1074,6 @@ def localize_timestamps_if_necessary(
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
-                        wrap_time_allowed=False,
                     )
                 case (BackendEngine.DUCKDB, _):
                     df = localize_time_zone_by_column_with_chronify_duckdb(
@@ -1084,7 +1082,6 @@ def localize_timestamps_if_necessary(
                         from_time_dim=time_dim,
                         time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
-                        wrap_time_allowed=False,
                     )
         case _:
             msg = f"Unknown localization plan: {localization_plan}"

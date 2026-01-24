@@ -82,7 +82,6 @@ def make_dataframes_single_tz(time_dim):
 
     sdf = spark.createDataFrame(df)
     scalled_df = spark.createDataFrame(called_df)
-    breakpoint()
     return sdf, scalled_df
 
 

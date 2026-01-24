@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 from datetime import tzinfo
 
 import chronify
@@ -441,8 +441,8 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone_column: str,
     scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
 ) -> DataFrame:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and DuckDB.
@@ -586,8 +586,8 @@ def localize_time_zone_by_column_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone_column: str,
     scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
 ) -> DataFrame:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
@@ -600,7 +600,7 @@ def localize_time_zone_by_column_with_chronify_spark_hive(
     try:
         dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
-            time_zone_column,
+            time_zone_column=time_zone_column,
             scratch_dir=scratch_dir_context.scratch_dir,
         )
     finally:
@@ -714,8 +714,8 @@ def localize_time_zone_by_column_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone_column: str,
     scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
 ) -> DataFrame:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
@@ -726,7 +726,7 @@ def localize_time_zone_by_column_with_chronify_spark_path(
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     store.localize_time_zone_by_column(
         src_schema.name,
-        time_zone_column,
+        time_zone_column=time_zone_column,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
     )
@@ -1052,7 +1052,6 @@ def localize_timestamps_if_necessary(
                         df=df,
                         value_column=value_column,
                         from_time_dim=time_dim,
-                        time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
                     )
                 case (BackendEngine.SPARK, False):
@@ -1066,7 +1065,6 @@ def localize_timestamps_if_necessary(
                         filename=filename,
                         value_column=value_column,
                         from_time_dim=time_dim,
-                        time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
                     )
                 case (BackendEngine.DUCKDB, _):
@@ -1074,7 +1072,6 @@ def localize_timestamps_if_necessary(
                         df=df,
                         value_column=value_column,
                         from_time_dim=time_dim,
-                        time_zone_column=TIME_ZONE_COLUMN,
                         scratch_dir_context=scratch_dir_context,
                     )
         case _:

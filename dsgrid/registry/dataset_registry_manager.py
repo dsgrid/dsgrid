@@ -623,7 +623,6 @@ class DatasetRegistryManager(RegistryManagerBase):
     ) -> None:
         """Update the time dimension model with the new format."""
         time_dim.model.column_format = new_col_format
-        time_dim.model.time_column = TIME_COLUMN
         if hour_col is None:
             for time_range in time_dim.model.ranges:
                 time_range.frequency = timedelta(days=1)

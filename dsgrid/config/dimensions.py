@@ -11,6 +11,7 @@ from pydantic import field_serializer, field_validator, model_validator, Field, 
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
 
+from dsgrid.common import TIME_COLUMN
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
@@ -20,7 +21,6 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
     TimeZoneFormat,
 )
-from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
@@ -243,7 +243,7 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
-        default=next(iter(DatetimeTimestampType._fields)),
+        default=TIME_COLUMN,
     )
 
     def get_time_columns(self) -> list[str]:
@@ -258,7 +258,7 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
-        default=next(iter(DatetimeTimestampType._fields)),
+        default=TIME_COLUMN,
     )
 
     def get_time_columns(self) -> list[str]:
@@ -525,12 +525,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             "options": TimeIntervalType.format_descriptions_for_docs(),
         },
     )
-    time_column: str = Field(
-        title="time_column",
-        description="Name of time column in the dataframe. It should be updated during the query process to reflect "
-        "any changes to the dataframe time column.",
-        default=next(iter(DatetimeTimestampType._fields)),
-    )
 
     @model_validator(mode="before")
     @classmethod
@@ -627,6 +621,22 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
                 else:
                     msg = f"Unexpected ranges type: {type(trange)}"
                     raise ValueError(msg)
+
+        if "time_column" in values:
+            logger.warning(
+                "Moving legacy time_column field to column_format struct within the datetime config."
+            )
+            time_column = values.pop("time_column")
+            if isinstance(values.get("column_format"), dict):
+                values["column_format"]["time_column"] = time_column
+            elif isinstance(values.get("column_format"), TimeFormatDateTimeTZModel) or isinstance(
+                values.get("column_format"), TimeFormatDateTimeNTZModel
+            ):
+                values["column_format"].time_column = time_column
+            else:
+                msg = f"Unexpected column_format type: {values['column_format']}"
+                raise ValueError(msg)
+
         return values
 
     # @model_validator(mode="after")

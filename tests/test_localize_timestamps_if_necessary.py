@@ -50,7 +50,7 @@ def make_datetime_config_single_tz_ntz():
         type=DimensionType.TIME,
         module="dsgrid.dimension.standard",
         class_name="Time",
-        column_format=TimeFormatDateTimeNTZModel(time_column="time"),
+        column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=AlignedTimeSingleTimeZone(
             format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
             time_zone="America/New_York",
@@ -64,7 +64,6 @@ def make_datetime_config_single_tz_ntz():
             )
         ],
         time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-        time_column="time",
     )
     return DateTimeDimensionConfig.load_from_model(model)
 
@@ -110,7 +109,7 @@ def make_datetime_config_multi_tz_ntz():
         type=DimensionType.TIME,
         module="dsgrid.dimension.standard",
         class_name="Time",
-        column_format=TimeFormatDateTimeNTZModel(time_column="time"),
+        column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=LocalTimeMultipleTimeZones(
             format_type=TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME,
             time_zones=["America/Los_Angeles", "America/New_York"],
@@ -124,7 +123,6 @@ def make_datetime_config_multi_tz_ntz():
             )
         ],
         time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-        time_column="time",
     )
     return DateTimeDimensionConfig.load_from_model(model)
 
@@ -135,7 +133,7 @@ def make_datetime_config_tz_aware():
         type=DimensionType.TIME,
         module="dsgrid.dimension.standard",
         class_name="Time",
-        column_format=TimeFormatDateTimeTZModel(time_column="time"),
+        column_format=TimeFormatDateTimeTZModel(),
         time_zone_format=AlignedTimeSingleTimeZone(
             format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
             time_zone="America/New_York",
@@ -149,7 +147,6 @@ def make_datetime_config_tz_aware():
             )
         ],
         time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-        time_column="time",
     )
     return DateTimeDimensionConfig.load_from_model(model)
 
@@ -160,7 +157,7 @@ def make_datetime_config_single_aligned_no_tz_ntz():
         type=DimensionType.TIME,
         module="dsgrid.dimension.standard",
         class_name="Time",
-        column_format=TimeFormatDateTimeNTZModel(time_column="time"),
+        column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=AlignedTimeSingleTimeZone(
             format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
             time_zone=None,
@@ -174,7 +171,6 @@ def make_datetime_config_single_aligned_no_tz_ntz():
             )
         ],
         time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-        time_column="time",
     )
     return DateTimeDimensionConfig.load_from_model(model)
 
@@ -201,7 +197,7 @@ def test_no_plan_returns_false(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]
 
     # Ensure helper functions are not called
     for name in [
@@ -228,7 +224,7 @@ def test_single_tz_duckdb_calls_duckdb(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]
 
     called_df = MagicMock()
     target = MagicMock(return_value=called_df)
@@ -296,7 +292,7 @@ def test_value_column_first_used(monkeypatch):
     config = DummyDatasetConfig(time_dim, value_columns=["val_a", "val_b", "val_c"])
 
     df = MagicMock()
-    df.columns = ["geography", "time", "val_a", "val_b", "val_c"]
+    df.columns = ["geography", TIME_COLUMN, "val_a", "val_b", "val_c"]
 
     called_df = MagicMock()
     target = MagicMock(return_value=called_df)
@@ -322,7 +318,7 @@ def test_multi_tz_duckdb_adds_tz_and_calls_duckdb(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]  # missing TIME_ZONE_COLUMN
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]  # missing TIME_ZONE_COLUMN
 
     add_tz_target = MagicMock(return_value=df)
     monkeypatch.setattr("dsgrid.utils.dataset.add_time_zone", add_tz_target)
@@ -401,7 +397,7 @@ def test_unknown_plan_raises(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]
 
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
@@ -413,7 +409,7 @@ def test_invalid_time_dimension_raises():
 
     config = DummyDatasetConfig(time_dim=NotDateTimeConfig())
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]
 
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
@@ -425,7 +421,7 @@ def test_ntz_no_time_zone_is_noop(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", VALUE_COLUMN]
+    df.columns = ["geography", TIME_COLUMN, VALUE_COLUMN]
 
     # Ensure localization helpers are not called
     for name in [

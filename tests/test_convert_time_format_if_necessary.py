@@ -1,13 +1,12 @@
-"""Tests for `DatasetRegistryManager._convert_time_format_if_necessary`.
+"""Tests for time-in-parts to timestamp conversion helpers.
 
-Validates behavior across time dimension formats:
-- No TIME dimension: returns early without touching handler.
-- TimeFormatInParts: converts, then localizes (order matters).
-- TimeFormatDateTimeNTZ: skips conversion, localizes.
-- TimeFormatDateTimeTZ: skips conversion, localizes.
+Focus:
+- Build timestamp string/SQL from `TimeFormatInPartsModel`.
+- Parse numeric and string UTC offsets into `TIMESTAMP_TZ`.
+- Validate DuckDB UTC rendering and Spark parity (conditional).
 
-These are unit-level tests using stubs/mocks to avoid Spark/Pandas dependencies
-while asserting call ordering and argument plumbing.
+Localization call-order tests have been moved to
+`tests/test_localize_timestamps_if_necessary.py`.
 """
 import pytest
 from unittest.mock import MagicMock
@@ -15,87 +14,18 @@ from pathlib import Path
 
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.config.dimensions import (
-    DateTimeDimensionModel,
     TimeFormatInPartsModel,
-    TimeFormatDateTimeNTZModel,
-    TimeFormatDateTimeTZModel,
-    AlignedTimeSingleTimeZone,
-    TimeRangeModel,
 )
-from dsgrid.dimension.time import TimeIntervalType
-from dsgrid.dimension.base_models import DimensionType
 from dsgrid.common import TIME_COLUMN
-from dsgrid.spark.functions import get_spark_session, select_expr, set_current_time_zone
+from dsgrid.spark.functions import (
+    get_spark_session,
+    select_expr,
+    set_current_time_zone,
+)
 import pandas as pd
 
 
-class _TimeDimStub:
-    def __init__(self, model):
-        self.model = model
-
-
-def make_datetime_config_in_parts():
-    model = DateTimeDimensionModel(
-        name="time",
-        dimension_type=DimensionType.TIME,
-        class_name="Geography",
-        column_format=TimeFormatInPartsModel(
-            year_column="year",
-            month_column="month",
-            day_column="day",
-            hour_column="hour",
-            offset_column=None,
-        ),
-        time_zone_format=AlignedTimeSingleTimeZone(time_zone=None),
-        ranges=[
-            TimeRangeModel(
-                start="2020-01-01 00:00:00",
-                end="2020-01-01 01:00:00",
-            )
-        ],
-        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-    )
-    return _TimeDimStub(model)
-
-
-def make_datetime_config_ntz():
-    model = DateTimeDimensionModel(
-        name="time",
-        dimension_type=DimensionType.TIME,
-        class_name="Geography",
-        column_format=TimeFormatDateTimeNTZModel(),
-        time_zone_format=AlignedTimeSingleTimeZone(time_zone=None),
-        ranges=[
-            TimeRangeModel(
-                start="2020-01-01 00:00:00",
-                end="2020-01-01 01:00:00",
-            )
-        ],
-        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-    )
-    return _TimeDimStub(model)
-
-
-def make_datetime_config_tz():
-    model = DateTimeDimensionModel(
-        name="time",
-        dimension_type=DimensionType.TIME,
-        class_name="Geography",
-        column_format=TimeFormatDateTimeTZModel(),
-        time_zone_format=AlignedTimeSingleTimeZone(time_zone="UTC"),
-        ranges=[
-            TimeRangeModel(
-                start="2020-01-01 00:00:00",
-                end="2020-01-01 01:00:00",
-            )
-        ],
-        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
-    )
-    return _TimeDimStub(model)
-
-
 def make_manager():
-    # Provide minimal, unused dependencies as mocks
     return DatasetRegistryManager(
         Path.cwd(),
         MagicMock(),
@@ -106,164 +36,12 @@ def make_manager():
     )
 
 
-def test_no_time_dimension_does_nothing(monkeypatch):
-    mgr = make_manager()
-    config = MagicMock()
-    handler = MagicMock()
-    scratch = MagicMock()
-
-    config.get_dimension.return_value = None
-
-    called_convert = False
-    called_localize = False
-
-    def fake_convert(df, time_dim, cfg, scratch_ctx):
-        nonlocal called_convert
-        called_convert = True
-        return df
-
-    def fake_localize(df, time_dim, cfg, scratch_ctx):
-        nonlocal called_localize
-        called_localize = True
-        return df
-
-    monkeypatch.setattr(mgr, "_convert_time_format_in_parts_to_datetime", fake_convert)
-    monkeypatch.setattr(mgr, "_localize_timestamps_if_necessary", fake_localize)
-
-    mgr._convert_time_format_if_necessary(config, handler, scratch)
-
-    handler.get_base_load_data_table.assert_not_called()
-    assert not called_convert
-    assert not called_localize
-
-
-def test_in_parts_triggers_convert_then_localize(monkeypatch):
-    mgr = make_manager()
-    time_dim = make_datetime_config_in_parts()
-
-    config = MagicMock()
-    config.get_dimension.return_value = time_dim
-
-    handler = MagicMock()
-    base_df = object()
-    converted_df = object()
-    handler.get_base_load_data_table.return_value = base_df
-    scratch = MagicMock()
-
-    call_order = []
-
-    def fake_convert(df, td, cfg, scratch_ctx):
-        call_order.append("convert")
-        assert df is base_df
-        assert td is time_dim
-        assert cfg is config
-        assert scratch_ctx is scratch
-        return converted_df
-
-    def fake_localize(df, td, cfg, scratch_ctx):
-        call_order.append("localize")
-        # Should receive the converted df
-        assert df is converted_df
-        assert td is time_dim
-        assert cfg is config
-        assert scratch_ctx is scratch
-        return df
-
-    monkeypatch.setattr(mgr, "_convert_time_format_in_parts_to_datetime", fake_convert)
-    monkeypatch.setattr(mgr, "_localize_timestamps_if_necessary", fake_localize)
-
-    mgr._convert_time_format_if_necessary(config, handler, scratch)
-
-    handler.get_base_load_data_table.assert_called_once()
-    assert call_order == ["convert", "localize"]
-
-
-def test_datetime_without_parts_triggers_only_localize(monkeypatch):
-    mgr = make_manager()
-    time_dim = make_datetime_config_ntz()
-
-    config = MagicMock()
-    config.get_dimension.return_value = time_dim
-
-    handler = MagicMock()
-    base_df = object()
-    handler.get_base_load_data_table.return_value = base_df
-    scratch = MagicMock()
-
-    called_convert = False
-    called_localize = False
-    call_order = []
-
-    def fake_convert(df, td, cfg, scratch_ctx):
-        nonlocal called_convert
-        called_convert = True
-        call_order.append("convert")
-        return df
-
-    def fake_localize(df, td, cfg, scratch_ctx):
-        nonlocal called_localize
-        called_localize = True
-        call_order.append("localize")
-        assert df is base_df
-        return df
-
-    monkeypatch.setattr(mgr, "_convert_time_format_in_parts_to_datetime", fake_convert)
-    monkeypatch.setattr(mgr, "_localize_timestamps_if_necessary", fake_localize)
-
-    mgr._convert_time_format_if_necessary(config, handler, scratch)
-
-    handler.get_base_load_data_table.assert_called_once()
-    assert not called_convert
-    assert called_localize
-    assert call_order == ["localize"]
-
-
-def test_datetime_tz_triggers_only_localize(monkeypatch):
-    mgr = make_manager()
-    time_dim = make_datetime_config_tz()
-
-    config = MagicMock()
-    config.get_dimension.return_value = time_dim
-
-    handler = MagicMock()
-    base_df = object()
-    handler.get_base_load_data_table.return_value = base_df
-    scratch = MagicMock()
-
-    called_convert = False
-    called_localize = False
-    call_order = []
-
-    def fake_convert(df, td, cfg, scratch_ctx):
-        nonlocal called_convert
-        called_convert = True
-        call_order.append("convert")
-        return df
-
-    def fake_localize(df, td, cfg, scratch_ctx):
-        nonlocal called_localize
-        called_localize = True
-        call_order.append("localize")
-        assert df is base_df
-        return df
-
-    monkeypatch.setattr(mgr, "_convert_time_format_in_parts_to_datetime", fake_convert)
-    monkeypatch.setattr(mgr, "_localize_timestamps_if_necessary", fake_localize)
-
-    mgr._convert_time_format_if_necessary(config, handler, scratch)
-
-    handler.get_base_load_data_table.assert_called_once()
-    assert not called_convert
-    assert called_localize
-    assert call_order == ["localize"]
-
-
 def test_offset_parsing_in_parts_builds_correct_timestamps():
-    """Ensure offset_column is parsed into the timestamp as +HH:MM/-HH:MM.
-
-    Validates edge cases: positive fractional hour, negative whole hour, negative fractional hour.
-    """
     mgr = make_manager()
+    """Ensure offset_column is parsed into timestamp as +HH:MM/-HH:MM.
+
+    Covers positive fractional, negative whole, negative fractional hours.
+    """
     # Define time-in-parts format with an offset column
     col_format = TimeFormatInPartsModel(
         year_column="year",
@@ -297,10 +75,11 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     assert new_col_format.dtype == "TIMESTAMP_TZ"
     assert new_col_format.time_column == TIME_COLUMN
 
-    # Cast the timestamp back to string to verify the absolute instants
-    # DuckDB TIMESTAMP WITH TIME ZONE displays in session time zone (default UTC).
-    # So these are the UTC instants corresponding to the local times + offsets above.
-    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])  # duckdb path
+    # Cast timestamp back to string to verify absolute instants.
+    # DuckDB TIMESTAMP WITH TIME ZONE displays in the
+    # session time zone (default UTC).
+    # These are the UTC instants corresponding to local times + offsets above.
+    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
     expected = [
@@ -342,7 +121,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
     assert new_col_format.dtype == "TIMESTAMP_TZ"
-    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])  # duckdb path
+    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
     # UTC instants corresponding to local time + string offsets
@@ -389,7 +168,7 @@ def test_offset_parsing_in_parts_spark_backend():
     out_df = DatasetRegistryManager._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
     assert new_col_format.dtype == "TIMESTAMP_TZ"
-    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS STRING) AS ts_str"])  # spark path
+    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS STRING) AS ts_str"])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
     expected = [

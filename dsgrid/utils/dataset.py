@@ -1007,7 +1007,7 @@ def localize_timestamps_if_necessary(
     if not localization_plan:
         return df, False
 
-    # This is a workaroud for pivoted tables to still use Chronify, which only supports stacked tables.
+    # This is a workaround for pivoted tables to still use Chronify, which only supports stacked tables.
     value_columns = config.get_value_columns()
     assert len(value_columns) > 0, value_columns
     value_column = next(iter(value_columns))

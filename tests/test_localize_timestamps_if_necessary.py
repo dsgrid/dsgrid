@@ -17,7 +17,7 @@ import pytest
 from unittest.mock import MagicMock
 import pandas as pd
 
-from dsgrid.common import TIME_ZONE_COLUMN, BackendEngine
+from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     TimeIntervalType,
@@ -37,6 +37,7 @@ from dsgrid.exceptions import DSGInvalidOperation
 import dsgrid
 
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
+from chronify.time_range_generator_factory import make_time_range_generator
 
 
 def make_datetime_config_single_tz_ntz():
@@ -62,6 +63,36 @@ def make_datetime_config_single_tz_ntz():
         time_column="time",
     )
     return DateTimeDimensionConfig.load_from_model(model)
+
+
+def make_dataframes_single_tz(time_dim):
+    timestamps = make_time_range_generator(time_dim.to_chronify()).list_timestamps()
+    df = pd.DataFrame({TIME_COLUMN: timestamps})
+    df["geography"] = "dummy_geo"
+    df[VALUE_COLUMN] = 1
+
+    assert time_dim.get_localization_plan() == "localize_to_single_tz"
+    to_tz = time_dim.model.time_zone_format.time_zone
+    called_df = df.copy()
+    called_df[TIME_COLUMN] = called_df[TIME_COLUMN].dt.tz_localize(to_tz)
+    return df, called_df
+
+
+def make_dataframes_multi_tz(time_dim):
+    timestamps = make_time_range_generator(time_dim.to_chronify()).list_timestamps()
+    df = pd.DataFrame({"ts": timestamps})
+    df["geography"] = "dummy_geo"
+    df[VALUE_COLUMN] = 1
+    time_zones = time_dim.model.time_zone_format.time_zones
+    df[TIME_ZONE_COLUMN] = time_zones * (len(df) // len(time_zones))
+
+    assert time_dim.get_localization_plan() == "localize_to_multi_tz"
+    called_df = df.copy()
+    for tz in time_zones:
+        cond = called_df[TIME_ZONE_COLUMN] == tz
+        called_df.loc[cond, TIME_COLUMN] = called_df.loc[cond, "ts"].dt.tz_localize(tz)
+
+    return df, called_df
 
 
 def make_datetime_config_multi_tz_ntz():
@@ -142,7 +173,7 @@ def make_datetime_config_single_aligned_no_tz_ntz():
 class DummyDatasetConfig:
     def __init__(self, time_dim, value_columns=None, geography_dim=None):
         self._time_dim = time_dim
-        self._value_columns = value_columns or ["value"]
+        self._value_columns = value_columns or [VALUE_COLUMN]
         self._geo_dim = geography_dim or MagicMock()
 
     def get_dimension(self, dimension_type):
@@ -161,7 +192,7 @@ def test_no_plan_returns_false(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]
+    df.columns = ["geography", "time", VALUE_COLUMN]
 
     # Ensure helper functions are not called
     for name in [
@@ -181,14 +212,14 @@ def test_no_plan_returns_false(monkeypatch):
 
 def test_single_tz_duckdb_calls_duckdb(monkeypatch):
     # Configure runtime
-    dsgrid.runtime_config.backend_engine = BackendEngine.DUCKDB
-    dsgrid.runtime_config.use_hive_metastore = False
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.DUCKDB)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", False)
 
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]
+    df.columns = ["geography", "time", VALUE_COLUMN]
 
     called_df = MagicMock()
     target = MagicMock(return_value=called_df)
@@ -204,16 +235,13 @@ def test_single_tz_duckdb_calls_duckdb(monkeypatch):
 
 
 def test_single_tz_spark_hive(monkeypatch):
-    dsgrid.runtime_config.backend_engine = BackendEngine.SPARK
-    dsgrid.runtime_config.use_hive_metastore = True
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.SPARK)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", True)
 
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
+    df, called_df = make_dataframes_single_tz(time_dim)
 
-    df = MagicMock()
-    df.columns = ["geography", "time", "value"]
-
-    called_df = MagicMock()
     target = MagicMock(return_value=called_df)
     monkeypatch.setattr(
         "dsgrid.utils.dataset.localize_time_zone_with_chronify_spark_hive",
@@ -232,11 +260,8 @@ def test_single_tz_spark_path(monkeypatch):
 
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
+    df, called_df = make_dataframes_single_tz(time_dim)
 
-    df = MagicMock()
-    df.columns = ["geography", "time", "value"]
-
-    called_df = MagicMock()
     path_target = MagicMock(return_value=called_df)
     monkeypatch.setattr(
         "dsgrid.utils.dataset.localize_time_zone_with_chronify_spark_path",
@@ -288,7 +313,7 @@ def test_multi_tz_duckdb_adds_tz_and_calls_duckdb(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]  # missing TIME_ZONE_COLUMN
+    df.columns = ["geography", "time", VALUE_COLUMN]  # missing TIME_ZONE_COLUMN
 
     add_tz_target = MagicMock(return_value=df)
     monkeypatch.setattr("dsgrid.utils.dataset.add_time_zone", add_tz_target)
@@ -313,9 +338,7 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
 
     time_dim = make_datetime_config_multi_tz_ntz()
     config = DummyDatasetConfig(time_dim)
-
-    df = MagicMock()
-    df.columns = ["geography", "time", TIME_ZONE_COLUMN, "value"]
+    df, called_df = make_dataframes_multi_tz(time_dim)
 
     # Ensure add_time_zone is not called
     monkeypatch.setattr(
@@ -323,7 +346,6 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
         MagicMock(side_effect=AssertionError("should not be called")),
     )
 
-    called_df = MagicMock()
     hive_target = MagicMock(return_value=called_df)
     monkeypatch.setattr(
         "dsgrid.utils.dataset." + "localize_time_zone_by_column_with_chronify_spark_hive",
@@ -342,11 +364,8 @@ def test_multi_tz_spark_path(monkeypatch):
 
     time_dim = make_datetime_config_multi_tz_ntz()
     config = DummyDatasetConfig(time_dim)
+    df, called_df = make_dataframes_multi_tz(time_dim)
 
-    df = MagicMock()
-    df.columns = ["geography", "time", TIME_ZONE_COLUMN, "value"]
-
-    called_df = MagicMock()
     path_target = MagicMock(return_value=called_df)
     monkeypatch.setattr(
         "dsgrid.utils.dataset." + "localize_time_zone_by_column_with_chronify_spark_path",
@@ -373,7 +392,7 @@ def test_unknown_plan_raises(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]
+    df.columns = ["geography", "time", VALUE_COLUMN]
 
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
@@ -385,7 +404,7 @@ def test_invalid_time_dimension_raises():
 
     config = DummyDatasetConfig(time_dim=NotDateTimeConfig())
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]
+    df.columns = ["geography", "time", VALUE_COLUMN]
 
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
@@ -397,7 +416,7 @@ def test_ntz_no_time_zone_is_noop(monkeypatch):
     config = DummyDatasetConfig(time_dim)
 
     df = MagicMock()
-    df.columns = ["geography", "time", "value"]
+    df.columns = ["geography", "time", VALUE_COLUMN]
 
     # Ensure localization helpers are not called
     for name in [

@@ -485,7 +485,7 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     )
 
     def get_time_zones(self) -> list[str]:
-        return [self.time_zones]
+        return self.time_zones
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):

@@ -30,6 +30,18 @@ class TimeZoneFormat(str, Enum):
     ALIGNED_IN_LOCAL_STD_TIME = "aligned_in_local_std_time"
     LOCAL_AS_STRINGS = "local_as_strings"
 
+    @classmethod
+    def _missing_(cls, value):
+        """Provide backward-compatible handling for legacy enum values.
+
+        The value ``"aligned_in_clock_time"`` was used in older configurations and
+        has since been renamed to ``"aligned_in_local_std_time"``. Map the legacy
+        value to the new enum member so that existing configs continue to work.
+        """
+        if value == "aligned_in_clock_time":
+            return cls.ALIGNED_IN_LOCAL_STD_TIME
+        return None
+
 
 class RepresentativePeriodFormat(DSGEnum):
     """Defines the supported formats for representative period data."""

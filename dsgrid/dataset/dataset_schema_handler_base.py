@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Iterable, Self
+from zoneinfo import ZoneInfo
 
 import chronify
 from sqlalchemy import Connection
@@ -495,7 +496,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     # This performs all of the checks.
                     store.create_view_from_parquet(src_path, chronify_schema)
                     if localization_plan == "localize_to_single_tz":
-                        to_time_zone = time_dim.get_time_zone()
+                        to_time_zone = ZoneInfo(time_dim.get_time_zone())
                         assert to_time_zone is not None
                         new_chronify_schema = store.localize_time_zone(
                             chronify_schema.name, to_time_zone, output_file=output_data_file_path

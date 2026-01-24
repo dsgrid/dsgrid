@@ -1,14 +1,16 @@
 import logging
 import os
 from pathlib import Path
-from typing import Iterable
-from zoneinfo import ZoneInfo
+from typing import Iterable, Optional
+from datetime import tzinfo
 
 import chronify
 from chronify.models import TableSchema
 
 import dsgrid
-from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
@@ -23,6 +25,7 @@ from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimensionMapping,
     DSGInvalidDataset,
+    DSGInvalidOperation,
 )
 from dsgrid.spark.functions import (
     coalesce,
@@ -49,6 +52,7 @@ from dsgrid.spark.types import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
+    persist_table,
     write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -104,7 +108,7 @@ def add_time_zone(
         raise ValueError(msg)
 
     df = add_column_from_records(
-        load_data_df, geo_records, "time_zone", df_key, record_key=dim_key
+        load_data_df, geo_records, TIME_ZONE_COLUMN, df_key, record_key=dim_key
     )
     return df
 
@@ -359,19 +363,20 @@ def convert_time_zone_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and DuckDB.
     All operations are performed in memory.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps with the specified time zone as a new column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    zone_info_tz = ZoneInfo(time_zone)
     dst_schema = store.convert_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
     )
     pandas_df = store.read_table(dst_schema.name)
@@ -390,6 +395,8 @@ def convert_time_zone_by_column_with_chronify_duckdb(
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and DuckDB.
     All operations are performed in memory.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps of the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_in_memory_db()
@@ -398,6 +405,56 @@ def convert_time_zone_by_column_with_chronify_duckdb(
         src_schema.name,
         time_zone_column,
         wrap_time_allowed=wrap_time_allowed,
+        scratch_dir=scratch_dir_context.scratch_dir,
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def localize_time_zone_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    time_zone: tzinfo | None,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Create a single time zone-localized table with chronify and DuckDB.
+    All operations are performed in memory.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
+    dst_schema = store.localize_time_zone(
+        src_schema.name,
+        time_zone,
+        scratch_dir=scratch_dir_context.scratch_dir,
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def localize_time_zone_by_column_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
+) -> DataFrame:
+    """Create a multiple time zone-localized table (based on a time_zone_column)
+    using chronify and DuckDB.
+    All operations are performed in memory.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
+    dst_schema = store.localize_time_zone_by_column(
+        src_schema.name,
+        time_zone_column,
         scratch_dir=scratch_dir_context.scratch_dir,
     )
     pandas_df = store.read_table(dst_schema.name)
@@ -446,7 +503,7 @@ def convert_time_zone_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
@@ -455,11 +512,10 @@ def convert_time_zone_with_chronify_spark_hive(
     with store.engine.begin() as conn:
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
-    zone_info_tz = ZoneInfo(time_zone)
     try:
         dst_schema = store.convert_time_zone(
             src_schema.name,
-            zone_info_tz,
+            time_zone,
             scratch_dir=scratch_dir_context.scratch_dir,
         )
     finally:
@@ -490,6 +546,61 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
             src_schema.name,
             time_zone_column,
             wrap_time_allowed=wrap_time_allowed,
+            scratch_dir=scratch_dir_context.scratch_dir,
+        )
+    finally:
+        with store.engine.begin() as conn:
+            store.schema_manager.remove_schema(conn, src_schema.name)
+
+    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+
+
+def localize_time_zone_with_chronify_spark_hive(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    time_zone: tzinfo | None,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Create a single time zone-localized table with chronify and Spark and a Hive Metastore."""
+
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    with store.engine.begin() as conn:
+        # This bypasses checks because the table should already be valid.
+        store.schema_manager.add_schema(conn, src_schema)
+    try:
+        dst_schema = store.localize_time_zone(
+            src_schema.name,
+            time_zone,
+            scratch_dir=scratch_dir_context.scratch_dir,
+        )
+    finally:
+        with store.engine.begin() as conn:
+            store.schema_manager.remove_schema(conn, src_schema.name)
+
+    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+
+
+def localize_time_zone_by_column_with_chronify_spark_hive(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
+) -> DataFrame:
+    """Create a multiple time zone-localized table (based on a time_zone_column)
+    using chronify and Spark and a Hive Metastore.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    with store.engine.begin() as conn:
+        # This bypasses checks because the table should already be valid.
+        store.schema_manager.add_schema(conn, src_schema)
+    try:
+        dst_schema = store.localize_time_zone_by_column(
+            src_schema.name,
+            time_zone_column=time_zone_column,
             scratch_dir=scratch_dir_context.scratch_dir,
         )
     finally:
@@ -533,7 +644,7 @@ def convert_time_zone_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark using the local filesystem."""
@@ -541,10 +652,9 @@ def convert_time_zone_with_chronify_spark_path(
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    zone_info_tz = ZoneInfo(time_zone)
     store.convert_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
     )
@@ -571,6 +681,52 @@ def convert_time_zone_by_column_with_chronify_spark_path(
         src_schema.name,
         time_zone_column,
         wrap_time_allowed=wrap_time_allowed,
+        scratch_dir=scratch_dir_context.scratch_dir,
+        output_file=output_file,
+    )
+    return df.sparkSession.read.load(str(output_file))
+
+
+def localize_time_zone_with_chronify_spark_path(
+    df: DataFrame,
+    filename: Path,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    time_zone: tzinfo | None,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Create a single time zone-localized table with chronify and Spark using the local filesystem."""
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
+    output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    store.localize_time_zone(
+        src_schema.name,
+        time_zone,
+        scratch_dir=scratch_dir_context.scratch_dir,
+        output_file=output_file,
+    )
+    return df.sparkSession.read.load(str(output_file))
+
+
+def localize_time_zone_by_column_with_chronify_spark_path(
+    df: DataFrame,
+    filename: Path,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+    time_zone_column: Optional[str] = None,
+) -> DataFrame:
+    """Create a multiple time zone-localized table (based on a time_zone_column)
+    using chronify and Spark using the local filesystem.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
+    output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    store.localize_time_zone_by_column(
+        src_schema.name,
+        time_zone_column=time_zone_column,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
     )
@@ -828,3 +984,98 @@ def split_expected_missing_rows(
     drop_columns = time_columns + [VALUE_COLUMN]
     missing_associations = null_df.drop(*drop_columns)
     return df.filter(f"{VALUE_COLUMN} IS NOT NULL"), missing_associations
+
+
+def localize_timestamps_if_necessary(
+    df: DataFrame,
+    config: DatasetConfig,
+    scratch_dir_context: ScratchDirContext,
+) -> tuple[DataFrame, bool]:
+    """Localize tz-naive timestamps to time zone(s) in the dataframe if necessary using Chronify."""
+    time_dim = config.get_dimension(DimensionType.TIME)
+    if not isinstance(time_dim, DateTimeDimensionConfig):
+        msg = f"Only DateTimeDimensionConfig allowed for time zone localization. {time_dim.__class__.__name__}"
+        raise DSGInvalidOperation(msg)
+
+    localization_plan = time_dim.get_localization_plan()
+    if not localization_plan:
+        return df, False
+
+    # This is a workaround for pivoted tables to still use Chronify, which only supports stacked tables.
+    value_columns = config.get_value_columns()
+    assert len(value_columns) > 0, value_columns
+    value_column = next(iter(value_columns))
+
+    runtime_config = dsgrid.runtime_config
+    match localization_plan:
+        case "localize_to_single_tz":
+            to_time_zone = time_dim._get_chronify_time_zone()
+            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
+                case (BackendEngine.SPARK, True):
+                    df = localize_time_zone_with_chronify_spark_hive(
+                        df=df,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+                case (BackendEngine.SPARK, False):
+                    filename = persist_table(
+                        df,
+                        scratch_dir_context,
+                        tag="dataset query before time zone localization",
+                    )
+                    df = localize_time_zone_with_chronify_spark_path(
+                        df=df,
+                        filename=filename,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+                case (BackendEngine.DUCKDB, _):
+                    df = localize_time_zone_with_chronify_duckdb(
+                        df=df,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+        case "localize_to_multi_tz":
+            if TIME_ZONE_COLUMN not in df.columns:
+                geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
+                df = add_time_zone(df, geo_dim)
+
+            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
+                case (BackendEngine.SPARK, True):
+                    df = localize_time_zone_by_column_with_chronify_spark_hive(
+                        df=df,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+                case (BackendEngine.SPARK, False):
+                    filename = persist_table(
+                        df,
+                        scratch_dir_context,
+                        tag="dataset query before time zone localization",
+                    )
+                    df = localize_time_zone_by_column_with_chronify_spark_path(
+                        df=df,
+                        filename=filename,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+                case (BackendEngine.DUCKDB, _):
+                    df = localize_time_zone_by_column_with_chronify_duckdb(
+                        df=df,
+                        value_column=value_column,
+                        from_time_dim=time_dim,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+        case _:
+            msg = f"Unknown localization plan: {localization_plan}"
+            raise DSGInvalidOperation(msg)
+
+    return df, True

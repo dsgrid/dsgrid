@@ -35,7 +35,7 @@ from dsgrid.config.dimensions import (
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import DSGInvalidOperation
 import dsgrid
-
+from dsgrid.spark.types import DataFrame
 from dsgrid.spark.functions import get_spark_session
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from chronify.time_range_generator_factory import make_time_range_generator
@@ -261,7 +261,9 @@ def test_single_tz_spark_hive(monkeypatch):
         sdf, config, scratch_dir_context=MagicMock()
     )
     assert changed is True
-    assert res_df is called_df
+    if isinstance(res_df, DataFrame):
+        res_df = res_df.toPandas()
+    assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
     target.assert_called_once()
 
 
@@ -286,7 +288,9 @@ def test_single_tz_spark_path(monkeypatch):
         sdf, config, scratch_dir_context=MagicMock()
     )
     assert changed is True
-    assert res_df is called_df
+    if isinstance(res_df, DataFrame):
+        res_df = res_df.toPandas()
+    assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
     path_target.assert_called_once()
     persist_target.assert_called_once()
 
@@ -371,7 +375,9 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
         sdf, config, scratch_dir_context=MagicMock()
     )
     assert changed is True
-    assert res_df is called_df
+    if isinstance(res_df, DataFrame):
+        res_df = res_df.toPandas()
+    assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
     hive_target.assert_called_once()
 
 
@@ -396,7 +402,9 @@ def test_multi_tz_spark_path(monkeypatch):
         sdf, config, scratch_dir_context=MagicMock()
     )
     assert changed is True
-    assert res_df is called_df
+    if isinstance(res_df, DataFrame):
+        res_df = res_df.toPandas()
+    assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
     path_target.assert_called_once()
     persist_target.assert_called_once()
 

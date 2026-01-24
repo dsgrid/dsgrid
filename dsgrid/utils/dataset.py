@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Iterable
-from zoneinfo import ZoneInfo
+from datetime import tzinfo
 
 import chronify
 from chronify.models import TableSchema
@@ -363,7 +363,7 @@ def convert_time_zone_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and DuckDB.
@@ -374,10 +374,9 @@ def convert_time_zone_with_chronify_duckdb(
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    zone_info_tz = ZoneInfo(time_zone)
     dst_schema = store.convert_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
     )
     pandas_df = store.read_table(dst_schema.name)
@@ -417,7 +416,7 @@ def localize_time_zone_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-localized table with chronify and DuckDB.
@@ -428,10 +427,9 @@ def localize_time_zone_with_chronify_duckdb(
 
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    zone_info_tz = ZoneInfo(time_zone)
     dst_schema = store.localize_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
     )
     pandas_df = store.read_table(dst_schema.name)
@@ -505,7 +503,7 @@ def convert_time_zone_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
@@ -514,11 +512,10 @@ def convert_time_zone_with_chronify_spark_hive(
     with store.engine.begin() as conn:
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
-    zone_info_tz = ZoneInfo(time_zone)
     try:
         dst_schema = store.convert_time_zone(
             src_schema.name,
-            zone_info_tz,
+            time_zone,
             scratch_dir=scratch_dir_context.scratch_dir,
         )
     finally:
@@ -562,7 +559,7 @@ def localize_time_zone_with_chronify_spark_hive(
     df: DataFrame,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-localized table with chronify and Spark and a Hive Metastore."""
@@ -572,11 +569,10 @@ def localize_time_zone_with_chronify_spark_hive(
     with store.engine.begin() as conn:
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
-    zone_info_tz = ZoneInfo(time_zone)
     try:
         dst_schema = store.localize_time_zone(
             src_schema.name,
-            zone_info_tz,
+            time_zone,
             scratch_dir=scratch_dir_context.scratch_dir,
         )
     finally:
@@ -648,7 +644,7 @@ def convert_time_zone_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark using the local filesystem."""
@@ -656,10 +652,9 @@ def convert_time_zone_with_chronify_spark_path(
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    zone_info_tz = ZoneInfo(time_zone)
     store.convert_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
     )
@@ -697,7 +692,7 @@ def localize_time_zone_with_chronify_spark_path(
     filename: Path,
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
-    time_zone: str,
+    time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-localized table with chronify and Spark using the local filesystem."""
@@ -705,10 +700,9 @@ def localize_time_zone_with_chronify_spark_path(
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    zone_info_tz = ZoneInfo(time_zone)
     store.localize_time_zone(
         src_schema.name,
-        zone_info_tz,
+        time_zone,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
     )
@@ -1015,7 +1009,7 @@ def localize_timestamps_if_necessary(
     runtime_config = dsgrid.runtime_config
     match localization_plan:
         case "localize_to_single_tz":
-            to_time_zone = time_dim.get_time_zone()
+            to_time_zone = time_dim._get_chronify_time_zone()
             match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):
                     df = localize_time_zone_with_chronify_spark_hive(

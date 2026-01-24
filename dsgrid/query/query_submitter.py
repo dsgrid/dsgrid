@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 import copy
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
 from chronify.utils.path_utils import check_overwrite
 from semver import VersionInfo
@@ -352,13 +353,15 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         config = dsgrid.runtime_config
         if isinstance(model.result.time_zone, str) and model.result.time_zone != "geography":
+            tz_name = model.result.time_zone
+            to_time_zone = ZoneInfo(tz_name) if tz_name not in [None, "None", "none"] else None
             match (config.backend_engine, config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):
                     df = convert_time_zone_with_chronify_spark_hive(
                         df=df,
                         value_column=VALUE_COLUMN,
                         from_time_dim=time_dim,
-                        time_zone=model.result.time_zone,
+                        time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
                     )
 
@@ -373,7 +376,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         filename=filename,
                         value_column=VALUE_COLUMN,
                         from_time_dim=time_dim,
-                        time_zone=model.result.time_zone,
+                        time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
                     )
                 case (BackendEngine.DUCKDB, _):
@@ -381,7 +384,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         df=df,
                         value_column=VALUE_COLUMN,
                         from_time_dim=time_dim,
-                        time_zone=model.result.time_zone,
+                        time_zone=to_time_zone,
                         scratch_dir_context=scratch_dir_context,
                     )
 

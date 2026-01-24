@@ -44,7 +44,7 @@ from chronify.time_range_generator_factory import make_time_range_generator
 spark = get_spark_session()
 
 
-def make_datetime_config_single_tz_ntz(time_zone="ETC/GMT+7"):
+def make_datetime_config_single_tz_ntz(time_zone="Etc/GMT+7"):
     # default to Mountain Standard Time
     model = DateTimeDimensionModel(
         name="time",
@@ -104,7 +104,7 @@ def make_dataframes_multi_tz(time_dim):
     return sdf, scalled_df
 
 
-def make_datetime_config_multi_tz_ntz(time_zones=["ETC/GMT+5", "ETC/GMT+8"]):
+def make_datetime_config_multi_tz_ntz(time_zones=["Etc/GMT+5", "Etc/GMT+8"]):
     # default to Eastern and Pacific Standard Time
     model = DateTimeDimensionModel(
         name="time",
@@ -262,8 +262,8 @@ def test_single_tz_spark_hive(monkeypatch):
 
 
 def test_single_tz_spark_path(monkeypatch):
-    dsgrid.runtime_config.backend_engine = BackendEngine.SPARK
-    dsgrid.runtime_config.use_hive_metastore = False
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.SPARK)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", False)
 
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
@@ -286,8 +286,8 @@ def test_single_tz_spark_path(monkeypatch):
 
 def test_value_column_first_used(monkeypatch):
     # Backend choice doesn't matter; use DUCKDB
-    dsgrid.runtime_config.backend_engine = BackendEngine.DUCKDB
-    dsgrid.runtime_config.use_hive_metastore = False
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.DUCKDB)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", False)
 
     time_dim = make_datetime_config_single_tz_ntz()
     # Provide multiple value columns; function should pick the first
@@ -313,8 +313,8 @@ def test_value_column_first_used(monkeypatch):
 
 
 def test_multi_tz_duckdb_adds_tz_and_calls_duckdb(monkeypatch):
-    dsgrid.runtime_config.backend_engine = BackendEngine.DUCKDB
-    dsgrid.runtime_config.use_hive_metastore = False
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.DUCKDB)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", False)
 
     time_dim = make_datetime_config_multi_tz_ntz()
     config = DummyDatasetConfig(time_dim)
@@ -340,8 +340,8 @@ def test_multi_tz_duckdb_adds_tz_and_calls_duckdb(monkeypatch):
 
 
 def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
-    dsgrid.runtime_config.backend_engine = BackendEngine.SPARK
-    dsgrid.runtime_config.use_hive_metastore = True
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.SPARK)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", True)
 
     time_dim = make_datetime_config_multi_tz_ntz()
     config = DummyDatasetConfig(time_dim)
@@ -366,8 +366,8 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
 
 
 def test_multi_tz_spark_path(monkeypatch):
-    dsgrid.runtime_config.backend_engine = BackendEngine.SPARK
-    dsgrid.runtime_config.use_hive_metastore = False
+    monkeypatch.setattr(dsgrid.runtime_config, "backend_engine", BackendEngine.SPARK)
+    monkeypatch.setattr(dsgrid.runtime_config, "use_hive_metastore", False)
 
     time_dim = make_datetime_config_multi_tz_ntz()
     config = DummyDatasetConfig(time_dim)

@@ -53,7 +53,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     length=self.get_lengths()[0],
                     resolution=self.get_frequency(),
                     time_zone_column=TIME_ZONE_COLUMN,
-                    time_zones=self.get_time_zones(),
+                    time_zones=self._get_chronify_time_zones(),
                     measurement_type=self._model.measurement_type,
                     interval_type=self._model.time_interval_type,
                 )
@@ -157,3 +157,13 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             # dtype is TIMESTAMP_NTZ, so drop tzinfo
             return pd.Timestamp(start_time.replace(tzinfo=None))
         return pd.Timestamp(start_time)
+
+    def _get_chronify_time_zone(self) -> tzinfo | None:
+        time_zone = self.get_time_zone()
+        return ZoneInfo(time_zone) if time_zone else None
+
+    def _get_chronify_time_zones(self) -> list[tzinfo]:
+        # Does not allow mix of time zones and None because databases do not
+        # allow mix of tz-aware and tz-naive timestamps in a single column.
+        time_zones = self.get_time_zones()
+        return [ZoneInfo(tz) for tz in time_zones]

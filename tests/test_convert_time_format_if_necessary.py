@@ -133,12 +133,8 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
     assert got == expected
 
 
-def test_offset_parsing_in_parts_spark_backend():
-    # Only run when the module is loaded in Spark mode.
-    import dsgrid.spark.types as types
-
-    if types.use_duckdb():
-        pytest.skip("Spark types not active; cannot switch backend at runtime")
+def test_offset_parsing_in_parts_backend_agnostic():
+    # Backend-agnostic: run under current engine (DuckDB or Spark).
 
     spark = get_spark_session()
     set_current_time_zone("UTC")
@@ -161,11 +157,11 @@ def test_offset_parsing_in_parts_spark_backend():
         }
     )
     df = spark.createDataFrame(pdf)
-
-    ts_str = DatasetRegistryManager._build_timestamp_string_expr(col_format)
-    ts_sql, new_col_format = DatasetRegistryManager._build_timestamp_sql(ts_str, col_format)
-    cols_to_drop = DatasetRegistryManager._get_time_columns_to_drop(col_format)
-    out_df = DatasetRegistryManager._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
+    mgr = make_manager()
+    ts_str = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, new_col_format = mgr._build_timestamp_sql(ts_str, col_format)
+    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
+    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
     assert new_col_format.dtype == "TIMESTAMP_TZ"
     check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS STRING) AS ts_str"])
@@ -176,3 +172,212 @@ def test_offset_parsing_in_parts_spark_backend():
         "2020-01-01 08:00:00",
     ]
     assert got == expected
+
+
+def test_invalid_numeric_offset_raises():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020, 2020],
+            "month": [1, 1],
+            "day": [1, 1],
+            "hour": [0, 0],
+            "utc_offset": [24.5, -24.5],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        # Validate directly; conversion also invokes this guard
+        mgr._validate_offset_bounds(df, "utc_offset")
+
+
+def test_invalid_string_offset_raises():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020, 2020],
+            "month": [1, 1],
+            "day": [1, 1],
+            "hour": [0, 0],
+            "utc_offset_str": ["+25:00", "-25:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_invalid_string_offset_minutes_out_of_range():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset_str": ["+12:60"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_invalid_string_offset_24_with_nonzero_minutes():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset_str": ["+24:01"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_invalid_string_offset_bad_format():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020, 2020],
+            "month": [1, 1],
+            "day": [1, 1],
+            "hour": [0, 0],
+            "utc_offset_str": ["24:00", "+2400"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_invalid_string_offset_missing_leading_zero_hours():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset_str": ["+5:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_invalid_string_offset_missing_leading_zero_minutes():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset_str": ["-07:5"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    with pytest.raises(Exception):
+        mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_valid_string_offset_24_allowed():
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020, 2020],
+            "month": [1, 1],
+            "day": [1, 1],
+            "hour": [0, 0],
+            "utc_offset_str": ["+24:00", "-24:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+    # Should not raise
+    mgr._validate_offset_bounds(df, "utc_offset_str")
+
+
+def test_cast_with_offset_24_numeric_previous_behavior():
+    """Bypass validation and confirm CAST accepts numeric offset=24.0.
+
+    This mimics previous code path (no bounds check) by using helper methods
+    directly. Verifies that +24:00 is accepted and yields UTC instant.
+    """
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset": [24.0],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+
+    col_format = TimeFormatInPartsModel(
+        year_column="year",
+        month_column="month",
+        day_column="day",
+        hour_column="hour",
+        offset_column="utc_offset",
+    )
+    ts_str = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(ts_str, col_format)
+    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
+
+    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
+    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])
+    rows = check_df.collect()
+    assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
+
+
+def test_cast_with_offset_24_string_previous_behavior():
+    """Bypass validation and confirm CAST accepts string offset="+24:00".
+
+    Uses helper methods directly to mimic previous behavior without bounds check.
+    Verifies that +24:00 is accepted and yields UTC instant.
+    """
+    mgr = make_manager()
+    spark = get_spark_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2020],
+            "month": [1],
+            "day": [1],
+            "hour": [0],
+            "utc_offset_str": ["+24:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+
+    col_format = TimeFormatInPartsModel(
+        year_column="year",
+        month_column="month",
+        day_column="day",
+        hour_column="hour",
+        offset_column="utc_offset_str",
+    )
+    ts_str = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(ts_str, col_format)
+    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
+
+    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
+    check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])
+    rows = check_df.collect()
+    assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]

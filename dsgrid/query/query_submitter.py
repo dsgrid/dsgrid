@@ -348,7 +348,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         time_cols = list(context.get_dimension_column_names(DimensionType.TIME))
         assert len(time_cols) == 1
         time_col = next(iter(time_cols))
-        time_dim.model.time_column = time_col
+        time_dim.model.column_format.time_column = time_col
 
         config = dsgrid.runtime_config
         if isinstance(model.result.time_zone, str) and model.result.time_zone != "geography":

@@ -91,7 +91,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:
-        return [self.model.time_column]
+        return self.model.column_format.get_time_columns()
 
     def get_time_zone(self) -> str | None:
         time_zones = self.get_time_zones()

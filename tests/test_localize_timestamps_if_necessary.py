@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 from unittest.mock import MagicMock
 import pandas as pd
-from pyspark.sql import SparkSession
 
 from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.dimension.base_models import DimensionType
@@ -37,11 +36,12 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import DSGInvalidOperation
 import dsgrid
 
+from dsgrid.spark.functions import get_spark_session
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from chronify.time_range_generator_factory import make_time_range_generator
 
 
-spark = SparkSession.builder.getOrCreate()
+spark = get_spark_session()
 
 
 def make_datetime_config_single_tz_ntz():
@@ -82,6 +82,7 @@ def make_dataframes_single_tz(time_dim):
 
     sdf = spark.createDataFrame(df)
     scalled_df = spark.createDataFrame(called_df)
+    breakpoint()
     return sdf, scalled_df
 
 

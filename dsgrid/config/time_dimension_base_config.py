@@ -2,6 +2,7 @@ import abc
 import logging
 from datetime import tzinfo
 from typing import Any
+import ibis.expr.types as ir
 import pandas as pd
 
 import chronify
@@ -15,10 +16,6 @@ from dsgrid.dimension.time_utils import (
     build_time_ranges,
 )
 from dsgrid.config.dimensions import TimeRangeModel
-
-from dsgrid.spark.types import (
-    DataFrame,
-)
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +40,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         Parameters
         ----------
-        load_data_df : pyspark.sql.DataFrame
+        load_data_df : ir.Table
         time_columns : list[str]
 
         Raises
@@ -54,12 +51,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         msg = f"{type(self)}.check_dataset_time_consistency is not implemented"
         raise NotImplementedError(msg)
 
-    def build_time_dataframe(self) -> DataFrame:
-        """Build time dimension as specified in config in a spark dataframe.
+    def build_time_dataframe(self) -> ir.Table:
+        """Build time dimension as specified in config in a table.
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ir.Table
         """
         msg = f"{self.__class__.__name__}.build_time_dataframe is not implemented"
         raise NotImplementedError(msg)
@@ -83,16 +80,16 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         # This may need to be re-implemented by child classes.
         return [self.model.name]
 
-    def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
+    def map_timestamp_load_data_columns_for_query_name(self, df) -> ir.Table:
         """Map the timestamp columns in the load data table to those specified by the query name.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ir.Table
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ir.Table
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
@@ -105,7 +102,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_col = time_cols[0]
         if time_col not in df.columns:
             return df
-        return df.withColumnRenamed(time_col, self.model.name)
+        return df.rename(**{self.model.name: time_col})
 
     def get_time_ranges(self) -> list[Any]:
         """Return time ranges with time_zone applied.

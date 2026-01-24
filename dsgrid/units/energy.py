@@ -2,7 +2,8 @@
 
 import logging
 
-from dsgrid.spark.types import DataFrame, F
+import ibis
+
 from dsgrid.units.constants import (
     GIGA_TO_KILO,
     GIGA_TO_MEGA,
@@ -46,100 +47,100 @@ from dsgrid.units.constants import (
 logger = logging.getLogger(__name__)
 
 
-def to_kwh(unit_col: str, value_col: str) -> DataFrame:
+def to_kwh(unit_col, value_col):
     """Convert a column to kWh."""
-    return (
-        F.when(F.col(unit_col) == KWH, F.col(value_col))
-        .when(F.col(unit_col) == MWH, (F.col(value_col) * MEGA_TO_KILO))
-        .when(F.col(unit_col) == GWH, (F.col(value_col) * GIGA_TO_KILO))
-        .when(F.col(unit_col) == TWH, (F.col(value_col) * TERA_TO_KILO))
-        .when(F.col(unit_col) == THERM, (F.col(value_col) * THERM_TO_KWH))
-        .when(F.col(unit_col) == MBTU, (F.col(value_col) * MBTU_TO_KWH))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col),
+        (unit_col == MWH, value_col * MEGA_TO_KILO),
+        (unit_col == GWH, value_col * GIGA_TO_KILO),
+        (unit_col == TWH, value_col * TERA_TO_KILO),
+        (unit_col == THERM, value_col * THERM_TO_KWH),
+        (unit_col == MBTU, value_col * MBTU_TO_KWH),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_mwh(unit_col: str, value_col: str) -> DataFrame:
+def to_mwh(unit_col, value_col):
     """Convert a column to mWh."""
-    return (
-        F.when(F.col(unit_col) == KWH, (F.col(value_col) * KILO_TO_MEGA))
-        .when(F.col(unit_col) == MWH, F.col(value_col))
-        .when(F.col(unit_col) == GWH, (F.col(value_col) * GIGA_TO_MEGA))
-        .when(F.col(unit_col) == TWH, (F.col(value_col) * TERA_TO_MEGA))
-        .when(F.col(unit_col) == THERM, (F.col(value_col) * THERM_TO_MWH))
-        .when(F.col(unit_col) == MBTU, (F.col(value_col) * MBTU_TO_MWH))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col * KILO_TO_MEGA),
+        (unit_col == MWH, value_col),
+        (unit_col == GWH, value_col * GIGA_TO_MEGA),
+        (unit_col == TWH, value_col * TERA_TO_MEGA),
+        (unit_col == THERM, value_col * THERM_TO_MWH),
+        (unit_col == MBTU, value_col * MBTU_TO_MWH),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_gwh(unit_col: str, value_col: str) -> DataFrame:
+def to_gwh(unit_col, value_col):
     """Convert a column to gWh."""
-    return (
-        F.when(F.col(unit_col) == KWH, (F.col(value_col) * KILO_TO_GIGA))
-        .when(F.col(unit_col) == MWH, (F.col(value_col) * MEGA_TO_GIGA))
-        .when(F.col(unit_col) == GWH, F.col(value_col))
-        .when(F.col(unit_col) == TWH, (F.col(value_col) * TERA_TO_GIGA))
-        .when(F.col(unit_col) == THERM, (F.col(value_col) * THERM_TO_GWH))
-        .when(F.col(unit_col) == MBTU, (F.col(value_col) * MBTU_TO_GWH))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col * KILO_TO_GIGA),
+        (unit_col == MWH, value_col * MEGA_TO_GIGA),
+        (unit_col == GWH, value_col),
+        (unit_col == TWH, value_col * TERA_TO_GIGA),
+        (unit_col == THERM, value_col * THERM_TO_GWH),
+        (unit_col == MBTU, value_col * MBTU_TO_GWH),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_twh(unit_col: str, value_col: str) -> DataFrame:
+def to_twh(unit_col, value_col):
     """Convert a column to tWh."""
-    return (
-        F.when(F.col(unit_col) == KWH, (F.col(value_col) * KILO_TO_TERA))
-        .when(F.col(unit_col) == MWH, (F.col(value_col) * MEGA_TO_TERA))
-        .when(F.col(unit_col) == GWH, (F.col(value_col) * GIGA_TO_TERA))
-        .when(F.col(unit_col) == TWH, F.col(value_col))
-        .when(F.col(unit_col) == THERM, (F.col(value_col) * THERM_TO_TWH))
-        .when(F.col(unit_col) == MBTU, (F.col(value_col) * MBTU_TO_TWH))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col * KILO_TO_TERA),
+        (unit_col == MWH, value_col * MEGA_TO_TERA),
+        (unit_col == GWH, value_col * GIGA_TO_TERA),
+        (unit_col == TWH, value_col),
+        (unit_col == THERM, value_col * THERM_TO_TWH),
+        (unit_col == MBTU, value_col * MBTU_TO_TWH),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_therm(unit_col: str, value_col: str) -> DataFrame:
+def to_therm(unit_col, value_col):
     """Convert a column to therm."""
-    return (
-        F.when(F.col(unit_col) == KWH, (F.col(value_col) * KWH_TO_THERM))
-        .when(F.col(unit_col) == MWH, (F.col(value_col) * MWH_TO_THERM))
-        .when(F.col(unit_col) == GWH, (F.col(value_col) * GWH_TO_THERM))
-        .when(F.col(unit_col) == TWH, (F.col(value_col) * TWH_TO_THERM))
-        .when(F.col(unit_col) == THERM, F.col(value_col))
-        .when(F.col(unit_col) == MBTU, (F.col(value_col) * MBTU_TO_THERM))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col * KWH_TO_THERM),
+        (unit_col == MWH, value_col * MWH_TO_THERM),
+        (unit_col == GWH, value_col * GWH_TO_THERM),
+        (unit_col == TWH, value_col * TWH_TO_THERM),
+        (unit_col == THERM, value_col),
+        (unit_col == MBTU, value_col * MBTU_TO_THERM),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def to_mbtu(unit_col: str, value_col: str) -> DataFrame:
+def to_mbtu(unit_col, value_col):
     """Convert a column to MBtu."""
-    return (
-        F.when(F.col(unit_col) == KWH, (F.col(value_col) * KWH_TO_MBTU))
-        .when(F.col(unit_col) == MWH, (F.col(value_col) * MWH_TO_MBTU))
-        .when(F.col(unit_col) == GWH, (F.col(value_col) * GWH_TO_MBTU))
-        .when(F.col(unit_col) == TWH, (F.col(value_col) * TWH_TO_MBTU))
-        .when(F.col(unit_col) == THERM, (F.col(value_col) * THERM_TO_MBTU))
-        .when(F.col(unit_col) == MBTU, F.col(value_col))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (unit_col == KWH, value_col * KWH_TO_MBTU),
+        (unit_col == MWH, value_col * MWH_TO_MBTU),
+        (unit_col == GWH, value_col * GWH_TO_MBTU),
+        (unit_col == TWH, value_col * TWH_TO_MBTU),
+        (unit_col == THERM, value_col * THERM_TO_MBTU),
+        (unit_col == MBTU, value_col),
+        (unit_col == "", value_col),
+        else_=ibis.null(),
     )
 
 
-def from_any_to_any(from_unit_col: str, to_unit_col: str, value_col: str) -> DataFrame:
+def from_any_to_any(from_unit_col, to_unit_col, value_col):
     """Convert a column of energy based on from/to columns."""
-    return (
-        F.when(F.col(from_unit_col) == F.col(to_unit_col), F.col(value_col))
-        .when(F.col(from_unit_col) == "", F.col(value_col))
-        .when(F.col(to_unit_col) == KWH, to_kwh(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == MWH, to_mwh(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == GWH, to_gwh(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == TWH, to_twh(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == THERM, to_therm(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == MBTU, to_mbtu(from_unit_col, value_col))
-        .otherwise(None)
+    return ibis.cases(
+        (from_unit_col == to_unit_col, value_col),
+        (from_unit_col == "", value_col),
+        (to_unit_col == KWH, to_kwh(from_unit_col, value_col)),
+        (to_unit_col == MWH, to_mwh(from_unit_col, value_col)),
+        (to_unit_col == GWH, to_gwh(from_unit_col, value_col)),
+        (to_unit_col == TWH, to_twh(from_unit_col, value_col)),
+        (to_unit_col == THERM, to_therm(from_unit_col, value_col)),
+        (to_unit_col == MBTU, to_mbtu(from_unit_col, value_col)),
+        else_=ibis.null(),
     )

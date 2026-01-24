@@ -1,5 +1,6 @@
 import logging
 import math
+import ibis
 
 from dsgrid.utils.timing import timed_info
 
@@ -31,7 +32,7 @@ class SparkPartition:
             Estimated size of df in memory in MB
 
         """
-        n_rows = df.count()
+        n_rows = df.count().execute()
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
         return n_rows, n_cols, data_MB
@@ -67,11 +68,20 @@ class SparkPartition:
     def file_size_if_partition_by(self, df, key):
         """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
-        n_partitions = df.select(key).distinct().count()
+        n_partitions = df.select(key).distinct().count().execute()
         avg_MB = round(data_MB / n_partitions, 2)
 
-        n_rows_largest_part = df.groupBy(key).count().orderBy("count", ascending=False).first()[1]
-        n_rows_smallest_part = df.groupBy(key).count().orderBy("count", ascending=True).first()[1]
+        # Ibis syntax: group_by with aggregate to name the count column
+        counts = df.group_by(key).aggregate(count=df.count())
+
+        # largest
+        n_rows_largest_part = (
+            counts.order_by(ibis.desc("count")).limit(1).to_pyarrow().to_pylist()[0]["count"]
+        )
+        # smallest
+        n_rows_smallest_part = (
+            counts.order_by("count").limit(1).to_pyarrow().to_pylist()[0]["count"]
+        )
 
         largest_MB = round(data_MB / n_rows * n_rows_largest_part, 2)
         smallest_MB = round(data_MB / n_rows * n_rows_smallest_part, 2)

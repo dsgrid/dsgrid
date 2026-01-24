@@ -1,4 +1,5 @@
 import math
+import ibis
 from pathlib import Path
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -26,30 +27,9 @@ from dsgrid.dimension.time import (
     TimeIntervalType,
     RepresentativePeriodFormat,
 )
-from dsgrid.spark.functions import (
-    aggregate_single_value,
-    init_spark,
-    is_dataframe_empty,
-)
-from dsgrid.spark.types import (
-    BooleanType,
-    ByteType,
-    DoubleType,
-    F,
-    StringType,
-    StructType,
-    StructField,
-    use_duckdb,
-)
-from dsgrid.utils.dataset import (
-    map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_spark_path,
-)
-from dsgrid.utils.spark import (
-    get_spark_session,
-    persist_table,
-    read_dataframe,
-)
+from dsgrid.ibis_api import read_csv
+from dsgrid.tests.utils import use_duckdb
+from dsgrid.utils.dataset import map_time_dimension_with_chronify
 
 
 ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE = (
@@ -62,23 +42,7 @@ ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE = (
 
 @pytest.fixture(scope="module")
 def one_weekday_day_and_one_weekend_day_per_month_by_hour_table():
-    spark = init_spark()
-    schema = StructType(
-        [
-            StructField("scenario", StringType(), False),
-            StructField("model_year", StringType(), False),
-            StructField("geography", StringType(), False),
-            StructField("subsector", StringType(), False),
-            StructField("metric", StringType(), False),
-            StructField("month", ByteType(), False),
-            StructField("hour", ByteType(), False),
-            StructField("is_weekday", BooleanType(), False),
-            StructField("value", DoubleType(), False),
-        ]
-    )
-    return spark.read.csv(
-        str(ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE), schema=schema, header=True
-    )
+    return read_csv(str(ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE))
 
 
 def make_date_time_config():
@@ -134,42 +98,29 @@ def test_time_mapping(
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
     df = one_weekday_day_and_one_weekend_day_per_month_by_hour_table
     # This dataset has only California counties.
-    df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
+    df = df.mutate(time_zone=ibis.literal("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
-    if use_duckdb():
-        mapped_df = map_time_dimension_with_chronify_duckdb(
-            df,
-            VALUE_COLUMN,
-            config,
-            project_time_config,
-            scratch_dir_context,
-        )
-    else:
-        filename = persist_table(
-            df,
-            scratch_dir_context,
-            tag="tmp query",
-        )
-        mapped_df = map_time_dimension_with_chronify_spark_path(
-            df=read_dataframe(filename),
-            filename=filename,
-            value_column=VALUE_COLUMN,
-            from_time_dim=config,
-            to_time_dim=project_time_config,
-            scratch_dir_context=scratch_dir_context,
-        )
-    timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
+    mapped_df = map_time_dimension_with_chronify(
+        df,
+        VALUE_COLUMN,
+        config,
+        project_time_config,
+        scratch_dir_context,
+    )
+    timestamps = (
+        mapped_df.select("timestamp").distinct().order_by("timestamp").to_pyarrow().to_pylist()
+    )
     zi = ZoneInfo("Etc/GMT+5")
-    est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]
+    est_timestamps = [x["timestamp"].astimezone(zi) for x in timestamps]
     start = datetime(year=2018, month=1, day=1, tzinfo=zi)
     resolution = timedelta(hours=1)
     expected_timestamps = [start + i * resolution for i in range(8760)]
     assert est_timestamps == expected_timestamps
-    assert is_dataframe_empty(mapped_df.filter(f"{VALUE_COLUMN} IS NULL"))
+    assert mapped_df.filter(mapped_df[VALUE_COLUMN].isnull()).count().execute() == 0
 
-    max_value = aggregate_single_value(df.select(VALUE_COLUMN), "max", VALUE_COLUMN)
-    max_row = df.filter(f"value == {max_value}").collect()[0]
+    max_value = df.select(VALUE_COLUMN).to_pandas()[VALUE_COLUMN].max()
+    max_row = df.filter(df["value"] == max_value).to_pyarrow().to_pylist()[0]
     # Expected max is determined by manually inspecting the file.
     expected_max = 0.9995036580360138
     assert math.isclose(max_value, expected_max)
@@ -181,14 +132,16 @@ def test_time_mapping(
     expected_geo = "06073"
     expected_model_year = "2030"
     num_weekdays_in_march_2018 = 22
-    assert max_row.month == expected_month
-    assert max_row.hour == expected_hour
-    assert max_row.is_weekday
-    assert max_row.geography == expected_geo
-    assert max_row.model_year == expected_model_year
-    assert max_row.scenario == expected_scenario
-    mapped_df_at_max = mapped_df.filter(f"value == {max_value}")
-    mapped_df.createOrReplaceTempView("tmp_view")
+    assert max_row["month"] == expected_month
+    assert max_row["hour"] == expected_hour
+    assert max_row["is_weekday"]
+    assert str(max_row["geography"]) == expected_geo
+    assert str(max_row["model_year"]) == expected_model_year
+    assert max_row["scenario"] == expected_scenario
+    mapped_df_at_max = mapped_df.filter(mapped_df["value"] == max_value)
+    from dsgrid.ibis_api import get_ibis_connection
+
+    get_ibis_connection().create_view("tmp_view", mapped_df, overwrite=True)
     if use_duckdb():
         func = "ISODOW"
         saturday = 6
@@ -200,23 +153,25 @@ def test_time_mapping(
         SELECT *
         FROM tmp_view
         WHERE (
-            model_year = '{max_row.model_year}'
-            AND geography = '{max_row.geography}'
-            AND scenario = '{max_row.scenario}'
-            AND MONTH(timestamp) = {max_row.month}
+            model_year = '{max_row["model_year"]}'
+            AND geography = '{max_row["geography"]}'
+            AND scenario = '{max_row["scenario"]}'
+            AND MONTH(timestamp) = {max_row["month"]}
             AND HOUR(timestamp) = {expected_hour_pst}
             AND {func}(timestamp) < {saturday}
         )
     """
-    spark = get_spark_session()
-    filtered_mapped_df = spark.sql(query)
-    assert mapped_df_at_max.count() == num_weekdays_in_march_2018
-    assert filtered_mapped_df.count() == num_weekdays_in_march_2018
-    assert filtered_mapped_df.select("value").distinct().count() == 1
+    from dsgrid.ibis_api import get_ibis_connection
+
+    filtered_mapped_df = get_ibis_connection().sql(query)
+    assert mapped_df_at_max.count().execute() == num_weekdays_in_march_2018
+    assert filtered_mapped_df.count().execute() == num_weekdays_in_march_2018
+    assert filtered_mapped_df.select("value").distinct().count().execute() == 1
     assert math.isclose(
-        filtered_mapped_df.select("value").distinct().collect()[0]["value"], expected_max
+        filtered_mapped_df.select("value").distinct().to_pyarrow().to_pylist()[0]["value"],
+        expected_max,
     )
     assert (
-        mapped_df_at_max.sort("timestamp").collect()
-        == filtered_mapped_df.sort("timestamp").collect()
+        mapped_df_at_max.order_by("timestamp").to_pyarrow().to_pylist()
+        == filtered_mapped_df.order_by("timestamp").to_pyarrow().to_pylist()
     )

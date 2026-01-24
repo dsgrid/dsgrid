@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Iterable, Self
 
 import chronify
+import ibis.expr.types as ir
 from sqlalchemy import Connection
 
-import dsgrid
-from dsgrid.chronify import create_store, create_in_memory_store
+from dsgrid.chronify import create_store
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -24,7 +24,7 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.common import VALUE_COLUMN, BackendEngine
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
@@ -46,40 +46,25 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.spark.functions import (
-    cache,
-    except_all,
-    is_dataframe_empty,
-    join,
-    make_temp_view_name,
-    unpersist,
-)
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import DataFrame, F, use_duckdb
 from dsgrid.units.convert import convert_units_unpivoted
+from dsgrid.ibis_api import make_temp_view_name
 from dsgrid.utils.dataset import (
+    align_column_types,
     check_historical_annual_time_model_year_consistency,
     filter_out_expected_missing_associations,
     handle_dimension_association_errors,
     is_noop_mapping,
     map_stacked_dimension,
     add_time_zone,
-    map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_spark_hive,
-    map_time_dimension_with_chronify_spark_path,
-    ordered_subset_columns,
+    map_time_dimension_with_chronify,
     repartition_if_needed_by_mapping,
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
+from dsgrid.ibis_api import (
     check_for_nulls,
     create_dataframe_from_product,
-    get_unique_values,
-    persist_table,
-    read_dataframe,
-    save_to_warehouse,
-    write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
@@ -128,7 +113,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @abc.abstractmethod
     def check_consistency(
         self,
-        missing_dimension_associations: dict[str, DataFrame],
+        missing_dimension_associations: dict[str, ir.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -141,19 +126,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
-    def get_base_load_data_table(self) -> DataFrame:
+    def get_base_load_data_table(self) -> ir.Table:
         """Return the base load data table, which must include time."""
 
     @abc.abstractmethod
-    def _get_load_data_table(self) -> DataFrame:
+    def _get_load_data_table(self) -> ir.Table:
         """Return the full load data table."""
 
-    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
+    def _make_actual_dimension_association_table_from_data(self) -> ir.Table:
         return self._remove_non_dimension_columns(self._get_load_data_table()).distinct()
 
     def _make_expected_dimension_association_table_from_records(
         self, dimension_types: Iterable[DimensionType], context: ScratchDirContext
-    ) -> DataFrame:
+    ) -> ir.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use dimensions in the dataset's dimension records.
         """
@@ -161,17 +146,22 @@ class DatasetSchemaHandlerBase(abc.ABC):
         for dim_type in dimension_types:
             dim = self._config.get_dimension_with_records(dim_type)
             if dim is not None:
-                data[dim_type.value] = list(dim.get_unique_ids())
+                data[dim_type.value] = [str(x) for x in dim.get_unique_ids()]
 
         if not data:
             msg = "Bug: did not find any dimension records"
             raise Exception(msg)
-        return create_dataframe_from_product(data, context)
+        df = create_dataframe_from_product(data, context)
+        # DuckDB read_csv infers types (e.g. integer for 2012), but dimension IDs must be strings.
+        # Force cast all columns to string.
+        table = df
+        exprs = [table[col].cast("string").name(col) for col in table.columns]
+        return table.select(exprs)
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
         self,
-        missing_dimension_associations: dict[str, DataFrame],
+        missing_dimension_associations: dict[str, ir.Table],
         context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -192,8 +182,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # This first check is redundant with the checks below. But, it is significantly
         # easier for users to debug.
         for column in assoc_by_records.columns:
-            expected = get_unique_values(assoc_by_records, column)
-            actual = get_unique_values(assoc_by_data, column)
+            expected = set(
+                assoc_by_records.select(column).distinct().to_pyarrow()[column].to_pylist()
+            )
+            actual = set(assoc_by_data.select(column).distinct().to_pyarrow()[column].to_pylist())
             if actual != expected:
                 missing = sorted(expected.difference(actual))
                 extra = sorted(actual.difference(expected))
@@ -204,41 +196,41 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
                 raise DSGInvalidDataset(msg)
 
-            required_assoc = assoc_by_records
-            if missing_dimension_associations:
-                for missing_df in missing_dimension_associations.values():
-                    required_assoc = filter_out_expected_missing_associations(
-                        required_assoc, missing_df
-                    )
+        required_assoc = assoc_by_records
+        if missing_dimension_associations:
+            for missing_df in missing_dimension_associations.values():
+                required_assoc = filter_out_expected_missing_associations(
+                    required_assoc, missing_df
+                )
 
-            cols = sorted(required_assoc.columns)
-            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-            cache(diff)
-            try:
-                if not is_dataframe_empty(diff):
-                    handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
-                logger.info("Successfully checked dataset dimension associations")
-            finally:
-                unpersist(diff)
+        cols = sorted(required_assoc.columns)
+        # Ensure compatible types before difference operation
+        aligned_data = align_column_types(required_assoc, assoc_by_data)
+        diff = required_assoc.select(cols).difference(aligned_data.select(cols))
 
-    def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
+        if diff.count().to_pyarrow().as_py() > 0:
+            handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+
+        logger.info("Successfully checked dataset dimension associations")
+
+    def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> ir.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use mapped dimensions.
         """
-        assoc_df = self._make_actual_dimension_association_table_from_data()
+        assoc_table = self._make_actual_dimension_association_table_from_data()
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            df = (
-                self._remap_dimension_columns(assoc_df, mapping_manager)
-                .drop("fraction")
-                .distinct()
-            )
+            mapped_table = self._remap_dimension_columns(assoc_table, mapping_manager)
+            if "fraction" in mapped_table.columns:
+                mapped_table = mapped_table.drop("fraction")
+            mapped_table = mapped_table.distinct()
+        df = mapped_table
         check_for_nulls(df)
         return df
 
     def remove_expected_missing_mapped_associations(
-        self, store: DataStoreInterface, df: DataFrame, context: ScratchDirContext
-    ) -> DataFrame:
+        self, store: DataStoreInterface, df: ir.Table, context: ScratchDirContext
+    ) -> ir.Table:
         """Remove expected missing associations from the full join of expected associations."""
         missing_associations = store.read_missing_associations_tables(
             self._config.model.dataset_id, self._config.model.version
@@ -246,17 +238,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if not missing_associations:
             return df
 
-        final_df = df
+        final_table = df
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
             for missing_df in missing_associations.values():
-                mapped_df = (
-                    self._remap_dimension_columns(missing_df, mapping_manager)
-                    .drop("fraction")
-                    .distinct()
-                )
-                final_df = filter_out_expected_missing_associations(final_df, mapped_df)
-        return final_df
+                mapped_table = self._remap_dimension_columns(missing_df, mapping_manager)
+                if "fraction" in mapped_table.columns:
+                    mapped_table = mapped_table.drop("fraction")
+                mapped_table = mapped_table.distinct()
+                final_table = filter_out_expected_missing_associations(final_table, mapped_table)
+        return final_table
 
     @abc.abstractmethod
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
@@ -288,7 +279,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return self._config
 
     @abc.abstractmethod
-    def make_project_dataframe(self, context, project_config) -> DataFrame:
+    def make_project_dataframe(self, context, project_config) -> ir.Table:
         """Return a load_data dataframe with dimensions mapped to the project's with filters
         as specified by the QueryContext.
 
@@ -299,7 +290,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ir.Table
 
         """
 
@@ -308,7 +299,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self,
         context: QueryContext,
         time_dimension: TimeDimensionBaseConfig | None = None,
-    ) -> DataFrame:
+    ) -> ir.Table:
         """Return a load_data dataframe with dimensions mapped as stored in the handler.
 
         Parameters
@@ -321,7 +312,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency(self, load_data_df: DataFrame):
+    def _check_dataset_time_consistency(self, load_data_df: ir.Table):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
         2. all dimension combinations return the same set of time range(s).
@@ -358,37 +349,38 @@ class DatasetSchemaHandlerBase(abc.ABC):
         file_schema = self._config.model.data_layout.data_file
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as context:
-            load_data_df = read_data_file(file_schema, scratch_dir_context=context)
+            load_data_df = read_data_file(file_schema)
+
+            # Handle time zone localization if the dimension specifies a time zone
+            # and the timestamps are tz-naive.
+            time_dim = self._config.get_dimension(DimensionType.TIME)
+            time_zone = time_dim.get_time_zone()
+            if time_zone:
+                time_cols = time_dim.get_load_data_time_columns()
+                for col in time_cols:
+                    col_type = load_data_df[col].type()
+                    # Only localize if the timestamp is tz-naive
+                    # TODO DT: what is Claude doing here?
+                    if hasattr(col_type, "timezone") and col_type.timezone is None:
+                        load_data_df = load_data_df.mutate(
+                            **{
+                                col: load_data_df[col]
+                                .cast("timestamp('UTC')")
+                                .cast(f"timestamp('{time_zone}')")
+                            }
+                        )
+
             chronify_schema = self._get_chronify_schema(load_data_df)
-            assert file_schema.path is not None
-            data_file_path = Path(file_schema.path)
-            if data_file_path.suffix == ".parquet" or not use_duckdb():
-                if data_file_path.suffix == ".csv":
-                    # This is a workaround for time zone issues between Spark, Pandas,
-                    # and Chronify when reading CSV files.
-                    # Chronify can ingest them correctly when we go to Parquet first.
-                    # This is really only a test issue because normal dsgrid users will not
-                    # use Spark with CSV data files.
-                    src_path = context.get_temp_filename(suffix=".parquet")
-                    write_dataframe(load_data_df, src_path)
-                else:
-                    src_path = data_file_path
-                store_file = context.get_temp_filename(suffix=".db")
-                with create_store(store_file) as store:
-                    # This performs all of the checks.
-                    store.create_view_from_parquet(src_path, chronify_schema)
-                    store.drop_view(chronify_schema.name)
-            else:
-                # For CSV and JSON files, use in-memory store with ingest_table.
-                # This avoids the complexity of converting to parquet.
-                with create_in_memory_store() as store:
-                    # ingest_table performs all of the time checks.
-                    store.ingest_table(load_data_df.toPandas(), chronify_schema)
-                    store.drop_table(chronify_schema.name)
+
+            # create_view registers the ibis table as a view and performs time checks.
+            store_file = context.get_temp_filename("chronify.db")
+            with create_store(store_file) as store:
+                store.create_view(chronify_schema, load_data_df)
+                store.drop_view(chronify_schema.name)
 
             self._check_model_year_time_consistency(load_data_df)
 
-    def _get_chronify_schema(self, df: DataFrame):
+    def _get_chronify_schema(self, df: ir.Table):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = time_dim.get_load_data_time_columns()
         time_array_id_columns = [
@@ -415,7 +407,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             value_column=value_column,
         )
 
-    def _check_model_year_time_consistency(self, df: DataFrame):
+    def _check_model_year_time_consistency(self, df: ir.Table):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if self._config.model.dataset_type == InputDatasetType.HISTORICAL and isinstance(
             time_dim, AnnualTimeDimensionConfig
@@ -431,19 +423,22 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
         """Check that each unique time array has the same timestamps."""
         logger.info("Check dataset time consistency by time array.")
+        load_data_df = load_data_df
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns
         )
-        counts = load_data_df.groupBy(*time_cols).count().select("count")
-        distinct_counts = counts.select("count").distinct().collect()
+        # Ibis groupby with count aggregation
+        counts = load_data_df.group_by(*time_cols).aggregate(count=load_data_df.count())
+        distinct_counts = counts.select("count").distinct().to_pyarrow().to_pylist()
         if len(distinct_counts) != 1:
             msg = (
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {len(distinct_counts)}"
             )
             raise DSGInvalidDataset(msg)
-        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
-        distinct_ta_counts = ta_counts.select("count").distinct().collect()
+
+        ta_counts = load_data_df.group_by(*unique_array_cols).aggregate(count=load_data_df.count())
+        distinct_ta_counts = ta_counts.select("count").distinct().to_pyarrow().to_pylist()
         if len(distinct_ta_counts) != 1:
             msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
@@ -459,16 +454,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _convert_units(
         self,
-        df: DataFrame,
-        project_metric_records: DataFrame,
+        df: ir.Table,
+        project_metric_records: ir.Table,
         mapping_manager: DatasetMappingManager,
-    ):
+    ) -> ir.Table:
+        table = df
         if not self._config.model.enable_unit_conversion:
-            return df
+            return table
 
         op = mapping_manager.plan.convert_units_op
         if mapping_manager.has_completed_operation(op):
-            return df
+            return table
 
         # Note that a dataset could have the same dimension record IDs as the project,
         # no mappings, but then still have different units.
@@ -484,19 +480,28 @@ class DatasetSchemaHandlerBase(abc.ABC):
         dataset_dim = self._config.get_dimension_with_records(DimensionType.METRIC)
         dataset_records = dataset_dim.get_records_dataframe()
         df = convert_units_unpivoted(
-            df,
+            table,
             DimensionType.METRIC.value,
             dataset_records,
             mapping_records,
             project_metric_records,
         )
-        if op.persist:
-            df = mapping_manager.persist_table(df, op)
-        return df
+        table = df
 
-    def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
+        if op.persist:
+            table = mapping_manager.persist_table(table, op)
+        return table
+
+        if op.persist:
+            table = mapping_manager.persist_table(table, op)
+        return table
+
+    def _finalize_table(
+        self, context: QueryContext, df: ir.Table, project_config: ProjectConfig
+    ) -> ir.Table:
         # TODO: remove ProjectConfig so that dataset queries can use this.
         # Issue #370
+
         table_handler = make_table_format_handler(
             self._config.get_value_format(),
             project_config,
@@ -504,10 +509,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
 
         time_dim = project_config.get_base_dimension(DimensionType.TIME)
+        # Determine time column names based on column type:
+        # - DIMENSION_NAMES: use the dimension name (e.g., "time_est")
+        # - DIMENSION_TYPES: use the load data time columns (e.g., "timestamp")
+        if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
+            mapped_time_columns = [time_dim.model.name]
+        else:
+            mapped_time_columns = project_config.get_load_data_time_columns(time_dim.model.name)
         context.set_dataset_metadata(
             self.dataset_id,
             context.model.result.column_type,
-            project_config.get_load_data_time_columns(time_dim.model.name),
+            mapped_time_columns,
         )
 
         if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
@@ -565,7 +577,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             config.model.to_dimension.dimension_id, conn=self._conn
         )
 
-    def _get_project_metric_records(self, project_config: ProjectConfig) -> DataFrame:
+    def _get_project_metric_records(self, project_config: ProjectConfig) -> ir.Table:
         metric_dim_query_name = getattr(
             project_config.get_dataset_base_dimension_names(self._config.model.dataset_id),
             DimensionType.METRIC.value,
@@ -592,28 +604,31 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _iter_dataset_record_ids(self, context: QueryContext):
         for dim_type, project_record_ids in context.get_record_ids().items():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
+            project_record_ids = project_record_ids
             if dataset_mapping is None:
                 dataset_record_ids = project_record_ids
             else:
+                dm = dataset_mapping
+                # Ensure compatible types for join
+                dm_col_type = dm["to_id"].type()
+                record_col_type = project_record_ids["id"].type()
+                if dm_col_type != record_col_type:
+                    dm = dm.mutate(to_id=dm["to_id"].cast(record_col_type))
                 dataset_record_ids = (
-                    join(
-                        dataset_mapping.withColumnRenamed("from_id", "dataset_record_id"),
-                        project_record_ids,
-                        "to_id",
-                        "id",
+                    dm.join(
+                        project_record_ids, dm["to_id"] == project_record_ids["id"], how="inner"
                     )
-                    .select("dataset_record_id")
-                    .withColumnRenamed("dataset_record_id", "id")
+                    .select(dm["from_id"].name("id"))
                     .distinct()
                 )
             yield dim_type, dataset_record_ids
 
     @staticmethod
-    def _list_dimension_columns(df: DataFrame) -> list[str]:
+    def _list_dimension_columns(df: ir.Table) -> list[str]:
         columns = DimensionType.get_allowed_dimension_column_names()
         return [x for x in df.columns if x in columns]
 
-    def _list_dimension_types_in_load_data(self, df: DataFrame) -> list[DimensionType]:
+    def _list_dimension_types_in_load_data(self, df: ir.Table) -> list[DimensionType]:
         dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
         if self._config.get_value_format() == ValueFormat.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()
@@ -621,31 +636,39 @@ class DatasetSchemaHandlerBase(abc.ABC):
             dims.append(pivoted_type)
         return dims
 
-    def _prefilter_pivoted_dimensions(self, context: QueryContext, df):
+    def _prefilter_pivoted_dimensions(self, context: QueryContext, df: ir.Table) -> ir.Table:
+        table = df
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
             if dim_type == self._config.get_pivoted_dimension_type():
                 # Drop columns that don't match requested project record IDs.
-                cols_to_keep = {x.id for x in dataset_record_ids.collect()}
+                cols_to_keep = set(dataset_record_ids["id"].to_pyarrow().to_pylist())
                 cols_to_drop = set(self._config.get_pivoted_dimension_columns()).difference(
                     cols_to_keep
                 )
                 if cols_to_drop:
-                    df = df.drop(*cols_to_drop)
+                    table = table.drop(*cols_to_drop)
 
-        return df
+        return table
 
-    def _prefilter_stacked_dimensions(self, context: QueryContext, df):
+    def _prefilter_stacked_dimensions(self, context: QueryContext, df: ir.Table) -> ir.Table:
+        table = df
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
-            # Drop rows that don't match requested project record IDs.
-            tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
-            if dim_type.value not in df.columns:
-                # This dimensions is stored in another table (e.g., lookup or load_data)
+            if dim_type.value not in table.columns:
                 continue
-            df = join(df, tmp, dim_type.value, "dataset_record_id").drop("dataset_record_id")
+            # Ensure compatible types for join
+            table_col_type = table[dim_type.value].type()
+            record_col_type = dataset_record_ids["id"].type()
+            if table_col_type != record_col_type:
+                dataset_record_ids = dataset_record_ids.mutate(
+                    id=dataset_record_ids["id"].cast(table_col_type)
+                )
+            table = table.join(
+                dataset_record_ids, table[dim_type.value] == dataset_record_ids["id"], how="inner"
+            ).select(table)
 
-        return df
+        return table
 
-    def _prefilter_time_dimension(self, context: QueryContext, df):
+    def _prefilter_time_dimension(self, context: QueryContext, df: ir.Table) -> ir.Table:
         # TODO #196:
         return df
 
@@ -746,10 +769,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _remap_dimension_columns(
         self,
-        df: DataFrame,
+        df: ir.Table,
         mapping_manager: DatasetMappingManager,
-        filtered_records: dict[DimensionType, DataFrame] | None = None,
-    ) -> DataFrame:
+        filtered_records: dict[DimensionType, ir.Table] | None = None,
+    ) -> ir.Table:
         """Map the table's dimensions according to the plan.
 
         Parameters
@@ -763,6 +786,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             If None, do not persist any intermediate tables.
             If not None, use this context to persist intermediate tables if required.
         """
+        table = df
         completed_operations = mapping_manager.get_completed_mapping_operations()
         for dim_mapping in mapping_manager.plan.mappings:
             if dim_mapping.name in completed_operations:
@@ -783,68 +807,89 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 dim_type,
                 mapping_config.model.mapping_type,
             )
-            records = mapping_config.get_records_dataframe()
+            records_table = mapping_config.get_records_dataframe()
             if filtered_records is not None and dim_type in filtered_records:
-                records = join(records, filtered_records[dim_type], "to_id", "id").drop("id")
+                filtered_table = filtered_records[dim_type]
+                records_table = records_table.join(
+                    filtered_table,
+                    records_table["to_id"] == filtered_table["id"],
+                    how="inner",
+                ).drop("id")
 
-            if is_noop_mapping(records):
+            if is_noop_mapping(records_table):
                 logger.info("Skip no-op mapping %s.", ref.mapping_id)
                 continue
-            if column in df.columns:
+            if column in table.columns:
                 persisted_file: Path | None = None
-                df = map_stacked_dimension(df, records, column)
-                df, persisted_file = repartition_if_needed_by_mapping(
-                    df,
+                table = map_stacked_dimension(table, records_table, column)
+
+                # Cleanup unit columns if present in mapping records
+                for col in ["from_unit", "to_unit"]:
+                    if col in table.columns:
+                        table = table.drop(col)
+
+                table, persisted_file = repartition_if_needed_by_mapping(
+                    table,
                     mapping_config.model.mapping_type,
                     mapping_manager.scratch_dir_context,
                     repartition=dim_mapping.handle_data_skew,
                 )
                 if dim_mapping.persist and persisted_file is None:
-                    mapping_manager.persist_table(df, dim_mapping)
+                    table = mapping_manager.persist_table(table, dim_mapping)
                 if persisted_file is not None:
                     mapping_manager.save_checkpoint(persisted_file, dim_mapping)
 
-        return df
+        return table
 
     def _apply_fraction(
         self,
-        df,
+        df: ir.Table,
         value_columns,
         mapping_manager: DatasetMappingManager,
         agg_func=None,
-    ):
+    ) -> ir.Table:
+        table = df
         op = mapping_manager.plan.apply_fraction_op
-        if "fraction" not in df.columns:
-            return df
+        if "fraction" not in table.columns:
+            return table
         if mapping_manager.has_completed_operation(op):
-            return df
-        agg_func = agg_func or F.sum
-        # Maintain column order.
-        agg_ops = [
-            agg_func(F.col(x) * F.col("fraction")).alias(x)
-            for x in [y for y in df.columns if y in value_columns]
-        ]
-        gcols = set(df.columns) - value_columns - {"fraction"}
-        df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
-        df = df.drop("fraction")
+            return table
+
+        # agg_func is usually sum for fraction application.
+        # We ignore custom agg_func for now as Ibis aggregation is constructed below.
+
+        subset = set(table.columns) - set(value_columns) - {"fraction"}
+        group_cols = [x for x in table.columns if x in subset]
+
+        aggs = []
+        for col in value_columns:
+            if col in table.columns:
+                aggs.append((table[col] * table["fraction"]).sum().name(col))
+
+        if not aggs:
+            return table.drop("fraction")
+
+        table = table.group_by(group_cols).aggregate(aggs)
+
         if op.persist:
-            df = mapping_manager.persist_table(df, op)
-        return df
+            table = mapping_manager.persist_table(table, op)
+        return table
 
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
         self,
-        load_data_df: DataFrame,
+        load_data_df: ir.Table,
         to_time_dim: TimeDimensionBaseConfig,
         value_column: str,
         mapping_manager: DatasetMappingManager,
         wrap_time_allowed: bool,
         time_based_data_adjustment: TimeBasedDataAdjustmentModel,
         to_geo_dim: DimensionBaseConfigWithFiles | None = None,
-    ):
+    ) -> ir.Table:
         op = mapping_manager.plan.map_time_op
         if mapping_manager.has_completed_operation(op):
             return load_data_df
+
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_time_dimension()
         assert time_dim is not None
@@ -865,14 +910,14 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 msg = f"Annual time can only be mapped to DateTime: {to_time_dim.model.time_type}"
                 raise NotImplementedError(msg)
 
-            return map_annual_time_to_date_time(
+            df = map_annual_time_to_date_time(
                 load_data_df,
                 time_dim,
                 to_time_dim,
                 {value_column},
             )
+            return df
 
-        config = dsgrid.runtime_config
         if not time_dim.supports_chronify():
             # annual time is returned above
             # no mapping for no-op
@@ -880,53 +925,24 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
             return load_data_df
-        match (config.backend_engine, config.use_hive_metastore):
-            case (BackendEngine.SPARK, True):
-                table_name = make_temp_view_name()
-                load_data_df = map_time_dimension_with_chronify_spark_hive(
-                    df=save_to_warehouse(load_data_df, table_name),
-                    table_name=table_name,
-                    value_column=value_column,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
 
-            case (BackendEngine.SPARK, False):
-                filename = persist_table(
-                    load_data_df,
-                    mapping_manager.scratch_dir_context,
-                    tag="query before time mapping",
-                )
-                load_data_df = map_time_dimension_with_chronify_spark_path(
-                    df=read_dataframe(filename),
-                    filename=filename,
-                    value_column=value_column,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
-            case (BackendEngine.DUCKDB, _):
-                load_data_df = map_time_dimension_with_chronify_duckdb(
-                    df=load_data_df,
-                    value_column=value_column,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
+        load_data_df = map_time_dimension_with_chronify(
+            df=load_data_df,
+            value_column=value_column,
+            from_time_dim=time_dim,
+            to_time_dim=to_time_dim,
+            scratch_dir_context=mapping_manager.scratch_dir_context,
+            time_based_data_adjustment=time_based_data_adjustment,
+            wrap_time_allowed=wrap_time_allowed,
+        )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
 
+        table = load_data_df
         if op.persist:
-            load_data_df = mapping_manager.persist_table(load_data_df, op)
-        return load_data_df
+            table = mapping_manager.persist_table(table, op)
+        return table
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):
         if (
@@ -940,6 +956,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
             msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
-    def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:
+    def _remove_non_dimension_columns(self, df: ir.Table) -> ir.Table:
         allowed_columns = self._list_dimension_columns(df)
         return df.select(*allowed_columns)

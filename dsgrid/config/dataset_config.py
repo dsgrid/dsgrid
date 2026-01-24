@@ -3,6 +3,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Union
 
+import ibis.expr.types as ir
 from pydantic import field_validator, model_validator, Field
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
@@ -23,11 +24,10 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
+from dsgrid.ibis_api import (
+    read_dataframe,
+    get_unique_values,
 )
-from dsgrid.utils.spark import get_unique_values, read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -848,14 +848,16 @@ class DatasetConfig(ConfigBase):
         msg = "Neither data_layout nor registry_data_layout is set"
         raise DSGInvalidDataset(msg)
 
-    def add_trivial_dimensions(self, df: DataFrame):
+    def add_trivial_dimensions(self, df: ir.Table):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                df = df.withColumn(col, F.lit(val))
+                import ibis
+
+                df = df.mutate(**{col: ibis.literal(val)})
         return df
 
     def remove_trivial_dimensions(self, df):
@@ -880,7 +882,11 @@ def get_unique_dimension_record_ids(
     if table_format == TableFormat.TWO_TABLE:
         ld = read_dataframe(check_load_data_filename(path))
         lk = read_dataframe(check_load_data_lookup_filename(path))
-        df = ld.join(lk, on="id").drop("id")
+        # Cast id to string to ensure type compatibility (CSV with inferSchema=False
+        # produces strings, parquet preserves original types like int64)
+        ld = ld.mutate(id=ld["id"].cast("string"))
+        lk = lk.mutate(id=lk["id"].cast("string"))
+        df = ld.join(lk, "id").drop("id")
     elif table_format == TableFormat.ONE_TABLE:
         ld_path = check_load_data_filename(path)
         df = read_dataframe(ld_path)

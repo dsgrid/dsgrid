@@ -1,6 +1,8 @@
 import logging
 from typing import Self
 
+import ibis.expr.types as ir
+
 from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
@@ -9,16 +11,12 @@ from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import (
-    DataFrame,
-    StringType,
-)
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.ibis_api import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
@@ -48,7 +46,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if config.data_file_schema is None:
                 msg = "Cannot load dataset without data file schema or store"
                 raise DSGInvalidDataset(msg)
-            df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
+            df = read_data_file(config.data_file_schema)
         else:
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
@@ -58,7 +56,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self,
-        missing_dimension_associations: dict[str, DataFrame],
+        missing_dimension_associations: dict[str, ir.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -97,7 +95,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         allowed_columns.add(VALUE_COLUMN)
         allowed_columns.add(TIME_ZONE_COLUMN)
 
-        schema = self._load_data.schema
+        schema = self._load_data.schema()
         for column in self._load_data.columns:
             if column not in allowed_columns:
                 msg = f"{column=} is not expected in load_data"
@@ -106,16 +104,17 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 column in time_columns or column == VALUE_COLUMN or column == TIME_ZONE_COLUMN
             ):
                 dim_type = DimensionType.from_column(column)
-                if schema[column].dataType != StringType():
+                dtype = schema[column]
+                if not dtype.is_string():
                     msg = f"dimension column {column} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
         check_for_nulls(self._load_data)
 
-    def get_base_load_data_table(self) -> DataFrame:
+    def get_base_load_data_table(self) -> ir.Table:
         return self._load_data
 
-    def _get_load_data_table(self) -> DataFrame:
+    def _get_load_data_table(self) -> ir.Table:
         return self._load_data
 
     @track_timing(timer_stats_collector)
@@ -135,7 +134,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = load_df.select(col).distinct().count()
+            count = load_df.select(col).distinct().count().execute()
             assert count == 1, f"{dim}: {count}"
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
@@ -145,7 +144,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
-    ) -> DataFrame:
+    ) -> ir.Table:
         plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
@@ -178,7 +177,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_mapped_dataframe(
         self, context: QueryContext, time_dimension: TimeDimensionBaseConfig | None = None
-    ) -> DataFrame:
+    ) -> ir.Table:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
         plan = query.mapping_plan

@@ -14,7 +14,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
-from dsgrid.spark.types import DataFrame
+import ibis.expr.types as ir
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ class Dataset(DatasetBase):
 
     def make_project_dataframe(
         self, query: QueryContext, project_config: ProjectConfig
-    ) -> DataFrame:
+    ) -> ir.Table:
         return self._handler.make_project_dataframe(query, project_config)
 
 

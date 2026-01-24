@@ -51,9 +51,13 @@ def test_project_load(cached_registry):
         assert subset_dims == ["commercial_subsectors2", "residential_subsectors"]
         config.get_dimension("residential_subsectors").get_unique_ids() == {"MidriseApartment"}
 
-        records = project.config.get_dimension_records("all_test_efs_subsectors").collect()
+        records = (
+            project.config.get_dimension_records("all_test_efs_subsectors")
+            .to_pyarrow()
+            .to_pylist()
+        )
         assert len(records) == 1
-        assert records[0].id == "all_subsectors"
+        assert records[0]["id"] == "all_subsectors"
 
         with pytest.raises(DSGValueNotRegistered):
             project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
@@ -136,7 +140,10 @@ def test_get_dimension_with_records(project_config: ProjectConfig):
 
 
 def test_get_dimension_records(project_config: ProjectConfig):
-    assert project_config.get_dimension_records("US Counties 2010 - ComStock Only").count() == 8
+    assert (
+        project_config.get_dimension_records("US Counties 2010 - ComStock Only").count().execute()
+        == 8
+    )
     with pytest.raises(DSGInvalidParameter):
         project_config.get_dimension_records(
             "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
@@ -170,7 +177,12 @@ def test_get_base_dimension_by_id(project_config: ProjectConfig):
 
 def test_get_base_dimension_records_by_id(project_config: ProjectConfig):
     county = project_config.get_dimension("US Counties 2010 - ComStock Only")
-    assert project_config.get_base_dimension_records_by_id(county.model.dimension_id).count() == 8
+    assert (
+        project_config.get_base_dimension_records_by_id(county.model.dimension_id)
+        .count()
+        .execute()
+        == 8
+    )
     assert (
         project_config.get_base_dimension_by_id(county.model.dimension_id).model.name
         == "US Counties 2010 - ComStock Only"
@@ -197,7 +209,7 @@ def test_dataset_load(cached_registry, scratch_dir_context):
             "all_test_efs_geographies",
         ]
         records = project.config.get_dimension_records("US States")
-        assert records.filter("id = 'CO'").count() > 0
+        assert records.filter(records["id"] == "CO").count().execute() > 0
 
 
 def test_dimension_map_and_reduce_in_dataset(cached_registry):
@@ -231,27 +243,37 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
                 assert column in mapped_load_data_lookup.columns
                 table_type = "load_data_lookup"
                 table = mapped_load_data_lookup
-            diff = set(
-                [row[column] for row in table.select(column).distinct().collect()]
-            ).symmetric_difference(to_records)
-            if diff:
-                raise DSGInvalidDimensionMapping(
-                    "Mapped %s is incorrect, check %s mapping: %s or mapping logic in 'dataset_schema_handler_base._map_and_reduce_dimension()' \n%s"
-                    % (table_type, column, ref.mapping_id, diff)
-                )
+
+                res = table.select(column).distinct().to_pyarrow().to_pylist()
+
+                vals = [row[column] for row in res]
+
+                diff = set(vals).symmetric_difference(to_records)
+
+                if diff:
+                    raise DSGInvalidDimensionMapping(
+                        "Mapped %s is incorrect, check %s mapping: %s or mapping logic in 'dataset_schema_handler_base._map_and_reduce_dimension()' \n%s"
+                        % (table_type, column, ref.mapping_id, diff)
+                    )
 
         # [2] check that fraction is correctly applied and reduced
+
         # [2A] load_data_lookup
+
         assert "fraction" in mapped_load_data_lookup.columns
 
         # * this check is specific to the actual from_fraction values specified in the mapping *
-        data_filters = "subsector=='Warehouse' and model_year=='2050'"
+
+        filters = (mapped_load_data_lookup["subsector"] == "Warehouse") & (
+            mapped_load_data_lookup["model_year"] == "2050"
+        )
         fraction = [
-            row.fraction
-            for row in mapped_load_data_lookup.filter(data_filters)
+            row["fraction"]
+            for row in mapped_load_data_lookup.filter(filters)
             .select("fraction")
             .distinct()
-            .collect()
+            .to_pyarrow()
+            .to_pylist()
         ]
         assert len(fraction) == 1
         assert fraction[0] == (0.9 * 1.3)

@@ -1,3 +1,4 @@
+import functools
 import itertools
 import logging
 from collections import defaultdict
@@ -37,12 +38,9 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
-from dsgrid.spark.types import (
-    DataFrame,
-)
+import ibis.expr.types as ir
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
-    cross_join_dfs,
+from dsgrid.ibis_api import (
     create_dataframe_from_product,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -853,8 +851,8 @@ class ProjectConfig(ConfigBase):
             raise DSGInvalidParameter(msg)
         return dim
 
-    def get_dimension_records(self, name: str) -> DataFrame:
-        """Return a DataFrame containing the records for a dimension."""
+    def get_dimension_records(self, name: str) -> ir.Table:
+        """Return a Table containing the records for a dimension."""
         return self.get_dimension_with_records(name).get_records_dataframe()
 
     def get_dimension_record_ids(self, name: str) -> set[str]:
@@ -970,12 +968,13 @@ class ProjectConfig(ConfigBase):
 
     def get_base_to_supplemental_mapping_records(
         self, base_dim: DimensionBaseConfigWithFiles, supp_dim: DimensionBaseConfigWithFiles
-    ) -> DataFrame:
+    ) -> ir.Table:
         """Return the project's base-to-supplemental dimension mapping records.
         Excludes rows with NULL to_id values.
         """
         config = self.get_base_to_supplemental_config(base_dim, supp_dim)
-        return config.get_records_dataframe().filter("to_id is not NULL")
+        df = config.get_records_dataframe()
+        return df.filter(df["to_id"].notnull())
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type) -> bool:
         """Return True if the config has these base-to-supplemental mappings."""
@@ -993,7 +992,7 @@ class ProjectConfig(ConfigBase):
         msg = f"Did not find a base dimension with {dimension_id=}"
         raise DSGValueNotRegistered(msg)
 
-    def get_base_dimension_records_by_id(self, dimension_id: str) -> DataFrame:
+    def get_base_dimension_records_by_id(self, dimension_id: str) -> ir.Table:
         """Return the records for the base dimension with dimension_id."""
         dim = self.get_base_dimension_by_id(dimension_id)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
@@ -1265,8 +1264,8 @@ class ProjectConfig(ConfigBase):
 
     def _build_multi_dim_requirement_associations(
         self, multi_dim_reqs: list[RequiredDimensionRecordsModel], context: ScratchDirContext
-    ) -> list[DataFrame]:
-        dfs_by_dim_combo: dict[tuple[str, ...], DataFrame] = {}
+    ) -> list[ir.Table]:
+        dfs_by_dim_combo: dict[tuple[str, ...], ir.Table] = {}
 
         # Example: Partial sector and subsector combinations are required.
         # [
@@ -1376,7 +1375,7 @@ class ProjectConfig(ConfigBase):
     @track_timing(timer_stats_collector)
     def make_dimension_association_table(
         self, dataset_id: str, context: ScratchDirContext
-    ) -> DataFrame:
+    ) -> ir.Table:
         """Build a table that includes all combinations of dimension records that must be provided
         by the dataset.
         """
@@ -1398,7 +1397,11 @@ class ProjectConfig(ConfigBase):
             single_dfs[field] = list(record_ids)
 
         single_df = create_dataframe_from_product(single_dfs, context)
-        return cross_join_dfs(multi_dfs + [single_df])
+        dfs = multi_dfs + [single_df]
+        if not dfs:
+            return None
+
+        return functools.reduce(lambda left, right: left.cross_join(right), dfs)
 
     def are_all_datasets_submitted(self) -> bool:
         """Return True if all datasets have been submitted."""

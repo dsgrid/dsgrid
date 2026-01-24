@@ -6,10 +6,9 @@ from typing import Type
 import json5
 
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.spark.types import (
-    DataFrame,
-)
-from dsgrid.utils.spark import models_to_dataframe
+import ibis.expr.types as ir
+
+from dsgrid.ibis_api import models_to_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -118,7 +117,7 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_records_dataframe(self) -> DataFrame:
+    def get_records_dataframe(self) -> ir.Table:
         """Return the records in a spark dataframe. Cached on first call."""
         # id provides uniqueness and the config_id could help inspect what's in cache in case we
         # ever need that.
@@ -141,7 +140,7 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
                 msg = f"{filename} exists. Set force=True to overwrite."
                 raise DSGInvalidOperation(msg)
 
-        self.get_records_dataframe().toPandas().to_csv(records_file, index=False)
+        self.get_records_dataframe().to_pandas().to_csv(records_file, index=False)
         model_data = self.model.serialize()
         model_data["file"] = records_file.name
         dst_config_file.write_text(json5.dumps(model_data, indent=2))

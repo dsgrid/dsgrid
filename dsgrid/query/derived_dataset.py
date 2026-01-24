@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import chronify
+import ibis.expr.types as ir
 import json5
 
 from dsgrid.chronify import create_store
@@ -19,14 +20,17 @@ from dsgrid.dataset.models import TableFormat, ValueFormat
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
-from dsgrid.query.query_submitter import QuerySubmitterBase
+from dsgrid.ibis_api import (
+    read_dataframe,
+    get_unique_values,
+    make_temp_view_name,
+    get_ibis_connection,
+)
+from dsgrid.query.models import ProjectQueryModel, ColumnType
+from dsgrid.query.query_submitter import QuerySubmitterBase, DatasetMetadataModel
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import make_temp_view_name
-from dsgrid.spark.types import DataFrame
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import read_dataframe, get_unique_values
 
 
 logger = logging.getLogger(__name__)
@@ -73,7 +77,10 @@ def create_derived_dataset_config_from_query(
         query.project.project_id, version=query.project.version
     )
     new_supplemental_dims_path = dst_path / "new_supplemental_dimensions"
-    df = read_dataframe(table_file)
+    if table_file.suffix == ".parquet":
+        df = get_ibis_connection().read_parquet(table_file)
+    else:
+        df = read_dataframe(table_file)
     # TODO: should there be a warning if the current project version is later?
 
     # This code blocks compares the dimension records in the dataframe against the project's base
@@ -179,7 +186,7 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
-def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path):
+def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: ir.Table, df_path: Path):
     try:
         if dim_config.supports_chronify():
             _check_time_dimension_with_chronify(dim_config, df, df_path)
@@ -191,7 +198,7 @@ def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFram
 
 
 def _check_time_dimension_with_chronify(
-    dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path
+    dim_config: TimeDimensionBaseConfig, df: ir.Table, df_path: Path
 ):
     scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
     with ScratchDirContext(scratch_dir) as scratch_dir_context:
@@ -215,14 +222,19 @@ def _check_time_dimension_with_chronify(
         store_file = scratch_dir_context.get_temp_filename(suffix=".db")
         with create_store(store_file) as store:
             # This performs all of the checks.
+            # If df_path is parquet, we can use create_view_from_parquet.
+            # But we might need to convert df to parquet if it was not.
+            # df_path is provided by caller.
+            # Assuming df_path is valid parquet or csv.
             store.create_view_from_parquet(df_path, schema)
             store.drop_view(schema.name)
 
 
 def _is_dimension_valid_for_dataset(
-    dim_config: DimensionBaseConfigWithFiles, unique_data_records: DataFrame
+    dim_config: DimensionBaseConfigWithFiles, unique_data_records: set[str]
 ):
     records = dim_config.get_records_dataframe()
+    # Assuming get_unique_values now returns set[str] and handles ibis table
     dim_values = get_unique_values(records, "id")
     diff = dim_values.symmetric_difference(unique_data_records)
     if not diff:
@@ -234,7 +246,7 @@ def _is_dimension_valid_for_dataset(
 def _get_matching_supplemental_dimension(
     project_config: ProjectConfig,
     dimension_type: DimensionType,
-    unique_data_records: DataFrame,
+    unique_data_records: set[str],
 ) -> DimensionBaseConfigWithFiles | None:
     for dim_config in project_config.list_supplemental_dimensions(dimension_type):
         if _is_dimension_valid_for_dataset(dim_config, unique_data_records):
@@ -320,7 +332,7 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
     # TODO: AWS #186 - not an issue if registry is in a database instead of files
     filename = new_dim_path / "records.csv"
     # Use pandas because spark creates a directory.
-    records.toPandas().to_csv(filename, index=False)
+    records.to_pandas().to_csv(filename, index=False)
     # Use dictionaries instead of DimensionModel to avoid running the Pydantic validators.
     # Some won't work, like loading the records. Others, like file_hash, shouldn't get set yet.
     new_dim = {

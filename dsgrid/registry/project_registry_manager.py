@@ -14,6 +14,8 @@ import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
+from dsgrid.common import BackendEngine
+from dsgrid import runtime_config
 from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
@@ -71,27 +73,17 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
     RegistryManagerParams,
 )
-from dsgrid.spark.functions import (
-    cache,
-    except_all,
-    is_dataframe_empty,
-    unpersist,
-)
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
-    use_duckdb,
-)
-from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.files import load_data, in_other_dir
-from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
+from dsgrid.ibis_api import (
     models_to_dataframe,
     get_unique_values,
     persist_table,
     read_dataframe,
 )
+import ibis.expr.types as ir
+from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.files import load_data, in_other_dir
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
 from .common import (
@@ -491,7 +483,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 for selector in subset_dimension.selectors:
                     new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
-                    new_records.toPandas().to_csv(filename, index=False)
+                    new_records.to_pandas().to_csv(filename, index=False)
                     dim = DimensionModel(
                         file=str(filename),
                         name=selector.name,
@@ -525,7 +517,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _check_subset_dimension_consistency(
         self,
         subset_dimension: SubsetDimensionGroupModel,
-        base_records: DataFrame,
+        base_records: ir.Table,
     ) -> None:
         base_record_ids = get_unique_values(base_records, "id")
         diff = subset_dimension.record_ids.difference(base_record_ids)
@@ -1205,8 +1197,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                     raise DSGInvalidDimensionMapping(msg)
                 reverse_records = (
                     records.drop("from_fraction")
-                    .select(F.col("to_id").alias("from_id"), F.col("from_id").alias("to_id"))
-                    .toPandas()
+                    .select(from_id=records["to_id"], to_id=records["from_id"])
+                    .to_pandas()
                 )
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
                 # Use pandas because spark creates a CSV directory.
@@ -1347,24 +1339,37 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_table = handler.remove_expected_missing_mapped_associations(
                 data_store, project_table, scontext
             )
+
+            # Ensure all columns are strings to avoid type mismatches (e.g., int vs string for years)
+            # This is critical for Ibis set operations like difference().
+            for col in project_table.columns:
+                project_table = project_table.mutate({col: project_table[col].cast("string")})
+            for col in mapped_dataset_table.columns:
+                mapped_dataset_table = mapped_dataset_table.mutate(
+                    {col: mapped_dataset_table[col].cast("string")}
+                )
+
             cols = sorted(project_table.columns)
-            cache(mapped_dataset_table)
-            diff: DataFrame | None = None
+            diff: ir.Table | None = None
 
             try:
+                # Debugging Schema Mismatch
+                p_schema = project_table.schema()
+                d_schema = mapped_dataset_table.schema()
+                logger.info(f"DEBUG: Project Table Schema: {p_schema}")
+                logger.info(f"DEBUG: Dataset Table Schema: {d_schema}")
+                logger.info(f"DEBUG: Cols for Difference: {cols}")
+
                 # This check is relatively short and will show the user clear errors.
                 _check_distinct_column_values(project_table, mapped_dataset_table)
                 # This check is long and will produce a full table of differences.
                 # It may require some effort from the user.
-                diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
-                cache(diff)
-                if not is_dataframe_empty(diff):
+                diff = project_table.select(*cols).difference(mapped_dataset_table.select(*cols))
+                if diff.count().execute() > 0:
                     dataset_id = dataset_config.model.dataset_id
                     handle_dimension_association_errors(diff, mapped_dataset_table, dataset_id)
             finally:
-                unpersist(mapped_dataset_table)
-                if diff is not None:
-                    unpersist(diff)
+                pass
 
     def _id_base_dimension_names_in_dataset(
         self,
@@ -1434,10 +1439,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         config: ProjectConfig,
         dataset_id: str,
         context: ScratchDirContext,
-    ) -> DataFrame:
+    ) -> ir.Table:
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
-        if use_duckdb():
+        if runtime_config.backend_engine == BackendEngine.DUCKDB:
             df2 = df
         else:
             # This operation is slow with Spark. Ensure that we only evaluate the query once.
@@ -1596,21 +1601,27 @@ class ProjectRegistryManager(RegistryManagerBase):
         display_table(table)
 
 
-def _check_distinct_column_values(project_table: DataFrame, mapped_dataset_table: DataFrame):
+def _check_distinct_column_values(project_table: ir.Table, mapped_dataset_table: ir.Table):
     """Ensure that the mapped dataset has the same distinct values as the project for all
     columns. This should be called before running a full comparison of the two tables.
     """
     has_mismatch = False
+    # get_unique_values handles both Spark and Ibis tables
+    from dsgrid.ibis_api import get_unique_values
+
+    has_mismatch = False
     for column in project_table.columns:
-        project_distinct = {x[column] for x in project_table.select(column).distinct().collect()}
-        dataset_distinct = {
-            x[column] for x in mapped_dataset_table.select(column).distinct().collect()
-        }
+        project_distinct = {str(x) for x in get_unique_values(project_table, column)}
+        dataset_distinct = {str(x) for x in get_unique_values(mapped_dataset_table, column)}
+
+        # Check that the project values are covered by the dataset (Completeness).
+        # Original logic was project.difference(dataset).
+        # Note: If dataset has extra values, we ignore them (based on sector='res' observation).
         if diff_values := project_distinct.difference(dataset_distinct):
             has_mismatch = True
             logger.error(
-                "The mapped dataset has different distinct values than the project "
-                "for column=%s: diff=%s",
+                "The mapped dataset is missing values required by the project "
+                "for column=%s: missing=%s",
                 column,
                 diff_values,
             )

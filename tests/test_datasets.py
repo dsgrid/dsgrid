@@ -200,7 +200,7 @@ def test_invalid_load_data_lookup_integer_column(register_dataset):
         item["geography"] = int(item["geography"])
     dump_line_delimited_json(data, lookup_file)
     expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"geography.*must have data type.*StringType"
+    expected_errors["match_msg"] = r"geography.*must have data type.*string"
 
 
 def test_invalid_load_data_lookup_no_id(register_dataset):

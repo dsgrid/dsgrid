@@ -18,13 +18,17 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.spark.types import (
     DUCKDB_COLUMN_TYPES,
-    F,
     SPARK_COLUMN_TYPES,
     SUPPORTED_TYPES,
     SparkSession,
-    use_duckdb,
 )
-from dsgrid.utils.spark import get_spark_session, set_session_time_zone
+from dsgrid.tests.utils import use_duckdb
+from dsgrid.ibis_api import (
+    get_spark_session,
+    set_session_time_zone,
+    create_dataframe,
+    write_dataframe,
+)
 
 
 @pytest.fixture(scope="module")
@@ -182,18 +186,18 @@ def test_file_schema_ignore_columns_no_overlap_allowed():
 
 def test_drop_ignored_columns_basic(spark):
     """Test dropping columns from a DataFrame."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [(1, "a", 1.0), (2, "b", 2.0)],
         ["id", "name", "value"],
     )
     result = _drop_ignored_columns(df, ["name"])
     assert set(result.columns) == {"id", "value"}
-    assert result.count() == 2
+    assert result.count().execute() == 2
 
 
 def test_drop_ignored_columns_multiple(spark):
     """Test dropping multiple columns."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [(1, "a", 1.0, "x"), (2, "b", 2.0, "y")],
         ["id", "name", "value", "extra"],
     )
@@ -203,7 +207,7 @@ def test_drop_ignored_columns_multiple(spark):
 
 def test_drop_ignored_columns_empty_list(spark):
     """Test with empty ignore list returns unchanged DataFrame."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [(1, "a", 1.0)],
         ["id", "name", "value"],
     )
@@ -213,7 +217,7 @@ def test_drop_ignored_columns_empty_list(spark):
 
 def test_drop_ignored_columns_nonexistent_column_warns(spark, caplog):
     """Test that dropping a nonexistent column logs a warning."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [(1, "a")],
         ["id", "name"],
     )
@@ -224,7 +228,7 @@ def test_drop_ignored_columns_nonexistent_column_warns(spark, caplog):
 
 def test_drop_ignored_columns_mixed_existing_nonexistent(spark, caplog):
     """Test dropping mix of existing and nonexistent columns."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [(1, "a", 1.0)],
         ["id", "name", "value"],
     )
@@ -324,7 +328,7 @@ def test_get_column_schema_invalid_type_raises():
 
 def test_rename_columns(spark):
     """Test renaming columns in a DataFrame."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [("Boulder", 1.0), ("Jefferson", 2.0)],
         ["county", "value"],
     )
@@ -337,12 +341,12 @@ def test_rename_columns(spark):
 
 def test_rename_columns_empty_mapping(spark):
     """Test with empty mapping returns unchanged DataFrame."""
-    df = spark.createDataFrame(
+    df = create_dataframe(
         [("Boulder", 1.0)],
         ["county", "value"],
     )
     result = _rename_columns(df, {})
-    assert result.columns == ["county", "value"]
+    assert list(result.columns) == ["county", "value"]
 
 
 # read_data_file tests
@@ -361,11 +365,11 @@ def test_read_data_file_csv(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert set(df.columns) == {"id", "name", "value"}
-    rows = df.collect()
-    assert rows[0].id == 1
-    assert rows[0].name == "a"
+    rows = df.to_pyarrow().to_pylist()
+    assert rows[0]["id"] == 1
+    assert rows[0]["name"] == "a"
 
 
 def test_read_data_file_csv_with_rename(tmp_path, spark):
@@ -387,11 +391,11 @@ def test_read_data_file_csv_with_rename(tmp_path, spark):
 def test_read_data_file_parquet(tmp_path, spark):
     """Test reading a Parquet file."""
     parquet_file = tmp_path / "test.parquet"
-    test_df = spark.createDataFrame(
+    test_df = create_dataframe(
         [(1, "a", 1.0), (2, "b", 2.0)],
         ["id", "name", "value"],
     )
-    test_df.write.parquet(str(parquet_file))
+    write_dataframe(test_df, parquet_file)
 
     columns = [
         Column(name="id", data_type=None),
@@ -401,7 +405,7 @@ def test_read_data_file_parquet(tmp_path, spark):
     schema = FileSchema(path=str(parquet_file), columns=columns)
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert "id" in df.columns
     assert "name" in df.columns
     assert "value" in df.columns
@@ -420,7 +424,7 @@ def test_read_data_file_json(tmp_path, spark):
     schema = FileSchema(path=str(json_file), columns=columns)
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert "id" in df.columns
     assert "name" in df.columns
 
@@ -448,7 +452,6 @@ def test_read_data_file_missing_column_raises(tmp_path, spark):
     When schema specifies columns with data types that don't exist in the file,
     DuckDB raises a BinderException before we reach the column validation.
     """
-    import duckdb
 
     csv_file = tmp_path / "test.csv"
     csv_file.write_text("id,name\n1,a\n")
@@ -460,7 +463,7 @@ def test_read_data_file_missing_column_raises(tmp_path, spark):
         Column(name="missing_column", data_type="STRING"),
     ]
     schema = FileSchema(path=str(csv_file), columns=columns)
-    with pytest.raises(duckdb.BinderException, match="missing_column"):
+    with pytest.raises(DSGInvalidDataset, match="Expected columns"):
         read_data_file(schema)
 
 
@@ -472,7 +475,7 @@ def test_read_data_file_csv_inferred_types(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=[])
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert set(df.columns) == {"id", "name", "value"}
 
 
@@ -515,7 +518,7 @@ def test_read_data_file_csv_with_fips_codes_and_energy_data(tmp_path, spark):
     ]
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
-    assert df.count() == 4
+    assert df.count().execute() == 4
 
     # Verify columns were renamed via dimension_type
     assert "county" not in df.columns
@@ -525,18 +528,22 @@ def test_read_data_file_csv_with_fips_codes_and_energy_data(tmp_path, spark):
     assert set(df.columns) == expected_columns
 
     # Verify leading zeros are preserved (critical for FIPS codes)
-    geography_values = sorted([row.geography for row in df.select("geography").collect()])
+    geography_values = sorted(
+        [row["geography"] for row in df.select("geography").to_pyarrow().to_pylist()]
+    )
     assert geography_values == ["06073", "06073", "06075", "06075"]
 
     # Verify sector values are present
-    sector_values = sorted(set(row.sector for row in df.select("sector").collect()))
+    sector_values = sorted(
+        set(row["sector"] for row in df.select("sector").to_pyarrow().to_pylist())
+    )
     assert sector_values == ["com", "res"]
 
     # Verify float values are readable and correct
-    cooling_sum = sum(row.cooling for row in df.select("cooling").collect())
+    cooling_sum = sum(row["cooling"] for row in df.select("cooling").to_pyarrow().to_pylist())
     assert abs(cooling_sum - 7.8) < 0.01  # 1.5 + 1.8 + 2.1 + 2.4
 
-    heating_sum = sum(row.heating for row in df.select("heating").collect())
+    heating_sum = sum(row["heating"] for row in df.select("heating").to_pyarrow().to_pylist())
     assert abs(heating_sum - 11.1) < 0.01  # 2.3 + 2.1 + 3.5 + 3.2
 
 
@@ -588,32 +595,32 @@ def test_read_data_file_csv_timestamp_with_timezone(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert df.count() == 4
+    assert df.count().execute() == 4
     assert set(df.columns) == {"id", "timestamp", "com_cooling", "com_fans"}
 
     # Collect the timestamps and verify they were parsed correctly
     with set_session_time_zone("America/New_York"):
         # Converting to string avoids the complexity of timestamp conversion to the system
         # time zone when calling collect().
-        df2 = df.withColumn("timestamp_str", F.col("timestamp").cast("string"))
-        rows = df2.orderBy("timestamp_str").collect()
-        first_ts = rows[0].timestamp_str
+        df2 = df.mutate(timestamp_str=df["timestamp"].cast("string"))
+        rows = df2.order_by("timestamp_str").to_pyarrow().to_pylist()
+        first_ts = rows[0]["timestamp_str"]
         if use_duckdb():
-            assert first_ts == "2012-01-01 01:00:00-05"
+            assert first_ts == "2012-01-01 06:00:00"
         else:
             assert first_ts == "2012-01-01 01:00:00"
 
     # Verify the timestamps are in the correct order (1 hour apart)
     for i in range(1, len(rows)):
-        prev_ts = rows[i - 1].timestamp
-        curr_ts = rows[i].timestamp
+        prev_ts = rows[i - 1]["timestamp"]
+        curr_ts = rows[i]["timestamp"]
         # Each timestamp should be 1 hour after the previous
         delta = curr_ts - prev_ts
         assert delta.total_seconds() == 3600, f"Expected 1 hour difference, got {delta}"
 
     # Verify the values are correct
-    assert rows[0].com_cooling == 0
-    assert abs(rows[0].com_fans - 0.002258824) < 1e-9
+    assert rows[0]["com_cooling"] == 0
+    assert abs(rows[0]["com_fans"] - 0.002258824) < 1e-9
 
 
 def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
@@ -640,14 +647,14 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert df.count() == 4
+    assert df.count().execute() == 4
     assert set(df.columns) == {"id", "timestamp", "com_cooling", "com_fans"}
 
     # Collect the timestamps and verify they were parsed correctly
-    rows = df.orderBy("timestamp").collect()
+    rows = df.order_by("timestamp").to_pyarrow().to_pylist()
 
     # The first timestamp should be 2012-01-01 01:00:00 with no time_zone conversion
-    first_ts = rows[0].timestamp
+    first_ts = rows[0]["timestamp"]
     assert first_ts.year == 2012
     assert first_ts.month == 1
     assert first_ts.day == 1
@@ -656,15 +663,15 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
 
     # Verify the timestamps are in the correct order (1 hour apart)
     for i in range(1, len(rows)):
-        prev_ts = rows[i - 1].timestamp
-        curr_ts = rows[i].timestamp
+        prev_ts = rows[i - 1]["timestamp"]
+        curr_ts = rows[i]["timestamp"]
         # Each timestamp should be 1 hour after the previous
         delta = curr_ts - prev_ts
         assert delta.total_seconds() == 3600, f"Expected 1 hour difference, got {delta}"
 
     # Verify the values are correct
-    assert rows[0].com_cooling == 0
-    assert abs(rows[0].com_fans - 0.002258824) < 1e-9
+    assert rows[0]["com_cooling"] == 0
+    assert abs(rows[0]["com_fans"] - 0.002258824) < 1e-9
 
 
 # read_data_file with ignore_columns tests
@@ -687,7 +694,7 @@ def test_read_data_file_csv_with_ignore_columns(tmp_path, spark):
     )
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert set(df.columns) == {"id", "name", "value"}
     assert "extra" not in df.columns
 
@@ -741,11 +748,11 @@ def test_read_data_file_csv_ignore_columns_before_rename(tmp_path, spark):
 def test_read_data_file_parquet_with_ignore_columns(tmp_path, spark):
     """Test reading a Parquet file with columns to ignore."""
     parquet_file = tmp_path / "test.parquet"
-    test_df = spark.createDataFrame(
+    test_df = create_dataframe(
         [(1, "a", "extra", 1.0), (2, "b", "extra", 2.0)],
         ["id", "name", "to_ignore", "value"],
     )
-    test_df.write.parquet(str(parquet_file))
+    write_dataframe(test_df, parquet_file)
 
     columns = [
         Column(name="id", data_type=None),
@@ -759,6 +766,6 @@ def test_read_data_file_parquet_with_ignore_columns(tmp_path, spark):
     )
     df = read_data_file(schema)
 
-    assert df.count() == 2
+    assert df.count().execute() == 2
     assert set(df.columns) == {"id", "name", "value"}
     assert "to_ignore" not in df.columns

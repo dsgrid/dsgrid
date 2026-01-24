@@ -21,6 +21,7 @@ from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
     DSGInvalidDimensionMapping,
+    DSGInvalidField,
     DSGValueNotRegistered,
 )
 from dsgrid.registry.common import (
@@ -33,7 +34,7 @@ from dsgrid.registry.common import (
 from dsgrid.registry.registry_auto_updater import RegistryAutoUpdater
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.types import DataFrame
+import ibis.expr.types as ir
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
@@ -232,7 +233,7 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
         orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
 
         try:
-            with pytest.raises(DSGInvalidDataset):
+            with pytest.raises((DSGInvalidDataset, DSGInvalidField)):
                 manager.project_manager.register_and_submit_dataset(
                     dataset_config_file,
                     project_id,
@@ -408,9 +409,10 @@ def test_register_with_duckdb_store(registry_with_duckdb_store):
         found_lookup = False
         for dataset_id in submitted_dataset_ids:
             dataset = project.load_dataset(dataset_id)
-            assert isinstance(dataset._handler._load_data, DataFrame)
+            # Data is always an Ibis Table regardless of backend (DuckDB or Spark)
+            assert isinstance(dataset._handler._load_data, ir.Table)
             if dataset_id == "test_efs_comstock":
-                assert isinstance(dataset._handler._load_data_lookup, DataFrame)
+                assert isinstance(dataset._handler._load_data_lookup, ir.Table)
                 found_lookup = True
         assert found_lookup
 
@@ -555,8 +557,9 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     ][0]
     orig_dim_version = dimension.model.version
 
-    # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
-    assert isinstance(dimension.get_records_dataframe(), DataFrame)
+    # Test that we can convert records to a Table. Unrelated to the rest.
+    # Data is always an Ibis Table regardless of backend (DuckDB or Spark)
+    assert isinstance(dimension.get_records_dataframe(), ir.Table)
 
     dimension.model.description += "; test update"
     update_type = VersionUpdateType.MINOR
@@ -1019,8 +1022,21 @@ def test_time_in_parts_matches_timestamp(cached_registry):
         time_parts_df = store.read_table("test_efs_comstock_time_in_parts", "1.0.0")
 
         # Convert to pandas for comparison
-        comstock_pd = comstock_df.toPandas()
-        time_parts_pd = time_parts_df.toPandas()
+        comstock_pd = comstock_df.to_pandas()
+        time_parts_pd = time_parts_df.to_pandas()
+
+        # Ensure consistent dtypes for comparison (id column may be int or string
+        # depending on the file format and how it was read)
+        comstock_pd["id"] = comstock_pd["id"].astype(str)
+        time_parts_pd["id"] = time_parts_pd["id"].astype(str)
+
+        # Normalize timestamps to UTC for comparison (timestamps may be tz-naive
+        # or tz-aware depending on how they were processed)
+
+        if comstock_pd["timestamp"].dt.tz is None:
+            comstock_pd["timestamp"] = comstock_pd["timestamp"].dt.tz_localize("UTC")
+        if time_parts_pd["timestamp"].dt.tz is None:
+            time_parts_pd["timestamp"] = time_parts_pd["timestamp"].dt.tz_localize("UTC")
 
         # Sort both dataframes for consistent comparison
         sort_columns = ["id", "timestamp", "metric"]

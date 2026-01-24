@@ -7,11 +7,14 @@ from pathlib import Path
 from typing import Any, Self, Type, Union
 from zoneinfo import ZoneInfo
 
+import ibis
+import ibis.expr.types as ir
 import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, BackendEngine
+from dsgrid import runtime_config
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
@@ -41,19 +44,14 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
-from dsgrid.spark.functions import (
-    get_spark_session,
-    is_dataframe_empty,
-    select_expr,
-)
-from dsgrid.spark.types import get_str_type, use_duckdb
-from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
+from dsgrid.ibis_api import (
     read_dataframe,
     write_dataframe,
+    select_expr,
 )
+from dsgrid.spark.types import get_str_type
+from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table, make_unique_key
@@ -127,7 +125,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: dict[str, DataFrame],
+        missing_dimension_associations: dict[str, ir.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -149,7 +147,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: dict[str, DataFrame],
+        missing_dimension_associations: dict[str, ir.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -444,8 +442,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _resolve_timezone(
-        df: DataFrame, config: DatasetConfig, col_format: TimeFormatInPartsModel
-    ) -> tuple[DataFrame, str | None]:
+        df: ir.Table, config: DatasetConfig, col_format: TimeFormatInPartsModel
+    ) -> tuple[ir.Table, str | None]:
         """Resolve timezone from config or geography dimension.
 
         Returns the (possibly modified) dataframe and the fixed timezone if single-tz,
@@ -464,7 +462,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
         """Build the final timestamp SQL expression and determine the column format."""
         if fixed_tz is not None:
-            if use_duckdb():
+            if runtime_config.backend_engine == BackendEngine.DUCKDB:
                 sql = f"cast({timestamp_str_expr} || ' {fixed_tz}' as timestamptz) as timestamp"
             else:
                 tz = ZoneInfo(fixed_tz)
@@ -489,8 +487,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _apply_timestamp_transformation(
-        df: DataFrame, cols_to_drop: set[str], timestamp_sql: str
-    ) -> DataFrame:
+        df: ir.Table, cols_to_drop: set[str], timestamp_sql: str
+    ) -> ir.Table:
         """Apply the timestamp transformation to the dataframe."""
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
         return select_expr(df, existing_cols + [timestamp_sql])
@@ -498,7 +496,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _update_config_for_timestamp(
         self,
         config: DatasetConfig,
-        df: DataFrame,
+        df: ir.Table,
         scratch_dir_context: ScratchDirContext,
         cols_to_drop: set[str],
         new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
@@ -535,17 +533,18 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
-    ) -> tuple[DataFrame, DataFrame | None]:
+    ) -> tuple[ir.Table, ir.Table | None]:
         if config.lookup_file_schema is None:
             msg = "Cannot read lookup table without lookup file schema"
             raise DSGInvalidDataset(msg)
 
-        df = read_data_file(config.lookup_file_schema, scratch_dir_context=scratch_dir_context)
+        df = read_data_file(config.lookup_file_schema)
         if "id" not in df.columns:
             msg = "load_data_lookup does not include an 'id' column"
             raise DSGInvalidDataset(msg)
-        missing = df.filter("id IS NULL").drop("id")
-        if is_dataframe_empty(missing):
+        print(f"DEBUG: df type in read_lookup: {type(df)}")
+        missing = df.filter(df["id"].isnull()).drop("id")
+        if missing.count().execute() == 0:
             missing_df = None
         else:
             missing_df = missing
@@ -555,11 +554,11 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _read_missing_associations_tables_from_user_path(
         self, config: DatasetConfig
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ir.Table]:
         """Return all missing association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
-        dfs: dict[str, DataFrame] = {}
+        dfs: dict[str, ir.Table] = {}
         missing_paths = config.missing_associations_paths
         if not missing_paths:
             return dfs
@@ -581,19 +580,24 @@ class DatasetRegistryManager(RegistryManagerBase):
         return dfs
 
     @staticmethod
-    def _read_associations_file(path: Path) -> DataFrame:
+    def _read_associations_file(path: Path) -> ir.Table:
         if path.suffix.lower() == ".csv":
-            df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
+            df = ibis.memtable(pd.read_csv(path, dtype="string"))
         else:
             df = read_dataframe(path)
-            for field in df.schema.fields:
-                if field.dataType != StringType():
-                    df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
+            # schema is available on ibis table
+            schema = df.schema()
+            mutations = {}
+            for name in schema.names:
+                if not schema[name].is_string():
+                    mutations[name] = df[name].cast("string")
+            if mutations:
+                df = df.mutate(**mutations)
         return df
 
     def _read_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
-    ) -> tuple[DataFrame, DataFrame | None]:
+    ) -> tuple[ir.Table, ir.Table | None]:
         """Read a table from a user-provided path. Split expected-missing rows into a separate
         DataFrame.
 
@@ -606,14 +610,14 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         Returns
         -------
-        tuple[DataFrame, DataFrame | None]
+        tuple[ir.Table, ir.Table | None]
             The first DataFrame contains the expected rows, and the second DataFrame contains the
             missing rows or will be None if there are no missing rows.
         """
         if config.data_file_schema is None:
             msg = "Cannot read table without data file schema"
             raise DSGInvalidDataset(msg)
-        df = read_data_file(config.data_file_schema, scratch_dir_context=scratch_dir_context)
+        df = read_data_file(config.data_file_schema)
 
         if config.get_value_format() == ValueFormat.PIVOTED:
             logger.info("Convert dataset %s from pivoted to stacked.", config.model.dataset_id)
@@ -654,8 +658,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         orig_version: str | None = None,
         scratch_dir_context: ScratchDirContext | None = None,
     ) -> None:
-        lk_df: DataFrame | None = None
-        missing_dfs: dict[str, DataFrame] = {}
+        lk_df: ir.Table | None = None
+        missing_dfs: dict[str, ir.Table] = {}
         match config.get_table_format():
             case TableFormat.ONE_TABLE:
                 if not config.has_user_layout:
@@ -720,8 +724,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _check_duplicate_missing_associations(
-        df1: DataFrame | None, dfs2: dict[str, DataFrame]
-    ) -> dict[str, DataFrame]:
+        df1: ir.Table | None, dfs2: dict[str, ir.Table]
+    ) -> dict[str, ir.Table]:
         if df1 is not None and dfs2:
             msg = "A dataset cannot have expected missing rows in the data and "
             "provide a missing_associations file. Provide one or the other."

@@ -20,7 +20,7 @@ from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import load_json_file, dump_json_file
-from dsgrid.utils.spark import get_unique_values
+from dsgrid.ibis_api import get_unique_values
 
 
 logger = logging.getLogger()

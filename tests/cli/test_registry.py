@@ -5,7 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.spark.types import use_duckdb
+from dsgrid.tests.utils import use_duckdb
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.query.models import ColumnType
 from dsgrid.registry.common import DatabaseConnection
@@ -135,6 +135,13 @@ def test_register_project_and_dataset(tmp_registry_db):
     ]
 
     result = runner.invoke(cli, cmd)
+    if result.exit_code != 0:
+        print(f"DEBUG: Output:\n{result.output}")
+        if result.exception:
+            print(f"DEBUG: Exception: {result.exception}")
+            import traceback
+
+            traceback.print_tb(result.exc_info[2])
     assert result.exit_code == 0, result.output
 
     result = runner.invoke(cli, ["--url", url, "registry", "list"])
@@ -325,6 +332,12 @@ def test_bulk_register(tmp_registry_db):
             str(journal_file),
         ],
     )
+    if result.exit_code != 0:
+        print(f"DEBUG: test_bulk_register failed. Output:\n{result.output}")
+        print(f"DEBUG: Exception: {result.exception}")
+        import traceback
+
+        traceback.print_tb(result.exc_info[2])
     assert result.exit_code == 0
     assert not journal_file.exists()
 

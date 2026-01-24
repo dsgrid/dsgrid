@@ -26,7 +26,7 @@ from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.ibis_api import read_dataframe
 
 
 REGISTRY_PATH = (
@@ -110,8 +110,8 @@ def test_create_derived_dataset_config(tmp_path):
     orig_df = read_dataframe(REGISTRY_PATH / "data" / dataset_id / "1.0.0" / "table.parquet")
     new_df = read_dataframe(query_output / "table.parquet")
     assert sorted(new_df.columns) == sorted(orig_df.columns)
-    orig_data = orig_df.sort(*orig_df.columns).collect()
-    new_data = new_df.select(*orig_df.columns).sort(*orig_df.columns).collect()
+    orig_data = orig_df.order_by(*orig_df.columns).to_pyarrow().to_pylist()
+    new_data = new_df.select(*orig_df.columns).order_by(*orig_df.columns).to_pyarrow().to_pylist()
     assert new_data == orig_data
 
     # Create the config in the CLI and Python API to get test coverage in both places.

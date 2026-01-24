@@ -14,7 +14,7 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.loggers import setup_logging
 from dsgrid.spark.types import SparkSession
-from dsgrid.utils.spark import init_spark
+from dsgrid.ibis_api import init_spark_session as init_spark
 
 SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.json5"
 RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.json5"

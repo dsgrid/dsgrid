@@ -4,7 +4,6 @@ from sqlalchemy import Connection
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.spark.functions import is_dataframe_empty
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from .registry_manager import RegistryManager
 
@@ -49,10 +48,10 @@ class FilterRegistryManager(RegistryManager):
         def handle_dimension(simple_dim, dim):
             records = dim.get_records_dataframe()
             df = records.filter(records.id.isin(simple_dim.record_ids))
-            filtered_records = [x.asDict() for x in df.collect()]
+            filtered_records = df.to_pyarrow().to_pylist()
             modified_dims.add(dim.model.dimension_id)
             modified_dim_records[dim.model.dimension_id] = {
-                x.id for x in df.select("id").distinct().collect()
+                x["id"] for x in df.select("id").distinct().to_pyarrow().to_pylist()
             }
             return filtered_records
 
@@ -115,8 +114,8 @@ class FilterRegistryManager(RegistryManager):
                     changed = True
 
             # TODO: probably need to remove a dimension mapping if it is empty
-            if records is not None and changed and not is_dataframe_empty(records):
-                mapping.model.records = [x.asDict() for x in records.collect()]
+            if records is not None and changed and records.count().execute() > 0:
+                mapping.model.records = records.to_pyarrow().to_pylist()
                 self.dimension_mapping_manager.db.replace(conn, mapping.model)
                 logger.info(
                     "Filtered dimension mapping records from ID %s", mapping.model.mapping_id

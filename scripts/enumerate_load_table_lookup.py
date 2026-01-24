@@ -5,8 +5,9 @@ import shutil
 import logging
 
 from dsgrid.loggers import setup_logging
-from dsgrid.spark.functions import cross_join, read_parquet
-from dsgrid.spark.types import use_duckdb
+from dsgrid.common import BackendEngine
+import dsgrid
+from dsgrid.ibis_api import read_parquet
 from dsgrid.utils.timing import timed_info
 from dsgrid.utils.spark_partition import SparkPartition
 
@@ -59,7 +60,7 @@ class EnumerateTable:
             df_lookup_full = df_lookup.select(keys[0]).distinct()
 
             for key in keys[1:]:
-                df_lookup_full = cross_join(df_lookup_full, df_lookup.select(key).distinct())
+                df_lookup_full = df_lookup_full.cross_join(df_lookup.select(key).distinct())
 
             df_lookup_full = df_lookup_full.join(df_lookup, keys, "left").sort(["id"] + keys)
         else:
@@ -106,9 +107,11 @@ class EnumerateTable:
             - df.repartition(col): shuffle and create partitions by col.nunique + 1 empty/very small partition
             - df.repartition(n, col): shufffle, number partitions = min(n, col.nunique)
         """
-        if use_duckdb():
+        if dsgrid.runtime_config.backend_engine == BackendEngine.DUCKDB:
             logger.warning("save_file is not optimized for DuckDB")
-            df.write.parquet(filepath)
+            from dsgrid.ibis_api import get_ibis_connection
+
+            get_ibis_connection().to_parquet(df, filepath)
             return
 
         current_n_parts = df.rdd.getNumPartitions()

@@ -2,8 +2,7 @@ import pytest
 
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.spark.functions import cache
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.ibis_api import create_dataframe_from_dicts
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -32,60 +31,62 @@ def datasets():
 
 def test_dataset_expression_add(datasets):
     df = evaluate_expression("dataset1 + dataset2", datasets).df
-    cache(df)
-    assert df.count() == 3
-    assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 11
-    assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 13
-    assert df.filter("county == 'Denver'").collect()[0].elec_heating == 18
+    assert df.count().execute() == 3
+    assert df.filter(df["county"] == "Jefferson").to_pyarrow().to_pylist()[0]["elec_cooling"] == 11
+    assert df.filter(df["county"] == "Boulder").to_pyarrow().to_pylist()[0]["elec_cooling"] == 13
+    assert df.filter(df["county"] == "Denver").to_pyarrow().to_pylist()[0]["elec_heating"] == 18
     assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_mul(datasets):
     df = evaluate_expression("dataset1 * dataset2", datasets).df
-    cache(df)
-    assert df.count() == 3
-    assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 18
-    assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 30
-    assert df.filter("county == 'Denver'").collect()[0].elec_heating == 72
+    assert df.count().execute() == 3
+    assert df.filter(df["county"] == "Jefferson").to_pyarrow().to_pylist()[0]["elec_cooling"] == 18
+    assert df.filter(df["county"] == "Boulder").to_pyarrow().to_pylist()[0]["elec_cooling"] == 30
+    assert df.filter(df["county"] == "Denver").to_pyarrow().to_pylist()[0]["elec_heating"] == 72
     assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_sub(datasets):
     df = evaluate_expression("dataset2 - dataset1", datasets).df
-    cache(df)
-    assert df.count() == 3
-    assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 7
-    assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 7
-    assert df.filter("county == 'Denver'").collect()[0].elec_heating == 6
+    assert df.count().execute() == 3
+    assert df.filter(df["county"] == "Jefferson").to_pyarrow().to_pylist()[0]["elec_cooling"] == 7
+    assert df.filter(df["county"] == "Boulder").to_pyarrow().to_pylist()[0]["elec_cooling"] == 7
+    assert df.filter(df["county"] == "Denver").to_pyarrow().to_pylist()[0]["elec_heating"] == 6
     assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_union(datasets):
     df = evaluate_expression("dataset1 | dataset2", datasets).df
-    cache(df)
-    assert df.count() == 6
-    assert df.filter("county == 'Jefferson'").count() == 2
-    assert df.filter("county == 'Boulder'").count() == 2
-    assert df.filter("county == 'Denver'").count() == 2
+    assert df.count().execute() == 6
+    assert df.filter(df["county"] == "Jefferson").count().execute() == 2
+    assert df.filter(df["county"] == "Boulder").count().execute() == 2
+    assert df.filter(df["county"] == "Denver").count().execute() == 2
     assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_combo(datasets):
     df = evaluate_expression("(dataset1 + dataset2) | (dataset1 * dataset2)", datasets).df
-    cache(df)
-    assert df.count() == 6
-    jefferson = df.filter("county == 'Jefferson'")
-    assert jefferson.count() == 2
-    assert jefferson.collect()[0].elec_cooling == 11
-    assert jefferson.collect()[1].elec_cooling == 18
-    boulder = df.filter("county == 'Boulder'")
-    assert boulder.count() == 2
-    assert boulder.collect()[0].elec_cooling == 13
-    assert boulder.collect()[1].elec_cooling == 30
-    denver = df.filter("county == 'Denver'")
-    assert denver.count() == 2
-    assert denver.collect()[0].elec_heating == 18
-    assert denver.collect()[1].elec_heating == 72
+    assert df.count().execute() == 6
+    jefferson = df.filter(df["county"] == "Jefferson")
+    assert jefferson.count().execute() == 2
+    jeff_data = jefferson.to_pyarrow().to_pylist()
+    # Union order not guaranteed, check values exist
+    cool_vals = sorted([row["elec_cooling"] for row in jeff_data])
+    assert cool_vals == [11, 18]
+
+    boulder = df.filter(df["county"] == "Boulder")
+    assert boulder.count().execute() == 2
+    boulder_data = boulder.to_pyarrow().to_pylist()
+    cool_vals = sorted([row["elec_cooling"] for row in boulder_data])
+    assert cool_vals == [13, 30]
+
+    denver = df.filter(df["county"] == "Denver")
+    assert denver.count().execute() == 2
+    denver_data = denver.to_pyarrow().to_pylist()
+    heat_vals = sorted([row["elec_heating"] for row in denver_data])
+    assert heat_vals == [18, 72]
+
     assert df.columns == datasets["dataset1"].df.columns
 
 

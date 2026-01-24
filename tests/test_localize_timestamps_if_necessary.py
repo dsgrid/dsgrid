@@ -80,28 +80,29 @@ def make_dataframes_single_tz(time_dim):
     called_df = df.copy()
     called_df[TIME_COLUMN] = called_df[TIME_COLUMN].dt.tz_localize(to_tz)
 
-    sdf = spark.createDataFrame(df)
-    scalled_df = spark.createDataFrame(called_df)
-    return sdf, scalled_df
+    return df, called_df
 
 
 def make_dataframes_multi_tz(time_dim):
-    timestamps = make_time_range_generator(time_dim.to_chronify()).list_timestamps()
-    df = pd.DataFrame({"ts": timestamps})
+    ts_dct = make_time_range_generator(time_dim.to_chronify()).list_timestamps_by_time_zone()
+    df = pd.DataFrame(list(ts_dct.items()), columns=[TIME_ZONE_COLUMN, TIME_COLUMN]).explode(
+        TIME_COLUMN
+    )
     df["geography"] = "dummy_geo"
     df[VALUE_COLUMN] = 1
     time_zones = time_dim.model.time_zone_format.get_time_zones()
-    df[TIME_ZONE_COLUMN] = time_zones * (len(df) // len(time_zones))
 
     assert time_dim.get_localization_plan() == "localize_to_multi_tz"
-    called_df = df.copy()
+    called_df = df.rename(columns={TIME_COLUMN: "ts"})
+    final_tz = time_zones[0]
     for tz in time_zones:
         cond = called_df[TIME_ZONE_COLUMN] == tz
-        called_df.loc[cond, TIME_COLUMN] = called_df.loc[cond, "ts"].dt.tz_localize(tz)
+        called_df.loc[cond, TIME_COLUMN] = (
+            called_df.loc[cond, "ts"].dt.tz_localize(tz).dt.tz_convert(final_tz)
+        )
 
-    sdf = spark.createDataFrame(df)
-    scalled_df = spark.createDataFrame(called_df)
-    return sdf, scalled_df
+    called_df.drop(columns=["ts"], inplace=True)
+    return df, called_df
 
 
 def make_datetime_config_multi_tz_ntz(time_zones=["Etc/GMT+5", "Etc/GMT+8"]):
@@ -255,7 +256,10 @@ def test_single_tz_spark_hive(monkeypatch):
         target,
     )
 
-    res_df, changed = localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
+    sdf = spark.createDataFrame(df)
+    res_df, changed = localize_timestamps_if_necessary(
+        sdf, config, scratch_dir_context=MagicMock()
+    )
     assert changed is True
     assert res_df is called_df
     target.assert_called_once()
@@ -277,7 +281,10 @@ def test_single_tz_spark_path(monkeypatch):
     persist_target = MagicMock(return_value=Path("/tmp/dummy.parquet"))
     monkeypatch.setattr("dsgrid.utils.dataset.persist_table", persist_target)
 
-    res_df, changed = localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
+    sdf = spark.createDataFrame(df)
+    res_df, changed = localize_timestamps_if_necessary(
+        sdf, config, scratch_dir_context=MagicMock()
+    )
     assert changed is True
     assert res_df is called_df
     path_target.assert_called_once()
@@ -359,7 +366,10 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
         hive_target,
     )
 
-    res_df, changed = localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
+    sdf = spark.createDataFrame(df)
+    res_df, changed = localize_timestamps_if_necessary(
+        sdf, config, scratch_dir_context=MagicMock()
+    )
     assert changed is True
     assert res_df is called_df
     hive_target.assert_called_once()
@@ -381,7 +391,10 @@ def test_multi_tz_spark_path(monkeypatch):
     persist_target = MagicMock(return_value=Path("/tmp/dummy.parquet"))
     monkeypatch.setattr("dsgrid.utils.dataset.persist_table", persist_target)
 
-    res_df, changed = localize_timestamps_if_necessary(df, config, scratch_dir_context=MagicMock())
+    sdf = spark.createDataFrame(df)
+    res_df, changed = localize_timestamps_if_necessary(
+        sdf, config, scratch_dir_context=MagicMock()
+    )
     assert changed is True
     assert res_df is called_df
     path_target.assert_called_once()

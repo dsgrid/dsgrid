@@ -12,7 +12,7 @@ dsgrid supports three types of datasets:
 
 ## Dimensions
 
-Similar to projects, dataset configs can contain already-registered dimension IDs or unregistered dimension configs. Refer to [](concepts.md) for background on dimensions and mappings. Dataset contributors will likely want to define new dimensions in the dataset config using the streamlined workflow.
+Similar to projects, dataset configs can contain already-registered dimension IDs or unregistered dimension configs. Refer to [](dimension_concepts.md) for background on dimensions and mappings. Dataset contributors will likely want to define new dimensions in the dataset config using the streamlined workflow.
 
 ## Trivial Dimensions
 

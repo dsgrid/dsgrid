@@ -23,6 +23,21 @@ Dimension types
 
 </div>
 
+## FunctionalForm
+
+*dsgrid.dimension.standard.FunctionalForm*
+
+Functional forms for regression parameters
+
+<div class="enum-table">
+
+| Constant | Value |
+|----------|-------|
+| `LINEAR` | `'linear'` |
+| `EXPONENTIAL` | `'exponential'` |
+
+</div>
+
 ## TimeDimensionType
 
 *dsgrid.dimension.time.TimeDimensionType*

@@ -168,6 +168,18 @@ def setup(app):
         print(f"Warning: Could not generate enum documentation: {e}")
         # Don't fail the build if generation fails
 
+    # Generate dimension record class documentation
+    try:
+        from doc_generators.generate_dimension_classes import main as generate_dim_classes
+
+        print("Generating dimension class documentation...")
+        result = generate_dim_classes()
+        if result != 0:
+            print("Warning: Failed to generate some dimension class documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate dimension class documentation: {e}")
+        # Don't fail the build if generation fails
+
     # Generate data model documentation
     try:
         from doc_generators.generate_all_models import main as generate_models

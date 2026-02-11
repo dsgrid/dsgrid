@@ -1,5 +1,4 @@
+(contact-us)=
 # Contact
 
-Get help or provide feedback.
-
-(To be populated with contact information)
+Please write us at [dsgrid.info@nlr.gov](mailto:dsgrid.info@nlr.gov) if you have any questions, comments, or suggestions.

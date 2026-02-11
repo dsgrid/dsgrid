@@ -4,15 +4,12 @@ The demand-side grid (dsgrid) toolkit provides a structured approach to managing
 
 ## Core Components
 
-- [Dataset Registration Concepts](dataset_registration/concepts)
+- [Dimension Concepts](dataset_registration/dimension_concepts)
 - [Dataset Concepts](dataset_registration/dataset_concepts)
 - [Dataset Mapping Concepts](dataset_mapping/concepts)
 - [Project Concepts](project_creation/concepts)
-- [Derived Dataset Concepts](project_derived_datasets/concepts)
-
-## Query Processing
-
 - [Query Concepts](project_queries/concepts)
+- [Derived Dataset Concepts](project_derived_datasets/concepts)
 
 ## Additional Resources
 

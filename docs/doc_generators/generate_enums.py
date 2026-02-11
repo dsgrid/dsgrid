@@ -11,6 +11,8 @@ from .core import generate_enum_documentation, import_enum
 ENUMS = [
     # From dsgrid.dimension.base_models
     "dsgrid.dimension.base_models.DimensionType",
+    # From dsgrid.dimension.standard
+    "dsgrid.dimension.standard.FunctionalForm",
     # From dsgrid.dimension.time
     "dsgrid.dimension.time.TimeDimensionType",
     "dsgrid.dimension.time.RepresentativePeriodFormat",

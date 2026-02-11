@@ -9,7 +9,7 @@ Before registering a dataset, understand the fundamental building blocks of dsgr
 ```{toctree}
 :maxdepth: 1
 
-concepts
+dimension_concepts
 dataset_concepts
 how_to_dimensions
 requirements

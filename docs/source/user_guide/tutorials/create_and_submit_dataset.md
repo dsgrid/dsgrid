@@ -113,7 +113,7 @@ required_dimensions: {
 }
 ```
 
-Follow the instructions at [Project Viewer](../registry/browse_registry) to start the viewer. Once you have the data table loaded in your browser, type `transportation` in the filter row of the `dimension_name` column and then select `transportation_subsectors` or `transportation_end_uses`. The dimension record table will get populated with record IDs.
+Follow the instructions at [Project Viewer](../how_tos/browse_registry) to start the viewer. Once you have the data table loaded in your browser, type `transportation` in the filter row of the `dimension_name` column and then select `transportation_subsectors` or `transportation_end_uses`. The dimension record table will get populated with record IDs.
 
 If you prefer working in an interactive Python session, here is example code to do the same thing:
 

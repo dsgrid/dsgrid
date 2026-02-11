@@ -85,7 +85,7 @@ dsgrid create-registry --help
 
 ## Apache Spark
 
-- **NREL High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/apache_spark/spark_cluster_on_kestrel)
+- **NREL High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
 - **Standalone resources**: [TODO: Provide link]
 
 ## Test Your Installation
@@ -147,6 +147,6 @@ aws s3 ls s3://nrel-dsgrid-registry
 
 ## Next Steps
 
-- Learn about [browsing the registry](../user_guide/registry/browse_registry)
+- Learn about [browsing the registry](../user_guide/how_tos/browse_registry)
 - Explore the [tutorials](../user_guide/tutorials/index) to get started with dsgrid
 - Understand [data formats](../user_guide/dataset_registration/formats) for preparing your data

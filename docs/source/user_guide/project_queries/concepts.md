@@ -58,6 +58,6 @@ You can choose to filter data before or after the datasets are mapped to the pro
 ## Next Steps
 
 - Follow the [Query a Project Tutorial](../tutorials/query_project) for hands-on practice
-- Learn [how to filter queries](how_to_filter)
+- Learn [how to filter queries](../how_tos/how_to_filter)
 - Explore [aggregation options](aggregations.md)
 - Understand [output formats](output_formats.md)

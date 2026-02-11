@@ -156,5 +156,5 @@ exit  # Exit salloc session
 ## Next Steps
 
 - Learn how to [run dsgrid on Kestrel](run_on_kestrel)
-- Understand [Spark configuration options](overview)
+- Understand [Spark configuration options](../apache_spark/overview)
 - Follow the [query project tutorial](../tutorials/query_project)

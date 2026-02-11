@@ -125,5 +125,5 @@ Time dimensions work differently from other dimensions. Instead of records in a 
 
 - [Dimension Data Models](../../software_reference/data_models/dimension_model.md) - Config model specifications
 - [Dimension Record Classes](../../software_reference/data_models/dimension_classes.md) - Full listing and tables of fields for all record classes
-- [How to Define Dimensions](how_to_dimensions) - Step-by-step workflow
+- [How to Define Dimensions](../how_tos/how_to_dimensions) - Step-by-step workflow
 - [Dataset Concepts](dataset_concepts) - Learn about datasets, including dataset types and file formats

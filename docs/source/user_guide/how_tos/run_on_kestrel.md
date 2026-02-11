@@ -94,4 +94,4 @@ dsgrid config validate dataset.json5
 
 - Learn how to [start a Spark cluster on Kestrel](spark_cluster_on_kestrel)
 - Follow the [query project tutorial](../tutorials/query_project)
-- Understand [Apache Spark configuration](overview)
+- Understand [Apache Spark configuration](../apache_spark/overview)

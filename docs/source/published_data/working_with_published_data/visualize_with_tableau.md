@@ -94,7 +94,7 @@ Follow the [Spark-on-HPC instructions](https://github.com/daniel-thom/HPC/blob/k
 
 **Key steps:**
 
-1. Start Spark cluster on Kestrel (see [Start Spark Cluster](../../user_guide/apache_spark/spark_cluster_on_kestrel))
+1. Start Spark cluster on Kestrel (see [Start Spark Cluster](../../user_guide/how_tos/spark_cluster_on_kestrel))
 2. Configure Spark Thrift Server
 3. Install Spark JDBC driver in Tableau
 4. Connect Tableau to Spark cluster

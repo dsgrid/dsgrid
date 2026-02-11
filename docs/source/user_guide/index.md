@@ -6,7 +6,6 @@
 fundamentals
 tutorials/index
 how_tos/index
-registry/browse_registry
 dataset_registration/index
 dataset_mapping/index
 dataset_submittal/index

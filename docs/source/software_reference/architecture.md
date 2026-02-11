@@ -74,7 +74,7 @@ Web UI based on Plotly Dash. Allows users to browse and filter project and datas
 - Filter and search metadata
 - Explore project structure
 
-The Project Viewer consumes the HTTP API. See [Browse Registry](../user_guide/registry/browse_registry) for usage instructions.
+The Project Viewer consumes the HTTP API. See [Browse Registry](../user_guide/how_tos/browse_registry) for usage instructions.
 
 ## Current Workflow
 
@@ -83,7 +83,7 @@ Future workflows may change significantly. We may have a persistent database and
 ### Typical HPC Workflow
 
 1. **Start a Spark cluster** on one or more compute nodes
-   - See [Start Spark Cluster on Kestrel](../user_guide/apache_spark/spark_cluster_on_kestrel)
+   - See [Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
 
 2. **Connect to a dsgrid registry database** or start your own
    - Existing registry: Connect via database URL

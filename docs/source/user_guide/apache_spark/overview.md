@@ -303,8 +303,8 @@ $ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 4. **Follow the rest of the sparkctl instructions** for starting the cluster and running jobs.
 
 See also:
-- [Run dsgrid on Kestrel](run_on_kestrel) for complete workflow
-- [Start Spark Cluster on Kestrel](spark_cluster_on_kestrel) for detailed cluster setup
+- [Run dsgrid on Kestrel](../how_tos/run_on_kestrel) for complete workflow
+- [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel) for detailed cluster setup
 
 ## Tuning Configuration Settings
 
@@ -532,7 +532,7 @@ dsgrid will employ this technique for specific mapping types or when you enable 
 
 ## Next Steps
 
-- Learn about [running dsgrid on Kestrel](run_on_kestrel)
-- Set up a [Spark cluster on Kestrel](spark_cluster_on_kestrel)
+- Learn about [running dsgrid on Kestrel](../how_tos/run_on_kestrel)
+- Set up a [Spark cluster on Kestrel](../how_tos/spark_cluster_on_kestrel)
 - Understand [software architecture](../../software_reference/architecture)
 - Explore [query concepts](../project_queries/concepts)

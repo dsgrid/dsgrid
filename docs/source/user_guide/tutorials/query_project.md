@@ -19,7 +19,7 @@ SSH to a login node to begin the tutorial.
 
 ### Step 1: Set Up Your Environment
 
-Follow the instructions at [Run dsgrid on Kestrel](../apache_spark/run_on_kestrel) if you have not already done so.
+Follow the instructions at [Run dsgrid on Kestrel](../how_tos/run_on_kestrel) if you have not already done so.
 
 ### Step 2: Create the Query Configuration
 
@@ -150,7 +150,7 @@ If you only care about a limited number of fuel types, you could add this filter
 
 ### Step 3: Start a Spark Cluster
 
-Start a Spark cluster with two compute nodes as described in [Start Spark Cluster on Kestrel](../apache_spark/spark_cluster_on_kestrel).
+Start a Spark cluster with two compute nodes as described in [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel).
 
 ### Step 4: Activate Python Environment
 
@@ -210,6 +210,6 @@ pyspark --master=spark://$(hostname):7077
 
 ## Next Steps
 
-- Learn how to [filter queries](../project_queries/how_to_filter) for more specific results
+- Learn how to [filter queries](../how_tos/how_to_filter) for more specific results
 - Understand [query concepts](../project_queries/concepts) in more detail
 - Explore [creating derived datasets](create_derived_dataset) from query results

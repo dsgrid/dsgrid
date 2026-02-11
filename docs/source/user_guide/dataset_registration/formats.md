@@ -487,7 +487,7 @@ missing_associations/
 
 Each file contains the relevant dimension columns:
 
-```csv
+```text
 # geography__subsector.csv
 geography,subsector
 01001,large_hotel

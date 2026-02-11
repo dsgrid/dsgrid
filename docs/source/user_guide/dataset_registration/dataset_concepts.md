@@ -1,6 +1,6 @@
 # Dataset Concepts
 
-A dataset is defined by its [dataset config](../../software_reference/data_models/dataset_config). This data structure describes the dataset's attributes, dimensionality, and file format characteristics.
+A dataset is defined by its [dataset config](../../software_reference/data_models/dataset_model). This data structure describes the dataset's attributes, dimensionality, and file format characteristics.
 
 ## Dataset Types
 
@@ -44,5 +44,5 @@ The [dsgrid-StandardScenarios repository](https://github.com/dsgrid/dsgrid-proje
 - [AEO 2021 Reference Case Residential Energy End Use Annual Growth Factors](https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.json5)
 
 :::{seealso}
-**More detailed content:** [Datasets (detailed)](../../explanations/components/datasets)
+**More detailed content:** [Dataset Data Model](../../software_reference/data_models/dataset_model)
 :::

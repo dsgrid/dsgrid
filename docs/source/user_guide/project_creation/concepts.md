@@ -71,5 +71,5 @@ dsgrid provides a streamlined workflow where you specify the dimension and mappi
 ## Next Steps
 
 - See the [Project Data Model](../../software_reference/data_models/project_model.md) for complete specifications
-- Follow the [Create a Project Tutorial](../tutorials/project_creation.md) for hands-on practice
-- Learn [how to create base dimensions](create_base_dimensions.md) and [supplemental dimensions](create_supplemental_dimensions.md)
+- Follow the [Create a Project Tutorial](../tutorials/create_project) for hands-on practice
+- Learn [how to create base dimensions](how_to_base_dimensions) and [supplemental dimensions](how_to_supplemental_dimensions)

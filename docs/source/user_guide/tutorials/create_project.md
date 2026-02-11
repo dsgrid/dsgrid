@@ -6,7 +6,7 @@ Project attributes, dimensions, and base-to-supplemental dimension mappings must
 
 ## Step 1: Create a Repository
 
-Create a repository to store your configuration and record files. This project follows the directory structure recommendation from [project repository organization](../project_creation/concepts#project-repository-organization). We recommend that you use a source control management system like git.
+Create a repository to store your configuration and record files. This project follows the directory structure recommendation from [project repository organization](../project_creation/concepts.md#project-repo-organization). We recommend that you use a source control management system like git.
 
 ## Step 2: Create the Project Configuration
 

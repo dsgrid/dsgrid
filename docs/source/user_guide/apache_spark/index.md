@@ -16,6 +16,6 @@ spark_cluster
 :::{note}
 Legacy detailed guides available at:
 - [Apache Spark Overview (detailed)](../../spark_overview)
-- [Run on Kestrel (detailed)](../../how_tos/run_dsgrid_on_kestrel)
-- [Start Spark Cluster (detailed)](../../how_tos/spark_cluster_on_kestrel)
+- [Run on Kestrel (detailed)](run_on_kestrel)
+- [Start Spark Cluster (detailed)](spark_cluster_on_kestrel)
 :::

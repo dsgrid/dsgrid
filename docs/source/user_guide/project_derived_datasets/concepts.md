@@ -19,7 +19,7 @@ Derived datasets leverage dsgrid's query and transformation capabilities to crea
 
 ## Next Steps
 
-- Follow the [Create a Derived Dataset Tutorial](../tutorials/derived_datasets.md)
+- Follow the [Create a Derived Dataset Tutorial](../tutorials/create_derived_dataset)
 - Learn about [growth rate calculations](growth_rates.md)
 - Understand [residual workflows](residuals.md)
 - See [derived dataset workflows](workflows.md)

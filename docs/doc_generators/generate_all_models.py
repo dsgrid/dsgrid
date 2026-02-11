@@ -88,8 +88,8 @@ def main():
         print(f"Generating documentation for {model_path}...")
 
         try:
-            # Start with page title and horizontal line
-            documentation = f"# {page_title}\n\n---\n\n"
+            # Start with page title
+            documentation = f"# {page_title}\n\n"
 
             # Collect all unique models to document on this page in order encountered
             # Only include models that should be documented on THIS page
@@ -134,7 +134,7 @@ def main():
                 )
                 model_docs.append(model_doc)
 
-            # Join all model docs with horizontal bars
+            # Join all model docs with separators
             documentation += "\n\n---\n\n".join(model_docs)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)

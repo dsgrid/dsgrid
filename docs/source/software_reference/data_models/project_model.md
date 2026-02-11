@@ -1,7 +1,5 @@
 # Project Config
 
----
-
 ## ProjectConfigModel
 
 *dsgrid.config.project_config.ProjectConfigModel*
@@ -298,19 +296,25 @@ Requirements can be specified for a single dimension or a combination of dimensi
 For example, if a project includes commercial, residential, and transportation sectors but the
 dataset has only transporation sector records, it should specify a single_dimensional
 requirement that is a subset of of the project's base dimension.
-`{"single_dimensional": "sector": {"base": {"record_ids": ["transportation"]}}}`.
+
+::
+
+    {"single_dimensional": "sector": {"base": {"record_ids": ["transportation"]}}}
 
 If a dataset's requirements span multiple dimensions, such as if it does not have some
 metric records for some geography records, then a multi_dimensional requirement should be
 specified. (By default, a full cross join is assumed to be present.)
-`{"multi_dimensional": {
-    "geography": {"base": {"record_ids": ["12345"]}}
-    "metric": {"base": {"record_ids": ["electricity_cooling"]}}
-  }
-}`
+
+::
+
+    {"multi_dimensional": {
+        "geography": {"base": {"record_ids": ["12345"]}}
+        "metric": {"base": {"record_ids": ["electricity_cooling"]}}
+      }
+    }
 
 If a dataset specifies a dimension type within a multi_dimensional section and wants to use
-all records from a project base dimension, it can specify `base.record_ids = ["__all__"]
+all records from a project base dimension, it can specify ``base.record_ids = ["__all__"]``
 as a shorthand notation.
 
 Requirements for a dimension cannot be defined in both single_dimensional and multi_dimensional

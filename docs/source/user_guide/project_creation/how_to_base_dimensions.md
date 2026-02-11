@@ -64,7 +64,7 @@ dimensions: {
 
 Create CSV files with dimension records:
 
-```csv
+```text
 id,name,description
 res,Residential,"Residential sector"
 com,Commercial,"Commercial sector"

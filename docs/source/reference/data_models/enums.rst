@@ -8,7 +8,7 @@ Enums
    :member-order: bysource
 
 .. automodule:: dsgrid.dimension.time
-   :members: TimeDimensionType, RepresentativePeriodFormat, LeapDayAdjustmentType, TimeIntervalType, MeasurementType, TimeZone
+   :members: TimeDimensionType, RepresentativePeriodFormat, LeapDayAdjustmentType, TimeIntervalType, MeasurementType
    :undoc-members:
    :member-order: bysource
 
@@ -18,7 +18,7 @@ Enums
    :member-order: bysource
 
 .. automodule:: dsgrid.config.dataset_config
-   :members: InputDatasetType, DataSchemaType, DataClassificationType, DatasetQualifierType, GrowthRateType
+   :members: InputDatasetType, DataClassificationType, DatasetQualifierType, GrowthRateType
    :undoc-members:
    :member-order: bysource
 

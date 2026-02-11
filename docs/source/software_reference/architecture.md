@@ -31,7 +31,7 @@ The Python API provides programmatic access to:
 - Query execution and result processing
 - Dimension operations
 
-See the [Python API Reference](../api_reference/index) for complete documentation.
+See the [Python API Reference](../reference/dsgrid_api/index) for complete documentation.
 
 ### HTTP
 
@@ -62,7 +62,7 @@ This is the primary user interface to dsgrid. Users run CLI commands to register
 - Configuration management (`dsgrid config`)
 - Notebook installation (`dsgrid install-notebooks`)
 
-The CLI consumes the Python API. See [CLI Reference](cli) for complete documentation.
+The CLI consumes the Python API. See [CLI Reference](../reference/cli) for complete documentation.
 
 ### Project Viewer
 
@@ -155,6 +155,6 @@ User → Web Browser → Dash App → HTTP API → Registry DB
 ## Next Steps
 
 - Learn about [CLI fundamentals](cli_fundamentals)
-- Explore the [Python API](../api_reference/index)
+- Explore the [Python API](../reference/dsgrid_api/index)
 - Understand [dataset formats](../user_guide/dataset_registration/formats)
 - See [data models](data_models/index) for configuration schemas

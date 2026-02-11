@@ -41,7 +41,7 @@ Each of those subgroups has four main commands:
   2. Edit the files
   3. Run the `update` command
 
-Refer to each command's `--help` output for additional information. Full CLI documentation at [CLI Reference](cli).
+Refer to each command's `--help` output for additional information. Full CLI documentation at [CLI Reference](../reference/cli).
 
 ## Shell Completion
 
@@ -221,7 +221,7 @@ $ export DSGRID_LOG_FILE=/path/to/my/logs/dsgrid.log
 
 ## Next Steps
 
-- See the [CLI Reference](cli) for complete command documentation
+- See the [CLI Reference](../reference/cli) for complete command documentation
 - Learn about [installation](../getting_started/installation) and setup
 - Understand the [software architecture](architecture)
 - Follow the [tutorials](../user_guide/tutorials/index) for hands-on practice

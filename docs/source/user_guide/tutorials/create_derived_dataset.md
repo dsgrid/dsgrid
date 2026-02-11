@@ -10,7 +10,7 @@ SSH to a login node to begin the tutorial.
 
 ### Step 1: Set Up Your Spark Cluster
 
-You will need at least four compute nodes to create this dataset in about an hour. Follow the instructions at [Run dsgrid on Kestrel](../../how_tos/run_dsgrid_on_kestrel) if you have not already done so. The instructions now assume that you are logged in to the compute node that is running the Spark master process.
+You will need at least four compute nodes to create this dataset in about an hour. Follow the instructions at [Run dsgrid on Kestrel](../apache_spark/run_on_kestrel) if you have not already done so. The instructions now assume that you are logged in to the compute node that is running the Spark master process.
 
 ### Step 2: Copy the Query File
 

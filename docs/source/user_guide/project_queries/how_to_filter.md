@@ -351,4 +351,4 @@ dimension_filters: [
 
 - Learn about [query concepts](concepts) for understanding query processing
 - Follow the [query project tutorial](../tutorials/query_project)
-- Explore the [CLI reference](../../software_reference/cli) for command-line query options
+- Explore the [CLI reference](../../reference/cli) for command-line query options

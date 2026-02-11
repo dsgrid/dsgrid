@@ -94,7 +94,7 @@ Follow the [Spark-on-HPC instructions](https://github.com/daniel-thom/HPC/blob/k
 
 **Key steps:**
 
-1. Start Spark cluster on Kestrel (see [Start Spark Cluster](../apache_spark/spark_cluster_on_kestrel))
+1. Start Spark cluster on Kestrel (see [Start Spark Cluster](../../user_guide/apache_spark/spark_cluster_on_kestrel))
 2. Configure Spark Thrift Server
 3. Install Spark JDBC driver in Tableau
 4. Connect Tableau to Spark cluster
@@ -180,6 +180,6 @@ CSV files can be very large and slower to load than Parquet. Consider using Opti
 
 ## Next Steps
 
-- Learn about [query optimization](concepts) for preparing data
-- Understand [aggregations](../project_queries/concepts#aggregations)
-- Follow the [query project tutorial](../tutorials/query_project)
+- Learn about [query optimization](../../user_guide/project_queries/concepts) for preparing data
+- Understand [aggregations](../../user_guide/project_queries/aggregations)
+- Follow the [query project tutorial](../../user_guide/tutorials/query_project)

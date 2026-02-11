@@ -16,5 +16,5 @@ mapping_workflows
 ```
 
 :::{note}
-Legacy detailed guide available at: [Dimension Mappings (detailed)](../../explanations/components/dimension_mappings)
+See also: [Dimension Mapping Data Models](../../software_reference/data_models/dimension_mapping_model)
 :::

@@ -18,7 +18,7 @@ Identify the dimension records that the project is expecting for your dataset:
 
 ### 2. Record Trivial Dimensions
 
-Record trivial dimensions in the dataset config. See [dataset concepts](dataset_concepts#trivial-dimensions) for more information on trivial dimensions.
+Record trivial dimensions in the dataset config. See [dataset concepts](dataset_concepts.md#trivial-dimensions) for more information on trivial dimensions.
 
 ### 3. Identify Unique Records
 

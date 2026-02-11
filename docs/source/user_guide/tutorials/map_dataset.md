@@ -4,7 +4,7 @@ It is often beneficial to map a dataset to a project's dimensions before running
 
 This page assumes that you have already registered a dataset and submitted it to a project. It also assumes that you have populated your `~/.dsgrid.json5` file with the location of your dsgrid registry.
 
-Spark runtime details are not covered here. Refer to [Apache Spark Overview](../apache_spark/spark_overview).
+Spark runtime details are not covered here. Refer to [Apache Spark Overview](../apache_spark/overview).
 
 ## Basic Operation
 
@@ -32,7 +32,7 @@ If you set `persist=true` for an operation, dsgrid will persist the query to the
 
 - If a dimension mapping operation will reduce the size of data, perhaps because it is aggregating data, list that operation first and persist it.
 - If a dimension mapping operation will increase the size of data, such as a disaggregation or duplication, list that operation last and persist the query just before it. We have experienced the most problems with Spark with this type of operation.
-- Some disaggregation operations can cause data skew. dsgrid will automatically enable techniques to handle this condition with certain mapping types. If you experience this problem, you may need to set `handle_data_skew: true` in the mapping plan for that operation. Refer to [Executors Spilling to Disk](../apache_spark/troubleshooting) for information on how to identify this condition.
+- Some disaggregation operations can cause data skew. dsgrid will automatically enable techniques to handle this condition with certain mapping types. If you experience this problem, you may need to set `handle_data_skew: true` in the mapping plan for that operation. Refer to [Executors Spilling to Disk](../apache_spark/overview.md#executors-spilling-to-disk) for information on how to identify this condition.
 
 ### Example Mapping Plan
 
@@ -101,4 +101,4 @@ $ cat /kfs3/scratch/dthom/ief-registry-y2-3/__dsgrid_scratch__/tmpgn_6xbst.json
 
 - Learn about [dimension mapping concepts](../dataset_mapping/concepts)
 - Explore [querying project data](query_project)
-- Understand [Apache Spark performance tuning](../apache_spark/troubleshooting)
+- Understand [Apache Spark performance tuning](../apache_spark/overview.md#troubleshooting-configuration-problems)

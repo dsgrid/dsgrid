@@ -18,8 +18,8 @@ output_formats
 ```
 
 :::{note}
-Legacy detailed guides available at:
-- [Queries (detailed)](../../explanations/queries)
-- [Filter Queries (detailed)](../../how_tos/filter_a_query)
+See also:
+- [Query Data Models](../../reference/dsgrid_api/query)
+- [Filter Queries](how_to_filter)
 
 :::

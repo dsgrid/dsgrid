@@ -17,5 +17,5 @@ workflows
 ```
 
 :::{note}
-Legacy detailed guide available at: [Derived Datasets (detailed)](../../explanations/components/derived_datasets)
+See also: [Derived Dataset Tutorial](../tutorials/create_derived_dataset)
 :::

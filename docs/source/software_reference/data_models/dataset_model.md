@@ -1,7 +1,5 @@
 # Dataset Config
 
----
-
 ## DatasetConfigModel
 
 *dsgrid.config.dataset_config.DatasetConfigModel*

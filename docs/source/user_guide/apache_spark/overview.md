@@ -534,5 +534,5 @@ dsgrid will employ this technique for specific mapping types or when you enable 
 
 - Learn about [running dsgrid on Kestrel](run_on_kestrel)
 - Set up a [Spark cluster on Kestrel](spark_cluster_on_kestrel)
-- Understand [software architecture](../software_reference/architecture)
-- Explore [query concepts](../user_guide/project_queries/concepts)
+- Understand [software architecture](../../software_reference/architecture)
+- Explore [query concepts](../project_queries/concepts)

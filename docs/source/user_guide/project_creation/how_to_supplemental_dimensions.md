@@ -93,7 +93,7 @@ dimension_mappings: {
 
 Create CSV files that define the mappings:
 
-```csv
+```text
 from_id,to_id
 01001,AL
 01003,AL
@@ -105,7 +105,7 @@ from_id,to_id
 
 For many-to-many mappings with fractions:
 
-```csv
+```text
 from_id,to_id,from_fraction
 detailed_metric_1,aggregated_metric_A,0.6
 detailed_metric_1,aggregated_metric_B,0.4
@@ -147,7 +147,7 @@ Complex relationships with fractional allocations:
 
 Base dimension has detailed building types:
 
-```csv
+```text
 id,name,sector
 single_family,Single Family Home,res
 multi_family_small,Small Multi-Family,res
@@ -158,7 +158,7 @@ office_large,Large Office,com
 
 Supplemental dimension provides simplified view:
 
-```csv
+```text
 id,name,sector
 residential_buildings,Residential Buildings,res
 commercial_buildings,Commercial Buildings,com
@@ -166,7 +166,7 @@ commercial_buildings,Commercial Buildings,com
 
 Mapping file:
 
-```csv
+```text
 from_id,to_id
 single_family,residential_buildings
 multi_family_small,residential_buildings

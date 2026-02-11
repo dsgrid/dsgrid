@@ -204,6 +204,67 @@ be applied to confidentiality, integrity, and availability.
 
 </div>
 
+## TableFormat
+
+*dsgrid.dataset.models.TableFormat*
+
+Defines the table structure of a dataset.
+
+<div class="enum-table">
+
+| Constant | Value |
+|----------|-------|
+| `ONE_TABLE` | `'one_table'` |
+| `TWO_TABLE` | `'two_table'` |
+
+</div>
+
+## ValueFormat
+
+*dsgrid.dataset.models.ValueFormat*
+
+Defines the format of value columns in a dataset.
+
+<div class="enum-table">
+
+| Constant | Value |
+|----------|-------|
+| `PIVOTED` | `'pivoted'` |
+| `STACKED` | `'stacked'` |
+
+</div>
+
+## DaylightSavingSpringForwardType
+
+*dsgrid.dimension.time.DaylightSavingSpringForwardType*
+
+Daylight saving spring forward adjustment enum types
+
+<div class="enum-table">
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DROP` | `'drop'` | Drop timestamp(s) and associated data for the spring forward hour (2AM in March) |
+| `NONE` | `'none'` | No daylight saving adjustment for data. |
+
+</div>
+
+## DaylightSavingFallBackType
+
+*dsgrid.dimension.time.DaylightSavingFallBackType*
+
+Daylight saving fall back adjustment enum types
+
+<div class="enum-table">
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `INTERPOLATE` | `'interpolate'` | Fill data by interpolating between the left and right edges of the dataframe. |
+| `DUPLICATE` | `'duplicate'` | Fill data by duplicating the fall-back hour (1AM in November) |
+| `NONE` | `'none'` | No daylight saving adjustment for data. |
+
+</div>
+
 ## DimensionMappingType
 
 *dsgrid.config.dimension_mapping_base.DimensionMappingType*

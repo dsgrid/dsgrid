@@ -25,6 +25,12 @@ ENUMS = [
     "dsgrid.config.dataset_config.DataClassificationType",
     "dsgrid.config.dataset_config.DatasetQualifierType",
     "dsgrid.config.dataset_config.GrowthRateType",
+    # From dsgrid.dataset.models
+    "dsgrid.dataset.models.TableFormat",
+    "dsgrid.dataset.models.ValueFormat",
+    # From dsgrid.dimension.time (daylight saving)
+    "dsgrid.dimension.time.DaylightSavingSpringForwardType",
+    "dsgrid.dimension.time.DaylightSavingFallBackType",
     # From dsgrid.config.dimension_mapping_base
     "dsgrid.config.dimension_mapping_base.DimensionMappingType",
     "dsgrid.config.dimension_mapping_base.DimensionMappingArchetype",

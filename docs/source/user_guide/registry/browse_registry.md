@@ -4,7 +4,7 @@
 
 ### List Registry Components
 
-Assuming you have already [configured dsgrid](../../getting_started/installation#save-your-configuration) to point to the right database (URL and name), you can list components by type: projects, datasets, dimensions, dimension mappings:
+Assuming you have already [configured dsgrid](../../getting_started/installation.md#save-your-configuration) to point to the right database (URL and name), you can list components by type: projects, datasets, dimensions, dimension mappings:
 
 ```bash
 dsgrid registry projects list
@@ -67,4 +67,4 @@ python dsgrid/apps/project_viewer/app.py
 
 - Learn about [dataset registration](../dataset_registration/index)
 - Explore [querying projects](../project_queries/index)
-- Understand the [CLI reference](../../software_reference/cli)
+- Understand the [CLI reference](../../reference/cli)

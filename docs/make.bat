@@ -25,7 +25,7 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
-rmdir /s /q %SOURCEDIR%\api
+rmdir /s /q %SOURCEDIR%\api 2>NUL
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 

@@ -67,6 +67,7 @@ myst_enable_extensions = [
     "substitution",
     "tasklist",
 ]
+myst_heading_anchors = 4
 
 source_suffix = {
     ".rst": "restructuredtext",

@@ -212,4 +212,4 @@ dataframe.to_csv('mydata.csv')
 
 ## Next Steps
 
-- See [how to work with Apache Spark](../../apache_spark/index.md) for larger datasets
+- See [how to work with Apache Spark](../../user_guide/apache_spark/index) for larger datasets

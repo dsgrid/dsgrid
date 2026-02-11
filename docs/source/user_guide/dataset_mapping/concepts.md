@@ -37,7 +37,7 @@ The [project config](https://github.com/dsgrid/dsgrid-project-StandardScenarios/
 
 The first few lines of the records file looks like this:
 
-```csv
+```text
 from_id,to_id
 01001,AL
 01003,AL
@@ -63,7 +63,7 @@ The mapping config looks like this:
 
 A sample of the records file looks like this:
 
-```csv
+```text
 from_id,to_id,from_fraction
 2018,2017,0
 2018,2018,1
@@ -75,5 +75,5 @@ from_id,to_id,from_fraction
 ## Next Steps
 
 - See the [Dimension Mapping Data Model](../../software_reference/data_models/dimension_mapping_model.md) for complete specifications
-- Follow the [Dataset Mapping Tutorial](../tutorials/dataset_mapping.md) for hands-on practice
+- Follow the [Dataset Mapping Tutorial](../tutorials/map_dataset) for hands-on practice
 - Learn [how to create dimension mappings](mapping_workflows.md) for your datasets

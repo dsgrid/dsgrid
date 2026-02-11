@@ -14,10 +14,9 @@ create_derived_dataset
 
 :::{note}
 Legacy detailed tutorials available at:
-- [Create and Submit a Dataset (detailed)](../../tutorials/create_and_submit_dataset)
-- [Map a Dataset (detailed)](../../tutorials/map_dataset)
-- [Query a Dataset with Python](../../tutorials/query_dataset)
-- [Create a Project (detailed)](../../tutorials/create_project)
-- [Query a Project (detailed)](../../tutorials/query_project)
-- [Create a Derived Dataset (detailed)](../../tutorials/create_derived_dataset)
+- [Create and Submit a Dataset (detailed)](create_and_submit_dataset)
+- [Map a Dataset (detailed)](map_dataset)
+- [Create a Project (detailed)](create_project)
+- [Query a Project (detailed)](query_project)
+- [Create a Derived Dataset (detailed)](create_derived_dataset)
 :::

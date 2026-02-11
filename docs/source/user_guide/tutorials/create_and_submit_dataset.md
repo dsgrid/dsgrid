@@ -113,7 +113,7 @@ required_dimensions: {
 }
 ```
 
-Follow the instructions at [Project Viewer](../../how_tos/browse_registry) to start the viewer. Once you have the data table loaded in your browser, type `transportation` in the filter row of the `dimension_name` column and then select `transportation_subsectors` or `transportation_end_uses`. The dimension record table will get populated with record IDs.
+Follow the instructions at [Project Viewer](../registry/browse_registry) to start the viewer. Once you have the data table loaded in your browser, type `transportation` in the filter row of the `dimension_name` column and then select `transportation_subsectors` or `transportation_end_uses`. The dimension record table will get populated with record IDs.
 
 If you prefer working in an interactive Python session, here is example code to do the same thing:
 
@@ -308,7 +308,7 @@ If your dataset uses FIPS county codes, be sure to not inadvertently drop leadin
 
 ## Step 8: Register and Submit the Dataset
 
-Register and submit the dataset. This requires a properly-configured Spark cluster because of the data size. Smaller datasets may succeed with Spark in local mode. Refer to [Apache Spark Overview](../apache_spark/spark_overview) to setup a Spark cluster.
+Register and submit the dataset. This requires a properly-configured Spark cluster because of the data size. Smaller datasets may succeed with Spark in local mode. Refer to [Apache Spark Overview](../apache_spark/overview) to setup a Spark cluster.
 
 This command assumes that `dataset.json5` and `dimension_mappings.json5` are in a directory called `base_dir`, and that the data files (`load_data.parquet` and `load_data_lookup.parquet`) are in paths relative to the config file as specified in the `data_layout` section. Note that the command provides the option `--data-base-dir` to specify the base directory for the data files if you prefer to avoid filling in the relative path.
 

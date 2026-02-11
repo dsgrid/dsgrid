@@ -56,7 +56,7 @@ Secondly, you may want to specify the minimum required size for each number. For
 if you don't need the precision that comes with 8-byte floats, choose ``FLOAT`` and
 Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.
 
-.. _csv-data-types:
+.. _ref-csv-data-types:
 
 Specifying Column Data Types
 ----------------------------
@@ -300,7 +300,7 @@ Fields:
   - ``columns``: Optional list of column definitions for type overrides and renaming.
 
     - ``name``: The actual column name in the file (required).
-    - ``data_type``: Data type override (optional). See :ref:`csv-data-types` for supported types.
+    - ``data_type``: Data type override (optional). See :ref:`ref-csv-data-types` for supported types.
     - ``dimension_type``: The dsgrid dimension type this column represents (optional).
       When specified, the column will be renamed to match the dimension type.
 
@@ -310,7 +310,7 @@ Fields:
 - ``lookup_data_file``: Lookup file configuration (required for ``two_table`` format).
   Has the same structure as ``data_file``.
 - ``missing_associations``: List of paths to files or directories defining missing dimension
-  combinations (optional, see :ref:`missing-associations`). Paths can be absolute or relative
+  combinations (optional, see :ref:`ref-missing-associations`). Paths can be absolute or relative
   to the config file. You can also use the ``--missing-associations-base-dir`` CLI option to
   specify a different base directory for resolving relative paths.
 
@@ -330,7 +330,7 @@ Both formats support pivoting the record IDs of one dimension as an option.
   one column) and a column called ``value`` that contains the data values. This format
   makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.
 
-.. _one-table-format:
+.. _ref-one-table-format:
 
 One Table Format
 ----------------
@@ -363,7 +363,7 @@ All metric data and dimension records are stored in one Parquet file.
     |2011-12-31 22:00:00|    01001|         reference|   retail_standalone|
     +-------------------+---------+------------------+--------------------+
 
-.. _two-table-format:
+.. _ref-two-table-format:
 
 Two Table Format
 ----------------
@@ -488,7 +488,7 @@ There are no shifts, missing hours, or extra hours for daylight savings time.
 dsgrid can add support for other period formats. Please submit requests as
 needed.
 
-.. _missing-associations:
+.. _ref-missing-associations:
 
 Missing Associations
 ====================
@@ -554,6 +554,7 @@ Example ``missing_associations.csv`` with only two dimensions::
     |    01001|  warehouse|
     |    01003|large_hotel|
     +---------+-----------+
+
 In this case, all metrics, model_years, and weather_years are expected to be missing for these combinations of (geography, subsector).
 Directory Format
 ~~~~~~~~~~~~~~~~

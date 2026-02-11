@@ -1,7 +1,5 @@
 # Dimension Mappings
 
----
-
 ## DimensionMappingBaseModel
 
 *dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel*

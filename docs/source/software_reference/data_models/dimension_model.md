@@ -1,7 +1,5 @@
 # Dimensions
 
----
-
 ## DimensionModel
 
 *dsgrid.config.dimensions.DimensionModel*

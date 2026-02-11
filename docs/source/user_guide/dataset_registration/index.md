@@ -19,8 +19,7 @@ validity_checks
 ```
 
 :::{note}
-Legacy detailed guides available at:
-- [Dimensions (detailed)](../../explanations/components/dimensions)
-- [Datasets (detailed)](../../explanations/components/datasets)
-- [Create Dataset Dimensions (detailed)](../../how_tos/create_dataset_dimensions)
+See also:
+- [Dimension Data Models](../../software_reference/data_models/dimension_model)
+- [Dataset Data Models](../../software_reference/data_models/dataset_model)
 :::

@@ -19,8 +19,8 @@ dataset_requirements
 ```
 
 :::{note}
-Legacy detailed guides available at:
-- [Projects (detailed)](../../explanations/components/projects)
-- [Base Dimensions (detailed)](../../how_tos/create_project_base_dimensions)
-- [Supplemental Dimensions (detailed)](../../how_tos/create_project_supplemental_dimensions)
+See also:
+- [Project Data Models](../../software_reference/data_models/project_model)
+- [Base Dimensions](how_to_base_dimensions)
+- [Supplemental Dimensions](how_to_supplemental_dimensions)
 :::

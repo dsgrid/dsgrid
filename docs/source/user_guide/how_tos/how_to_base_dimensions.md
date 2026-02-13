@@ -91,5 +91,5 @@ Ensure that:
 ## Next Steps
 
 - Learn about [supplemental dimensions](how_to_supplemental_dimensions)
-- Understand [project concepts](../project_creation/concepts) in detail
+- Understand [project concepts](../project_creation/project_concepts) in detail
 - Follow the [create project tutorial](../tutorials/create_project)

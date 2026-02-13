@@ -10,11 +10,11 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 
 ## Workflow Overview
 
-1. **Design the project** — Define the dimensional structure that all datasets will map to. Read [Project Concepts](../user_guide/project_creation/concepts) for the design considerations.
+1. **Design the project** — Define the dimensional structure that all datasets will map to. Read [Project Concepts](../user_guide/project_creation/project_concepts) for an overview, design considerations, and links to key [Dimension](../user_guide/dataset_registration/dimension_concepts.md) and [Dataset](../user_guide/dataset_registration/dataset_concepts.md) concepts.
 2. **Create base dimensions** — Define the finest-grained dimensions the project will support. Follow [How to Create Base Dimensions](../user_guide/how_tos/how_to_base_dimensions).
-3. **Create supplemental dimensions** — Define alternative aggregations for querying (e.g., counties → states). Follow [How to Create Supplemental Dimensions](../user_guide/how_tos/how_to_supplemental_dimensions).
+3. **Create supplemental dimensions** — Define alternative dimensions, typically aggregations, that can be used for querying (e.g., counties → states). Follow [How to Create Supplemental Dimensions](../user_guide/how_tos/how_to_supplemental_dimensions).
 4. **Register the project** — Create the project config and register it. See the [Create a Project](../user_guide/tutorials/create_project) tutorial.
-5. **Coordinate dataset submissions** — Work with dataset submitters and mappers to register and validate their contributions.
+5. **Coordinate dataset submissions** — Work with [dataset submitters](dataset_submitters) to register and validate their contributions.
 6. **Define and run queries** — Assemble the data using queries. See [Query Concepts](../user_guide/project_queries/concepts) and [How to Filter Query Results](../user_guide/how_tos/how_to_filter).
 7. **Create derived datasets** — Build derived datasets from query results for publication. See [Derived Dataset Concepts](../user_guide/project_derived_datasets/concepts).
 
@@ -22,8 +22,9 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 
 ### Core Concepts
 
-- [Project Concepts](../user_guide/project_creation/concepts)
 - [Dimension Concepts](../user_guide/dataset_registration/dimension_concepts)
+- [Project Concepts](../user_guide/project_creation/project_concepts)
+- [Dataset Concepts](../user_guide/dataset_registration/dataset_concepts)
 - [Query Concepts](../user_guide/project_queries/concepts)
 - [Derived Dataset Concepts](../user_guide/project_derived_datasets/concepts)
 
@@ -46,3 +47,5 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 
 - [Project Data Model](../software_reference/data_models/project_model)
 - [Dimension Data Model](../software_reference/data_models/dimension_model)
+- [Dimension Mapping Model](../software_reference/data_models/dimension_mapping_model)
+- [CLI Fundamentals](../software_reference/cli_fundamentals)

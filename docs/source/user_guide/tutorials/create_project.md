@@ -6,7 +6,7 @@ Project attributes, dimensions, and base-to-supplemental dimension mappings must
 
 ## Step 1: Create a Repository
 
-Create a repository to store your configuration and record files. This project follows the directory structure recommendation from [project repository organization](../project_creation/concepts.md#project-repo-organization). We recommend that you use a source control management system like git.
+Create a repository to store your configuration and record files. This project follows the directory structure recommendation from [project repository organization](../project_creation/project_concepts.md#project-repo-organization). We recommend that you use a source control management system like git.
 
 ## Step 2: Create the Project Configuration
 
@@ -135,5 +135,5 @@ dsgrid registry projects register --log-message "my log message" project.json5
 ## Next Steps
 
 - Learn how to [create and submit a dataset](create_and_submit_dataset) to your project
-- Understand [project concepts](../project_creation/concepts) in more detail
+- Understand [project concepts](../project_creation/project_concepts) in more detail
 - Explore [querying project data](query_project)

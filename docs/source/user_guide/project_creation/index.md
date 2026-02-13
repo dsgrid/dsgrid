@@ -7,7 +7,6 @@ Learn how to create and configure dsgrid projects.
 ```{toctree}
 :maxdepth: 1
 
-concepts
 project_concepts
 base_dimensions
 supplemental_dimensions

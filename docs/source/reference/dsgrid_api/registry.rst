@@ -29,9 +29,9 @@ Project
    :members: get_dataset, version
 
 .. autoclass:: dsgrid.config.project_config.ProjectConfig
-   :members: get_base_dimension, get_dimension_type_to_base_query_name_mapping, get_base_to_supplemental_config, get_base_to_supplemental_dimension_mappings_by_types, get_base_to_supplemental_mapping_records, get_dimension, get_dimension_records, get_required_dimension_record_ids, get_supplemental_dimension_to_query_name_mapping, list_dimension_query_names, list_registered_dataset_ids, list_supplemental_dimensions, list_unregistered_dataset_ids
+   :members: get_base_dimension, get_base_to_supplemental_config, get_base_to_supplemental_dimension_mappings_by_types, get_base_to_supplemental_mapping_records, get_dimension, get_dimension_records, get_required_dimension_record_ids, list_registered_dataset_ids, list_supplemental_dimensions, list_unregistered_dataset_ids
 
-.. autopydantic_model:: dsgrid.config.project_config.ProjectDimensionQueryNamesModel
+.. autopydantic_model:: dsgrid.config.project_config.ProjectDimensionNamesModel
 
 .. autopydantic_model:: dsgrid.config.project_config.DimensionsByCategoryModel
 

@@ -4,4 +4,10 @@ orphan: true
 
 # CLI Reference
 
-(To be populated from reference/cli.rst)
+Auto-generated reference for all `dsgrid` CLI commands and subcommands.
+
+```{eval-rst}
+.. click:: dsgrid.cli.dsgrid:cli
+   :prog: dsgrid
+   :nested: full
+```

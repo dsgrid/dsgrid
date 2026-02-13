@@ -8,6 +8,7 @@ Technical reference documentation for dsgrid software components.
 architecture
 cli_fundamentals
 data_models/index
+cli_reference
 ```
 
 :::{note}

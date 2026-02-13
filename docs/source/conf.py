@@ -117,10 +117,6 @@ todo_include_todos = True
 
 
 # CSS styling
-rst_prolog = """
-.. include:: /special.rst
-
-"""
 
 html_css_files = ["style.css"]
 

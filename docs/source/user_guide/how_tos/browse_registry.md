@@ -67,4 +67,4 @@ python dsgrid/apps/project_viewer/app.py
 
 - Learn about [dataset registration](../dataset_registration/index)
 - Explore [querying projects](../project_queries/index)
-- Understand the [CLI reference](../../reference/cli)
+- Understand the [CLI reference](../../software_reference/cli_reference)

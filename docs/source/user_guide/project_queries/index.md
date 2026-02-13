@@ -25,4 +25,4 @@ output_formats
 
 ## Software Reference
 
-- [Query Data Models](../../reference/dsgrid_api/query)
+- [Data Models](../../software_reference/data_models/index)

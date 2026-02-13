@@ -48,3 +48,63 @@ else:
     )
     from pyspark.errors import AnalysisException
     from pyspark import SparkConf
+
+
+SUPPORTED_TYPES = set(
+    (
+        "BOOLEAN",
+        "INT",
+        "INTEGER",
+        "TINYINT",
+        "SMALLINT",
+        "BIGINT",
+        "FLOAT",
+        "DOUBLE",
+        "TIMESTAMP_TZ",
+        "TIMESTAMP_NTZ",
+        "STRING",
+        "TEXT",
+        "VARCHAR",
+    )
+)
+
+DUCKDB_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INTEGER",
+    "INTEGER": "INTEGER",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "INTEGER",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "TIMESTAMP_TZ": "TIMESTAMP WITH TIME ZONE",
+    "TIMESTAMP_NTZ": "TIMESTAMP",
+    "STRING": "VARCHAR",
+    "TEXT": "VARCHAR",
+    "VARCHAR": "VARCHAR",
+}
+
+SPARK_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INT",
+    "INTEGER": "INT",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "SMALLINT",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "STRING": "STRING",
+    "TEXT": "STRING",
+    "VARCHAR": "STRING",
+    "TIMESTAMP_TZ": "TIMESTAMP",
+    "TIMESTAMP_NTZ": "TIMESTAMP_NTZ",
+}
+
+assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
+assert not SUPPORTED_TYPES.difference(DUCKDB_COLUMN_TYPES.keys())
+
+
+def get_str_type() -> str:
+    """Return the string type used by the current database system."""
+    types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
+    return types["STRING"]

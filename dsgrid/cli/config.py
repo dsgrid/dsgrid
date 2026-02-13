@@ -40,7 +40,7 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
     "-b",
     "--backend-engine",
     type=click.Choice([x.value for x in BackendEngine]),
-    default=DEFAULT_BACKEND,
+    default=DEFAULT_BACKEND.value,
     help="Backend engine for SQL processing",
 )
 @click.option(

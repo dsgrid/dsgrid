@@ -37,7 +37,7 @@ from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.config.file_schema import read_data_file
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
     DaylightSavingAdjustmentModel,
@@ -126,7 +126,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
+    def check_consistency(
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        scratch_dir_context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
+    ) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
         """
@@ -134,6 +139,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @abc.abstractmethod
     def check_time_consistency(self):
         """Check the time consistency of the dataset."""
+
+    @abc.abstractmethod
+    def get_base_load_data_table(self) -> DataFrame:
+        """Return the base load data table, which must include time."""
 
     @abc.abstractmethod
     def _get_load_data_table(self) -> DataFrame:
@@ -161,31 +170,39 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
-        self, missing_dimension_associations: dict[str, DataFrame]
+        self,
+        missing_dimension_associations: dict[str, DataFrame],
+        context: ScratchDirContext,
+        requirements: DatasetDimensionRequirements,
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
-        logger.info("Check dimension associations")
-        dsgrid_config = DsgridRuntimeConfig.load()
-        scratch_dir = dsgrid_config.get_scratch_dir()
-        with ScratchDirContext(scratch_dir) as context:
-            assoc_by_records = self._make_expected_dimension_association_table_from_records(
-                [x for x in DimensionType if x != DimensionType.TIME], context
+
+        if not requirements.check_dimension_associations:
+            logger.info(
+                "Skip checks of dataset dimension associations for %s",
+                self._config.model.dataset_id,
             )
-            assoc_by_data = self._make_actual_dimension_association_table_from_data()
-            # This first check is redundant with the checks below. But, it is significantly
-            # easier for users to debug.
-            for column in assoc_by_records.columns:
-                expected = get_unique_values(assoc_by_records, column)
-                actual = get_unique_values(assoc_by_data, column)
-                if actual != expected:
-                    missing = sorted(expected.difference(actual))
-                    extra = sorted(actual.difference(expected))
-                    num_matching = len(actual.intersection(expected))
-                    msg = (
-                        f"Dataset records for dimension type {column} do not match expected "
-                        f"values. {missing=} {extra=} {num_matching=}"
-                    )
-                    raise DSGInvalidDataset(msg)
+            return
+
+        logger.info("Check dimension associations")
+        assoc_by_records = self._make_expected_dimension_association_table_from_records(
+            [x for x in DimensionType if x != DimensionType.TIME], context
+        )
+        assoc_by_data = self._make_actual_dimension_association_table_from_data()
+        # This first check is redundant with the checks below. But, it is significantly
+        # easier for users to debug.
+        for column in assoc_by_records.columns:
+            expected = get_unique_values(assoc_by_records, column)
+            actual = get_unique_values(assoc_by_data, column)
+            if actual != expected:
+                missing = sorted(expected.difference(actual))
+                extra = sorted(actual.difference(expected))
+                num_matching = len(actual.intersection(expected))
+                msg = (
+                    f"Dataset records for dimension type {column} do not match expected "
+                    f"values. {missing=} {extra=} {num_matching=}"
+                )
+                raise DSGInvalidDataset(msg)
 
             required_assoc = assoc_by_records
             if missing_dimension_associations:
@@ -339,13 +356,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         logger.info("Check dataset time consistency.")
         assert isinstance(self._config.model.data_layout, UserDataLayout)
         file_schema = self._config.model.data_layout.data_file
-        load_data_df = read_data_file(file_schema)
-        chronify_schema = self._get_chronify_schema(load_data_df)
-
-        data_file_path = Path(file_schema.path)
-        if data_file_path.suffix == ".parquet" or not use_duckdb():
-            scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
-            with ScratchDirContext(scratch_dir) as context:
+        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as context:
+            load_data_df = read_data_file(file_schema, scratch_dir_context=context)
+            chronify_schema = self._get_chronify_schema(load_data_df)
+            assert file_schema.path is not None
+            data_file_path = Path(file_schema.path)
+            if data_file_path.suffix == ".parquet" or not use_duckdb():
                 if data_file_path.suffix == ".csv":
                     # This is a workaround for time zone issues between Spark, Pandas,
                     # and Chronify when reading CSV files.
@@ -361,15 +378,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     # This performs all of the checks.
                     store.create_view_from_parquet(src_path, chronify_schema)
                     store.drop_view(chronify_schema.name)
-        else:
-            # For CSV and JSON files, use in-memory store with ingest_table.
-            # This avoids the complexity of converting to parquet.
-            with create_in_memory_store() as store:
-                # ingest_table performs all of the time checks.
-                store.ingest_table(load_data_df.toPandas(), chronify_schema)
-                store.drop_table(chronify_schema.name)
+            else:
+                # For CSV and JSON files, use in-memory store with ingest_table.
+                # This avoids the complexity of converting to parquet.
+                with create_in_memory_store() as store:
+                    # ingest_table performs all of the time checks.
+                    store.ingest_table(load_data_df.toPandas(), chronify_schema)
+                    store.drop_table(chronify_schema.name)
 
-        self._check_model_year_time_consistency(load_data_df)
+            self._check_model_year_time_consistency(load_data_df)
 
     def _get_chronify_schema(self, df: DataFrame):
         time_dim = self._config.get_dimension(DimensionType.TIME)

@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo
-import pyspark
 
 import chronify
 from chronify.models import TableSchema
@@ -82,7 +81,7 @@ def map_stacked_dimension(
 
 
 def add_time_zone(
-    load_data_df: pyspark.sql.DataFrame,
+    load_data_df: DataFrame,
     geography_dim: DimensionConfig,
     df_key: str = "geography",
     dim_key: str = "id",
@@ -91,12 +90,12 @@ def add_time_zone(
 
     Parameters
     ----------
-    load_data_df : pyspark.sql.DataFrame
+    load_data_df : DataFrame
     geography_dim: DimensionConfig
 
     Returns
     -------
-    pyspark.sql.DataFrame
+    DataFrame
 
     """
     geo_records = geography_dim.get_records_dataframe()
@@ -246,15 +245,7 @@ def handle_dimension_association_errors(
 ) -> None:
     """Record missing dimension record combinations in a Parquet file and log an error."""
     out_file = Path(f"{dataset_id}__missing_dimension_record_combinations.parquet")
-    df = diff
-    changed = False
-    for column in diff.columns:
-        if diff.select(column).distinct().count() == 1:
-            df = df.drop(column)
-            changed = True
-    if changed:
-        df = df.distinct()
-    df = write_dataframe(coalesce(df, 1), out_file, overwrite=True)
+    df = write_dataframe(coalesce(diff, 1), out_file, overwrite=True)
     logger.error(
         "Dataset %s is missing required dimension records. Recorded missing records in %s",
         dataset_id,

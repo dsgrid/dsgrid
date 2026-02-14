@@ -77,7 +77,7 @@ def one_weekday_day_and_one_weekend_day_per_month_by_hour_table():
         ]
     )
     return spark.read.csv(
-        str(ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE), schema=schema, header=True
+        ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE.as_posix(), schema=schema, header=True
     )
 
 

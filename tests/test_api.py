@@ -222,13 +222,17 @@ def test_submit_project_query(client):
     assert isinstance(df, pd.DataFrame)
 
     data = check_response(client, f"/async_tasks/archive_file/{async_task_id}")
-    with tempfile.NamedTemporaryFile() as fp:
+    with tempfile.NamedTemporaryFile(delete=False) as fp:
         fp.write(data.content)
         fp.flush()
-        with ZipFile(fp.name) as zipf:
-            names = {os.path.basename(x) for x in zipf.namelist()}
-            assert "metadata.json" in names
-            assert "query.json5" in names
+        fp.close()
+        try:
+            with ZipFile(fp.name) as zipf:
+                names = {os.path.basename(x) for x in zipf.namelist()}
+                assert "metadata.json" in names
+                assert "query.json5" in names
+        finally:
+            os.unlink(fp.name)
 
 
 def check_response(client, endpoint, data=None, expected_status_code=200):

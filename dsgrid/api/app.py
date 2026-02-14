@@ -360,13 +360,15 @@ def download_async_task_archive_file(async_task_id: int):
 
 
 def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_task_id):
-    with NamedTemporaryFile(mode="w", suffix=".json") as fp:
+    fp = NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    try:
         query = spark_query.query
         fp.write(query.model_dump_json())
         fp.write("\n")
         fp.flush()
+        fp.close()
         output_dir = Path(QUERY_OUTPUT_DIR)
-        dsgrid_exec = "dsgrid-cli.py"
+        dsgrid_exec = "dsgrid-cli.exe" if sys.platform == "win32" else "dsgrid-cli.py"
         base_cmd = (
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
             f"query project run "
@@ -402,6 +404,8 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
                 archive_file="",
                 archive_file_size_mb=0,
             )
+    finally:
+        Path(fp.name).unlink(missing_ok=True)
 
     api_mgr.complete_async_task(async_task_id, ret, result=result)
 

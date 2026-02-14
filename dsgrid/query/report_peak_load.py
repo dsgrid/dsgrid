@@ -65,6 +65,6 @@ class PeakLoadReport(ReportsBase):
         )
         output_file = output_dir / PeakLoadReport.REPORT_FILENAME
         delete_if_exists(output_file)
-        with_time.write.parquet(str(output_file))
+        with_time.write.parquet(output_file.as_posix())
         logger.info("Wrote Peak Load Report to %s", output_file)
         return output_file

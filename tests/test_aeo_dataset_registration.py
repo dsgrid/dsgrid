@@ -15,7 +15,7 @@ from dsgrid.tests.common import (
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection, make_sqlite_url
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
@@ -32,7 +32,7 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_aeo"
 @pytest.fixture(scope="module")
 def make_test_project_dir(tmp_path_factory):
     base_dir = tmp_path_factory.mktemp("registry")
-    url = f"sqlite:///{base_dir}/registry.db"
+    url = make_sqlite_url(base_dir / "registry.db")
     conn = DatabaseConnection(url=url)
     RegistryDatabase.delete(conn)
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)

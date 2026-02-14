@@ -61,7 +61,6 @@ a space, and then ``tab``. This is the result:
     $ dsgrid
     config             -- Config commands
     download           -- Download a dataset.
-    install-notebooks  -- Install dsgrid notebooks to a local path.
     query              -- Query group commands
     registry           -- Manage a registry.
 

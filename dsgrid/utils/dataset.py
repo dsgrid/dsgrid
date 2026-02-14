@@ -749,7 +749,7 @@ def repartition_if_needed_by_mapping(
         num_partitions = int(spark.conf.get("spark.sql.shuffle.partitions"))
         df.withColumn(
             salted_column, (F.rand() * num_partitions).cast(IntegerType()) + 1
-        ).repartition(salted_column).write.parquet(str(filename))
+        ).repartition(salted_column).write.parquet(filename.as_posix())
         df = read_parquet(filename).drop(salted_column)
         logger.info("Completed repartition.")
         return df, filename

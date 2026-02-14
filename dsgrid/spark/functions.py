@@ -435,9 +435,9 @@ def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> D
     """
     path = Path(path_or_str)
     if path.is_dir():
-        path_str = str(path) + "**/*.csv"
+        path_str = path.as_posix() + "**/*.csv"
     else:
-        path_str = str(path)
+        path_str = path.as_posix()
 
     spark = get_spark_session()
     if not schema:
@@ -488,9 +488,9 @@ def read_parquet(path: Path | str) -> DataFrame:
     path = Path(path) if isinstance(path, str) else path
     spark = get_spark_session()
     if path.is_file() or not use_duckdb():
-        df = spark.read.parquet(str(path))
+        df = spark.read.parquet(path.as_posix())
     else:
-        df = spark.read.parquet(f"{path}/**/*.parquet")
+        df = spark.read.parquet(f"{path.as_posix()}/**/*.parquet")
     return df
 
 

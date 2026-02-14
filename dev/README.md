@@ -363,59 +363,6 @@ mgr = RegistryManager.load(conn, offline_mode=True)
 mgr.dimension_manager.show()
 ```
 
-## Interactive Exploration in a Jupyter notebook UI
-
-The dsgrid team has developed a simple UI to interact with the registry. Here's how to use it.
-
-```
-$ dsgrid install-notebooks
-```
-
-That copies the dsgrid notebooks to `~/dsgrid-notebooks`.
-
-If you are running a Spark cluster then set the environment variable `SPARK_CLUSTER`.
-
-```
-$ export SPARK_CLUSTER=spark://$(hostname):7077
-```
-
-Start Jupyter and open `registration.ipynb`.
-
-Handling of stdout and stderr needs improvement. If the notebook gets cluttered, the best solution is to
-re-execute the cell that creates the UI. You can pass default values for all text box fields in order to
-avoid having to re-enter them every time.
-
-```
-app = RegistrationGui(
-    defaults={
-       "local_registry": "/my-local-registry",
-        "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.json5",
-        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.json5",
-        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
-        "dataset_path": "/dsgrid-data/data-StandardScenarios/comstock_conus_2022_reference",
-        "log_message": "log message",
-    }
-)
-```
-
-Note that you can access the dsgrid registry manager instances from the `app` instance.
-
-```
-from dsgrid.dimension.base_models import DimensionType
-project_config = app.project_manager.get_by_id("dsgrid_conus_2022")
-geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
-spark_df = geography_dim.get_records_dataframe()
-pandas_df = spark_df.toPandas()
-```
-
-You can debug Pydantic data models with the devtools package.
-
-```
-from devtools import debug
-debug(project_config.model)
-debug(geography_dim.model)
-```
-
 ## Registry Database
 The dsgrid registry is stored in a SQLite database. Please refer to this
 [page](registry_database.md) for more information.

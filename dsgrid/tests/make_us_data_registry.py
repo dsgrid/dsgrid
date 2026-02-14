@@ -10,7 +10,7 @@ import rich_click as click
 
 from dsgrid.cli.common import path_callback
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.common import DataStoreType, DatabaseConnection
+from dsgrid.registry.common import DataStoreType, DatabaseConnection, make_sqlite_url
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
@@ -126,7 +126,7 @@ def make_test_data_registry(
     if not include_projects and include_datasets:
         msg = "If include_datasets is True then include_projects must also be True."
         raise Exception(msg)
-    url = f"sqlite:///{registry_path}/registry.db" if database_url is None else database_url
+    url = make_sqlite_url(Path(registry_path) / "registry.db") if database_url is None else database_url
     conn = DatabaseConnection(url=url)
     create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
     dataset_dirs = [

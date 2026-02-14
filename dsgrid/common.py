@@ -1,6 +1,9 @@
 import enum
 import os
+import sys
 from pathlib import Path
+
+IS_WINDOWS = sys.platform == "win32"
 
 # AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"

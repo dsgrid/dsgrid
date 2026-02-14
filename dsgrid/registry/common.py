@@ -48,6 +48,11 @@ def check_config_id_strict(config_id, tag):
         raise ValueError(msg)
 
 
+def make_sqlite_url(path: Path | str) -> str:
+    """Build a SQLite URL from a file path, using forward slashes for cross-platform compatibility."""
+    return f"sqlite:///{Path(path).as_posix()}"
+
+
 class DatabaseConnection(DSGBaseModel):
     """Input information to connect to a registry database"""
 
@@ -59,6 +64,14 @@ class DatabaseConnection(DSGBaseModel):
     # port: int = 8529
     # username: str = "root"
     # password: str = DEFAULT_DB_PASSWORD
+
+    @classmethod
+    def from_file(cls, path: Path | str) -> "DatabaseConnection":
+        """Create a connection from a SQLite file path.
+
+        Uses forward slashes in the URL for cross-platform compatibility.
+        """
+        return cls(url=make_sqlite_url(path))
 
     # @classmethod
     # def from_url(cls, url, **kwargs):

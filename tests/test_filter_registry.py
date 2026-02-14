@@ -54,7 +54,7 @@ def test_filter_registry2(registry_with_duckdb_store, tmp_path):
 def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> None:
     simple_model = RegistrySimpleModel(**FILTER_CONFIG)
     dst_data_path = tmp_path / "test-dsgrid-registry"
-    dst_conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/registry.db")
+    dst_conn = DatabaseConnection.from_file(tmp_path / "registry.db")
 
     try:
         RegistryManager.copy(src_conn, dst_conn, dst_data_path, force=True)

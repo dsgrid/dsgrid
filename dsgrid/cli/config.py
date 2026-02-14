@@ -13,7 +13,7 @@ from dsgrid.dsgrid_rc import (
     DEFAULT_BACKEND,
 )
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection, make_sqlite_url
 
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ def create(
     try:
         db_filename = conn.get_filename()
         if use_absolute_db_path and not db_filename.is_absolute():
-            conn.url = f"sqlite:///{db_filename.resolve()}"
+            conn.url = make_sqlite_url(db_filename.resolve())
 
     except DSGInvalidParameter as exc:
         print(str(exc), file=sys.stderr)

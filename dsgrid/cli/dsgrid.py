@@ -145,7 +145,8 @@ def create_registry(url: str, data_path: Path, overwrite: bool, data_store_type:
     """Create a new registry."""
     check_overwrite(data_path, overwrite)
     conn = DatabaseConnection(url=url)
-    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
+    mgr = RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
+    mgr.dispose()
 
 
 cli.add_command(config)

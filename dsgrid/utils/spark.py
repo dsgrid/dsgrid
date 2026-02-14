@@ -478,23 +478,25 @@ def overwrite_dataframe_file(filename: Path | str, df: DataFrame) -> DataFrame:
     Do not attempt to access the original dataframe unless it was fully cached.
     """
     spark = get_spark_session()
-    suffix = Path(filename).suffix
-    tmp = str(filename) + ".tmp"
+    path = Path(filename)
+    suffix = path.suffix
+    tmp = str(path) + ".tmp"
+    tmp_posix = Path(tmp).as_posix()
     if suffix == ".parquet":
-        df.write.parquet(tmp)
+        df.write.parquet(tmp_posix)
         read_method = read_parquet
         kwargs = {}
     elif suffix == ".csv":
-        df.write.csv(str(tmp), header=True)
+        df.write.csv(tmp_posix, header=True)
         read_method = spark.read.csv
         kwargs = {"header": True, "schema": df.schema}
     elif suffix == ".json":
-        df.write.json(str(tmp))
+        df.write.json(tmp_posix)
         read_method = spark.read.json
         kwargs = {}
     delete_if_exists(filename)
-    os.rename(tmp, str(filename))
-    return read_method(str(filename), **kwargs)
+    os.rename(tmp, str(path))
+    return read_method(path.as_posix(), **kwargs)
 
 
 @track_timing(timer_stats_collector)
@@ -521,8 +523,8 @@ def persist_intermediate_query(
     tmp_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     if auto_partition:
         return write_dataframe_and_auto_partition(df, tmp_file)
-    df.write.parquet(str(tmp_file))
-    return spark.read.parquet(str(tmp_file))
+    df.write.parquet(tmp_file.as_posix())
+    return spark.read.parquet(tmp_file.as_posix())
 
 
 @track_timing(timer_stats_collector)
@@ -566,7 +568,7 @@ def write_dataframe_and_auto_partition(
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
-        df.write.parquet(str(filename))
+        df.write.parquet(Path(filename).as_posix())
         df = read_parquet(filename)
 
     end_initial_write = time.time()
@@ -642,7 +644,7 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
         delete_if_exists(path)
 
     suffix = path.suffix
-    name = str(filename)
+    name = path.as_posix()
     if suffix == ".parquet":
         df.write.parquet(name)
     elif suffix == ".csv":
@@ -778,7 +780,7 @@ def create_dataframe_from_product(
 
     spark = get_spark_session()
     if use_duckdb():
-        df = spark.read.csv(f"{csv_dir}/*.csv", header=False, schema=schema)
+        df = spark.read.csv(f"{csv_dir.as_posix()}/*.csv", header=False, schema=schema)
     else:
         df = spark.read.csv(str(csv_dir), header=False, schema=schema)
     return df

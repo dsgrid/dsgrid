@@ -9,7 +9,7 @@ from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidOperation
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.registry.common import DataStoreType, DatabaseConnection, VersionUpdateType
+from dsgrid.registry.common import DataStoreType, DatabaseConnection, VersionUpdateType, make_sqlite_url
 from dsgrid.utils.files import dump_data, load_data
 
 TEST_PROJECT_PATH = Path(__file__).absolute().parents[2] / "dsgrid-test-data"
@@ -22,12 +22,12 @@ TEST_REGISTRY_DATA_PATH = Path("tests/data/registry/registry_data")
 TEST_EFS_REGISTRATION_FILE = Path("tests/data/test_efs_registration.json5")
 # AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
-CACHED_TEST_REGISTRY_DB = f"sqlite:///{TEST_REGISTRY_BASE_PATH}/cached_registry.db"
+CACHED_TEST_REGISTRY_DB = make_sqlite_url(TEST_REGISTRY_BASE_PATH / "cached_registry.db")
 STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
 IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
 SIMPLE_STANDARD_SCENARIOS = TEST_PROJECT_PATH / "filtered_registries" / "simple_standard_scenarios"
-SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB = (
-    f"sqlite:///{TEST_PROJECT_PATH}/filtered_registries/simple_standard_scenarios/registry.db"
+SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB = make_sqlite_url(
+    TEST_PROJECT_PATH / "filtered_registries" / "simple_standard_scenarios" / "registry.db"
 )
 
 
@@ -35,7 +35,7 @@ def create_local_test_registry(
     tmpdir: Path, conn=None, data_store_type: DataStoreType = DataStoreType.FILESYSTEM
 ):
     if conn is None:
-        conn = DatabaseConnection(url=f"sqlite:///{tmpdir}/dsgrid-test.db")
+        conn = DatabaseConnection.from_file(tmpdir / "dsgrid-test.db")
     data_path = tmpdir / "registry_data"
     mgr = RegistryManager.create(conn, data_path, data_store_type=data_store_type, overwrite=True)
     mgr.dispose()

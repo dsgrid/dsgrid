@@ -152,7 +152,6 @@ exclude = [
 
 extend-exclude = [
     "dsgrid/utils/py_expression_eval/*.py",
-    "dsgrid/notebooks/*.ipynb"
 ]
 
 line-length = 99

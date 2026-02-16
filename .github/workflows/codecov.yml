@@ -6,30 +6,61 @@ on:
 
 jobs:
   run:
-    name: Codecov
-    runs-on: ubuntu-latest
+    name: Codecov (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Python
-      uses: actions/setup-python@v5
+    - uses: actions/checkout@v6
       with:
-        python-version: "3.11"
-    - name: Install dependencies
+        submodules: true
+
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies (Linux)
+      if: runner.os == 'Linux'
       run: |
         python -m pip install --upgrade pip
         python -m pip install maturin
         python -m pip install -e '.[dev,spark]'
-    - name: Generate coverage report
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install maturin
+        python -m pip install -e '.[dev]'
+
+    - name: Generate coverage report (Linux)
+      if: runner.os == 'Linux'
       run: |
         # This does not run the AWS tests.
         # Credentials would need to be configured.
-        git submodule init
-        git submodule update
+        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        # Restart from scratch.
+        rm -rf tests/data/registry
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests/test_spark_utils.py
+
+    - name: Generate coverage report (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        $env:DSGRID_BACKEND_ENGINE = 'duckdb'
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        name: codecov-umbrella
+        flags: ${{ runner.os }}
+        name: ${{ matrix.os }}
         fail_ci_if_error: false
         verbose: true

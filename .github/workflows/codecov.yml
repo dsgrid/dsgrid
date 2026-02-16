@@ -48,7 +48,7 @@ jobs:
         DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
         # Restart from scratch.
         rm -rf tests/data/registry
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
         DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests/test_spark_utils.py
 
     - name: Generate coverage report (Windows)

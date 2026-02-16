@@ -1,9 +1,11 @@
 name: Run tests
 
-on: pull_request
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
-  pytest:
+  tests:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -23,16 +25,68 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Cache Spark
+    - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install maturin
+        pip install -e '.[dev]'
+
+    - name: Install dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m venv .venv
+        .venv\Scripts\Activate.ps1
+        pip install --upgrade pip
+        pip install maturin
+        pip install -e '.[dev]'
+
+    - name: Run tests (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        source .venv/bin/activate
+        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+
+    - name: Run tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .venv\Scripts\Activate.ps1
+        $env:DSGRID_BACKEND_ENGINE = 'duckdb'
+        python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4.2.0
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        flags: ${{ runner.os }}
+        name: ${{ matrix.os }}
+        fail_ci_if_error: false
+        verbose: true
+
+  tests-spark:
+    if: contains(github.event.pull_request.labels.*.name, 'run-spark-tests')
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        submodules: true
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.13"
+
+    - name: Cache Spark
       id: cache-spark
       uses: actions/cache@v4
       with:
         path: spark-4.0.0-bin-hadoop3
         key: spark-4.0.0-bin-hadoop3
 
-    - name: Install dependencies (Linux)
-      if: runner.os == 'Linux'
+    - name: Install dependencies
       run: |
         python -m venv .venv
         source .venv/bin/activate
@@ -61,41 +115,17 @@ jobs:
           sleep 2
         done
 
-    - name: Install dependencies (Windows)
-      if: runner.os == 'Windows'
+    - name: Run Spark tests
       run: |
-        python -m venv .venv
-        .venv\Scripts\Activate.ps1
-        pip install --upgrade pip
-        pip install maturin
-        pip install -e '.[dev]'
-
-    - name: Run tests (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        # This does not run the AWS tests.
-        # Credentials would need to be configured.
         source .venv/bin/activate
         export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
-        # Restart from scratch.
-        rm -rf tests/data/registry
         DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
-
-    - name: Run tests (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        # This does not run the AWS tests.
-        # Credentials would need to be configured.
-        .venv\Scripts\Activate.ps1
-        $env:DSGRID_BACKEND_ENGINE = 'duckdb'
-        python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        flags: ${{ runner.os }}
-        name: ${{ matrix.os }}
+        flags: spark
+        name: ubuntu-spark
         fail_ci_if_error: false
         verbose: true

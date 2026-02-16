@@ -104,7 +104,9 @@ jobs:
         fi
 
         export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        ${SPARK_HOME}/sbin/start-thriftserver.sh
+        ${SPARK_HOME}/sbin/start-thriftserver.sh \
+          --hiveconf javax.jdo.option.ConnectionURL="jdbc:derby:;databaseName=/tmp/thrift-metastore-db;create=true" \
+          --hiveconf spark.sql.warehouse.dir=/tmp/spark-warehouse
         # Wait for the Thrift server to be ready
         for i in $(seq 1 30); do
           if nc -z localhost 10000 2>/dev/null; then

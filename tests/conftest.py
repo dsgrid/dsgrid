@@ -48,9 +48,11 @@ def pytest_sessionstart(session):
         sys.exit(1)
 
     # Previous versions of this database can cause problems in error conditions.
-    path = Path("metastore_db")
-    if path.exists():
-        shutil.rmtree(path)
+    # Only clean up if running with DuckDB; with Spark the Thrift server owns the metastore.
+    if use_duckdb():
+        path = Path("metastore_db")
+        if path.exists():
+            shutil.rmtree(path)
 
 
 def pytest_sessionfinish(session, exitstatus):

@@ -29,6 +29,7 @@ from dsgrid.registry.common import (
     RegistryTables,
     VersionUpdateType,
     RegistryType,
+    make_sqlite_url,
 )
 from dsgrid.registry.registry_auto_updater import RegistryAutoUpdater
 from dsgrid.registry.registry_database import DatabaseConnection
@@ -289,7 +290,7 @@ fans,x
     dump_data(subset_dimensions_model, model_file)
     subset_data_file.write_text(subset_dimensions_data, encoding="utf-8")
 
-    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    url = make_sqlite_url(project_mgr.db.engine.url.database)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -361,7 +362,7 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
             for county_id in county_ids:
                 f.write(f"{county_id},{region}\n")
 
-    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    url = make_sqlite_url(project_mgr.db.engine.url.database)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -423,7 +424,7 @@ def test_remove_dataset(mutable_cached_registry):
     dataset_id = config.model.datasets[0].dataset_id
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
 
-    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    url = make_sqlite_url(project_mgr.db.engine.url.database)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -455,7 +456,7 @@ def test_add_dataset_requirements(mutable_cached_registry, tmp_path):
     with open(dataset_file, "w") as f:
         f.write(model.model_dump_json())
 
-    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    url = make_sqlite_url(project_mgr.db.engine.url.database)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -517,7 +518,7 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
     with open(requirements_file, "w") as f:
         f.write(model.model_dump_json())
 
-    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    url = make_sqlite_url(project_mgr.db.engine.url.database)
     runner = CliRunner()
     result = runner.invoke(
         cli,
@@ -815,7 +816,7 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
         dump_data(data, modified_config_file)
 
         # Use CLI runner to test the --data-base-dir option
-        db_url = f"sqlite:///{manager.dataset_manager.db.engine.url.database}"
+        db_url = make_sqlite_url(manager.dataset_manager.db.engine.url.database)
         runner = CliRunner()
         result = runner.invoke(
             cli,
@@ -897,7 +898,7 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
         dump_data(data, modified_config_file)
 
         # Use CLI runner to test register-and-submit-dataset with --data-base-dir
-        db_url = f"sqlite:///{manager.dataset_manager.db.engine.url.database}"
+        db_url = make_sqlite_url(manager.dataset_manager.db.engine.url.database)
         runner = CliRunner()
         result = runner.invoke(
             cli,

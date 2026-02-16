@@ -10,7 +10,7 @@ import rich_click as click
 
 from dsgrid.cli.common import path_callback
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.common import DataStoreType, DatabaseConnection
+from dsgrid.registry.common import DataStoreType, DatabaseConnection, make_sqlite_url
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
@@ -37,6 +37,18 @@ def _find_file_with_stem(directory: Path, stem: str) -> Path | None:
     return None
 
 
+def _relpath_or_absolute(target: Path, start: Path) -> str:
+    """Return a relative path from start to target, or an absolute path if that's not possible.
+
+    On Windows, os.path.relpath raises ValueError when the paths are on different drives.
+    In that case, return the absolute path to the target instead.
+    """
+    try:
+        return os.path.relpath(target, start)
+    except ValueError:
+        return str(target)
+
+
 def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
     """Update the data file paths in a dataset config to be relative to the config file.
 
@@ -61,8 +73,7 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
         if data_file_path is None:
             msg = f"Could not find data file with stem '{stem}' in {dataset_data_dir}"
             raise FileNotFoundError(msg)
-        relative_path = os.path.relpath(data_file_path, config_dir)
-        data_layout["data_file"]["path"] = relative_path
+        data_layout["data_file"]["path"] = _relpath_or_absolute(data_file_path, config_dir)
 
     if "lookup_data_file" in data_layout and data_layout["lookup_data_file"] is not None:
         stem = Path(data_layout["lookup_data_file"]["path"]).stem
@@ -70,8 +81,9 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
         if lookup_file_path is None:
             msg = f"Could not find lookup file with stem '{stem}' in {dataset_data_dir}"
             raise FileNotFoundError(msg)
-        relative_path = os.path.relpath(lookup_file_path, config_dir)
-        data_layout["lookup_data_file"]["path"] = relative_path
+        data_layout["lookup_data_file"]["path"] = _relpath_or_absolute(
+            lookup_file_path, config_dir
+        )
 
     if "missing_associations" in data_layout and data_layout["missing_associations"] is not None:
         items = []
@@ -83,8 +95,7 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
                     f"Could not find missing associations with stem '{stem}' in {dataset_data_dir}"
                 )
                 raise FileNotFoundError(msg)
-            relative_path = os.path.relpath(missing_path, config_dir)
-            items.append(relative_path)
+            items.append(_relpath_or_absolute(missing_path, config_dir))
         data_layout["missing_associations"] = items
 
     dump_data(data, config_file)
@@ -126,7 +137,11 @@ def make_test_data_registry(
     if not include_projects and include_datasets:
         msg = "If include_datasets is True then include_projects must also be True."
         raise Exception(msg)
-    url = f"sqlite:///{registry_path}/registry.db" if database_url is None else database_url
+    url = (
+        make_sqlite_url(Path(registry_path) / "registry.db")
+        if database_url is None
+        else database_url
+    )
     conn = DatabaseConnection(url=url)
     create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
     dataset_dirs = [

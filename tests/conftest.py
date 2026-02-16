@@ -1,3 +1,4 @@
+import gc
 import os
 import re
 import shutil
@@ -10,7 +11,7 @@ import pytest
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.registry.common import DataStoreType, DatabaseConnection
+from dsgrid.registry.common import DataStoreType, DatabaseConnection, make_sqlite_url
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
     drop_temp_tables_and_views,
@@ -33,7 +34,7 @@ from dsgrid.tests.common import (
     CACHED_TEST_REGISTRY_DB,
 )
 from dsgrid.tests.make_us_data_registry import update_dataset_config_paths
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -47,11 +48,14 @@ def pytest_sessionstart(session):
         sys.exit(1)
 
     # Previous versions of this database can cause problems in error conditions.
-    path = Path("metastore_db")
-    if path.exists():
-        shutil.rmtree(path)
+    # Only clean up if running with DuckDB; with Spark the Thrift server owns the metastore.
+    if use_duckdb():
+        path = Path("metastore_db")
+        if path.exists():
+            shutil.rmtree(path)
 
-    yield
+
+def pytest_sessionfinish(session, exitstatus):
     drop_temp_tables_and_views()
 
 
@@ -67,8 +71,7 @@ def cached_registry():
     if commit_file.exists() and commit_file.read_text().strip() == latest_commit:
         print(f"Use existing test registry at {TEST_REGISTRY_BASE_PATH}.")
     else:
-        if TEST_REGISTRY_BASE_PATH.exists():
-            shutil.rmtree(TEST_REGISTRY_BASE_PATH)
+        delete_if_exists(TEST_REGISTRY_BASE_PATH)
         TEST_REGISTRY_BASE_PATH.mkdir()
         runner = CliRunner()
         result = runner.invoke(
@@ -107,7 +110,7 @@ def cached_registry():
                     result.exception.__traceback__,
                 )
             # Delete it because it is invalid.
-            shutil.rmtree(TEST_REGISTRY_DATA_PATH)
+            delete_if_exists(TEST_REGISTRY_DATA_PATH)
             RegistryDatabase.delete(conn)
             sys.exit(1)
 
@@ -118,7 +121,7 @@ def cached_registry():
 def src_tmp_registry_db(tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("tmpdir")
     project_dir = _make_project_dir(TEST_PROJECT_REPO, base_dir=tmp_path) / "dsgrid_project"
-    conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/tmp_reg.db")
+    conn = DatabaseConnection.from_file(tmp_path / "tmp_reg.db")
     RegistryDatabase.delete(conn)
     registry_dir = tmp_path_factory.mktemp("registry_data")
     with make_test_data_registry(
@@ -134,7 +137,7 @@ def src_tmp_registry_db(tmp_path_factory):
 @pytest.fixture
 def registry_with_duckdb_store(tmp_path):
     db_file = tmp_path / "duckdb_registry.db"
-    url = f"sqlite:///{db_file}"
+    url = make_sqlite_url(db_file)
     data_path = tmp_path / "registry_data"
     runner = CliRunner()
     result = runner.invoke(
@@ -161,15 +164,21 @@ def registry_with_duckdb_store(tmp_path):
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
     yield conn
-    shutil.rmtree(data_path)
-    db_file.unlink()
+    # Dispose the database engine and data store before removing files.
+    try:
+        db = RegistryDatabase.connect(conn)
+        db.dispose()
+    except Exception:
+        pass
+    delete_if_exists(data_path)
+    delete_if_exists(db_file)
 
 
 @pytest.fixture()
 def mutable_cached_registry(src_tmp_registry_db, tmp_path) -> tuple[RegistryManager, Path]:
     """Creates a copy of the cached_registry. Tests may make changes to the registry."""
     src_conn, src_project_dir = src_tmp_registry_db
-    dst_conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/dst_registry.db")
+    dst_conn = DatabaseConnection.from_file(tmp_path / "dst_registry.db")
     tmp_project_dir = tmp_path / "tmp_project_dir"
     shutil.copytree(src_project_dir, tmp_project_dir)
     RegistryManager.copy(src_conn, dst_conn, tmp_path / "mutable_registry_data")
@@ -178,6 +187,7 @@ def mutable_cached_registry(src_tmp_registry_db, tmp_path) -> tuple[RegistryMana
         yield mgr, tmp_project_dir
     finally:
         mgr.dispose()
+        gc.collect()
 
 
 def _get_latest_commit():
@@ -200,37 +210,32 @@ def spark_session():
 def make_test_project_dir_module():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
-    if tmpdir.exists():
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
 
 
 @pytest.fixture
 def make_test_project_dir():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
-    if tmpdir.exists():
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
 
 
 @pytest.fixture
 def make_standard_scenarios_project_dir():
     tmpdir = _make_project_dir(TEST_STANDARD_SCENARIOS_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
-    if tmpdir.exists():
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
 
 
 @pytest.fixture(scope="module")
 def make_test_data_dir_module():
     tmpdir = Path(gettempdir()) / "test_data"
-    if os.path.exists(tmpdir):
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
     os.mkdir(tmpdir)
     dst_path = tmpdir / "datasets"
     shutil.copytree(Path(TEST_DATASET_DIRECTORY), dst_path)
     yield dst_path
-    if tmpdir.exists():
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
 
 
 @pytest.fixture
@@ -243,8 +248,7 @@ def make_test_data_dir(tmp_path):
 def _make_project_dir(project, base_dir: Optional[Path] = None):
     tmpdir_base = base_dir or Path(gettempdir())
     tmpdir = tmpdir_base / "test_project"
-    if os.path.exists(tmpdir):
-        shutil.rmtree(tmpdir)
+    delete_if_exists(tmpdir)
     tmpdir.mkdir(parents=True)
     shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
 
@@ -266,11 +270,12 @@ def _make_project_dir(project, base_dir: Optional[Path] = None):
 
 @pytest.fixture
 def tmp_registry_db(make_test_project_dir, tmp_path):
-    conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/registry.db")
+    conn = DatabaseConnection.from_file(tmp_path / "registry.db")
     RegistryDatabase.delete(conn)
     registry_path = tmp_path / "registry"
     registry_path.mkdir()
     yield make_test_project_dir, registry_path, conn.url
+    gc.collect()
     RegistryDatabase.delete(conn)
 
 

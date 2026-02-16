@@ -158,6 +158,8 @@ metastore_db
 __dsgrid_scratch__
 *.tgz
 *.db
+journal__*.json5
+missing_associations/
 
 # Rust / Cargo
 rust/target/

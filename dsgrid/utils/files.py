@@ -1,15 +1,19 @@
 """File utility functions"""
 
+import gc
 import hashlib
 import logging
 import os
 import json
 import shutil
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 import json5
+
+from dsgrid.common import IS_WINDOWS
 
 
 logger = logging.getLogger(__name__)
@@ -38,13 +42,35 @@ def compute_hash(text: bytes) -> str:
 
 
 def delete_if_exists(path: Path | str) -> None:
-    """Delete a file or directory if it exists."""
+    """Delete a file or directory if it exists.
+
+    On Windows, retries up to 5 times with short delays to handle files that
+    may still be locked by recently-closed database connections.
+    """
     path = Path(path) if isinstance(path, str) else path
-    if path.exists():
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
+    if not path.exists():
+        return
+
+    max_retries = 5 if IS_WINDOWS else 1
+    for attempt in range(max_retries):
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            return
+        except PermissionError:
+            if attempt < max_retries - 1:
+                gc.collect()
+                time.sleep(1.0 * (attempt + 1))
+                logger.debug(
+                    "Retry %s/%s deleting %s due to PermissionError",
+                    attempt + 1,
+                    max_retries,
+                    path,
+                )
+            else:
+                raise
 
 
 def dump_data(data, filename, **kwargs) -> None:

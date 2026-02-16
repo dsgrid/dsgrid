@@ -10,7 +10,7 @@ def read_parquet(filename: Path):
     to inspect the dataframe.
     """
     spark = get_spark_session()
-    df = spark.read.parquet(str(filename))
+    df = spark.read.parquet(Path(filename).as_posix())
     if not use_duckdb():
         df.cache()
         df.count()
@@ -19,7 +19,7 @@ def read_parquet(filename: Path):
 
 def read_parquet_two_table_format(path: Path):
     spark = get_spark_session()
-    load_data = spark.read.parquet(str(path / "load_data.parquet"))
-    lookup = spark.read.parquet(str(path / "load_data_lookup.parquet"))
+    load_data = spark.read.parquet((path / "load_data.parquet").as_posix())
+    lookup = spark.read.parquet((path / "load_data_lookup.parquet").as_posix())
     table = load_data.join(lookup, on="id").drop("id")
     return table

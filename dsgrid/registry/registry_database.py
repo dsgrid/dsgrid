@@ -23,6 +23,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.pool import NullPool
 
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
@@ -40,10 +41,18 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.data_store_factory import make_data_store
-from dsgrid.utils.files import dump_data
+from dsgrid.common import IS_WINDOWS
+from dsgrid.utils.files import delete_if_exists, dump_data
 
 
 logger = logging.getLogger(__name__)
+
+
+def _create_engine(url: str, **kwargs: Any) -> Engine:
+    """Create a SQLAlchemy engine, using NullPool on Windows for SQLite to avoid file locking."""
+    if IS_WINDOWS and url.startswith("sqlite"):
+        kwargs.setdefault("poolclass", NullPool)
+    return create_engine(url, **kwargs)
 
 
 class RegistryDatabase:
@@ -57,6 +66,8 @@ class RegistryDatabase:
 
     def dispose(self) -> None:
         """Dispose the database engine and release all connections."""
+        if self._data_store is not None:
+            self._data_store.close()
         self._engine.dispose()
 
     @classmethod
@@ -74,7 +85,7 @@ class RegistryDatabase:
             check_overwrite(path, overwrite=overwrite)
         data_path.mkdir()
         data_store = make_data_store(data_path, data_store_type, initialize=True)
-        db = cls(create_engine(conn.url, **connect_kwargs), data_store)
+        db = cls(_create_engine(conn.url, **connect_kwargs), data_store)
         db.initialize_db(data_path, data_store_type)
         return db
 
@@ -91,7 +102,7 @@ class RegistryDatabase:
         filename = conn.get_filename()
         check_overwrite(filename, overwrite=overwrite)
         store = make_data_store(data_path, data_store_type, initialize=False)
-        db = RegistryDatabase(create_engine(conn.url, **connect_kwargs), store)
+        db = RegistryDatabase(_create_engine(conn.url, **connect_kwargs), store)
         db.initialize_db(data_path, data_store_type)
         return db
 
@@ -104,7 +115,7 @@ class RegistryDatabase:
         """Load an existing registry database."""
         # This tests the connection.
         conn.get_filename()
-        engine = create_engine(conn.url, **connect_kwargs)
+        engine = _create_engine(conn.url, **connect_kwargs)
         db = RegistryDatabase(engine)
         db.update_sqlalchemy_metadata()
         base_path = db.get_data_path()
@@ -223,8 +234,7 @@ class RegistryDatabase:
     def delete(conn: DatabaseConnection) -> None:
         """Delete the dsgrid database."""
         filename = conn.get_filename()
-        if filename.exists():
-            filename.unlink()
+        delete_if_exists(filename)
 
     @staticmethod
     def has_database(conn: DatabaseConnection) -> bool:

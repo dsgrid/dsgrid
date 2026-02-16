@@ -132,7 +132,7 @@ addopts = "-ra"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = ["tests/*"]
+omit = ["dsgrid/tests/*", "tests/*", "tests_aws/*", "build_backend.py"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
@@ -152,7 +152,6 @@ exclude = [
 
 extend-exclude = [
     "dsgrid/utils/py_expression_eval/*.py",
-    "dsgrid/notebooks/*.ipynb"
 ]
 
 line-length = 99

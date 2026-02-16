@@ -349,6 +349,22 @@ calculations.
 
 </div>
 
+### WeatherVariable
+
+*dsgrid.dimension.standard.WeatherVariable*
+
+Weather attributes - e.g., dry bulb temperature, relative humidity
+
+<div class="model-fields-table">
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | `str` | *(required)* | Unique identifier within a dimension |
+| `name` | `str` | *(required)* | User-defined name |
+| `unit` | `str` | *(required)* |  |
+
+</div>
+
 ---
 
 ## Model Year

@@ -68,6 +68,7 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `cls` | `Any` | `None` | Dimension record model class |
 | `description` | `str` \| None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME` | Type of time dimension |
+| `column_format` | [TimeFormatDateTimeTZModel](dimension_model.md#timeformatdatetimetzmodel) \| [TimeFormatDateTimeNTZModel](dimension_model.md#timeformatdatetimentzmodel) \| [TimeFormatInPartsModel](dimension_model.md#timeformatinpartsmodel) | `dtype='TIMESTAMP_TZ' time_column='timestamp'` | Specifies the format of the timestamps in the dataset. |
 | `time_zone_format` | [AlignedTimeSingleTimeZone](dimension_model.md#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](dimension_model.md#localtimemultipletimezones) | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: mean, min, max, measured, total |
 | `ranges` | list[[TimeRangeModel](dimension_model.md#timerangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
@@ -111,7 +112,7 @@ E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME"` |  |
-| `time_zone` | `str` | *(required)* | Time zone of data |
+| `time_zone` | `str` | *(required)* | IANA time zone of data |
 
 </div>
 
@@ -146,7 +147,73 @@ They are aligned in clock time but not in absolute time.
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_CLOCK_TIME"` |  |
-| `time_zones` | list[`str`] | *(required)* | List of unique time zones in the dataset |
+| `time_zones` | list[`str`] | *(required)* | List of unique IANA time zones in the dataset |
+
+</div>
+
+
+---
+
+## TimeFormatDateTimeNTZModel
+
+*dsgrid.config.dimensions.TimeFormatDateTimeNTZModel*
+
+Format of timestamps in a dataset is timezone-naive datetime,
+requiring localization to time zones.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dtype` | `Literal` | `"TIMESTAMP_NTZ"` |  |
+| `time_column` | `str` | `"timestamp"` | Name of the timestamp column in the dataset. |
+
+</div>
+
+
+---
+
+## TimeFormatDateTimeTZModel
+
+*dsgrid.config.dimensions.TimeFormatDateTimeTZModel*
+
+Format of timestamps in a dataset is timezone-aware datetime.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dtype` | `Literal` | `"TIMESTAMP_TZ"` |  |
+| `time_column` | `str` | `"timestamp"` | Name of the timestamp column in the dataset. |
+
+</div>
+
+
+---
+
+## TimeFormatInPartsModel
+
+*dsgrid.config.dimensions.TimeFormatInPartsModel*
+
+Format of timestamps in a dataset is in parts, e.g., month-day-hour format,
+requiring conversion to datetime.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dtype` | `Literal` | `"time_format_in_parts"` |  |
+| `year_column` | `str` | *(required)* | Name of the year column in the dataset. |
+| `month_column` | `str` | *(required)* | Name of the month column in the dataset. Value is the month in a year (1 - 12) |
+| `day_column` | `str` | *(required)* | Name of the day column in the dataset. Value is the day in a month (1 - 31). |
+| `hour_column` | `str` \| None | `None` | Name of the hour column in the dataset. Value is the hour in a day (0 - 23). If None, the hour will be set to 0 for all rows. |
+| `time_zone` | `str` \| None | `None` | IANA time zone of the timestamps. Use None for time zone-naive timestamps. |
 
 </div>
 

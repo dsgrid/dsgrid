@@ -107,6 +107,7 @@ The `class` field must reference a class from the `dsgrid.dimension.standard` mo
 | **StockShare** | Market share of a technology (generally dimensionless) | `unit` |
 | **FractionalIndex** | Bounded index (e.g., HDI) | `unit`, `min_value`, `max_value` |
 | **PeggedIndex** | Index relative to a base year (e.g., normalized to 1 or 100) | `unit`, `base_year`, `base_value` |
+| **WeatherVariable** | Weather attributes (e.g., dry bulb temperature, relative humidity) | `unit` |
 
 See the [Dimension Record Classes](../../software_reference/data_models/dimension_classes.md) reference for full field definitions, including accepted enum values.
 

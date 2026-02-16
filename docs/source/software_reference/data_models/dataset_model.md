@@ -73,7 +73,7 @@ Base data model for all dsgrid data models
 |------|------|---------|-------------|
 | `name` | `str` | *(required)* | Name of the column |
 | `dimension_type` | [DimensionType](enums.md#dimensiontype) \| None | `None` | Dimension represented by the data in the column. Optional if this is a time column or pivoted column. Required if the column represents a stacked dimension but an alternate name is being used, such as 'county' instead of 'geography'. dsgrid will rename any column that is set at runtime, writing out the result to the registry's data directory. The original dataset is not modified. |
-| `data_type` | `str` \| None | *(required)* | Type of the data in the column. If None, infer the type. |
+| `data_type` | `str` \| None | `None` | Type of the data in the column. If None, infer the type. |
 
 </div>
 

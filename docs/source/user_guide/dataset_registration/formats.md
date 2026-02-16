@@ -351,9 +351,53 @@ This format minimizes file storage because:
 
 ### DateTime
 
-The load data table has one column representing time, typically called `timestamp`. When written to Parquet files the type should be the `TIMESTAMP` logical type (integer, not string) and be adjusted to UTC. When read into Spark the type should be `TimestampType` (not `TimestampNTZType`).
+Datetime time dimensions use the `column_format` field in the time dimension config to describe how timestamps are represented in the data files. Three formats are supported:
 
-Handling of no-time-zone timestamps (Spark type `TimestampNTZType`) is possible. Contact the dsgrid team if you need this.
+#### Timezone-aware timestamps (`TIMESTAMP_TZ`)
+
+This is the default. The load data table has one column representing time (typically called `timestamp`). When written to Parquet files the type should be the `TIMESTAMP` logical type (integer, not string) and be adjusted to UTC. When read into Spark the type should be `TimestampType`.
+
+```javascript
+// Time dimension config (default — can be omitted)
+column_format: {
+  dtype: "TIMESTAMP_TZ",
+  time_column: "timestamp",
+}
+```
+
+#### Timezone-naive timestamps (`TIMESTAMP_NTZ`)
+
+For datasets where timestamps are local time without an explicit time zone. The data must include a `time_zone` column (or the time zone must be derivable from the geography dimension) so dsgrid can localize the values. When read into Spark the type should be `TimestampNTZType`.
+
+```javascript
+column_format: {
+  dtype: "TIMESTAMP_NTZ",
+  time_column: "timestamp",
+}
+```
+
+#### Time-in-parts
+
+For datasets that store time components in separate columns (year, month, day, and optionally hour) rather than a single timestamp column. During registration, dsgrid automatically converts these columns into a single timestamp column.
+
+```javascript
+column_format: {
+  dtype: "time_format_in_parts",
+  year_column: "year",
+  month_column: "month",
+  day_column: "day",
+  hour_column: "hour",    // optional — omit for daily data
+  time_zone: "US/Eastern", // optional — if omitted, derived from geography
+}
+```
+
+When `time_zone` is specified, the resulting timestamps are timezone-aware (`TIMESTAMP_TZ`) and the year, month, day, and hour columns are assumed to already be aligned in the specified time zone (US/Eastern in the example).
+
+When `time_zone` is omitted, dsgrid assumes that year, month, day, and hour correspond to local time. To create specific timestamps in this case, dsgrid joins the geography dimension's records onto the data and pulls in the `time_zone` column — this requires that the geography dimension's records file includes a column named `time_zone` containing IANA time zone strings. The resulting data has a naive `timestamp` column (`TIMESTAMP_NTZ`) alongside the `time_zone` column, such that the combination is a fully specified point in time.
+
+:::{note}
+The time-in-parts columns are dropped from the data during registration and replaced by a single `timestamp` column. The original data files are not modified.
+:::
 
 ### Annual
 

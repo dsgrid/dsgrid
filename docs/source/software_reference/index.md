@@ -6,7 +6,7 @@ Technical reference documentation for dsgrid software components.
 :maxdepth: 1
 
 architecture
-cli_fundamentals
 data_models/index
+cli_fundamentals
 cli_reference
 ```

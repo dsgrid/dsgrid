@@ -62,7 +62,7 @@ This is the primary user interface to dsgrid. Users run CLI commands to register
 - Configuration management (`dsgrid config`)
 - Notebook installation (`dsgrid install-notebooks`)
 
-The CLI consumes the Python API. See [CLI Reference](../reference/cli) for complete documentation.
+The CLI consumes the Python API. See [CLI Reference](cli_reference) for complete documentation.
 
 ### Project Viewer
 

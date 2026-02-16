@@ -26,12 +26,41 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Cache Spark
+      if: runner.os == 'Linux'
+      id: cache-spark
+      uses: actions/cache@v4
+      with:
+        path: spark-4.0.0-bin-hadoop3
+        key: spark-4.0.0-bin-hadoop3
+
     - name: Install dependencies (Linux)
       if: runner.os == 'Linux'
       run: |
         python -m pip install --upgrade pip
         python -m pip install maturin
         python -m pip install -e '.[dev,spark]'
+
+        # Only download if cache miss
+        if [ ! -d "spark-4.0.0-bin-hadoop3" ]; then
+          echo "Spark cache missed, downloading..."
+          wget -q https://archive.apache.org/dist/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
+          tar -xzf spark-4.0.0-bin-hadoop3.tgz
+        else
+          echo "Spark restored from cache."
+        fi
+
+        export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
+        ${SPARK_HOME}/sbin/start-thriftserver.sh
+        # Wait for the Thrift server to be ready
+        for i in $(seq 1 30); do
+          if nc -z localhost 10000 2>/dev/null; then
+            echo "Thrift server is ready."
+            break
+          fi
+          echo "Waiting for Thrift server... ($i/30)"
+          sleep 2
+        done
 
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
@@ -45,11 +74,11 @@ jobs:
       run: |
         # This does not run the AWS tests.
         # Credentials would need to be configured.
-        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
+        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
         # Restart from scratch.
         rm -rf tests/data/registry
         DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests/test_spark_utils.py
 
     - name: Generate coverage report (Windows)
       if: runner.os == 'Windows'

@@ -3,7 +3,6 @@ import getpass
 import logging
 import os
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
@@ -82,7 +81,9 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
         if lookup_file_path is None:
             msg = f"Could not find lookup file with stem '{stem}' in {dataset_data_dir}"
             raise FileNotFoundError(msg)
-        data_layout["lookup_data_file"]["path"] = _relpath_or_absolute(lookup_file_path, config_dir)
+        data_layout["lookup_data_file"]["path"] = _relpath_or_absolute(
+            lookup_file_path, config_dir
+        )
 
     if "missing_associations" in data_layout and data_layout["missing_associations"] is not None:
         items = []
@@ -136,7 +137,11 @@ def make_test_data_registry(
     if not include_projects and include_datasets:
         msg = "If include_datasets is True then include_projects must also be True."
         raise Exception(msg)
-    url = make_sqlite_url(Path(registry_path) / "registry.db") if database_url is None else database_url
+    url = (
+        make_sqlite_url(Path(registry_path) / "registry.db")
+        if database_url is None
+        else database_url
+    )
     conn = DatabaseConnection(url=url)
     create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
     dataset_dirs = [

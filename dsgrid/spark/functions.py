@@ -435,7 +435,7 @@ def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> D
     """
     path = Path(path_or_str)
     if path.is_dir():
-        path_str = path.as_posix() + "**/*.csv"
+        path_str = path.as_posix() + "/**/*.csv"
     else:
         path_str = path.as_posix()
 

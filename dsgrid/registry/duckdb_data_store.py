@@ -171,14 +171,15 @@ class DuckDbDataStore(DataStoreInterface):
 
     def _replace_table(self, df: DataFrame, schema: str, table_name: str) -> None:
         with self._connect() as con:
+            full_name = f"{schema}.{table_name}"
             if not self._has_table(con, schema, table_name):
-                _create_table_from_dataframe(con, df, table_name)
+                _create_table_from_dataframe(con, df, full_name)
                 return
 
-            tmp_name = f"{schema}.{table_name}_tmp"
+            tmp_name = f"{full_name}_tmp"
             _create_table_from_dataframe(con, df, tmp_name)
-            con.sql(f"DROP TABLE {table_name}")
-            con.sql(f"ALTER TABLE {tmp_name} RENAME TO {table_name}")
+            con.sql(f"DROP TABLE {full_name}")
+            con.sql(f"ALTER TABLE {tmp_name} RENAME TO {full_name}")
 
     def _list_dim_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
         with self._connect() as con:

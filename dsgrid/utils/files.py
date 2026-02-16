@@ -44,7 +44,7 @@ def compute_hash(text: bytes) -> str:
 def delete_if_exists(path: Path | str) -> None:
     """Delete a file or directory if it exists.
 
-    On Windows, retries up to 3 times with short delays to handle files that
+    On Windows, retries up to 5 times with short delays to handle files that
     may still be locked by recently-closed database connections.
     """
     path = Path(path) if isinstance(path, str) else path

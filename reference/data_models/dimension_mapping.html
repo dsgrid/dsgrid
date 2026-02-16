@@ -1,0 +1,1222 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Dataset Mapping Plan" href="dataset_mapping_plan.html"><link rel="prev" title="Dimension Config" href="dimension.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Dimension Mapping Config - dsgrid 0.3.3 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.3.3 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.3.3 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/map_dataset.html">Map a dataset to a project’s dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/query_dataset.html">Query a Dataset with Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_dataset_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/filter_a_query.html">How to Filter a Query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/run_dsgrid_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/visualize_data_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../explanations/index.html">Explanations</a><input aria-label="Toggle navigation of Explanations" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../explanations/components/index.html">Components</a><input aria-label="Toggle navigation of Components" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dataset_formats.html">Dataset Formats</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" checked="" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="project.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension.html">Dimension Config</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset_mapping_plan.html">Dataset Mapping Plan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dsgrid_api/index.html">dsgrid API</a><input aria-label="Toggle navigation of dsgrid API" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../architecture.html">Architecture</a><input aria-label="Toggle navigation of Architecture" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/reference/data_models/dimension_mapping.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="dimension-mapping-config">
+<span id="id1"></span><h1>Dimension Mapping Config<a class="headerlink" href="#dimension-mapping-config" title="Link to this heading">¶</a></h1>
+<section id="registered-dimension-mappings">
+<h2>Registered Dimension Mappings<a class="headerlink" href="#registered-dimension-mappings" title="Link to this heading">¶</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.mapping_tables.</span></span><span class="sig-name descname"><span class="pre">MappingTableModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel" title="Link to this definition">¶</a></dt>
+<dd><p>Attributes for a dimension mapping table</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-778392fe44ce558fda641b3839932083824a5d46.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension stored in the registry&amp;#xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MappingTableModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_dimension&lt;/td&gt;&lt;td port=&quot;from_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_dimension&lt;/td&gt;&lt;td port=&quot;to_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_id&lt;/td&gt;&lt;td port=&quot;mapping_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;file_hash&lt;/td&gt;&lt;td port=&quot;file_hash&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;records&lt;/td&gt;&lt;td port=&quot;records&quot;&gt;list&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.MappingTableModel&amp;#xA;&amp;#xA;Attributes for a dimension mapping table&amp;#xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;:from_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;:to_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.file_hash" title="dsgrid.config.mapping_tables.MappingTableModel.file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">file_hash</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.filename" title="dsgrid.config.mapping_tables.MappingTableModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.records" title="dsgrid.config.mapping_tables.MappingTableModel.records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">records</span> <span class="pre">(list)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.add_records" title="dsgrid.config.mapping_tables.MappingTableModel.add_records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_records</span></code></a> » <a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.records" title="dsgrid.config.mapping_tables.MappingTableModel.records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">records</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.check_filename" title="dsgrid.config.mapping_tables.MappingTableModel.check_filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_filename</span></code></a> » <a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.filename" title="dsgrid.config.mapping_tables.MappingTableModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash" title="dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_file_hash</span></code></a> » <a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.file_hash" title="dsgrid.config.mapping_tables.MappingTableModel.file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">file_hash</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.file_hash">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">file_hash</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.file_hash" title="Link to this definition">¶</a></dt>
+<dd><p>Hash of the contents of the file, computed by dsgrid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash" title="dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_file_hash</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.filename">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">filename</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"> <span class="pre">(alias</span> <span class="pre">'file')</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.filename" title="Link to this definition">¶</a></dt>
+<dd><p>Filename containing association table records. Only assigned for user input and output purposes. The registry database stores records in the mapping JSON document.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.check_filename" title="dsgrid.config.mapping_tables.MappingTableModel.check_filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_filename</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.records">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">records</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.records" title="Link to this definition">¶</a></dt>
+<dd><p>dimension mapping records in filename that get loaded at runtime</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.add_records" title="dsgrid.config.mapping_tables.MappingTableModel.add_records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_records</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.add_records">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_records</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.records" title="dsgrid.config.mapping_tables.MappingTableModel.records"><em class="xref py py-obj"><span class="pre">records</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel.add_records"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.add_records" title="Link to this definition">¶</a></dt>
+<dd><p>Add records from the file.</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.check_filename">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_filename</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.filename" title="dsgrid.config.mapping_tables.MappingTableModel.filename"><em class="xref py py-obj"><span class="pre">filename</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel.check_filename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.check_filename" title="Link to this definition">¶</a></dt>
+<dd><p>Validate record file</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute_file_hash</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.file_hash" title="dsgrid.config.mapping_tables.MappingTableModel.file_hash"><em class="xref py py-obj"><span class="pre">file_hash</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel.compute_file_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash" title="Link to this definition">¶</a></dt>
+<dd><p>Compute file hash.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.from_pre_registered_model">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_pre_registered_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableByNameModel" title="dsgrid.config.mapping_tables.MappingTableByNameModel"><span class="pre">MappingTableByNameModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel"><span class="pre">DatasetBaseToProjectMappingTableModel</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">from_dimension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionReferenceModel" title="dsgrid.config.dimensions.DimensionReferenceModel"><span class="pre">DimensionReferenceModel</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">to_dimension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionReferenceModel" title="dsgrid.config.dimensions.DimensionReferenceModel"><span class="pre">DimensionReferenceModel</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel.from_pre_registered_model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.from_pre_registered_model" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableModel.serialize_cls">
+<span class="sig-name descname"><span class="pre">serialize_cls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableModel.serialize_cls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableModel.serialize_cls" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableRecordModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.mapping_tables.</span></span><span class="sig-name descname"><span class="pre">MappingTableRecordModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableRecordModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableRecordModel" title="Link to this definition">¶</a></dt>
+<dd><p>Represents one record in dimension mapping record files. Maps one dimension to another.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-37ce45b67c549bc97e66bf1e273f1a8665acd48b.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.mapping_tables.MappingTableRecordModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MappingTableRecordModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_id&lt;/td&gt;&lt;td port=&quot;from_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_id&lt;/td&gt;&lt;td port=&quot;to_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction&lt;/td&gt;&lt;td port=&quot;from_fraction&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.MappingTableRecordModel&amp;#xA;&amp;#xA;Represents one record in dimension mapping record files. Maps one \
+dimension to another.&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_fraction" title="dsgrid.config.mapping_tables.MappingTableRecordModel.from_fraction"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_fraction</span> <span class="pre">(float)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.from_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_id</span> <span class="pre">(str)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_id</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_to_id</span></code></a> » <a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.from_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_id</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_to_id</span></code></a> » <a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_id</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableRecordModel.from_fraction">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_fraction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_fraction" title="Link to this definition">¶</a></dt>
+<dd><p>Fraction of from_id to map to to_id</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableRecordModel.from_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_id" title="Link to this definition">¶</a></dt>
+<dd><p>Source mapping</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_to_id</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableRecordModel.to_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.to_id" title="Link to this definition">¶</a></dt>
+<dd><p>Destination mapping</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_to_id</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_to_id</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.from_id"><em class="xref py py-obj"><span class="pre">from_id</span></em></a><em class="property"><span class="pre">,</span> </em><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.to_id" title="dsgrid.config.mapping_tables.MappingTableRecordModel.to_id"><em class="xref py py-obj"><span class="pre">to_id</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableRecordModel.check_to_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mapping_base.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingBaseModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingBaseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for mapping dimensions</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-5ed23e460dd22d61e16ffb6922d964575216a5d7.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingBaseModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_dimension&lt;/td&gt;&lt;td port=&quot;from_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_dimension&lt;/td&gt;&lt;td port=&quot;to_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_id&lt;/td&gt;&lt;td port=&quot;mapping_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel&amp;#xA;&amp;#xA;Base class for mapping dimensions&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension stored in the registry&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel&quot;:from_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel&quot;:to_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">archetype</span> <span class="pre">(dsgrid.config.dimension_mapping_base.DimensionMappingArchetype</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.description" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">description</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_dimension" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_dimension"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_dimension</span> <span class="pre">(dsgrid.config.dimensions.DimensionReferenceModel)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_fraction_tolerance" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_fraction_tolerance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_fraction_tolerance</span> <span class="pre">(float)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_id" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mapping_id</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_type" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mapping_type</span> <span class="pre">(dsgrid.config.dimension_mapping_base.DimensionMappingType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_dimension" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_dimension"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_dimension</span> <span class="pre">(dsgrid.config.dimensions.DimensionReferenceModel)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_fraction_tolerance" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_fraction_tolerance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_fraction_tolerance</span> <span class="pre">(float)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_archetype</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">archetype</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">archetype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">DimensionMappingArchetype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension mapping archetype, determined based on mapping_type</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_archetype</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.description">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">description</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.description" title="Link to this definition">¶</a></dt>
+<dd><p>Description of dimension mapping</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_dimension">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dimension</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionReferenceModel" title="dsgrid.config.dimensions.DimensionReferenceModel"><span class="pre">DimensionReferenceModel</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_dimension" title="Link to this definition">¶</a></dt>
+<dd><p>From dimension</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_fraction_tolerance">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_fraction_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_fraction_tolerance" title="Link to this definition">¶</a></dt>
+<dd><p>Tolerance to apply when checking from_fraction column sums</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mapping_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique dimension mapping identifier, generated by dsgrid</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mapping_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.config.dimension_mapping_base.DimensionMappingType" title="dsgrid.config.dimension_mapping_base.DimensionMappingType"><span class="pre">DimensionMappingType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'many_to_one_aggregation'</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_type" title="Link to this definition">¶</a></dt>
+<dd><p>Type/purpose of the dimension mapping</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_dimension">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_dimension</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionReferenceModel" title="dsgrid.config.dimensions.DimensionReferenceModel"><span class="pre">DimensionReferenceModel</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_dimension" title="Link to this definition">¶</a></dt>
+<dd><p>To dimension</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_fraction_tolerance">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_fraction_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_fraction_tolerance" title="Link to this definition">¶</a></dt>
+<dd><p>Tolerance to apply when checking to_fraction column sums</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_archetype</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype"><em class="xref py py-obj"><span class="pre">archetype</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingBaseModel.check_archetype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<section id="dimension-mapping-reference">
+<span id="id2"></span><h3>Dimension Mapping Reference<a class="headerlink" href="#dimension-mapping-reference" title="Link to this heading">¶</a></h3>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mapping_base.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingReferenceModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingReferenceModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel" title="Link to this definition">¶</a></dt>
+<dd><p>Reference to a dimension mapping stored in the registry.</p>
+<p>The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-bdece2d7a8a2f6f18a5f8667da5e46ba63eb17a4.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_dimension_type&lt;/td&gt;&lt;td port=&quot;from_dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_dimension_type&lt;/td&gt;&lt;td port=&quot;to_dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_id&lt;/td&gt;&lt;td port=&quot;mapping_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension mapping stored in the registry.&amp;#\
+xA;&amp;#xA;The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the&amp;#xA;dimension \
+mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.&amp;#\
+xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.from_dimension_type" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.from_dimension_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_dimension_type</span> <span class="pre">(dsgrid.dimension.base_models.DimensionType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.mapping_id" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.mapping_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mapping_id</span> <span class="pre">(str)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.to_dimension_type" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.to_dimension_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_dimension_type</span> <span class="pre">(dsgrid.dimension.base_models.DimensionType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.version" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">version</span> <span class="pre">(str)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.from_dimension_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dimension_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.base_models.DimensionType" title="dsgrid.dimension.base_models.DimensionType"><span class="pre">DimensionType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.from_dimension_type" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension Type</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.mapping_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mapping_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.mapping_id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique ID of the dimension mapping</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.to_dimension_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_dimension_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.base_models.DimensionType" title="dsgrid.dimension.base_models.DimensionType"><span class="pre">DimensionType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.to_dimension_type" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension Type</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.version">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">version</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.version" title="Link to this definition">¶</a></dt>
+<dd><p>Version of the dimension</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">handle_legacy_fields</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingReferenceModel.handle_legacy_fields"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mapping_base.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingReferenceListModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingReferenceListModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel" title="Link to this definition">¶</a></dt>
+<dd><p>List of dimension mapping references used by the dimensions_mappings.json5 config</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-59b7203c091284472e8482f89957f1e9de3656fe.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingReferenceListModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;references&lt;/td&gt;&lt;td port=&quot;references&quot;&gt;list[DimensionMappingReferenceModel]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel&amp;#xA;&amp;#xA;List of dimension mapping references used by the \
+dimensions_mappings.json5 config&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_dimension_type&lt;/td&gt;&lt;td port=&quot;from_dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_dimension_type&lt;/td&gt;&lt;td port=&quot;to_dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_id&lt;/td&gt;&lt;td port=&quot;mapping_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension mapping stored in the registry.&amp;#\
+xA;&amp;#xA;The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the&amp;#xA;dimension \
+mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.&amp;#\
+xA;&quot;];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel&quot;:references:e -&gt; &quot;dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel.references" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel.references"><code class="xref py py-obj docutils literal notranslate"><span class="pre">references</span> <span class="pre">(list[dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel])</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel.references">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">references</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel"><span class="pre">DimensionMappingReferenceModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel.references" title="Link to this definition">¶</a></dt>
+<dd><p>List of dimension mapping references</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mappings_config.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingsConfigModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mappings_config.html#DimensionMappingsConfigModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel" title="Link to this definition">¶</a></dt>
+<dd><p>Represents dimension mapping model configurations</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-a9a6f55cb2d422d9eaae88efdb2272814038ee01.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingsConfigModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mappings&lt;/td&gt;&lt;td port=&quot;mappings&quot;&gt;list[MappingTableModel]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel&amp;#xA;&amp;#xA;Represents dimension mapping model configurations&amp;#\
+xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MappingTableModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_dimension&lt;/td&gt;&lt;td port=&quot;from_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_dimension&lt;/td&gt;&lt;td port=&quot;to_dimension&quot;&gt;DimensionReferenceModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_id&lt;/td&gt;&lt;td port=&quot;mapping_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;file_hash&lt;/td&gt;&lt;td port=&quot;file_hash&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;records&lt;/td&gt;&lt;td port=&quot;records&quot;&gt;list&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.MappingTableModel&amp;#xA;&amp;#xA;Attributes for a dimension mapping table&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel&quot;:mappings:e -&gt; &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension stored in the registry&amp;#xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;:from_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.mapping_tables.MappingTableModel&quot;:to_dimension:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel.mappings" title="dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel.mappings"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mappings</span> <span class="pre">(list[dsgrid.config.mapping_tables.MappingTableModel])</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel.mappings">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mappings</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel" title="dsgrid.config.mapping_tables.MappingTableModel"><span class="pre">MappingTableModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel.mappings" title="Link to this definition">¶</a></dt>
+<dd><p>dimension mappings between and within projects and datasets</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.mapping_tables.</span></span><span class="sig-name descname"><span class="pre">DatasetBaseToProjectMappingTableModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#DatasetBaseToProjectMappingTableModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel" title="Link to this definition">¶</a></dt>
+<dd><p>Attributes for a dimension mapping table to map soon-to-be-registered dataset base
+dimensions to a project’s dimensions. This will be converted to a MappingTableModel as soon as
+the dimensions are registered.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-a470467ab208d9642c149fb31b034360184b1abd.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DatasetBaseToProjectMappingTableModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;project_base_dimension_name&lt;/td&gt;&lt;td port=&quot;project_base_dimension_name&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel&amp;#xA;&amp;#xA;Attributes for a dimension mapping table to map soon-to-be-registered \
+dataset base&amp;#xA;dimensions to a project's dimensions. This will be converted to a MappingTableModel as soon as&amp;#xA;the dimensions \
+are registered.&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel.filename" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span> <span class="pre">(str)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel.filename">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">filename</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><em class="property"> <span class="pre">(alias</span> <span class="pre">'file')</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel.filename" title="Link to this definition">¶</a></dt>
+<dd><p>Filename containing association table records.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.mapping_tables.</span></span><span class="sig-name descname"><span class="pre">DatasetBaseToProjectMappingTableListModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#DatasetBaseToProjectMappingTableListModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel" title="Link to this definition">¶</a></dt>
+<dd><p>Represents the config file passed to register-and-submit-dataset command.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-d4287254de84b9b4afc76c274860d84a5bb1a0c6.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DatasetBaseToProjectMappingTableListModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mappings&lt;/td&gt;&lt;td port=&quot;mappings&quot;&gt;list[DatasetBaseToProjectMappingTableModel]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel&amp;#xA;&amp;#xA;Represents the config file passed to register-and-submit-dataset \
+command.&amp;#xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DatasetBaseToProjectMappingTableModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;project_base_dimension_name&lt;/td&gt;&lt;td port=&quot;project_base_dimension_name&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel&amp;#xA;&amp;#xA;Attributes for a dimension mapping table to map soon-to-be-registered \
+dataset base&amp;#xA;dimensions to a project's dimensions. This will be converted to a MappingTableModel as soon as&amp;#xA;the dimensions \
+are registered.&amp;#xA;&quot;];
+   &quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel&quot;:mappings:e -&gt; &quot;dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel.mappings" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel.mappings"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mappings</span> <span class="pre">(list[dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel])</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel.mappings">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mappings</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel"><span class="pre">DatasetBaseToProjectMappingTableModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel.mappings" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mapping_base.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingDatasetToProjectBaseModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingDatasetToProjectBaseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for mapping soon-to-be registered dimensions for a dataset. Used when
+automatically registering mappings while submitting a dataset to a project.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-9995f1595e8604c24c045c5edb1c7345a96b0e51.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingDatasetToProjectBaseModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;project_base_dimension_name&lt;/td&gt;&lt;td port=&quot;project_base_dimension_name&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel&amp;#xA;&amp;#xA;Base class for mapping soon-to-be registered \
+dimensions for a dataset. Used when&amp;#xA;automatically registering mappings while submitting a dataset to a project.&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel.dimension_type" title="dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel.dimension_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimension_type</span> <span class="pre">(dsgrid.dimension.base_models.DimensionType)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel.dimension_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimension_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.base_models.DimensionType" title="dsgrid.dimension.base_models.DimensionType"><span class="pre">DimensionType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel.dimension_type" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension types that will be mapped</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+<section id="unregistered-dimension-mappings">
+<span id="id3"></span><h2>Unregistered Dimension Mappings<a class="headerlink" href="#unregistered-dimension-mappings" title="Link to this heading">¶</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableByNameModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.mapping_tables.</span></span><span class="sig-name descname"><span class="pre">MappingTableByNameModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/mapping_tables.html#MappingTableByNameModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableByNameModel" title="Link to this definition">¶</a></dt>
+<dd><p>Attributes for a dimension mapping table for soon-to-be registered dimensions by name.
+This will be converted to a MappingTableModel as soon as the dimensions are registered.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-d22d4b6c3a499b69d3a727a280db11daf27a05c5.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.mapping_tables.MappingTableByNameModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MappingTableByNameModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;project_base_dimension_name&lt;/td&gt;&lt;td port=&quot;project_base_dimension_name&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.mapping_tables.MappingTableByNameModel&amp;#xA;&amp;#xA;Attributes for a dimension mapping table for soon-to-be registered \
+dimensions by name.&amp;#xA;This will be converted to a MappingTableModel as soon as the dimensions are registered.&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableByNameModel.filename" title="dsgrid.config.mapping_tables.MappingTableByNameModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span> <span class="pre">(str)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.mapping_tables.MappingTableByNameModel.filename">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">filename</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><em class="property"> <span class="pre">(alias</span> <span class="pre">'file')</span></em><a class="headerlink" href="#dsgrid.config.mapping_tables.MappingTableByNameModel.filename" title="Link to this definition">¶</a></dt>
+<dd><p>Filename containing association table records.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimension_mapping_base.</span></span><span class="sig-name descname"><span class="pre">DimensionMappingPreRegisteredBaseModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimension_mapping_base.html#DimensionMappingPreRegisteredBaseModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for mapping soon-to-be registered dimensions. As soon as the dimensions
+are registered this will be converted to a DimensionMappingBaseModel and then registered.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-554a90f9997c90e9366d21623b6516c0b13edc06.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionMappingPreRegisteredBaseModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;mapping_type&lt;/td&gt;&lt;td port=&quot;mapping_type&quot;&gt;DimensionMappingType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;archetype&lt;/td&gt;&lt;td port=&quot;archetype&quot;&gt;DimensionMappingArchetype | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;from_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;from_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;to_fraction_tolerance&lt;/td&gt;&lt;td port=&quot;to_fraction_tolerance&quot;&gt;float&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;project_base_dimension_name&lt;/td&gt;&lt;td port=&quot;project_base_dimension_name&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel&amp;#xA;&amp;#xA;Base class for mapping soon-to-be registered \
+dimensions. As soon as the dimensions&amp;#xA;are registered this will be converted to a DimensionMappingBaseModel and then registered.&amp;#\
+xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.archetype" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.archetype"><code class="xref py py-obj docutils literal notranslate"><span class="pre">archetype</span> <span class="pre">(dsgrid.config.dimension_mapping_base.DimensionMappingArchetype</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.description" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">description</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_fraction_tolerance</span> <span class="pre">(float)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.mapping_type" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.mapping_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mapping_type</span> <span class="pre">(dsgrid.config.dimension_mapping_base.DimensionMappingType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.project_base_dimension_name" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.project_base_dimension_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">project_base_dimension_name</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_fraction_tolerance</span> <span class="pre">(float)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.archetype">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">archetype</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">DimensionMappingArchetype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.archetype" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension mapping archetype, determined based on mapping_type</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.description">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">description</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.description" title="Link to this definition">¶</a></dt>
+<dd><p>Description of dimension mapping</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_fraction_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance" title="Link to this definition">¶</a></dt>
+<dd><p>Tolerance value to apply to the from_fraction column</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.mapping_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">mapping_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.config.dimension_mapping_base.DimensionMappingType" title="dsgrid.config.dimension_mapping_base.DimensionMappingType"><span class="pre">DimensionMappingType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'many_to_one_aggregation'</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.mapping_type" title="Link to this definition">¶</a></dt>
+<dd><p>Type/purpose of the dimension mapping</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.project_base_dimension_name">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">project_base_dimension_name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.project_base_dimension_name" title="Link to this definition">¶</a></dt>
+<dd><p>Name of the base dimension for which the mapping is being registered. This is required in cases where the project has multiple base dimensions of the same type. If None, there must only be one base dimension of this type in the project.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_fraction_tolerance</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-06</span></em><a class="headerlink" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance" title="Link to this definition">¶</a></dt>
+<dd><p>Tolerance value to apply to the to_fraction column</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="dataset_mapping_plan.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Dataset Mapping Plan</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="dimension.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Dimension Config</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dimension Mapping Config</a><ul>
+<li><a class="reference internal" href="#registered-dimension-mappings">Registered Dimension Mappings</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel"><code class="docutils literal notranslate"><span class="pre">MappingTableModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.file_hash"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.file_hash</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.filename"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.filename</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.records"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.records</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.add_records"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.add_records</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.check_filename"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.check_filename</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.compute_file_hash"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.compute_file_hash</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.from_pre_registered_model"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.from_pre_registered_model()</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableModel.serialize_cls"><code class="docutils literal notranslate"><span class="pre">MappingTableModel.serialize_cls()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel"><code class="docutils literal notranslate"><span class="pre">MappingTableRecordModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_fraction"><code class="docutils literal notranslate"><span class="pre">MappingTableRecordModel.from_fraction</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.from_id"><code class="docutils literal notranslate"><span class="pre">MappingTableRecordModel.from_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.to_id"><code class="docutils literal notranslate"><span class="pre">MappingTableRecordModel.to_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableRecordModel.check_to_id"><code class="docutils literal notranslate"><span class="pre">MappingTableRecordModel.check_to_id</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.archetype"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.archetype</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.description"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.description</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_dimension"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.from_dimension</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.from_fraction_tolerance"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.from_fraction_tolerance</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_id"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.mapping_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.mapping_type"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.mapping_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_dimension"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.to_dimension</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.to_fraction_tolerance"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.to_fraction_tolerance</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingBaseModel.check_archetype"><code class="docutils literal notranslate"><span class="pre">DimensionMappingBaseModel.check_archetype</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dimension-mapping-reference">Dimension Mapping Reference</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.from_dimension_type"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel.from_dimension_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.mapping_id"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel.mapping_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.to_dimension_type"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel.to_dimension_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.version"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel.version</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel.handle_legacy_fields"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceModel.handle_legacy_fields</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceListModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel.references"><code class="docutils literal notranslate"><span class="pre">DimensionMappingReferenceListModel.references</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingsConfigModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel.mappings"><code class="docutils literal notranslate"><span class="pre">DimensionMappingsConfigModel.mappings</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel"><code class="docutils literal notranslate"><span class="pre">DatasetBaseToProjectMappingTableModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel.filename"><code class="docutils literal notranslate"><span class="pre">DatasetBaseToProjectMappingTableModel.filename</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel"><code class="docutils literal notranslate"><span class="pre">DatasetBaseToProjectMappingTableListModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel.mappings"><code class="docutils literal notranslate"><span class="pre">DatasetBaseToProjectMappingTableListModel.mappings</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingDatasetToProjectBaseModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel.dimension_type"><code class="docutils literal notranslate"><span class="pre">DimensionMappingDatasetToProjectBaseModel.dimension_type</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#unregistered-dimension-mappings">Unregistered Dimension Mappings</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableByNameModel"><code class="docutils literal notranslate"><span class="pre">MappingTableByNameModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.mapping_tables.MappingTableByNameModel.filename"><code class="docutils literal notranslate"><span class="pre">MappingTableByNameModel.filename</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.archetype"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.archetype</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.description"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.description</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.from_fraction_tolerance</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.mapping_type"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.mapping_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.project_base_dimension_name"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.project_base_dimension_name</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance"><code class="docutils literal notranslate"><span class="pre">DimensionMappingPreRegisteredBaseModel.to_fraction_tolerance</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=d198571b"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

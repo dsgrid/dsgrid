@@ -1,0 +1,8 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel
+
+Attributes for a dimension mapping table to map soon&#45;to&#45;be&#45;registered dataset base
+dimensions to a project&#39;s dimensions. This will be converted to a MappingTableModel as soon as
+the dimensions are registered.
+" alt="" coords="5,5,521,257"/>
+</map>

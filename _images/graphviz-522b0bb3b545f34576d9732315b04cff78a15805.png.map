@@ -1,0 +1,12 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AnnualRangeModel
+
+Defines a continuous range of annual time.
+" alt="" coords="485,342,651,482"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.
+" alt="" coords="5,5,341,397"/>
+</map>

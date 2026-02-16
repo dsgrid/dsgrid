@@ -1,0 +1,684 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Map a dataset to a project’s dimensions" href="map_dataset.html"><link rel="prev" title="Create a Project" href="create_project.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Create and Submit a Dataset - dsgrid 0.3.3 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">dsgrid 0.3.3 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.3.3 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="create_project.html">Create a Project</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="map_dataset.html">Map a dataset to a project’s dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="query_project.html">Query a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="create_derived_dataset.html">Create a Derived Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="query_dataset.html">Query a Dataset with Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/create_dataset_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/filter_a_query.html">How to Filter a Query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/run_dsgrid_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../how_tos/visualize_data_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../explanations/index.html">Explanations</a><input aria-label="Toggle navigation of Explanations" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../explanations/components/index.html">Components</a><input aria-label="Toggle navigation of Components" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/dataset_formats.html">Dataset Formats</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/project.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/dataset.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/dimension.html">Dimension Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/dimension_mapping.html">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/dataset_mapping_plan.html">Dataset Mapping Plan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/dsgrid_api/index.html">dsgrid API</a><input aria-label="Toggle navigation of dsgrid API" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/architecture.html">Architecture</a><input aria-label="Toggle navigation of Architecture" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/tutorials/create_and_submit_dataset.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="create-and-submit-a-dataset">
+<span id="tutorial-create-and-submit-a-dataset"></span><h1>Create and Submit a Dataset<a class="headerlink" href="#create-and-submit-a-dataset" title="Link to this heading">¶</a></h1>
+<p>In this tutorial you will learn how to create a dsgrid dataset and register it with a project by
+following the example of the TEMPO dataset from <a class="reference external" href="https://github.com/dsgrid/dsgrid-project-StandardScenarios">dsgrid-project-StandardScenarios</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is possible to register a dataset without connecting it to a project. The main
+difference is that the information about dimension mappings below is not relevant.</p>
+</div>
+<p>Dataset attributes and dimensions must be defined in a
+dataset config as defined by <a class="reference internal" href="../reference/data_models/dataset.html#dataset-config"><span class="std std-ref">Dataset Config</span></a>. This tutorial will give step-by-step
+instructions on how to assign values in this file.</p>
+<ol class="arabic simple">
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">dataset.json5</span></code> with these fields (but choose your own values):</p></li>
+</ol>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">dataset_id</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;tempo_conus_2022&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">dataset_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;modeled&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">data_source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;tempo&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">sector_description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;transportation&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;CONUS 2022 TEMPO county-level results for PEV charging.&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">origin_creator</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Arthur Yip&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">origin_organization</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;NREL&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">origin_contributors</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;Arthur Yip&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;Brian Bush&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;Christopher Hoehne&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;Paige Jadun&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;Catherine Ledna&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;Matteo Muratori&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">origin_project</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dsgrid CONUS 2022&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">origin_date</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Dec 21 2021&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">origin_version</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dsgrid&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;https://github.nrel.gov/mmurator/TMM/commit/54f715e0fe015a578dd0594c7031c046cfe27907&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">data_classification</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;low&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">tags</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;transportation&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;conus-2022&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;reference&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;tempo&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ol class="arabic" start="2">
+<li><p>Choose a data format as described in <a class="reference internal" href="../reference/dataset_formats.html#dataset-formats"><span class="std std-ref">Dataset Formats</span></a>. Please note all requirements listed
+on that page.</p>
+<p>This dataset uses the two-table
+(standard) format with dimension information stored like this:</p>
+<ul class="simple">
+<li><p>Time: Representative period format with hourly data for one week per month.</p></li>
+<li><p>Metric: record IDs are pivoted in the data table.</p></li>
+<li><p>Geography: Stored in lookup table.</p></li>
+<li><p>Subsector: Stored in lookup table.</p></li>
+<li><p>Model Year: Stored in lookup table.</p></li>
+<li><p>Scenario: Stored in lookup table.</p></li>
+<li><p>Sector: Trivial</p></li>
+<li><p>Weather Year: Trivial</p></li>
+</ul>
+<p>Add the relevant settings to your dataset.json5.</p>
+</li>
+</ol>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">trivial_dimensions</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="s2">&quot;sector&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;weather_year&quot;</span><span class="p">,</span>
+<span class="p">],</span>
+<span class="c1">// The time in this dataset has no time zone. It is based on the local time perceived by the</span>
+<span class="c1">// people being modeled. dsgrid will map times to the project&#39;s geography time zone.</span>
+<span class="nx">use_project_geography_time_zone</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;two_table&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;pivoted&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">pivoted_dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;metric&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;./load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">lookup_data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;./load_data_lookup.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">},</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>Identify the dimension records required by the project. Here is what is listed in the
+<code class="docutils literal notranslate"><span class="pre">project.json5</span></code>:</p></li>
+</ol>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">required_dimensions</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">single_dimensional</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">sector</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">base</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;trans&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">subsector</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">supplemental</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Subsectors by Sector Collapsed&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nx">record_ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;transportation_subsectors&quot;</span><span class="p">],</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">metric</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">supplemental</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;transportation-end-uses-collapsed&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nx">record_ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;transportation_end_uses&quot;</span><span class="p">],</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Follow the instructions at <a class="reference internal" href="../how_tos/browse_registry.html#project-viewer"><span class="std std-ref">Project Viewer</span></a> to start the viewer. Once you have the data table
+loaded in your browser, type <code class="docutils literal notranslate"><span class="pre">transportation</span></code> in the filter row of the <code class="docutils literal notranslate"><span class="pre">dimension_name</span></code>
+column and then select <code class="docutils literal notranslate"><span class="pre">transportation_subsectors</span></code> or <code class="docutils literal notranslate"><span class="pre">transportation_end_uses</span></code>. The dimension
+record table will get populated with record IDs.</p>
+<p>If you prefer working in an interactive Python session, here is example code to do the same thing:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">In</span> <span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.dimension.base_models</span><span class="w"> </span><span class="kn">import</span> <span class="n">DimensionType</span>
+   <span class="o">...</span><span class="p">:</span> <span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.registry_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegistryManager</span>
+   <span class="o">...</span><span class="p">:</span> <span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.registry.registry_database</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatabaseConnection</span>
+   <span class="o">...</span><span class="p">:</span>
+   <span class="o">...</span><span class="p">:</span> <span class="n">manager</span> <span class="o">=</span> <span class="n">RegistryManager</span><span class="o">.</span><span class="n">load</span><span class="p">(</span>
+   <span class="o">...</span><span class="p">:</span>     <span class="n">DatabaseConnection</span><span class="p">(</span>
+   <span class="o">...</span><span class="p">:</span>         <span class="n">hostname</span><span class="o">=</span><span class="s2">&quot;dsgrid-registry.hpc.nrel.gov&quot;</span><span class="p">,</span>
+   <span class="o">...</span><span class="p">:</span>         <span class="n">database</span><span class="o">=</span><span class="s2">&quot;standard-scenarios&quot;</span><span class="p">,</span>
+   <span class="o">...</span><span class="p">:</span>     <span class="p">)</span>
+   <span class="o">...</span><span class="p">:</span> <span class="p">)</span>
+   <span class="o">...</span><span class="p">:</span> <span class="n">project</span> <span class="o">=</span> <span class="n">manager</span><span class="o">.</span><span class="n">project_manager</span><span class="o">.</span><span class="n">load_project</span><span class="p">(</span><span class="s2">&quot;dsgrid_conus_2022&quot;</span><span class="p">)</span>
+   <span class="o">...</span><span class="p">:</span> <span class="n">project</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get_dimension_records</span><span class="p">(</span><span class="s2">&quot;transportation_end_uses&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+   <span class="o">...</span><span class="p">:</span> <span class="n">project</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get_dimension_records</span><span class="p">(</span><span class="s2">&quot;transportation_subsectors&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="o">+-------------------+--------------------+-----------+----+</span>
+<span class="o">|</span>                 <span class="nb">id</span><span class="o">|</span>                <span class="n">name</span><span class="o">|</span>    <span class="n">fuel_id</span><span class="o">|</span><span class="n">unit</span><span class="o">|</span>
+<span class="o">+-------------------+--------------------+-----------+----+</span>
+<span class="o">|</span><span class="n">electricity_ev_l1l2</span><span class="o">|</span><span class="n">Electricity</span> <span class="n">EV</span> <span class="n">L1</span><span class="o">/</span><span class="n">L2</span><span class="o">|</span><span class="n">electricity</span><span class="o">|</span> <span class="n">kWh</span><span class="o">|</span>
+<span class="o">|</span><span class="n">electricity_ev_dcfc</span><span class="o">|</span>  <span class="n">Electricty</span> <span class="n">EV</span> <span class="n">DCFC</span><span class="o">|</span><span class="n">electricity</span><span class="o">|</span> <span class="n">kWh</span><span class="o">|</span>
+<span class="o">+-------------------+--------------------+-----------+----+</span>
+
+<span class="o">+------------+------------+</span>
+<span class="o">|</span>          <span class="nb">id</span><span class="o">|</span>        <span class="n">name</span><span class="o">|</span>
+<span class="o">+------------+------------+</span>
+<span class="o">|</span> <span class="n">bev_compact</span><span class="o">|</span> <span class="n">Bev</span> <span class="n">Compact</span><span class="o">|</span>
+<span class="o">|</span> <span class="n">bev_midsize</span><span class="o">|</span> <span class="n">Bev</span> <span class="n">Midsize</span><span class="o">|</span>
+<span class="o">|</span>  <span class="n">bev_pickup</span><span class="o">|</span>  <span class="n">Bev</span> <span class="n">Pickup</span><span class="o">|</span>
+<span class="o">|</span>     <span class="n">bev_suv</span><span class="o">|</span>     <span class="n">Bev</span> <span class="n">Suv</span><span class="o">|</span>
+<span class="o">|</span><span class="n">phev_compact</span><span class="o">|</span><span class="n">Phev</span> <span class="n">Compact</span><span class="o">|</span>
+<span class="o">|</span><span class="n">phev_midsize</span><span class="o">|</span><span class="n">Phev</span> <span class="n">Midsize</span><span class="o">|</span>
+<span class="o">|</span> <span class="n">phev_pickup</span><span class="o">|</span> <span class="n">Phev</span> <span class="n">Pickup</span><span class="o">|</span>
+<span class="o">|</span>    <span class="n">phev_suv</span><span class="o">|</span>    <span class="n">Phev</span> <span class="n">Suv</span><span class="o">|</span>
+<span class="o">+------------+------------+</span>
+</pre></div>
+</div>
+<p>Alteratively, you can browse the source files, such as <a class="reference external" href="https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/dimensions/supplemental/transportation_subsectors.csv">this records file</a>.</p>
+<ol class="arabic simple" start="3">
+<li><p>Add dimension configs to the <code class="docutils literal notranslate"><span class="pre">dimensions</span></code> section of your <code class="docutils literal notranslate"><span class="pre">dataset.json5</span></code> for each dimension
+that is unique for your dataset. If you use a dimension from the project or another dataset, add
+its dimension ID to the <code class="docutils literal notranslate"><span class="pre">dimension_references</span></code> section of the file. For example,</p></li>
+</ol>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="nx">dimensions</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;County&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ACS County 2018&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">file</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dimensions/counties.csv&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;American Community Survey US counties, 2018.&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li><p>Create dimension mappings for all dimensions that are different than the project. Add mappings
+to <code class="docutils literal notranslate"><span class="pre">dimension_mappings.json5</span></code> and records to <code class="docutils literal notranslate"><span class="pre">dimension_mappings/&lt;your-mapping&gt;.csv</span></code>. Here
+are two examples.</p>
+<ul class="simple">
+<li><p>The TEMPO dataset uses a superset of county records compared to the project (it includes
+Alaska and Hawaii). The counties in common have the same IDs. Here is the resulting dimension
+mapping metadata and records. All IDs that exist in TEMPO but not the project have a <code class="docutils literal notranslate"><span class="pre">null</span></code>
+entry for <code class="docutils literal notranslate"><span class="pre">to_id</span></code>.</p></li>
+</ul>
+</li>
+</ol>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ACS County 2018 to ACS County 2020 L48&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nx">file</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dimension_mappings/county_to_county.csv&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">   </span><span class="nx">mapping_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;many_to_one_aggregation&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="p">},</span>
+
+<span class="nx">Records</span><span class="w"> </span><span class="nx">file</span><span class="w"> </span><span class="nx">snippet</span><span class="o">::</span>
+
+<span class="w"> </span><span class="nx">from_id</span><span class="p">,</span><span class="nx">to_id</span>
+<span class="w"> </span><span class="mo">01001</span><span class="p">,</span><span class="mo">01001</span>
+<span class="w"> </span><span class="mo">01003</span><span class="p">,</span><span class="mo">01003</span>
+<span class="w"> </span><span class="mo">01005</span><span class="p">,</span><span class="mo">01005</span>
+<span class="w"> </span><span class="mo">01007</span><span class="p">,</span><span class="mo">01007</span>
+<span class="w"> </span><span class="mo">02013</span><span class="p">,</span>
+<span class="w"> </span><span class="mo">02016</span><span class="p">,</span>
+
+
+<span class="o">-</span><span class="w"> </span><span class="nx">The</span><span class="w"> </span><span class="nx">TEMPO</span><span class="w"> </span><span class="nx">dataset</span><span class="w"> </span><span class="nx">projects</span><span class="w"> </span><span class="nx">electricity</span><span class="w"> </span><span class="nx">load</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="mf">2018</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="mf">2050</span><span class="w"> </span><span class="kd">with</span><span class="w"> </span><span class="nx">only</span><span class="w"> </span><span class="nx">even</span><span class="w"> </span><span class="nx">years</span><span class="p">.</span><span class="w"> </span><span class="nx">The</span>
+<span class="w">  </span><span class="nx">project</span><span class="w"> </span><span class="nx">expects</span><span class="w"> </span><span class="nx">model</span><span class="w"> </span><span class="nx">years</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="mf">2010</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="mf">2050.</span><span class="w"> </span><span class="nx">The</span><span class="w"> </span><span class="nx">TEMPO</span><span class="w"> </span><span class="nx">dataset</span><span class="w"> </span><span class="nx">uses</span><span class="w"> </span><span class="k">this</span><span class="w"> </span><span class="nx">mapping</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="nx">meet</span><span class="w"> </span><span class="nx">the</span>
+<span class="w">  </span><span class="nx">project</span><span class="w"> </span><span class="nx">requirements</span><span class="p">.</span>
+</pre></div>
+</div>
+<div class="highlight-JavaScript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2010-2050 from interpolating for every other year and 0 for 2010-2017&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;model_year&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">file</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dimension_mappings/model_year_to_model_year.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">mapping_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;many_to_many_explicit_multipliers&quot;</span><span class="p">,</span>
+<span class="p">},</span>
+</pre></div>
+</div>
+<p>Records file snippet:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">from_id</span><span class="p">,</span><span class="n">to_id</span><span class="p">,</span><span class="n">from_fraction</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2010</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2011</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2012</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2013</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2014</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2015</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2016</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2017</span><span class="p">,</span><span class="mi">0</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2018</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">2018</span><span class="p">,</span><span class="mi">2019</span><span class="p">,</span><span class="mf">0.5</span>
+<span class="mi">2020</span><span class="p">,</span><span class="mi">2019</span><span class="p">,</span><span class="mf">0.5</span>
+<span class="mi">2020</span><span class="p">,</span><span class="mi">2020</span><span class="p">,</span><span class="mi">1</span>
+<span class="mi">2020</span><span class="p">,</span><span class="mi">2021</span><span class="p">,</span><span class="mf">0.5</span>
+<span class="mi">2022</span><span class="p">,</span><span class="mi">2021</span><span class="p">,</span><span class="mf">0.5</span>
+</pre></div>
+</div>
+<ol class="arabic" start="5">
+<li><p>Create <code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code>. This data table includes time columns (<code class="docutils literal notranslate"><span class="pre">day_of_week</span></code>, <code class="docutils literal notranslate"><span class="pre">hour</span></code>,
+<code class="docutils literal notranslate"><span class="pre">month</span></code>) and metric columns (<code class="docutils literal notranslate"><span class="pre">L1andL2</span></code> and <code class="docutils literal notranslate"><span class="pre">DCFC</span></code>). Other dimensions will go into the
+<code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code>. Each unique time array needs to have a unique <code class="docutils literal notranslate"><span class="pre">id</span></code>. The TEMPO
+team decided to encode internal information into specific bytes of each value, but that is
+optional. Other datasets use 1 to N.</p>
+<p>Refer to <a class="reference internal" href="../reference/dataset_formats.html#dataset-formats"><span class="std std-ref">Dataset Formats</span></a> for guidance about partitions.</p>
+</li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">spark</span><span class="o">.</span><span class="n">read</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;tempo_conus_2022/1.0.0/load_data.parquet&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="go">+-----------+----+-----+---------+---------+---------+</span>
+<span class="go">|day_of_week|hour|month|  L1andL2|     DCFC|       id|</span>
+<span class="go">+-----------+----+-----+---------+---------+---------+</span>
+<span class="go">|          0|   0|   12|484.81393|405.39902|109450511|</span>
+<span class="go">|          0|   1|   12|150.94759|      0.0|109450511|</span>
+<span class="go">|          0|   2|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   3|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   4|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   5|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   6|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   7|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   8|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|   9|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|  10|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|  11|   12|      0.0|      0.0|109450511|</span>
+<span class="go">|          0|  12|   12|312.24542|      0.0|109450511|</span>
+<span class="go">|          0|  13|   12|  270.221|      0.0|109450511|</span>
+<span class="go">|          0|  14|   12|180.36609|      0.0|109450511|</span>
+<span class="go">|          0|  15|   12|1078.6263|      0.0|109450511|</span>
+<span class="go">|          0|  16|   12| 656.5123|      0.0|109450511|</span>
+<span class="go">|          0|  17|   12|1092.3519|      0.0|109450511|</span>
+<span class="go">|          0|  18|   12| 959.8675|      0.0|109450511|</span>
+<span class="go">|          0|  19|   12| 841.9459|      0.0|109450511|</span>
+<span class="go">+-----------+----+-----+---------+---------+---------+</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li><p>Create <code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code>. The <code class="docutils literal notranslate"><span class="pre">id</span></code> column should match the values in
+<code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code> so that a single table can be produced by joining the two tables on that
+column. If the dataset is missing data for specific dimension combinations, include a row for
+each combination and set <code class="docutils literal notranslate"><span class="pre">id</span></code> to <code class="docutils literal notranslate"><span class="pre">null</span></code>.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>All dimension columns must be strings, including columns that look like numbers, such
+as <code class="docutils literal notranslate"><span class="pre">model_year</span></code>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If your dataset uses FIPS county codes, be sure to not inadvertently drop leading
+zeros.</p>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">spark</span><span class="o">.</span><span class="n">read</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;tempo_conus_2022/1.0.0/load_data_lookup.parquet&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="go">+---------+--------------------+----------+--------+------------------+</span>
+<span class="go">|geography|           subsector|model_year|      id|          scenario|</span>
+<span class="go">+---------+--------------------+----------+--------+------------------+</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 1060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 2060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 3060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 4060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 5060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 6060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 7060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 8060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022| 9060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|10060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|11060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|12060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|13060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|14060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|15060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|16060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|17060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|18060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|19060853|ldv_sales_evs_2035|</span>
+<span class="go">|    06085|Single_Driver+Low...|      2022|20060853|ldv_sales_evs_2035|</span>
+<span class="go">+---------+--------------------+----------+--------+------------------+</span>
+</pre></div>
+</div>
+<ol class="arabic" start="7">
+<li><p>Register and submit the dataset. This requires a properly-configured Spark cluster because of
+the data size. Smaller datasets may succeed with Spark in local mode. Refer to
+<a class="reference internal" href="../spark_overview.html#spark-overview"><span class="std std-ref">Apache Spark</span></a> to setup a Spark cluster.</p>
+<p>This command assumes that <code class="docutils literal notranslate"><span class="pre">dataset.json5</span></code> and <code class="docutils literal notranslate"><span class="pre">dimension_mappings.json5</span></code> are in a
+directory called <code class="docutils literal notranslate"><span class="pre">base_dir</span></code>, and that the data files (<code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code> and
+<code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code>) are in paths relative to the config file as specified in
+the <code class="docutils literal notranslate"><span class="pre">data_layout</span></code> section. Note that the command provides the option <code class="docutils literal notranslate"><span class="pre">--data-base-dir</span></code> to
+specify the base directory for the data files if you prefer to avoid filling in the relative
+path.</p>
+<p>When running this command dsgrid will perform numerous validations in order to verify dataset
+consistency and that the project requirements are met. It may take up to an hour on an HPC
+compute node.</p>
+</li>
+</ol>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>spark-submit<span class="w"> </span>--master<span class="o">=</span>spark://&lt;master_hostname&gt;::7077<span class="w"> </span><span class="k">$(</span>which<span class="w"> </span>dsgrid-cli.py<span class="k">)</span><span class="w"> </span>registry<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>projects<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>register-and-submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--project-id<span class="w"> </span>dsgrid_conus_2022<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--dimension-mapping-file<span class="w"> </span>base_dir/dimension_mappings.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--log-message<span class="w"> </span><span class="s2">&quot;Register and submit TEMPO dataset&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>base_dir/dataset.json5
+</pre></div>
+</div>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="map_dataset.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Map a dataset to a project’s dimensions</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="create_project.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Create a Project</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=d198571b"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

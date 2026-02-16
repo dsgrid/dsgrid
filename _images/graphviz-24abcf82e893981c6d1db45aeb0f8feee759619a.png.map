@@ -1,0 +1,93 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel
+
+Reference to a dimension mapping stored in the registry.
+
+The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
+" alt="" coords="1157,137,1452,277"/>
+<area shape="rect" id="node2" title="dsgrid.config.input_dataset_requirements.InputDatasetListModel
+
+Base data model for all dsgrid data models
+" alt="" coords="5,47,253,103"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.InputDatasetModel
+
+Defines an input dataset for the project config.
+" alt="" coords="397,77,927,357"/>
+<area shape="rect" id="node4" title="dsgrid.config.project_config.DatasetBaseDimensionNamesModel
+
+Defines the query names for project base dimensions to which datasets will be mapped.
+This is important for cases where a project has multiple base dimensions of the same type.
+" alt="" coords="1160,325,1449,577"/>
+<area shape="rect" id="node5" title="dsgrid.config.project_config.RequiredDimensionsModel
+
+Defines required record IDs that must exist for each dimension in a dataset.
+Record IDs can reside in the project&#39;s base or subset dimensions.
+
+Requirements can be specified for a single dimension or a combination of dimensions.
+For example, if a project includes commercial, residential, and transportation sectors but the
+dataset has only transporation sector records, it should specify a single_dimensional
+requirement that is a subset of of the project&#39;s base dimension.
+`{&quot;single_dimensional&quot;: &quot;sector&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;transportation&quot;]}}}`.
+
+If a dataset&#39;s requirements span multiple dimensions, such as if it does not have some
+metric records for some geography records, then a multi_dimensional requirement should be
+specified. (By default, a full cross join is assumed to be present.)
+`{&quot;multi_dimensional&quot;: {
+ &#160;&#160;&#160;&quot;geography&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;12345&quot;]}}
+ &#160;&#160;&#160;&quot;metric&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;electricity_cooling&quot;]}}
+ &#160;}
+}`
+
+If a dataset specifies a dimension type within a multi_dimensional section and wants to use
+all records from a project base dimension, it can specify `base.record_ids = [&quot;__all__&quot;]
+as a shorthand notation.
+
+Requirements for a dimension cannot be defined in both single_dimensional and multi_dimensional
+sections.
+
+If no records are listed for a dimension then all project base records are required.
+
+It might be easier for a dataset to specify what it does not have rather than what it does have.
+In that case, it is recommended to use the RequiredDimensionRecordsModel.base_missing field.
+dsgrid will compute the difference of the base dimension records and the base_missing records
+to determine the dataset&#39;s required records.
+
+If a project has multiple base dimensions of the same type, the
+RequiredDimensionRecordsModel.dimension_name must be specified to identify the base
+dimension that contains the record IDs.
+
+If a dataset contains a subset of project base dimension records that are defined in the
+project&#39;s subset dimensions, it is recommended to use that specification. dsgrid will
+substitute base records for mapped subset records at runtime.
+" alt="" coords="1082,5,1527,89"/>
+<area shape="rect" id="node6" title="dsgrid.dimension.time.TimeBasedDataAdjustmentModel
+
+Defines how data needs to be adjusted with respect to time.
+For leap day adjustment, up to one full day of timestamps and data are dropped.
+For daylight savings, the dataframe is adjusted alongside the timestamps.
+This is useful when the load profiles are modeled in standard time and
+need to be converted to get clock time load profiles.
+" alt="" coords="1071,625,1539,709"/>
+<area shape="rect" id="node10" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1685,50,2109,274"/>
+<area shape="rect" id="node11" title="dsgrid.dimension.time.DaylightSavingAdjustmentModel
+
+Defines how to drop and add data along with timestamps to convert standard time
+load profiles to clock time
+" alt="" coords="1683,683,2111,767"/>
+<area shape="rect" id="node7" title="dsgrid.config.project_config.RequiredBaseDimensionModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2889,191,3138,275"/>
+<area shape="rect" id="node8" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2255,163,2705,275"/>
+<area shape="rect" id="node9" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2849,323,3177,407"/>
+</map>

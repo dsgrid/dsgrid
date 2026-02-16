@@ -1,0 +1,7 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel
+
+Base class for mapping soon&#45;to&#45;be registered dimensions. As soon as the dimensions
+are registered this will be converted to a DimensionMappingBaseModel and then registered.
+" alt="" coords="5,5,521,201"/>
+</map>

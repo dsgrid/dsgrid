@@ -1,0 +1,962 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Dimension Config" href="dimension.html"><link rel="prev" title="Project Config" href="project.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Dataset Config - dsgrid 0.3.3 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=fd3f3429" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.3.3 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.3.3 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/map_dataset.html">Map a dataset to a project’s dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/query_dataset.html">Query a Dataset with Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_dataset_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/filter_a_query.html">How to Filter a Query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/run_dsgrid_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/visualize_data_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../explanations/index.html">Explanations</a><input aria-label="Toggle navigation of Explanations" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../explanations/components/index.html">Components</a><input aria-label="Toggle navigation of Components" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dataset_formats.html">Dataset Formats</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" checked="" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="project.html">Project Config</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension.html">Dimension Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension_mapping.html">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset_mapping_plan.html">Dataset Mapping Plan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dsgrid_api/index.html">dsgrid API</a><input aria-label="Toggle navigation of dsgrid API" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../architecture.html">Architecture</a><input aria-label="Toggle navigation of Architecture" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/reference/data_models/dataset.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="dataset-config">
+<span id="id1"></span><h1>Dataset Config<a class="headerlink" href="#dataset-config" title="Link to this heading">¶</a></h1>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dataset_config.</span></span><span class="sig-name descname"><span class="pre">DatasetConfigModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel" title="Link to this definition">¶</a></dt>
+<dd><p>Represents dataset configurations.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>self</cite> is explicitly positional-only to allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-868b4b62521b867a1110d3dd8c2ab07eb6ef80e6.png" alt="digraph &quot;Entity Relationship Diagram created by erdantic&quot; {
+   graph [fontcolor=gray66,
+      fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=9,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontname=&quot;Times New Roman,Times,Liberation Serif,serif&quot;,
+      fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   edge [dir=both];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DatasetConfigModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dataset_id&lt;/td&gt;&lt;td port=&quot;dataset_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_layout&lt;/td&gt;&lt;td port=&quot;data_layout&quot;&gt;UserDataLayout | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;registry_data_layout&lt;/td&gt;&lt;td port=&quot;registry_data_layout&quot;&gt;RegistryDataLayout | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dataset_type&lt;/td&gt;&lt;td port=&quot;dataset_type&quot;&gt;InputDatasetType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dataset_qualifier_metadata&lt;/td&gt;&lt;td port=&quot;dataset_qualifier_metadata&quot;&gt;Union[QuantityModel, GrowthRateModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;sector_description&lt;/td&gt;&lt;td port=&quot;sector_description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_source&lt;/td&gt;&lt;td port=&quot;data_source&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_source_date&lt;/td&gt;&lt;td port=&quot;data_source_date&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_source_version&lt;/td&gt;&lt;td port=&quot;data_source_version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_source_authors&lt;/td&gt;&lt;td port=&quot;data_source_authors&quot;&gt;list[str] | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_source_doi_url&lt;/td&gt;&lt;td port=&quot;data_source_doi_url&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;origin_creator&lt;/td&gt;&lt;td port=&quot;origin_creator&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;origin_organization&lt;/td&gt;&lt;td port=&quot;origin_organization&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;origin_contributors&lt;/td&gt;&lt;td port=&quot;origin_contributors&quot;&gt;list[str] | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;origin_project&lt;/td&gt;&lt;td port=&quot;origin_project&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;user_defined_metadata&lt;/td&gt;&lt;td port=&quot;user_defined_metadata&quot;&gt;dict[str, Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;tags&lt;/td&gt;&lt;td port=&quot;tags&quot;&gt;list[str] | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_classification&lt;/td&gt;&lt;td port=&quot;data_classification&quot;&gt;DataClassificationType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;enable_unit_conversion&lt;/td&gt;&lt;td port=&quot;enable_unit_conversion&quot;&gt;bool&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;use_project_geography_time_zone&lt;/td&gt;&lt;td port=&quot;use_project_geography_time_zone&quot;&gt;bool&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimensions&lt;/td&gt;&lt;td port=&quot;dimensions&quot;&gt;list[Union[DimensionModel, DateTimeDimensionModel, AnnualTimeDimensionModel, RepresentativePeriodTimeDimensionModel, DatetimeExternalTimeZoneDimensionModel, IndexTimeDimensionModel, NoOpTimeDimensionModel]]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_references&lt;/td&gt;&lt;td port=&quot;dimension_references&quot;&gt;list[DimensionReferenceModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;trivial_dimensions&lt;/td&gt;&lt;td port=&quot;trivial_dimensions&quot;&gt;list[DimensionType]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dataset_config.DatasetConfigModel&amp;#xA;&amp;#xA;Represents dataset configurations.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.GrowthRateModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;GrowthRateModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dataset_qualifier_type&lt;/td&gt;&lt;td port=&quot;dataset_qualifier_type&quot;&gt;Literal[DatasetQualifierType.GROWTH_RATE]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;growth_rate_type&lt;/td&gt;&lt;td port=&quot;growth_rate_type&quot;&gt;GrowthRateType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dataset_config.GrowthRateModel&amp;#xA;&amp;#xA;Base data model for all dsgrid data models&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dataset_qualifier_metadata:e -&gt; &quot;dsgrid.config.dataset_config.GrowthRateModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dataset_config.QuantityModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;QuantityModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dataset_qualifier_type&lt;/td&gt;&lt;td port=&quot;dataset_qualifier_type&quot;&gt;Literal[DatasetQualifierType.QUANTITY]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dataset_config.QuantityModel&amp;#xA;&amp;#xA;Base data model for all dsgrid data models&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dataset_qualifier_metadata:e -&gt; &quot;dsgrid.config.dataset_config.QuantityModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dataset_config.RegistryDataLayout&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;RegistryDataLayout&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;table_format&lt;/td&gt;&lt;td port=&quot;table_format&quot;&gt;TableFormat&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;value_format&lt;/td&gt;&lt;td port=&quot;value_format&quot;&gt;ValueFormat&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;pivoted_dimension_type&lt;/td&gt;&lt;td port=&quot;pivoted_dimension_type&quot;&gt;DimensionType | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dataset_config.RegistryDataLayout&amp;#xA;&amp;#xA;Data layout stored in the dsgrid registry (without file paths).&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:registry_data_layout:e -&gt; &quot;dsgrid.config.dataset_config.RegistryDataLayout&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dataset_config.UserDataLayout&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;UserDataLayout&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_file&lt;/td&gt;&lt;td port=&quot;data_file&quot;&gt;FileSchema&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;lookup_data_file&lt;/td&gt;&lt;td port=&quot;lookup_data_file&quot;&gt;FileSchema | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;missing_associations&lt;/td&gt;&lt;td port=&quot;missing_associations&quot;&gt;list[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;table_format&lt;/td&gt;&lt;td port=&quot;table_format&quot;&gt;TableFormat&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;value_format&lt;/td&gt;&lt;td port=&quot;value_format&quot;&gt;ValueFormat&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;pivoted_dimension_type&lt;/td&gt;&lt;td port=&quot;pivoted_dimension_type&quot;&gt;DimensionType | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dataset_config.UserDataLayout&amp;#xA;&amp;#xA;User-defined data layout for dataset registration.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:data_layout:e -&gt; &quot;dsgrid.config.dataset_config.UserDataLayout&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;AnnualTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;list[AnnualRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;include_leap_day&lt;/td&gt;&lt;td port=&quot;include_leap_day&quot;&gt;bool&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&amp;#xA;&amp;#xA;Defines an annual time dimension where timestamps are years.&amp;#xA;Each \
+value associated with a year represents the MEASUREMENT_TYPE over the entire year.&amp;#xA;i.e., MEASUREMENT_TYPE = total means the \
+value is the total over the year, not over the range frequency.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DateTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;column_format&lt;/td&gt;&lt;td port=&quot;column_format&quot;&gt;TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel | TimeFormatInPartsModel&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_zone_format&lt;/td&gt;&lt;td port=&quot;time_zone_format&quot;&gt;Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;list[TimeRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_column&lt;/td&gt;&lt;td port=&quot;time_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;localize_to_time_zone&lt;/td&gt;&lt;td port=&quot;localize_to_time_zone&quot;&gt;bool&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DateTimeDimensionModel&amp;#xA;&amp;#xA;Defines a time dimension where timestamps translate to datetime objects.&amp;#\
+xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DatetimeExternalTimeZoneDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_zone_format&lt;/td&gt;&lt;td port=&quot;time_zone_format&quot;&gt;Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;list[TimeRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&amp;#xA;&amp;#xA;Defines a time dimension where timestamps are tz-naive \
+and require localizing to a time zone&amp;#xA;using a time zone column.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;file_hash&lt;/td&gt;&lt;td port=&quot;file_hash&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;records&lt;/td&gt;&lt;td port=&quot;records&quot;&gt;list&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionModel&amp;#xA;&amp;#xA;Defines a non-time dimension&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.DimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension stored in the registry&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimension_references:e -&gt; &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.IndexTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;IndexTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;list[IndexRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.IndexTimeDimensionModel&amp;#xA;&amp;#xA;Defines a time dimension where timestamps are indices and requires converting \
+to datetime.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.IndexTimeDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.NoOpTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;NoOpTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.NoOpTimeDimensionModel&amp;#xA;&amp;#xA;Defines a NoOp time dimension.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.NoOpTimeDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;RepresentativePeriodTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;int | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Any&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;format&lt;/td&gt;&lt;td port=&quot;format&quot;&gt;RepresentativePeriodFormat&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;list[MonthRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&amp;#xA;&amp;#xA;Defines a representative time dimension.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.DatasetConfigModel&quot;:dimensions:e -&gt; &quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.file_schema.FileSchema&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;FileSchema&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;path&lt;/td&gt;&lt;td port=&quot;path&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;columns&lt;/td&gt;&lt;td port=&quot;columns&quot;&gt;list[Column]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ignore_columns&lt;/td&gt;&lt;td port=&quot;ignore_columns&quot;&gt;list[str]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.file_schema.FileSchema&amp;#xA;&amp;#xA;Defines the format of a data file (CSV, JSON, Parquet).&amp;#xA;&quot;];
+   &quot;dsgrid.config.dataset_config.UserDataLayout&quot;:data_file:e -&gt; &quot;dsgrid.config.file_schema.FileSchema&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dataset_config.UserDataLayout&quot;:lookup_data_file:e -&gt; &quot;dsgrid.config.file_schema.FileSchema&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.AlignedTimeSingleTimeZone&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;AlignedTimeSingleTimeZone&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;format_type&lt;/td&gt;&lt;td port=&quot;format_type&quot;&gt;Literal[TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_zone&lt;/td&gt;&lt;td port=&quot;time_zone&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.AlignedTimeSingleTimeZone&amp;#xA;&amp;#xA;For each geography, data has the same set of timestamps in absolute \
+time.&amp;#xA;Timestamps in the data must be tz-aware.&amp;#xA;&amp;#xA;E.g., data in CA and NY both start in 2018-01-01 00:00 EST.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.AnnualRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;AnnualRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;str_format&lt;/td&gt;&lt;td port=&quot;str_format&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;frequency&lt;/td&gt;&lt;td port=&quot;frequency&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.AnnualRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of annual time.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.AnnualRangeModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:time_zone_format:e -&gt; &quot;dsgrid.config.dimensions.AlignedTimeSingleTimeZone&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.LocalTimeMultipleTimeZones&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;LocalTimeMultipleTimeZones&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;format_type&lt;/td&gt;&lt;td port=&quot;format_type&quot;&gt;Literal[TimeZoneFormat.ALIGNED_IN_CLOCK_TIME]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_zones&lt;/td&gt;&lt;td port=&quot;time_zones&quot;&gt;list[str]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.LocalTimeMultipleTimeZones&amp;#xA;&amp;#xA;For each geography, data has the same set of timestamps when interpreted \
+as local clock time by adjusting&amp;#xA;for the time zone of each geography.&amp;#xA;Timestamps in the data must be tz-aware.&amp;#xA;&amp;#xA;\
+E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.&amp;#xA;They are aligned in clock \
+time but not in absolute time.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:time_zone_format:e -&gt; &quot;dsgrid.config.dimensions.LocalTimeMultipleTimeZones&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.TimeFormatDateTimeNTZModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeFormatDateTimeNTZModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dtype&lt;/td&gt;&lt;td port=&quot;dtype&quot;&gt;Literal['TIMESTAMP_NTZ']&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_column&lt;/td&gt;&lt;td port=&quot;time_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeFormatDateTimeNTZModel&amp;#xA;&amp;#xA;Format of timestamps in a dataset is timezone-naive datetime,&amp;#xA;requiring \
+localization to time zones.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:column_format:e -&gt; &quot;dsgrid.config.dimensions.TimeFormatDateTimeNTZModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.TimeFormatDateTimeTZModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeFormatDateTimeTZModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dtype&lt;/td&gt;&lt;td port=&quot;dtype&quot;&gt;Literal['TIMESTAMP_TZ']&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_column&lt;/td&gt;&lt;td port=&quot;time_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeFormatDateTimeTZModel&amp;#xA;&amp;#xA;Format of timestamps in a dataset is timezone-aware datetime.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:column_format:e -&gt; &quot;dsgrid.config.dimensions.TimeFormatDateTimeTZModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.TimeFormatInPartsModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeFormatInPartsModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dtype&lt;/td&gt;&lt;td port=&quot;dtype&quot;&gt;Literal['time_format_in_parts']&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;year_column&lt;/td&gt;&lt;td port=&quot;year_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;month_column&lt;/td&gt;&lt;td port=&quot;month_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;day_column&lt;/td&gt;&lt;td port=&quot;day_column&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;hour_column&lt;/td&gt;&lt;td port=&quot;hour_column&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_zone&lt;/td&gt;&lt;td port=&quot;time_zone&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeFormatInPartsModel&amp;#xA;&amp;#xA;Format of timestamps in a dataset is in parts, e.g., month-day-hour format,&amp;#\
+xA;requiring conversion to datetime.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:column_format:e -&gt; &quot;dsgrid.config.dimensions.TimeFormatInPartsModel&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.TimeRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;str_format&lt;/td&gt;&lt;td port=&quot;str_format&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;frequency&lt;/td&gt;&lt;td port=&quot;frequency&quot;&gt;timedelta&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.TimeRangeModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&quot;:time_zone_format:e -&gt; &quot;dsgrid.config.dimensions.AlignedTimeSingleTimeZone&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&quot;:time_zone_format:e -&gt; &quot;dsgrid.config.dimensions.LocalTimeMultipleTimeZones&quot;:_root:w   [arrowhead=noneteetee,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.TimeRangeModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.IndexRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;IndexRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;starting_timestamp&lt;/td&gt;&lt;td port=&quot;starting_timestamp&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;str_format&lt;/td&gt;&lt;td port=&quot;str_format&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;frequency&lt;/td&gt;&lt;td port=&quot;frequency&quot;&gt;timedelta&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.IndexRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of indices.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.IndexTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.IndexRangeModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.dimensions.MonthRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MonthRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.MonthRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.MonthRangeModel&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+   &quot;dsgrid.config.file_schema.Column&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;Column&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType | None&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;data_type&lt;/td&gt;&lt;td port=&quot;data_type&quot;&gt;str | None&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.file_schema.Column&amp;#xA;&amp;#xA;Base data model for all dsgrid data models&amp;#xA;&quot;];
+   &quot;dsgrid.config.file_schema.FileSchema&quot;:columns:e -&gt; &quot;dsgrid.config.file_schema.Column&quot;:_root:w   [arrowhead=crownone,
+      arrowtail=nonenone];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_classification" title="dsgrid.config.dataset_config.DatasetConfigModel.data_classification"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_classification</span> <span class="pre">(dsgrid.config.dataset_config.DataClassificationType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_layout" title="dsgrid.config.dataset_config.DatasetConfigModel.data_layout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_layout</span> <span class="pre">(dsgrid.config.dataset_config.UserDataLayout</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source" title="dsgrid.config.dataset_config.DatasetConfigModel.data_source"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_source</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_authors" title="dsgrid.config.dataset_config.DatasetConfigModel.data_source_authors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_source_authors</span> <span class="pre">(list[str]</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_date" title="dsgrid.config.dataset_config.DatasetConfigModel.data_source_date"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_source_date</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_doi_url" title="dsgrid.config.dataset_config.DatasetConfigModel.data_source_doi_url"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_source_doi_url</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_version" title="dsgrid.config.dataset_config.DatasetConfigModel.data_source_version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">data_source_version</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_id" title="dsgrid.config.dataset_config.DatasetConfigModel.dataset_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataset_id</span> <span class="pre">(str)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_qualifier_metadata" title="dsgrid.config.dataset_config.DatasetConfigModel.dataset_qualifier_metadata"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataset_qualifier_metadata</span> <span class="pre">(dsgrid.config.dataset_config.QuantityModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dataset_config.GrowthRateModel)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_type" title="dsgrid.config.dataset_config.DatasetConfigModel.dataset_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataset_type</span> <span class="pre">(dsgrid.config.dataset_config.InputDatasetType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.description" title="dsgrid.config.dataset_config.DatasetConfigModel.description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">description</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimension_references" title="dsgrid.config.dataset_config.DatasetConfigModel.dimension_references"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimension_references</span> <span class="pre">(list[dsgrid.config.dimensions.DimensionReferenceModel])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimensions</span> <span class="pre">(list[dsgrid.config.dimensions.DimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.DateTimeDimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.AnnualTimeDimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.IndexTimeDimensionModel</span> <span class="pre">|</span> <span class="pre">dsgrid.config.dimensions.NoOpTimeDimensionModel])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.enable_unit_conversion" title="dsgrid.config.dataset_config.DatasetConfigModel.enable_unit_conversion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enable_unit_conversion</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_contributors" title="dsgrid.config.dataset_config.DatasetConfigModel.origin_contributors"><code class="xref py py-obj docutils literal notranslate"><span class="pre">origin_contributors</span> <span class="pre">(list[str]</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_creator" title="dsgrid.config.dataset_config.DatasetConfigModel.origin_creator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">origin_creator</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_organization" title="dsgrid.config.dataset_config.DatasetConfigModel.origin_organization"><code class="xref py py-obj docutils literal notranslate"><span class="pre">origin_organization</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_project" title="dsgrid.config.dataset_config.DatasetConfigModel.origin_project"><code class="xref py py-obj docutils literal notranslate"><span class="pre">origin_project</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.registry_data_layout" title="dsgrid.config.dataset_config.DatasetConfigModel.registry_data_layout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">registry_data_layout</span> <span class="pre">(dsgrid.config.dataset_config.RegistryDataLayout</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.sector_description" title="dsgrid.config.dataset_config.DatasetConfigModel.sector_description"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sector_description</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.tags" title="dsgrid.config.dataset_config.DatasetConfigModel.tags"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tags</span> <span class="pre">(list[str]</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">trivial_dimensions</span> <span class="pre">(list[dsgrid.dimension.base_models.DimensionType])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.use_project_geography_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.use_project_geography_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">use_project_geography_time_zone</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.user_defined_metadata" title="dsgrid.config.dataset_config.DatasetConfigModel.user_defined_metadata"><code class="xref py py-obj docutils literal notranslate"><span class="pre">user_defined_metadata</span> <span class="pre">(dict[str,</span> <span class="pre">Any])</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id" title="dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_dataset_id</span></code></a> » <a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_id" title="dsgrid.config.dataset_config.DatasetConfigModel.dataset_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dataset_id</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_files" title="dsgrid.config.dataset_config.DatasetConfigModel.check_files"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_files</span></code></a> » <a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimensions</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_names" title="dsgrid.config.dataset_config.DatasetConfigModel.check_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_names</span></code></a> » <a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimensions</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_not_trivial</span></code></a> » <a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">trivial_dimensions</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_classification">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_classification</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.config.dataset_config.DataClassificationType" title="dsgrid.config.dataset_config.DataClassificationType"><span class="pre">DataClassificationType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_classification" title="Link to this definition">¶</a></dt>
+<dd><p>Data security classification (e.g., low, moderate).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_layout">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_layout</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">UserDataLayout</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_layout" title="Link to this definition">¶</a></dt>
+<dd><p>Defines the data layout (table format, value format, and file paths) for dataset registration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_source">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_source</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source" title="Link to this definition">¶</a></dt>
+<dd><p>Original data source name, e.g. ‘ComStock’, ‘EIA 861’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_source_authors">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_source_authors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_authors" title="Link to this definition">¶</a></dt>
+<dd><p>List of authors for the original data source.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_source_date">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_source_date</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_date" title="Link to this definition">¶</a></dt>
+<dd><p>Date or year the original source data were published, e.g., ‘2021’ for ‘EIA AEO 2021’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_source_doi_url">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_source_doi_url</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_doi_url" title="Link to this definition">¶</a></dt>
+<dd><p>Original data source doi or other url</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.data_source_version">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">data_source_version</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_version" title="Link to this definition">¶</a></dt>
+<dd><p>Source data version, if applicable. For example, could specify preliminary versus final data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.dataset_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dataset_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_id" title="Link to this definition">¶</a></dt>
+<dd><p>Unique dataset identifier.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id" title="dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_dataset_id</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.dataset_qualifier_metadata">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dataset_qualifier_metadata</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">QuantityModel</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">GrowthRateModel</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">QuantityModel(dataset_qualifier_type=&lt;DatasetQualifierType.QUANTITY:</span> <span class="pre">'quantity'&gt;)</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_qualifier_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Additional metadata to include related to the dataset_qualifier</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.dataset_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dataset_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.config.dataset_config.InputDatasetType" title="dsgrid.config.dataset_config.InputDatasetType"><span class="pre">InputDatasetType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">InputDatasetType.UNSPECIFIED</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_type" title="Link to this definition">¶</a></dt>
+<dd><p>Input dataset type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.description">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">description</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.description" title="Link to this definition">¶</a></dt>
+<dd><p>A detailed description of the dataset</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.dimension_references">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimension_references</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionReferenceModel" title="dsgrid.config.dimensions.DimensionReferenceModel"><span class="pre">DimensionReferenceModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimension_references" title="Link to this definition">¶</a></dt>
+<dd><p>List of registered dimension references that make up the dimensions of dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.dimensions">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimensions</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Annotated</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DimensionModel" title="dsgrid.config.dimensions.DimensionModel"><span class="pre">DimensionModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.DateTimeDimensionModel" title="dsgrid.config.dimensions.DateTimeDimensionModel"><span class="pre">DateTimeDimensionModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.AnnualTimeDimensionModel" title="dsgrid.config.dimensions.AnnualTimeDimensionModel"><span class="pre">AnnualTimeDimensionModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel"><span class="pre">RepresentativePeriodTimeDimensionModel</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">DatetimeExternalTimeZoneDimensionModel</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">IndexTimeDimensionModel</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="dimension.html#dsgrid.config.dimensions.NoOpTimeDimensionModel" title="dsgrid.config.dimensions.NoOpTimeDimensionModel"><span class="pre">NoOpTimeDimensionModel</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">BeforeValidator</span><span class="p"><span class="pre">(</span></span><span class="n"><span class="pre">func</span></span><span class="o"><span class="pre">=</span></span><span class="pre">handle_dimension_union</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="n"><span class="pre">json_schema_input_type</span></span><span class="o"><span class="pre">=</span></span><span class="pre">PydanticUndefined</span><span class="p"><span class="pre">)</span></span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="Link to this definition">¶</a></dt>
+<dd><p>List of dimensions that make up the dimensions of dataset. They will be automatically registered during dataset registration and then converted to dimension_references.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Constraints<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> = &lt;function handle_dimension_union at 0x7f8b6cba6020&gt;</p></li>
+<li><p><strong>json_schema_input_type</strong> = PydanticUndefined</p></li>
+</ul>
+</dd>
+<dt class="field-even">Validated by<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_files" title="dsgrid.config.dataset_config.DatasetConfigModel.check_files"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_files</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_names" title="dsgrid.config.dataset_config.DatasetConfigModel.check_names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_names</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.enable_unit_conversion">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">enable_unit_conversion</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.enable_unit_conversion" title="Link to this definition">¶</a></dt>
+<dd><p>If the dataset uses its dimension mapping for the metric dimension to also perform unit conversion, then this value should be false.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.origin_contributors">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">origin_contributors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_contributors" title="Link to this definition">¶</a></dt>
+<dd><p>List of contributors to the compilation of this dataset for dsgrid,  e.g., [‘Harry Potter’, ‘Ronald Weasley’]</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.origin_creator">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">origin_creator</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_creator" title="Link to this definition">¶</a></dt>
+<dd><p>First and last name of the person who formatted this dataset for dsgrid</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.origin_organization">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">origin_organization</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_organization" title="Link to this definition">¶</a></dt>
+<dd><p>Organization name of the origin_creator, e.g., ‘NREL’</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.origin_project">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">origin_project</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_project" title="Link to this definition">¶</a></dt>
+<dd><p>Name of the project for/from which this dataset was compiled, e.g., ‘IEF’, ‘Building Standard Scenarios’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.registry_data_layout">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">registry_data_layout</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">RegistryDataLayout</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.registry_data_layout" title="Link to this definition">¶</a></dt>
+<dd><p>Defines the dataset’s data layout once stored in the registry.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.sector_description">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">sector_description</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.sector_description" title="Link to this definition">¶</a></dt>
+<dd><p>Sectoral description (e.g., residential, commercial, industrial, transportation, electricity)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.tags">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">tags</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.tags" title="Link to this definition">¶</a></dt>
+<dd><p>List of data tags</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">trivial_dimensions</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="enums.html#dsgrid.dimension.base_models.DimensionType" title="dsgrid.dimension.base_models.DimensionType"><span class="pre">DimensionType</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions" title="Link to this definition">¶</a></dt>
+<dd><p>List of trivial dimensions (i.e., 1-element dimensions) that do not exist in the load_data_lookup. List the dimensions by dimension type. Trivial dimensions are 1-element dimensions that are not present in the parquet data columns. Instead they are added by dsgrid as an alias column.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_not_trivial</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.use_project_geography_time_zone">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">use_project_geography_time_zone</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.use_project_geography_time_zone" title="Link to this definition">¶</a></dt>
+<dd><p>If true, time zones will be applied from the project’s geography dimension. If false, the dataset’s geography dimension records must provide a time zone column.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.user_defined_metadata">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">user_defined_metadata</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></em><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.user_defined_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Additional user defined metadata fields</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_layout_fields</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_zone</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_dataset_id</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_id" title="dsgrid.config.dataset_config.DatasetConfigModel.dataset_id"><em class="xref py py-obj"><span class="pre">dataset_id</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_dataset_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id" title="Link to this definition">¶</a></dt>
+<dd><p>Check dataset ID validity</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_files">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_files</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><em class="xref py py-obj"><span class="pre">dimensions</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_files" title="Link to this definition">¶</a></dt>
+<dd><p>Validate dimension files are unique across all dimensions</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_layout_fields</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_layout_fields"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields" title="Link to this definition">¶</a></dt>
+<dd><p>Ensure data_layout and registry_data_layout are mutually exclusive.</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_names">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_names</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><em class="xref py py-obj"><span class="pre">dimensions</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_names" title="Link to this definition">¶</a></dt>
+<dd><p>Validate dimension names are unique across all dimensions.</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_time_not_trivial</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions" title="dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions"><em class="xref py py-obj"><span class="pre">trivial_dimensions</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_time_not_trivial"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_time_zone</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dataset_config.html#DatasetConfigModel.check_time_zone"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone" title="Link to this definition">¶</a></dt>
+<dd><p>Validate whether required time zone information is present.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="dimension.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Dimension Config</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="project.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Project Config</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dataset Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_classification"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_classification</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_layout"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_layout</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_source</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_authors"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_source_authors</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_date"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_source_date</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_doi_url"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_source_doi_url</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.data_source_version"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.data_source_version</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_id"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.dataset_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_qualifier_metadata"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.dataset_qualifier_metadata</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dataset_type"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.dataset_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.description"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.description</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimension_references"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.dimension_references</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.dimensions"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.dimensions</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.enable_unit_conversion"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.enable_unit_conversion</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_contributors"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.origin_contributors</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_creator"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.origin_creator</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_organization"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.origin_organization</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.origin_project"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.origin_project</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.registry_data_layout"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.registry_data_layout</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.sector_description"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.sector_description</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.tags"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.tags</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.trivial_dimensions"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.trivial_dimensions</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.use_project_geography_time_zone"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.use_project_geography_time_zone</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.user_defined_metadata"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.user_defined_metadata</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_dataset_id"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_dataset_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_files"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_files</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_layout_fields"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_layout_fields</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_names"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_names</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_not_trivial"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_time_not_trivial</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dataset_config.DatasetConfigModel.check_time_zone"><code class="docutils literal notranslate"><span class="pre">DatasetConfigModel.check_time_zone</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=d198571b"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

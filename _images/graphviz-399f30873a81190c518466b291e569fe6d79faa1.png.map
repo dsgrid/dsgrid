@@ -1,0 +1,98 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel
+
+Reference to a dimension mapping stored in the registry.
+
+The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
+" alt="" coords="3755,1471,4049,1611"/>
+<area shape="rect" id="node2" title="dsgrid.dimension.dimension_filters.DimensionFilterBetweenColumnOperatorModel
+
+Filters a table where a dimension column is between the lower bound and upper bound,
+inclusive.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;timestamp&quot;).between(&quot;2012&#45;07&#45;01 00:00:00&quot;, &quot;2012&#45;08&#45;01 00:00:00&quot;))
+" alt="" coords="3583,277,4221,501"/>
+<area shape="rect" id="node3" title="dsgrid.dimension.dimension_filters.DimensionFilterColumnOperatorModel
+
+Filters a table where a dimension column matches a Spark SQL operator.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;geography&quot;).like(&quot;abc%&quot;))
+df.filter(~F.col(&quot;sector&quot;).startswith(&quot;com&quot;))
+" alt="" coords="3631,549,4173,773"/>
+<area shape="rect" id="node4" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionModel
+
+Filters a table where a dimension column matches an expression.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;operator=&quot;==&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;06037&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+" alt="" coords="3667,822,4137,1018"/>
+<area shape="rect" id="node5" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionRawModel
+
+Filters a table where a dimension column matches an expression.
+Uses the passed string with no modification.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionRawModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;== &#39;06037&#39;&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+
+The difference between this class and DimensionFilterExpressionModel is that the latter
+will attempt to add quotes as necessary.
+" alt="" coords="3641,1067,4163,1235"/>
+<area shape="rect" id="node6" title="dsgrid.dimension.dimension_filters.SubsetDimensionFilterModel
+
+Filters base dimension records that match a subset dimension.
+" alt="" coords="3683,1283,4121,1423"/>
+<area shape="rect" id="node7" title="dsgrid.dimension.dimension_filters.SupplementalDimensionFilterColumnOperatorModel
+
+Filters base dimension records that have a valid mapping to a supplemental dimension.
+" alt="" coords="3556,5,4248,229"/>
+<area shape="rect" id="node8" title="dsgrid.query.dataset_mapping_plan.DatasetMappingPlan
+
+Defines how to map a dataset to a list of dimensions.
+" alt="" coords="744,1019,1080,1243"/>
+<area shape="rect" id="node9" title="dsgrid.query.dataset_mapping_plan.MapOperation
+
+Defines one mapping operation for a dataset.
+" alt="" coords="2142,1146,2621,1286"/>
+<area shape="rect" id="node10" title="dsgrid.query.models.DatasetModel
+
+Specifies the datasets to use in a project query.
+" alt="" coords="617,641,1207,781"/>
+<area shape="rect" id="node11" title="dsgrid.query.models.ProjectQueryDatasetParamsModel
+
+Parameters in a project query that only apply to datasets
+" alt="" coords="1351,793,3412,849"/>
+<area shape="rect" id="node12" title="dsgrid.query.models.ProjectionDatasetModel
+
+A dataset with growth rates that can be applied to a standalone dataset.
+" alt="" coords="2155,417,2608,613"/>
+<area shape="rect" id="node13" title="dsgrid.query.models.StandaloneDatasetModel
+
+A dataset with energy use data.
+" alt="" coords="2190,661,2573,745"/>
+<area shape="rect" id="node14" title="dsgrid.query.models.ProjectQueryParamsModel
+
+Defines how to transform a project into a CompositeDataset
+" alt="" coords="5,849,473,1073"/>
+<area shape="rect" id="node15" title="dsgrid.query.models.SparkConfByDataset
+
+Defines a custom Spark configuration to use while running a query on a dataset.
+" alt="" coords="819,1291,1005,1375"/>
+</map>

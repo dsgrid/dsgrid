@@ -1,0 +1,14 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.project_config.RequiredBaseDimensionModel
+
+Base data model for all dsgrid data models
+" alt="" coords="639,33,889,117"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="5,5,456,117"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="600,165,928,249"/>
+</map>

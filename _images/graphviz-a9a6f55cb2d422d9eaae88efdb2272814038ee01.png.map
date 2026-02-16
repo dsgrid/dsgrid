@@ -1,0 +1,14 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel
+
+Represents dimension mapping model configurations
+" alt="" coords="5,5,283,61"/>
+<area shape="rect" id="node2" title="dsgrid.config.mapping_tables.MappingTableModel
+
+Attributes for a dimension mapping table
+" alt="" coords="427,35,895,427"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+" alt="" coords="1039,188,1289,300"/>
+</map>

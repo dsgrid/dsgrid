@@ -1,0 +1,63 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.dimension.dimension_filters.DimensionFilterBetweenColumnOperatorModel
+
+Filters a table where a dimension column is between the lower bound and upper bound,
+inclusive.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;timestamp&quot;).between(&quot;2012&#45;07&#45;01 00:00:00&quot;, &quot;2012&#45;08&#45;01 00:00:00&quot;))
+" alt="" coords="2183,5,2821,229"/>
+<area shape="rect" id="node2" title="dsgrid.dimension.dimension_filters.DimensionFilterColumnOperatorModel
+
+Filters a table where a dimension column matches a Spark SQL operator.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;geography&quot;).like(&quot;abc%&quot;))
+df.filter(~F.col(&quot;sector&quot;).startswith(&quot;com&quot;))
+" alt="" coords="2231,277,2773,501"/>
+<area shape="rect" id="node3" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionModel
+
+Filters a table where a dimension column matches an expression.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;operator=&quot;==&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;06037&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+" alt="" coords="2267,550,2737,746"/>
+<area shape="rect" id="node4" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionRawModel
+
+Filters a table where a dimension column matches an expression.
+Uses the passed string with no modification.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionRawModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;== &#39;06037&#39;&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+
+The difference between this class and DimensionFilterExpressionModel is that the latter
+will attempt to add quotes as necessary.
+" alt="" coords="2241,795,2763,963"/>
+<area shape="rect" id="node5" title="dsgrid.dimension.dimension_filters.SubsetDimensionFilterModel
+
+Filters base dimension records that match a subset dimension.
+" alt="" coords="2283,1011,2721,1151"/>
+<area shape="rect" id="node6" title="dsgrid.dimension.dimension_filters.SupplementalDimensionFilterColumnOperatorModel
+
+Filters base dimension records that have a valid mapping to a supplemental dimension.
+" alt="" coords="2156,1200,2848,1424"/>
+<area shape="rect" id="node7" title="dsgrid.query.models.FilteredDatasetModel
+
+Filters to apply to a dataset
+" alt="" coords="5,615,2012,699"/>
+</map>

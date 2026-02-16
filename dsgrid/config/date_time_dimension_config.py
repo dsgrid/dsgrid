@@ -7,6 +7,7 @@ import pandas as pd
 import chronify
 
 from dsgrid.dimension.time import TimeZoneFormat, TimeIntervalType
+from dsgrid.exceptions import DSGInvalidParameter
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.common import TIME_ZONE_COLUMN
@@ -57,6 +58,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     measurement_type=self._model.measurement_type,
                     interval_type=self._model.time_interval_type,
                 )
+            case _:
+                msg = f"Unsupported time zone format for chronify: {self.model.time_zone_format.format_type}"
+                raise DSGInvalidParameter(msg)
 
     def get_frequency(self) -> timedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
@@ -71,7 +75,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         for trange in self.model.ranges:
             start = datetime.strptime(trange.start, trange.str_format)
             assert start.tzinfo is None
-            start_times.append(start.replace(tzinfo=tz))
+            start_times.append(pd.Timestamp(start.replace(tzinfo=tz)))
         return start_times
 
     def get_lengths(self) -> list[int]:

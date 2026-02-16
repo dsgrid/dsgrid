@@ -264,7 +264,6 @@ def test_single_tz_spark_hive(monkeypatch):
     if isinstance(res_df, DataFrame):
         res_df = res_df.toPandas()
     assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
-    # target.assert_called_once()
 
 
 def test_single_tz_spark_path(monkeypatch):
@@ -291,8 +290,6 @@ def test_single_tz_spark_path(monkeypatch):
     if isinstance(res_df, DataFrame):
         res_df = res_df.toPandas()
     assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
-    # path_target.assert_called_once()
-    # persist_target.assert_called_once()
 
 
 def test_value_column_first_used(monkeypatch):
@@ -378,7 +375,6 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch):
     if isinstance(res_df, DataFrame):
         res_df = res_df.toPandas()
     assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
-    # hive_target.assert_called_once()
 
 
 def test_multi_tz_spark_path(monkeypatch):
@@ -405,8 +401,6 @@ def test_multi_tz_spark_path(monkeypatch):
     if isinstance(res_df, DataFrame):
         res_df = res_df.toPandas()
     assert sorted(res_df[TIME_COLUMN]) == sorted(called_df[TIME_COLUMN])
-    # path_target.assert_called_once()
-    # persist_target.assert_called_once()
 
 
 def test_unknown_plan_raises(monkeypatch):

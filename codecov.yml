@@ -1,4 +1,5 @@
 ignore:
+  - "dsgrid/tests/**"
   - "tests/simple_standard_scenarios_datasets.py"
   - "tests_aws/**"
   - "build_backend.py"

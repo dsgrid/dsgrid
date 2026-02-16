@@ -132,7 +132,7 @@ addopts = "-ra"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = ["tests/*", "tests_aws/*", "build_backend.py"]
+omit = ["dsgrid/tests/*", "tests/*", "tests_aws/*", "build_backend.py"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"

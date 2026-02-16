@@ -66,10 +66,10 @@ jobs:
         # This does not run the AWS tests.
         # Credentials would need to be configured.
         source .venv/bin/activate
-        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
         # Restart from scratch.
         rm -rf tests/data/registry
-        #DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
         DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_spark_functions.py tests/test_spark_utils.py
 
     - name: Run tests (Windows)
@@ -79,7 +79,7 @@ jobs:
         # Credentials would need to be configured.
         .venv\Scripts\Activate.ps1
         $env:DSGRID_BACKEND_ENGINE = 'duckdb'
-        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0

@@ -10,9 +10,12 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+docs_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(docs_dir))
 
 # -- Project information -----------------------------------------------------
 import dsgrid
@@ -33,22 +36,43 @@ release = dsgrid.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
-    "sphinx.ext.graphviz",
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
+    # "sphinx.ext.autosectionlabel",  # Temporarily disabled due to NoneType parent error
     "sphinxarg.ext",
     "sphinx.ext.todo",
     "sphinxcontrib.programoutput",
     "sphinx_copybutton",
     "sphinx_click",
+    "sphinx_design",
     "sphinxcontrib.autodoc_pydantic",
     "sphinx_tabs.tabs",
 ]
+
+# MyST parser configuration
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "substitution",
+    "tasklist",
+]
+myst_heading_anchors = 4
+
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -93,10 +117,6 @@ todo_include_todos = True
 
 
 # CSS styling
-rst_prolog = """
-.. include:: /special.rst
-
-"""
 
 html_css_files = ["style.css"]
 
@@ -111,5 +131,59 @@ copybutton_copy_empty_lines = False
 autodoc_pydantic_model_show_json = False
 autodoc_pydantic_model_show_config_member = False
 autodoc_pydantic_model_show_config_summary = False
-autodoc_pydantic_model_erdantic_figure = True
+autodoc_pydantic_model_erdantic_figure = False
 autodoc_pydantic_model_erdantic_figure_collapsed = False
+
+# Display Pydantic model fields in compact table format
+autodoc_pydantic_model_show_field_summary = True
+autodoc_pydantic_model_summary_list_order = "bysource"
+autodoc_pydantic_field_list_validators = True
+autodoc_pydantic_field_doc_policy = "docstring"
+autodoc_pydantic_field_show_constraints = True
+autodoc_pydantic_field_show_alias = False
+autodoc_pydantic_field_show_default = True
+autodoc_pydantic_model_hide_paramlist = True
+autodoc_pydantic_model_members = True
+autodoc_pydantic_model_undoc_members = False
+
+
+# -- Custom setup for auto-generating model documentation -------------------
+
+
+def setup(app):
+    """Sphinx setup hook to auto-generate data model documentation."""
+    # Generate enum documentation first
+    try:
+        from doc_generators.generate_enums import main as generate_enums
+
+        print("Generating enum documentation...")
+        result = generate_enums()
+        if result != 0:
+            print("Warning: Failed to generate some enum documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate enum documentation: {e}")
+        # Don't fail the build if generation fails
+
+    # Generate dimension record class documentation
+    try:
+        from doc_generators.generate_dimension_classes import main as generate_dim_classes
+
+        print("Generating dimension class documentation...")
+        result = generate_dim_classes()
+        if result != 0:
+            print("Warning: Failed to generate some dimension class documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate dimension class documentation: {e}")
+        # Don't fail the build if generation fails
+
+    # Generate data model documentation
+    try:
+        from doc_generators.generate_all_models import main as generate_models
+
+        print("Generating data model documentation...")
+        result = generate_models()
+        if result != 0:
+            print("Warning: Failed to generate some model documentation")
+    except Exception as e:
+        print(f"Warning: Could not generate model documentation: {e}")
+        # Don't fail the build if generation fails

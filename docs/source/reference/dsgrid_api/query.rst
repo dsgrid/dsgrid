@@ -13,7 +13,7 @@ Data Models
 .. autopydantic_model:: dsgrid.query.models.ProjectionDatasetModel
 .. autopydantic_model:: dsgrid.query.models.AggregationModel
 .. autopydantic_model:: dsgrid.query.models.ColumnModel
-.. autopydantic_model:: dsgrid.query.models.DimensionQueryNamesModel
+.. autopydantic_model:: dsgrid.query.models.DimensionNamesModel
 .. autopydantic_model:: dsgrid.query.models.FilteredDatasetModel
 .. autopydantic_model:: dsgrid.query.models.ReportInputModel
 .. autopydantic_model:: dsgrid.query.models.SparkConfByDataset
@@ -40,7 +40,7 @@ Examples
     from dsgrid.query.models import (
         AggregationModel,
         DatasetModel,
-        DimensionQueryNamesModel,
+        DimensionNamesModel,
         ProjectQueryParamsModel,
         ProjectQueryModel,
         QueryResultParamsModel,
@@ -72,7 +72,7 @@ Examples
         result=QueryResultParamsModel(
             aggregations=[
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(
+                    dimensions=DimensionNamesModel(
                         geography=["state"],
                         metric=["electricity_collapsed"],
                         model_year=[],

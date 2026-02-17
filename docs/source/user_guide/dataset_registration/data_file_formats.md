@@ -94,7 +94,7 @@ Two Parquet files comprise the dataset: a **data table** with time-series metric
 **Lookup table** (`load_data_lookup.parquet`) — required columns and content:
 - `id` (integer) — matches the IDs in the data table.
 - Every non-time, non-trivial dimension that is *not* already a column in the data table. This typically includes all non-time dimensions (geography, sector, subsector, metric, scenario, model_year, weather_year, etc.).
-- `scaling_factor` (float, optional) — see [Lookup Table with Scaling Factor](#scaling-factor) below.
+- `scaling_factor` (float, optional) — see [Lookup Table with Scaling Factor](#lookup-table-with-scaling-factor) below.
 
 #### Pivoted, No Scaling Factor
 
@@ -255,9 +255,60 @@ This format minimizes file storage because:
 
 Both table formats support two value layouts:
 
-- **Pivoted**: The record IDs of one dimension (typically `metric`) become column names in the data table. All other dimensions remain as columns. This saves storage space by avoiding repeated rows but can make manual inspection more complex. dsgrid handles the complexity at query time.
+### Stacked
 
-- **Stacked**: The table has one column per dimension (except time, which might have more than one column) and a column called `value` that contains the data values. This format makes queries simpler and is a good default choice.
+Each non-time dimension has its own column, plus a single `value` column containing the data. A `metric` column identifies which metric each row represents. This format is a good default choice.
+
+The [one-table example](#one-table-format) above uses stacked format. The same layout works with two-table format: the `value`, `metric`, and any time columns appear in the data table, and other dimensions go in the lookup table.
+
+### Pivoted
+
+The record IDs of one dimension become column names in the data table, and each row contains all values for that combination of other (non-pivoted) dimensions at once. In practice, the pivoted dimension is almost always `metric`. The code allows pivoting on other dimensions, but this is uncommon.
+
+The [two-table example](#two-table-format) above uses pivoted format. Here is a one-table pivoted equivalent in which the `metric` and `value` columns are replaced by one column per metric record ID:
+
+:::{list-table} One-table pivoted example
+:header-rows: 1
+:widths: 28 10 12 25 15 15 20
+
+* - timestamp
+  - geography
+  - scenario
+  - subsector
+  - heating
+  - cooling
+  - interior_equipment
+* - 2012-01-01T00:00:00+00:00
+  - 01001
+  - reference
+  - full_service_restaurant
+  - 1.234
+  - 0.002
+  - 0.051
+* - 2012-01-01T00:00:00+00:00
+  - 01001
+  - reference
+  - primary_school
+  - 2.345
+  - 0.008
+  - 0.073
+* - 2012-01-01T01:00:00+00:00
+  - 01001
+  - reference
+  - full_service_restaurant
+  - 1.456
+  - 0.003
+  - 0.049
+* - …
+  - …
+  - …
+  - …
+  - …
+  - …
+  - …
+:::
+
+Pivoted format saves storage space by avoiding repeated dimension values across rows, but can make inspection and data operations more complex because the column names carry semantic meaning. dsgrid converts pivoted data to stacked format during registration, so all downstream processing and queries operate on stacked data.
 
 ## Data Layout
 

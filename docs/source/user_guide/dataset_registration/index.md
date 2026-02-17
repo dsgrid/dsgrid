@@ -9,8 +9,7 @@ Learn how to register datasets for use in dsgrid projects.
 
 dimension_concepts
 dataset_concepts
-requirements
-formats
+data_file_formats
 config_files
 validity_checks
 ```

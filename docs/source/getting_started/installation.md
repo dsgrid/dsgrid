@@ -149,4 +149,4 @@ aws s3 ls s3://nrel-dsgrid-registry
 
 - Learn about [browsing the registry](../user_guide/how_tos/browse_registry)
 - Explore the [tutorials](../user_guide/tutorials/index) to get started with dsgrid
-- Understand [data formats](../user_guide/dataset_registration/formats) for preparing your data
+- Understand [data file formats](../user_guide/dataset_registration/data_file_formats) for preparing your data

@@ -156,5 +156,5 @@ User → Web Browser → Dash App → HTTP API → Registry DB
 
 - Learn about [CLI fundamentals](cli_fundamentals)
 - Explore the [Python API](../reference/dsgrid_api/index)
-- Understand [dataset formats](../user_guide/dataset_registration/formats)
+- Understand [data file formats](../user_guide/dataset_registration/data_file_formats)
 - See [data models](data_models/index) for configuration schemas

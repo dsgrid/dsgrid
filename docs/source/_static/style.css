@@ -1,11 +1,15 @@
-.wy-nav-content {
-  max-width: none;
+/* Widen the Furo content area so wide tables are not clipped.
+   Furo compiles Sass layout variables into hard-coded CSS values:
+     $content-width:  46em  ->  60em  (our override)
+     $content-padding: 3em  (unchanged)
+     $sidebar-width: 15em   (unchanged)
+     $full-width: 46+6+30 = 82em  ->  60+6+30 = 96em
+   We override the compiled rules directly. */
+.content {
+  width: 60em;
 }
-.wy-table-responsive table td {
-  white-space: normal !important;
-}
-.wy-table-responsive {
-  overflow: visible !important;
+.sidebar-drawer {
+  width: calc((100% - 96em) / 2 + 15em);
 }
 
 /* Colors and text decoration.

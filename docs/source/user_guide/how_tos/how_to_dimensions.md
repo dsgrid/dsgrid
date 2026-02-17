@@ -40,4 +40,4 @@ Define your dimensions in the dataset config. See the [dimension model reference
 
 - Learn about [dimension mapping](../dataset_mapping/concepts)
 - Follow the complete [dataset registration tutorial](../tutorials/create_and_submit_dataset)
-- Understand [dataset formats](../dataset_registration/formats)
+- Understand [data file formats](../dataset_registration/data_file_formats)

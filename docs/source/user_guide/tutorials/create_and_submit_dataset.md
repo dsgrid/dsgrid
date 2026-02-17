@@ -45,7 +45,7 @@ Create a `dataset.json5` with these fields (but choose your own values):
 
 ## Step 2: Choose a Data Format
 
-Choose a data format as described in [Dataset Formats](../dataset_registration/formats). Please note all requirements listed on that page.
+Choose a data format as described in [Data File Formats](../dataset_registration/data_file_formats). Please note all requirements listed on that page.
 
 This dataset uses the two-table (standard) format with dimension information stored like this:
 
@@ -236,7 +236,7 @@ from_id,to_id,from_fraction
 
 Create `load_data.parquet`. This data table includes time columns (`day_of_week`, `hour`, `month`) and metric columns (`L1andL2` and `DCFC`). Other dimensions will go into the `load_data_lookup.parquet`. Each unique time array needs to have a unique `id`. The TEMPO team decided to encode internal information into specific bytes of each value, but that is optional. Other datasets use 1 to N.
 
-Refer to [Dataset Formats](../dataset_registration/formats) for guidance about partitions.
+Refer to [Data File Formats](../dataset_registration/data_file_formats) for guidance about partitions.
 
 ```
 >>> spark.read.parquet("tempo_conus_2022/1.0.0/load_data.parquet").show()

@@ -93,7 +93,7 @@ If you're evaluating dsgrid for your organization:
 
 - **[Dataset Registration](user_guide/dataset_registration/index.md)** - Requirements, formats, and validation
 - **[Dataset Mapping](user_guide/dataset_mapping/index.md)** - Dimension mappings and workflows
-- **[Dataset Submittal](user_guide/dataset_submittal/index.md)** - Submission process and verification
+- **[Dataset Submittal](user_guide/dataset_submittal/index.md)** - Submission process and checks
 - **[Project Creation](user_guide/project_creation/index.md)** - Building dsgrid projects
 - **[Project Queries](user_guide/project_queries/index.md)** - Querying and analyzing projects
 - **[Project Derived Datasets](user_guide/project_derived_datasets/index.md)** - Creating derived datasets

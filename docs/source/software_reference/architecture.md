@@ -31,7 +31,7 @@ The Python API provides programmatic access to:
 - Query execution and result processing
 - Dimension operations
 
-See the [Python API Reference](../reference/dsgrid_api/index) for complete documentation.
+See the [Python API Reference](python_api) for complete documentation.
 
 ### HTTP
 
@@ -155,6 +155,6 @@ User → Web Browser → Dash App → HTTP API → Registry DB
 ## Next Steps
 
 - Learn about [CLI fundamentals](cli_fundamentals)
-- Explore the [Python API](../reference/dsgrid_api/index)
+- Explore the [Python API](python_api)
 - Understand [data file formats](../user_guide/dataset_registration/data_file_formats)
 - See [data models](data_models/index) for configuration schemas

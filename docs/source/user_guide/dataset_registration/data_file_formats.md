@@ -346,14 +346,14 @@ data_layout: {
 
 **Fields:**
 
-- `table_format`: Defines the table structure — `"two_table"` or `"one_table"`.
-- `value_format`: Defines whether values are pivoted or stacked.
+- `table_format`: Defines the table structure: `"two_table"` or `"one_table"`.
+- `value_format`: Defines whether values are `"pivoted"` or `"stacked"`.
 - `data_file`: Main data file configuration (required).
   - `path`: Path to the data file. Can be absolute or relative to the config file. You can also use the `--data-base-dir` CLI option to specify a different base directory for resolving relative paths.
   - `columns`: Optional list of column definitions for type overrides and renaming.
     - `name`: The actual column name in the file (required).
     - `data_type`: Data type override (optional). See [Specifying Column Data Types](#specifying-column-data-types) for supported types.
-    - `dimension_type`: The dsgrid dimension type this column represents (optional). When specified, the column will be renamed to match the dimension type.
+    - `dimension_type`: The dsgrid dimension type this column represents (optional, but required if this column is not a time column and `name` is not already a [dimension type](../../software_reference/data_models/enums.md#dimensiontype)). When specified, the column will be renamed to match the dimension type.
   - `ignore_columns`: Optional list of column names to drop when reading the file. Cannot overlap with columns defined in `columns`.
 - `lookup_data_file`: Lookup file configuration (required for `two_table` format). Has the same structure as `data_file`.
 - `missing_associations`: List of paths to files or directories defining missing dimension combinations (optional). Paths can be absolute or relative to the config file. You can also use the `--missing-associations-base-dir` CLI option to specify a different base directory for resolving relative paths. See [How to Handle Missing Dimension Associations](../how_tos/how_to_missing_associations) for details.
@@ -556,6 +556,10 @@ A column cannot appear in both `columns` and `ignore_columns` — dsgrid will ra
 
 ## Time
 
+dsgrid automates timeseries data alignment by requiring datasets and projects to clearly specify time conventions in their respective configuration files and then applying standardized transformations to align dataset time with project time. Project time is typically hourly, aligned with one or more weather years, and defined over a specific time zone that uses standard time (no daylight saving time). For interoperability, dsgrid stores timestamps in UTC.
+
+Datasets might have timestamps already aligned for a single time zone, or they might be in local standard time, they might use representative time (daily load shapes for weekdays and weekends varying by month), etc. The intention is for dsgrid to handle the time transformations implied by dataset-project time mismatches, because these are typically a time sink and common source of errors. Thus if your dataset's time convention is not yet supported, please {ref}`contact the dsgrid team <contact-us>` to discuss.
+
 ### Time Zones
 
 Timestamps must be converted to UTC when written to the Parquet files. Do not use the Pandas feature where it records time zone information into the Parquet metadata.
@@ -572,6 +576,13 @@ dsgrid can convert timestamps in data tables to the proper time zone by looking 
 #### Time Zone Unaware Timestamps
 
 Time-zone-unaware timestamps that will be interpreted as local time should be written as UTC timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
+
+To resolve local times to absolute timestamps, dsgrid needs a time zone for each geographic location. There are two ways to provide this:
+
+- **Dataset geography records** (default) — include a `time_zone` column with IANA time zone strings (e.g., `US/Eastern`) in the dataset's geography dimension records file.
+- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config. dsgrid will look up time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+
+See [Dataset Concepts — Configuration Options](dataset_concepts.md#configuration-options) for more on this setting.
 
 (time-formats)=
 ### Time Formats
@@ -592,6 +603,9 @@ column_format: {
 }
 ```
 
+The [one-table](#one-table-format) and [two-table](#two-table-format) examples above both use this format — note the UTC-offset suffix on each timestamp (e.g., `2012-01-01T00:00:00+00:00`).
+
+(timestamp-ntz)=
 ##### Timezone-naive timestamps (`TIMESTAMP_NTZ`)
 
 For datasets where timestamps are local time without an explicit time zone. The data must include a `time_zone` column (or the time zone must be derivable from the geography dimension) so dsgrid can localize the values. When read into Spark the type should be `TimestampNTZType`.
@@ -602,6 +616,30 @@ column_format: {
   time_column: "timestamp",
 }
 ```
+
+In the data file the timestamp column contains naive timestamps with no time zone suffix:
+
+:::{list-table} TIMESTAMP_NTZ data file example (two-table, pivoted)
+:header-rows: 1
+:widths: 25 8 15 15
+
+* - timestamp
+  - id
+  - heating
+  - cooling
+* - 2012-01-01 00:00:00
+  - 1
+  - 0.214
+  - 0.002
+* - 2012-01-01 01:00:00
+  - 1
+  - 0.329
+  - 0.000
+* - …
+  - …
+  - …
+  - …
+:::
 
 ##### Time-in-parts
 
@@ -622,17 +660,187 @@ When `time_zone` is specified, the resulting timestamps are timezone-aware (`TIM
 
 When `time_zone` is omitted, dsgrid assumes that year, month, day, and hour correspond to local time. To create specific timestamps in this case, dsgrid joins the geography dimension's records onto the data and pulls in the `time_zone` column — this requires that the geography dimension's records file includes a column named `time_zone` containing IANA time zone strings. The resulting data has a naive `timestamp` column (`TIMESTAMP_NTZ`) alongside the `time_zone` column, such that the combination is a fully specified point in time.
 
+In the data file, time components appear as separate integer columns:
+
+:::{list-table} Time-in-parts data file example (two-table, stacked)
+:header-rows: 1
+:widths: 8 8 8 8 8 12 10
+
+* - year
+  - month
+  - day
+  - hour
+  - id
+  - metric
+  - value
+* - 2012
+  - 1
+  - 1
+  - 0
+  - 1
+  - heating
+  - 0.214
+* - 2012
+  - 1
+  - 1
+  - 0
+  - 1
+  - cooling
+  - 0.002
+* - 2012
+  - 1
+  - 1
+  - 1
+  - 1
+  - heating
+  - 0.329
+* - …
+  - …
+  - …
+  - …
+  - …
+  - …
+  - …
+:::
+
 :::{note}
 The time-in-parts columns are dropped from the data during registration and replaced by a single `timestamp` column. The original data files are not modified.
 :::
 
+#### Datetime with External Time Zone
+
+For datasets where timestamps are timezone-naive and the time zone is derived from the geography dimension. This uses a dedicated time dimension model ([DatetimeExternalTimeZoneDimensionModel](../../software_reference/data_models/dimension_model.md#datetimeexternaltimezonedimensionmodel)) rather than the `column_format` field used by the standard [DateTime](#datetime) format.
+
+The data files look the same as [TIMESTAMP_NTZ](#timestamp-ntz) — naive timestamps with no time zone suffix. The geography dimension's records must include a `time_zone` column with IANA time zone strings so dsgrid can localize the timestamps.
+
+```javascript
+// Time dimension config
+time_type: "datetime_external_tz",
+time_zone_format: {
+  format_type: "aligned_in_clock_time",
+  time_zones: ["US/Eastern", "US/Central", "US/Mountain", "US/Pacific"],
+},
+ranges: [{
+  start: "2012-01-01 00:00:00",
+  end: "2012-12-31 23:00:00",
+  str_format: "%Y-%m-%d %H:%M:%S",
+  frequency: "01:00:00",
+}],
+time_interval_type: "period_beginning",
+measurement_type: "total",
+```
+
+See [DatetimeExternalTimeZoneDimensionModel](../../software_reference/data_models/dimension_model.md#datetimeexternaltimezonedimensionmodel) for all config fields.
+
 #### Annual
 
-Load data contains one value per model year.
+Annual time dimensions contain one value per year per dimension combination. The time dimension config specifies the range of years:
 
+```javascript
+// Time dimension config
+time_type: "annual",
+ranges: [{
+  start: "2020",
+  end: "2030",
+  str_format: "%Y",
+  frequency: 1,
+}],
+measurement_type: "total",
 ```
-[2020, 2021, 2022]
+
+The data file includes a `model_year` column with integer year values:
+
+:::{list-table} Annual data file example (one-table, stacked)
+:header-rows: 1
+:widths: 12 12 20 15 10
+
+* - model_year
+  - geography
+  - subsector
+  - metric
+  - value
+* - 2020
+  - 01001
+  - rooftop_pv
+  - capacity_kw
+  - 10.5
+* - 2021
+  - 01001
+  - rooftop_pv
+  - capacity_kw
+  - 25.3
+* - 2022
+  - 01001
+  - rooftop_pv
+  - capacity_kw
+  - 42.7
+* - 2020
+  - 01003
+  - rooftop_pv
+  - capacity_kw
+  - 8.1
+* - …
+  - …
+  - …
+  - …
+  - …
+:::
+
+See [AnnualTimeDimensionModel](../../software_reference/data_models/dimension_model.md#annualtimedimensionmodel) for all config fields.
+
+#### Index
+
+Index time dimensions use integer time steps rather than timestamp values. The time dimension config maps each index to a point in time via a starting timestamp and frequency:
+
+```javascript
+// Time dimension config
+time_type: "index",
+ranges: [{
+  start: 0,
+  end: 8783,
+  starting_timestamp: "2012-01-01 00:00:00",
+  str_format: "%Y-%m-%d %H:%M:%S",
+  frequency: "P0DT1H0M0.000000S",  // 1 hour
+}],
+time_interval_type: "period_beginning",
+measurement_type: "total",
 ```
+
+In the data file the time column is an integer named `time_index`:
+
+:::{list-table} Index data file example (two-table, pivoted)
+:header-rows: 1
+:widths: 12 8 15 15
+
+* - time_index
+  - id
+  - heating
+  - cooling
+* - 0
+  - 1
+  - 0.214
+  - 0.002
+* - 1
+  - 1
+  - 0.329
+  - 0.000
+* - 2
+  - 1
+  - 0.369
+  - 0.000
+* - …
+  - …
+  - …
+  - …
+* - 8783
+  - 1
+  - 0.198
+  - 0.001
+:::
+
+During registration, dsgrid converts the integer indices to timestamps using the config's starting timestamp and frequency. The original integer column is replaced by a proper timestamp column in the registered data.
+
+See [IndexTimeDimensionModel](../../software_reference/data_models/dimension_model.md#indextimedimensionmodel) for all config fields.
 
 #### Representative Period
 
@@ -711,10 +919,102 @@ Each time array contains one week of hourly data (24 hours per day) that applies
 This example uses the two-table format with pivoted metrics (`L1andL2`, `DCFC`). The `id` column links to the lookup table, which maps each ID to a combination of geography, scenario, subsector, etc. Only a subset of rows is shown — a complete dataset would have 2,016 rows per ID (12 months × 7 days × 24 hours).
 :::
 
-dsgrid can add support for other period formats. Please submit requests as needed.
+##### one_weekday_day_and_one_weekend_day_per_month_by_hour
 
-## Missing Associations
+Each time array contains one representative weekday and one representative weekend day of hourly data for each month. The times represent local time (no time zone).
 
-Datasets may legitimately lack data for certain dimension combinations. For example, a building model might not have data for certain geography-subsector combinations because those building types don't exist in those regions. These missing combinations must be explicitly declared in the dataset config.
+- All time columns must be integers except `is_weekday`, which is boolean.
+- `month` is one-based, starting in January. `Jan` → 1, `Feb` → 2, etc.
+- `hour` is zero-based, starting at midnight.
+- `is_weekday` is `true` for the weekday profile and `false` for the weekend profile.
 
-See [How to Handle Missing Dimension Associations](../how_tos/how_to_missing_associations) for a complete guide on identifying and declaring missing associations, including an iterative workflow for discovering them during registration.
+:::{list-table} one_weekday_day_and_one_weekend_day_per_month_by_hour (one-table, stacked)
+:header-rows: 1
+:widths: 10 12 10 12 12 10
+
+* - month
+  - is_weekday
+  - hour
+  - geography
+  - metric
+  - value
+* - 1
+  - false
+  - 0
+  - 06037
+  - electricity
+  - 0.594
+* - 1
+  - false
+  - 1
+  - 06037
+  - electricity
+  - 0.162
+* - 1
+  - false
+  - 2
+  - 06037
+  - electricity
+  - 0.379
+* - …
+  - …
+  - …
+  - …
+  - …
+  - …
+* - 1
+  - true
+  - 0
+  - 06037
+  - electricity
+  - 0.612
+* - …
+  - …
+  - …
+  - …
+  - …
+  - …
+:::
+
+:::{note}
+A complete dataset has 576 time rows per dimension combination (12 months × 2 day types × 24 hours).
+:::
+
+See [RepresentativePeriodTimeDimensionModel](../../software_reference/data_models/dimension_model.md#representativeperiodtimedimensionmodel) and [RepresentativePeriodFormat](../../software_reference/data_models/enums.md#representativeperiodformat) for all config fields and supported formats.
+
+#### NoOp (No Time Dimension)
+
+For time-invariant datasets that have no time component — for example, annual growth factors or static capacity values. The data files contain no time columns.
+
+```javascript
+// Time dimension config
+time_type: "noop",
+```
+
+:::{list-table} NoOp data file example (one-table, stacked)
+:header-rows: 1
+:widths: 12 25 20 10
+
+* - geography
+  - subsector
+  - metric
+  - value
+* - 01001
+  - full_service_restaurant
+  - growth_factor
+  - 1.05
+* - 01001
+  - primary_school
+  - growth_factor
+  - 1.02
+* - 01003
+  - full_service_restaurant
+  - growth_factor
+  - 1.08
+* - …
+  - …
+  - …
+  - …
+:::
+
+See [NoOpTimeDimensionModel](../../software_reference/data_models/dimension_model.md#nooptimedimensionmodel) for all config fields.

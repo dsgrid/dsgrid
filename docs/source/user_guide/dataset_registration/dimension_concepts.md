@@ -91,7 +91,7 @@ Not all dimension types need to be present in every dataset. A dimension with on
 
 Every dimension config has a `class` field that selects a **record class**. The record class determines what columns are required or optional in the dimension records CSV. All record classes require `id` and `name` columns; each class may add additional fields.For example, a metric dimension using the `EnergyEndUse` class requires `fuel_id` and `unit` columns in addition to `id` and `name`.
 
-The `class` field must reference a class from the `dsgrid.dimension.standard` module. The available classes for each dimension type are listed in the [Dimension Record Classes](../../software_reference/data_models/dimension_classes.md) reference. Metric dimensions have the most variety. Choose the class that best matches what your data represents, or {ref}`contact-us` to suggest a new metric type:
+The `class` field must reference a class from the `dsgrid.dimension.standard` module. The available classes for each dimension type are listed in the [Dimension Record Classes](../../software_reference/data_models/dimension_classes) reference. Metric dimensions have the most variety. Choose the class that best matches what your data represents, or {ref}`contact-us` to suggest a new metric type:
 
 | Metric Class | Description | Key Fields |
 |-------|-------------|------------|

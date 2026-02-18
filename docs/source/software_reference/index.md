@@ -9,4 +9,5 @@ architecture
 data_models/index
 cli_fundamentals
 cli_reference
+python_api
 ```

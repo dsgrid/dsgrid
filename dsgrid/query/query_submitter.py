@@ -5,13 +5,14 @@ import shutil
 from pathlib import Path
 import copy
 from zipfile import ZipFile
+from zoneinfo import ZoneInfo
 
 from chronify.utils.path_utils import check_overwrite
 from semver import VersionInfo
 from sqlalchemy import Connection
 
 import dsgrid
-from dsgrid.common import VALUE_COLUMN, BackendEngine
+from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
@@ -348,50 +349,47 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         time_cols = list(context.get_dimension_column_names(DimensionType.TIME))
         assert len(time_cols) == 1
         time_col = next(iter(time_cols))
-        time_dim.model.time_column = time_col
+        time_dim.model.column_format.time_column = time_col
 
         config = dsgrid.runtime_config
         if isinstance(model.result.time_zone, str) and model.result.time_zone != "geography":
-            if time_dim.supports_chronify():
-                match (config.backend_engine, config.use_hive_metastore):
-                    case (BackendEngine.SPARK, True):
-                        df = convert_time_zone_with_chronify_spark_hive(
-                            df=df,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone=model.result.time_zone,
-                            scratch_dir_context=scratch_dir_context,
-                        )
+            tz_name = model.result.time_zone
+            to_time_zone = ZoneInfo(tz_name) if tz_name not in [None, "None", "none"] else None
+            match (config.backend_engine, config.use_hive_metastore):
+                case (BackendEngine.SPARK, True):
+                    df = convert_time_zone_with_chronify_spark_hive(
+                        df=df,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
 
-                    case (BackendEngine.SPARK, False):
-                        filename = persist_table(
-                            df,
-                            scratch_dir_context,
-                            tag="project query before time mapping",
-                        )
-                        df = convert_time_zone_with_chronify_spark_path(
-                            df=df,
-                            filename=filename,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone=model.result.time_zone,
-                            scratch_dir_context=scratch_dir_context,
-                        )
-                    case (BackendEngine.DUCKDB, _):
-                        df = convert_time_zone_with_chronify_duckdb(
-                            df=df,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone=model.result.time_zone,
-                            scratch_dir_context=scratch_dir_context,
-                        )
-
-            else:
-                msg = "time_dim must support Chronify"
-                raise DSGInvalidParameter(msg)
+                case (BackendEngine.SPARK, False):
+                    filename = persist_table(
+                        df,
+                        scratch_dir_context,
+                        tag="project query before time zone conversion",
+                    )
+                    df = convert_time_zone_with_chronify_spark_path(
+                        df=df,
+                        filename=filename,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
+                case (BackendEngine.DUCKDB, _):
+                    df = convert_time_zone_with_chronify_duckdb(
+                        df=df,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone=to_time_zone,
+                        scratch_dir_context=scratch_dir_context,
+                    )
 
         elif model.result.time_zone == "geography":
-            if "time_zone" not in df.columns:
+            if TIME_ZONE_COLUMN not in df.columns:
                 geo_cols = list(context.get_dimension_column_names(DimensionType.GEOGRAPHY))
                 assert len(geo_cols) == 1
                 geo_col = next(iter(geo_cols))
@@ -402,46 +400,41 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     dim_key = "id"
                 df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
-            if time_dim.supports_chronify():
-                # use chronify
-                match (config.backend_engine, config.use_hive_metastore):
-                    case (BackendEngine.SPARK, True):
-                        df = convert_time_zone_by_column_with_chronify_spark_hive(
-                            df=df,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone_column="time_zone",
-                            scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,
-                        )
-                    case (BackendEngine.SPARK, False):
-                        filename = persist_table(
-                            df,
-                            scratch_dir_context,
-                            tag="project query before time mapping",
-                        )
-                        df = convert_time_zone_by_column_with_chronify_spark_path(
-                            df=df,
-                            filename=filename,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone_column="time_zone",
-                            scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,
-                        )
-                    case (BackendEngine.DUCKDB, _):
-                        df = convert_time_zone_by_column_with_chronify_duckdb(
-                            df=df,
-                            value_column=VALUE_COLUMN,
-                            from_time_dim=time_dim,
-                            time_zone_column="time_zone",
-                            scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,
-                        )
-
-            else:
-                msg = "time_dim must support Chronify"
-                raise DSGInvalidParameter(msg)
+            # use chronify
+            match (config.backend_engine, config.use_hive_metastore):
+                case (BackendEngine.SPARK, True):
+                    df = convert_time_zone_by_column_with_chronify_spark_hive(
+                        df=df,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone_column=TIME_ZONE_COLUMN,
+                        scratch_dir_context=scratch_dir_context,
+                        wrap_time_allowed=False,
+                    )
+                case (BackendEngine.SPARK, False):
+                    filename = persist_table(
+                        df,
+                        scratch_dir_context,
+                        tag="project query before time mapping",
+                    )
+                    df = convert_time_zone_by_column_with_chronify_spark_path(
+                        df=df,
+                        filename=filename,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone_column=TIME_ZONE_COLUMN,
+                        scratch_dir_context=scratch_dir_context,
+                        wrap_time_allowed=False,
+                    )
+                case (BackendEngine.DUCKDB, _):
+                    df = convert_time_zone_by_column_with_chronify_duckdb(
+                        df=df,
+                        value_column=VALUE_COLUMN,
+                        from_time_dim=time_dim,
+                        time_zone_column=TIME_ZONE_COLUMN,
+                        scratch_dir_context=scratch_dir_context,
+                        wrap_time_allowed=False,
+                    )
         else:
             msg = f"Unknown input {model.result.time_zone=}"
             raise DSGInvalidParameter(msg)

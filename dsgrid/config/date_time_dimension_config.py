@@ -7,8 +7,10 @@ import pandas as pd
 import chronify
 
 from dsgrid.dimension.time import TimeZoneFormat, TimeIntervalType
+from dsgrid.exceptions import DSGInvalidParameter
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.common import TIME_ZONE_COLUMN
 
 logger = logging.getLogger(__name__)
 
@@ -30,36 +32,35 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: issue #341: this is actually tied to the weather_year problem #340
         # If there are no ranges, all of this must be dynamic.
         # The two issues should be solved together.
-        datetime_type = self._get_datetime_type()
+        col_dtype = self._get_chronify_dtype()
+        start = self._get_chronify_start_time()
 
-        if datetime_type == "tz_aware_datetime_single_tz":
-            return chronify.DatetimeRange(
-                time_column=time_cols[0],
-                start=pd.Timestamp(self.get_start_times()[0]),
-                length=self.get_lengths()[0],
-                resolution=self.get_frequency(),
-                measurement_type=self._model.measurement_type,
-                interval_type=self._model.time_interval_type,
-            )
-        if datetime_type == "tz_naive_datetime_single_tz":
-            # localize to time zones, may do this outside of Chronify
-            msg = "dsgrid does not support NTZ datetime in dataframe yet"
-            raise NotImplementedError(msg)
-        if datetime_type == "tz_aware_datetime_multiple_tz":
-            return chronify.DatetimeRangeWithTZColumn(
-                time_column=time_cols[0],
-                start=pd.Timestamp(self.get_start_times()[0]),
-                length=self.get_lengths()[0],
-                resolution=self.get_frequency(),
-                time_zone_column="time_zone",
-                time_zones=self.get_time_zones(),
-                measurement_type=self._model.measurement_type,
-                interval_type=self._model.time_interval_type,
-            )
-        if datetime_type == "tz_naive_datetime_multiple_tz":
-            # localize to time zones, may do this outside of Chronify
-            msg = "dsgrid does not support NTZ datetime in dataframe yet"
-            raise NotImplementedError(msg)
+        match self.model.time_zone_format.format_type:
+            case TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
+                return chronify.DatetimeRange(
+                    dtype=col_dtype,
+                    time_column=time_cols[0],
+                    start=start,
+                    length=self.get_lengths()[0],
+                    resolution=self.get_frequency(),
+                    measurement_type=self._model.measurement_type,
+                    interval_type=self._model.time_interval_type,
+                )
+            case TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME:
+                return chronify.DatetimeRangeWithTZColumn(
+                    dtype=col_dtype,
+                    time_column=time_cols[0],
+                    start=start,
+                    length=self.get_lengths()[0],
+                    resolution=self.get_frequency(),
+                    time_zone_column=TIME_ZONE_COLUMN,
+                    time_zones=self._get_chronify_time_zones(),
+                    measurement_type=self._model.measurement_type,
+                    interval_type=self._model.time_interval_type,
+                )
+            case _:
+                msg = f"Unsupported time zone format for chronify: {self.model.time_zone_format.format_type}"
+                raise DSGInvalidParameter(msg)
 
     def get_frequency(self) -> timedelta:
         freqs = [trange.frequency for trange in self.model.ranges]
@@ -74,7 +75,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         for trange in self.model.ranges:
             start = datetime.strptime(trange.start, trange.str_format)
             assert start.tzinfo is None
-            start_times.append(start.replace(tzinfo=tz))
+            start_times.append(pd.Timestamp(start.replace(tzinfo=tz)))
         return start_times
 
     def get_lengths(self) -> list[int]:
@@ -94,19 +95,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:
-        return [self.model.time_column]
+        return self.model.column_format.get_time_columns()
 
     def get_time_zone(self) -> str | None:
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return self.model.time_zone_format.time_zone
-        return None
+        time_zones = self.get_time_zones()
+        return time_zones[0] if len(time_zones) == 1 else None
 
     def get_time_zones(self) -> list[str]:
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
-            return [self.model.time_zone_format.time_zone]
-        if self.model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
-            return self.model.time_zone_format.time_zones
-        return []
+        return self.model.time_zone_format.get_time_zones()
 
     def get_tzinfo(self) -> tzinfo | None:
         time_zone = self.get_time_zone()
@@ -117,20 +113,61 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def _get_datetime_type(self) -> str:
-        """Return a string representing the datetime type for this dimension."""
-        match (self.model.time_zone_format.format_type, self.model.localize_to_time_zone):
+    def get_localization_plan(self) -> str | None:
+        """Return a plan for localizing TIMESTAMP_NTZ datetime data."""
+        if self.model.column_format.dtype == "TIMESTAMP_TZ":
+            return None
+
+        tz_aware_post_reformat = len(self.get_time_zones()) > 0
+        match (self.model.time_zone_format.format_type, tz_aware_post_reformat):
             case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, True):
-                return "tz_aware_datetime_single_tz"
+                return "localize_to_single_tz"
             case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, False):
-                return "tz_naive_datetime_single_tz"
-            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, True):
-                return "tz_aware_datetime_multiple_tz"
-            case (TimeZoneFormat.ALIGNED_IN_CLOCK_TIME, False):
-                return "tz_naive_datetime_multiple_tz"
+                return None
+            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, True):
+                return "localize_to_multi_tz"
+            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, False):
+                return None
+
             case _:
                 msg = (
-                    f"Unsupported combination of format_type {self.model.time_zone_format.format_type} "
-                    f"and localize_to_time_zone {self.model.localize_to_time_zone}"
+                    f"Unsupported combination of time zone format: {self.model.time_zone_format.format_type}, and "
+                    f"time zone(s): {self.model.time_zone_format.get_time_zones()}"
                 )
                 raise ValueError(msg)
+
+    def _get_chronify_dtype(self) -> chronify.TimeDataType:
+        match self.model.column_format.dtype:
+            case "TIMESTAMP_NTZ":
+                return chronify.TimeDataType.TIMESTAMP_NTZ
+            case "TIMESTAMP_TZ":
+                return chronify.TimeDataType.TIMESTAMP_TZ
+            case _:
+                msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
+                raise ValueError(msg)
+
+    def _get_chronify_start_time(self) -> pd.Timestamp:
+        """Modify start time for chronify depending on localization plan.
+        Modification is necessary only for TIMESTAMP_NTZ data localized to a single time zone.
+        because of the way self.get_start_times() works.
+        Returns:
+            pd.Timestamp: start time for chronify
+        """
+        start_times = self.get_start_times()
+        assert len(start_times) == 1
+        start_time = start_times[0]
+
+        if self.get_localization_plan() == "localize_to_single_tz":
+            # dtype is TIMESTAMP_NTZ, so drop tzinfo
+            return pd.Timestamp(start_time.replace(tzinfo=None))
+        return pd.Timestamp(start_time)
+
+    def _get_chronify_time_zone(self) -> tzinfo | None:
+        time_zone = self.get_time_zone()
+        return ZoneInfo(time_zone) if time_zone else None
+
+    def _get_chronify_time_zones(self) -> list[tzinfo]:
+        # Does not allow mix of time zones and None because databases do not
+        # allow mix of tz-aware and tz-naive timestamps in a single column.
+        time_zones = self.get_time_zones()
+        return [ZoneInfo(tz) for tz in time_zones]

@@ -22,12 +22,12 @@ dsgrid projects typically assemble datasets from multiple domains to build a com
 - **Historical electricity data** — observed utility sales or grid load, often at annual or monthly resolution (e.g., EIA 861).
 - **Benchmark projections and growth factors** — reference-case energy projections or annual growth rates used to scale or calibrate modeled data (e.g., AEO end-use projections).
 
-### By Data Classification
+### By Data Qualifier
 
-The `data_classification` field describes the nature of the values:
+The `dataset_qualifier_metadata` field describes the nature of the values:
 
 - **Quantity** (default) — absolute values such as energy consumption (kWh), capacity (kW), or count.
-- **Growth rate** — multiplicative factors applied to scale other datasets over time. Growth-rate datasets may include additional metadata fields such as `growth_rate_base_year` and `growth_rate_base_year_value`.
+- **Growth rate** — multiplicative factors applied to scale other datasets over time. Growth-rate datasets include additional metadata such as `growth_rate_type` (e.g., `exponential_annual`).
 
 ## Dataset Dimensions
 

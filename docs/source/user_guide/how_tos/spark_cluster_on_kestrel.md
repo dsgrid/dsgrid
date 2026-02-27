@@ -1,6 +1,6 @@
 # How to Start a Spark Cluster on Kestrel
 
-This guide explains how to start an Apache Spark cluster on NREL's Kestrel HPC system for running dsgrid queries.
+This guide explains how to start an Apache Spark cluster on NLR's Kestrel HPC system for running dsgrid queries.
 
 ## Prerequisites
 

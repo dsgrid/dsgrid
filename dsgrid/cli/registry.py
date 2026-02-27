@@ -35,6 +35,53 @@ from dsgrid.utils.filters import ACCEPTED_OPS
 logger = logging.getLogger(__name__)
 
 
+class _LazyRegistryManager:
+    """Defers RegistryManager creation until first attribute access.
+
+    This allows Click to process --help on subcommands without requiring a
+    registry URL, while still failing with a clear error message when a
+    command actually needs the registry manager.
+    """
+
+    def __init__(self, ctx):
+        self._ctx = ctx
+        self._manager = None
+        self._initialized = False
+
+    def _init_manager(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        url = get_value_from_context(self._ctx, "url")
+        if url is None:
+            msg = (
+                "A registry URL is required. Pass it as 'dsgrid --url <URL> registry <command>' "
+                "or set it via the DSGRID_REGISTRY_DATABASE_URL environment variable "
+                "or in ~/.dsgrid.json5."
+            )
+            raise click.UsageError(msg)
+        conn = DatabaseConnection(url=url)
+        scratch_dir = get_value_from_context(self._ctx, "scratch_dir")
+        no_prompts = self._ctx.parent.params["no_prompts"]
+        self._manager = RegistryManager.load(
+            conn,
+            REMOTE_REGISTRY,
+            offline_mode=True,
+            no_prompts=no_prompts,
+            scratch_dir=scratch_dir,
+        )
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        self._init_manager()
+        return getattr(self._manager, name)
+
+    def dispose(self):
+        if self._manager is not None:
+            self._manager.dispose()
+
+
 def _version_info_callback(*args) -> VersionInfo | None:
     val = args[2]
     if val is None:
@@ -61,21 +108,7 @@ Click Group Definitions
 @click.pass_context
 def registry(ctx):
     """Manage a registry."""
-    conn = DatabaseConnection(
-        url=get_value_from_context(ctx, "url"),
-    )
-    scratch_dir = get_value_from_context(ctx, "scratch_dir")
-    no_prompts = ctx.parent.params["no_prompts"]
-    if "--help" in sys.argv:
-        ctx.obj = None
-    else:
-        ctx.obj = RegistryManager.load(
-            conn,
-            REMOTE_REGISTRY,
-            offline_mode=True,
-            no_prompts=no_prompts,
-            scratch_dir=scratch_dir,
-        )
+    ctx.obj = _LazyRegistryManager(ctx)
 
 
 @registry.result_callback()

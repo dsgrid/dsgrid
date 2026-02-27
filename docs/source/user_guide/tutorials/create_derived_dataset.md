@@ -2,7 +2,7 @@
 
 In this tutorial you will learn how to query a dsgrid project to produce and register a derived dataset. The tutorial uses the comstock_conus_2022_projected derived dataset from [dsgrid-project-StandardScenarios](https://github.com/dsgrid/dsgrid-project-StandardScenarios) as an example.
 
-You can run all commands in this tutorial except the last one on NREL's HPC Kestrel cluster (the dataset is already registered).
+You can run all commands in this tutorial except the last one on NLR's HPC Kestrel cluster (the dataset is already registered).
 
 ## Steps
 

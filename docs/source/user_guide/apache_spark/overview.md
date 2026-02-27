@@ -161,7 +161,7 @@ The Spark master starts a web application at `http://<master_hostname>:8080`. Jo
 
 ### SSH Tunnel for Remote Access
 
-If your Spark cluster is running on a remote system, like an HPC, you may need to open an SSH tunnel to the master node. Here is how to do that on NREL's Kestrel cluster.
+If your Spark cluster is running on a remote system, like an HPC, you may need to open an SSH tunnel to the master node. Here is how to do that on NLR's Kestrel cluster.
 
 **On your laptop:**
 ```bash
@@ -188,13 +188,13 @@ As stated earlier, the scripts mentioned in this section do not work in a native
 Download your desired version from [Spark Downloads](https://spark.apache.org/downloads.html) and extract it on your system.
 
 :::{important}
-Choose the version that is set in `dsgrid/setup.py` for `pyspark`. Major, minor, and patch versions must match.
+Choose the version that is set in `pyproject.toml` for `pyspark`. Major, minor, and patch versions must match.
 :::
 
 ```bash
 $ cd <your-preferred-base-directory>  # directions below assume $HOME
-$ wget https://dlcdn.apache.org/spark/spark-3.3.1/spark-3.3.1-bin-hadoop3.tgz
-$ tar -xzf spark-3.3.1-bin-hadoop3.tgz && rm spark-3.3.1-bin-hadoop3.tgz
+$ wget https://dlcdn.apache.org/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
+$ tar -xzf spark-4.0.0-bin-hadoop3.tgz && rm spark-4.0.0-bin-hadoop3.tgz
 ```
 
 The full instructions to create a cluster are at [Spark Standalone Mode](http://spark.apache.org/docs/latest/spark-standalone.html). The rest of this section documents the requirements for dsgrid.
@@ -202,13 +202,13 @@ The full instructions to create a cluster are at [Spark Standalone Mode](http://
 #### Set Environment Variables
 
 ```bash
-$ export SPARK_HOME=$HOME/spark-3.3.1-bin-hadoop3
+$ export SPARK_HOME=$HOME/spark-4.0.0-bin-hadoop3
 $ export PATH=$PATH:$SPARK_HOME/sbin
 ```
 
 Note that after doing this your system will have two versions of `pyspark`:
 - In your Python virtual environment where you installed dsgrid (because dsgrid installs pyspark)
-- In `$HOME/spark-3.3.1-bin-hadoop3/bin`
+- In `$HOME/spark-4.0.0-bin-hadoop3/bin`
 
 If you use a conda virtual environment, when that environment is activated, its `pyspark` will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.
 
@@ -261,7 +261,7 @@ $ stop-worker.sh && stop-master.sh
 
 ### Installing on HPC
 
-This section describes how you can run Spark jobs on any number of HPC compute nodes. The scripts and examples described here rely on the SLURM scheduling system and have been tested on NREL's Kestrel cluster.
+This section describes how you can run Spark jobs on any number of HPC compute nodes. The scripts and examples described here rely on the SLURM scheduling system and have been tested on NLR's Kestrel cluster.
 
 #### Install sparkctl
 

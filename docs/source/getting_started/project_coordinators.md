@@ -5,7 +5,7 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 ## Prerequisites
 
 - [Install dsgrid](installation) on your system, including Spark extras: `pip install "dsgrid-toolkit[spark]"`
-- Access to NREL HPC (most project coordination tasks involve large datasets)
+- Access to NLR HPC (most project coordination tasks involve large datasets)
 - See [How to Start a Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel) for cluster setup
 
 ## Workflow Overview

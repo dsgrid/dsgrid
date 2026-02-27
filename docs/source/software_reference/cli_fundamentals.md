@@ -169,7 +169,7 @@ $ dsgrid registry projects list
 $ dsgrid registry projects list --filter-config 'project_id=="StandardScenarios2021"'
 
 # Filter datasets by submitter
-$ dsgrid registry datasets list --filter-config 'submitter=="NREL"'
+$ dsgrid registry datasets list --filter-config 'submitter=="NLR"'
 ```
 
 ### Working with IDs

@@ -18,7 +18,7 @@ Dataset mappers create the dimension mappings that align a dataset's dimensions 
 
 ## When You Need Apache Spark
 
-Mapping validation and application can be computationally intensive for datasets with many records or fine-grained dimensions. If you are working with large datasets on NREL HPC:
+Mapping validation and application can be computationally intensive for datasets with many records or fine-grained dimensions. If you are working with large datasets on NLR HPC:
 
 - Install the Spark extras: `pip install "dsgrid-toolkit[spark]"`
 - See [How to Run dsgrid on Kestrel](../user_guide/how_tos/run_on_kestrel)

@@ -16,7 +16,7 @@ Specify missing associations in the `data_layout` section of your dataset config
 ```javascript
 data_layout: {
   table_format: "one_table",
-  value_format: { format_type: "stacked" },
+  value_format: "stacked",
   data_file: { path: "load_data.parquet" },
   missing_associations: [
     "missing_associations.parquet",
@@ -132,7 +132,7 @@ Add the `missing_associations` field to your `data_layout` pointing to the files
 ```javascript
 data_layout: {
   table_format: "one_table",
-  value_format: { format_type: "stacked" },
+  value_format: "stacked",
   data_file: { path: "load_data.parquet" },
   // Option 1: Use the all-inclusive Parquet file
   missing_associations: ["./my_dataset__missing_dimension_record_combinations.parquet"],

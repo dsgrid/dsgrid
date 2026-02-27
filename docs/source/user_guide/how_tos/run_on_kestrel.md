@@ -1,6 +1,6 @@
 # How to Run dsgrid on Kestrel
 
-This guide explains how to run dsgrid on NREL's Kestrel HPC system.
+This guide explains how to run dsgrid on NLR's Kestrel HPC system.
 
 ## Steps
 
@@ -23,10 +23,10 @@ Follow the installation instructions at [Installation](../../getting_started/ins
 Create a dsgrid runtime config file pointing to the shared registry:
 
 ```bash
-dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db -N standard-scenarios
+dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db
 ```
 
-This configures dsgrid to use the NREL shared registry database.
+This configures dsgrid to use the NLR shared registry database.
 
 ### 4. Start a Spark Cluster
 

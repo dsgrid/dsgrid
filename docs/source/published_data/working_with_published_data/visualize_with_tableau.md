@@ -8,7 +8,7 @@ This page describes various ways to connect Tableau to dsgrid data after you've 
 
 ## Install Tableau
 
-**For NREL employees:** Licenses are available through theSOURCE. Go to IT Service Portal → Service Catalog → search for Tableau, and submit a ticket to get `Tableau Creator` installed (IT will install `Tableau Desktop`).
+**For NLR employees:** Licenses are available through theSOURCE. Go to IT Service Portal → Service Catalog → search for Tableau, and submit a ticket to get `Tableau Creator` installed (IT will install `Tableau Desktop`).
 
 **For others:** Visit [Tableau's website](https://www.tableau.com/) to purchase or request a trial license.
 

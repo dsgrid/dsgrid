@@ -70,10 +70,8 @@ Add the relevant settings to your dataset.json5:
   use_project_geography_time_zone: true,
   data_layout: {
     table_format: "two_table",
-    value_format: {
-      format_type: "pivoted",
-      pivoted_dimension_type: "metric",
-    },
+    value_format: "pivoted",
+    pivoted_dimension_type: "metric",
     data_file: {
       path: "./load_data.parquet",
     },
@@ -124,8 +122,7 @@ In [1]: from dsgrid.dimension.base_models import DimensionType
    ...:
    ...: manager = RegistryManager.load(
    ...:     DatabaseConnection(
-   ...:         hostname="dsgrid-registry.hpc.nrel.gov",
-   ...:         database="standard-scenarios",
+   ...:         url="sqlite:////projects/dsgrid/standard-scenarios.db",
    ...:     )
    ...: )
    ...: project = manager.project_manager.load_project("dsgrid_conus_2022")
@@ -315,7 +312,7 @@ This command assumes that `dataset.json5` and `dimension_mappings.json5` are in 
 When running this command dsgrid will perform numerous validations in order to verify dataset consistency and that the project requirements are met. It may take up to an hour on an HPC compute node.
 
 ```bash
-spark-submit --master=spark://<master_hostname>::7077 $(which dsgrid-cli.py) registry \
+spark-submit --master=spark://<master_hostname>:7077 $(which dsgrid-cli.py) registry \
     projects \
     register-and-submit-dataset \
     --project-id dsgrid_conus_2022 \

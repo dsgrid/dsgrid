@@ -71,9 +71,9 @@ pip install "dsgrid-toolkit[spark]"
 
 ## Registry
 
-### NREL Shared Registry
+### NLR Shared Registry
 
-The current dsgrid registries are stored in per-project SQLite database files. All configuration information is stored in the database(s) and all dataset files are stored on the NREL HPC shared filesystem.
+The current dsgrid registries are stored in per-project SQLite database files. All configuration information is stored in the database(s) and all dataset files are stored on the NLR HPC shared filesystem.
 
 ### Standalone Registry
 
@@ -85,12 +85,12 @@ dsgrid create-registry --help
 
 ## Apache Spark
 
-- **NREL High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
+- **NLR High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
 - **Standalone resources**: [TODO: Provide link]
 
 ## Test Your Installation
 
-If you're running dsgrid at NREL and using the shared registry, you can test your installation with this command:
+If you're running dsgrid at NLR and using the shared registry, you can test your installation with this command:
 
 ```bash
 dsgrid -u sqlite:///<your-db-path> registry projects list
@@ -100,7 +100,7 @@ dsgrid -u sqlite:///<your-db-path> registry projects list
 
 Running `dsgrid config create` stores key information for working with dsgrid in a config file at `~/.dsgrid.json5`. Currently, dsgrid only supports offline mode, and the other key information to store is the registry URL. The parameters in the config file are the default values used by the command-line interface.
 
-The appropriate configuration for using the shared registry at NREL is:
+The appropriate configuration for using the shared registry at NLR is:
 
 ```bash
 dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db
@@ -114,11 +114,11 @@ Access from AWS is under development.
 <!--
 dsgrid uses Amazon Web Services (AWS) cloud. The dsgrid registry of datasets and configurations are stored on S3. dsgrid also uses EMR spark clusters for big data ETLs and queries.
 
-Currently, the dsgrid registry is only accessible through the internal NREL dsgrid sandbox account (`nrel-aws-dsgrid`). To get set up on the sandbox account, please reach out to the dsgrid team.
+Currently, the dsgrid registry is only accessible through the internal NLR dsgrid sandbox account (`nrel-aws-dsgrid`). To get set up on the sandbox account, please reach out to the dsgrid team.
 
 ### Setup sandbox account
 
-Once the NREL Stratus Cloud Team has set you up with a dsgrid sandbox account (`nrel-aws-dsgrid`), you will receive an email with your temporary password and instructions on how to setup your account. Follow the instructions in the email to complete the following:
+Once the NLR Stratus Cloud Team has set you up with a dsgrid sandbox account (`nrel-aws-dsgrid`), you will receive an email with your temporary password and instructions on how to setup your account. Follow the instructions in the email to complete the following:
 
 1. Log in and set up your password
 2. Set up Multi-Factor Authentication (MFA)

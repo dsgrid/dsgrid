@@ -22,7 +22,7 @@ To work with published data you will need:
 - **Tableau** with a Spark JDBC driver (for Tableau visualization), or
 - Any tool that can read **Parquet** files
 
-Access to NREL HPC is required for some datasets that are not yet available on [OEDI](https://data.openei.org/). Check the dataset catalog for access details.
+Access to NLR HPC is required for some datasets that are not yet available on [OEDI](https://data.openei.org/). Check the dataset catalog for access details.
 
 ## Next Steps
 

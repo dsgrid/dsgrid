@@ -25,10 +25,10 @@ You can also list all components at once:
 dsgrid registry list
 ```
 
-You can also browse different registries by specifying the database URL and name directly on the command line:
+You can also browse different registries by specifying the database URL directly on the command line:
 
 ```bash
-dsgrid -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios registry list
+dsgrid -u sqlite:////projects/dsgrid/standard-scenarios.db registry list
 ```
 
 ## Project Viewer

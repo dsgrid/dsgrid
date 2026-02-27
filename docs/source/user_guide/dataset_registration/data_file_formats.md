@@ -317,10 +317,8 @@ The `data_layout` section of a dataset configuration defines the data file locat
 ```javascript
 data_layout: {
   table_format: "two_table",       // or "one_table"
-  value_format: {
-    format_type: "pivoted",        // or "stacked"
-    pivoted_dimension_type: "metric",  // required if pivoted
-  },
+  value_format: "pivoted",         // or "stacked"
+  pivoted_dimension_type: "metric",  // required if value_format is "pivoted"
   data_file: {
     path: "load_data.parquet",
     columns: [                     // optional
@@ -348,6 +346,7 @@ data_layout: {
 
 - `table_format`: Defines the table structure: `"two_table"` or `"one_table"`.
 - `value_format`: Defines whether values are `"pivoted"` or `"stacked"`.
+- `pivoted_dimension_type`: The dimension type whose records are columns (required when `value_format` is `"pivoted"`).
 - `data_file`: Main data file configuration (required).
   - `path`: Path to the data file. Can be absolute or relative to the config file. You can also use the `--data-base-dir` CLI option to specify a different base directory for resolving relative paths.
   - `columns`: Optional list of column definitions for type overrides and renaming.
@@ -418,9 +417,7 @@ Example dataset configuration with column data types:
 ```javascript
 data_layout: {
   table_format: "one_table",
-  value_format: {
-    format_type: "stacked",
-  },
+  value_format: "stacked",
   data_file: {
     path: "load_data.csv",
     columns: [

@@ -14,7 +14,6 @@ from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir
 from dsgrid.cli.config import config
 from dsgrid.cli.download import download
-from dsgrid.cli.install_notebooks import install_notebooks
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
 from dsgrid.loggers import setup_logging, check_log_file_size, disable_console_logging
@@ -146,12 +145,12 @@ def create_registry(url: str, data_path: Path, overwrite: bool, data_store_type:
     """Create a new registry."""
     check_overwrite(data_path, overwrite)
     conn = DatabaseConnection(url=url)
-    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
+    mgr = RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
+    mgr.dispose()
 
 
 cli.add_command(config)
 cli.add_command(create_registry)
 cli.add_command(download)
-cli.add_command(install_notebooks)
 cli.add_command(query)
 cli.add_command(registry)

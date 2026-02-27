@@ -72,3 +72,6 @@ class DataStoreInterface(abc.ABC):
     @abc.abstractmethod
     def remove_tables(self, dataset_id: str, version: str) -> None:
         """Remove the data and lookup tables from the data store."""
+
+    def close(self) -> None:
+        """Close any open connections. Subclasses should override if needed."""

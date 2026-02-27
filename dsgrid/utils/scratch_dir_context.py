@@ -1,8 +1,10 @@
+import gc
 import logging
 import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from dsgrid.common import IS_WINDOWS
 from dsgrid.utils.files import delete_if_exists
 
 
@@ -52,9 +54,18 @@ class ScratchDirContext:
 
     def finalize(self) -> None:
         """Remove all tracked paths once use of them is complete."""
+        if IS_WINDOWS:
+            gc.collect()
         for path in self._paths:
-            delete_if_exists(path)
-            logger.info("Deleted temporary path %s", path)
+            try:
+                delete_if_exists(path)
+                logger.info("Deleted temporary path %s", path)
+            except PermissionError:
+                logger.warning(
+                    "Could not delete temporary path %s (file may still be locked). "
+                    "It can be cleaned up manually.",
+                    path,
+                )
 
     def __enter__(self):
         return self

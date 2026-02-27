@@ -31,6 +31,7 @@ from dsgrid.tests.make_us_data_registry import make_test_data_registry
 from dsgrid.tests.common import (
     STANDARD_SCENARIOS_PROJECT_REPO,
 )
+from dsgrid.registry.common import make_sqlite_url
 
 logger = logging.getLogger()
 
@@ -53,7 +54,7 @@ def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_dat
         base_dir,
         test_project_dir,
         include_datasets=False,
-        database_url=f"sqlite:///{base_dir}/registry.db",
+        database_url=make_sqlite_url(base_dir / "registry.db"),
     ) as manager:
         dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
         assert dataset_config_path.exists()
@@ -78,7 +79,7 @@ def setup_registry_single(tmp_path_factory, make_test_project_dir, make_test_dat
         base_dir,
         test_project_dir,
         include_datasets=False,
-        database_url=f"sqlite:///{base_dir}/registry.db",
+        database_url=make_sqlite_url(base_dir / "registry.db"),
     ) as manager:
         dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
         assert dataset_config_path.exists()

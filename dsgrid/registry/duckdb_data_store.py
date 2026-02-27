@@ -1,6 +1,7 @@
 import logging
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Self
+from typing import Generator, Literal, Self
 
 import duckdb
 from duckdb import DuckDBPyConnection
@@ -42,15 +43,15 @@ class DuckDbDataStore(DataStoreInterface):
     @classmethod
     def create(cls, base_path: Path) -> Self:
         base_path.mkdir(exist_ok=True)
-        store = cls(base_path)
         db_file = base_path / DATABASE_FILENAME
         if db_file.exists():
             msg = f"Database file {db_file} already exists. Cannot initialize DuckDB data store."
             raise FileExistsError(msg)
-        con = duckdb.connect(db_file)
-        con.sql(f"CREATE SCHEMA {SCHEMA_DATA}")
-        con.sql(f"CREATE SCHEMA {SCHEMA_LOOKUP_DATA}")
-        con.sql(f"CREATE SCHEMA {SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}")
+        store = cls(base_path)
+        with store._connect() as con:
+            con.sql(f"CREATE SCHEMA {SCHEMA_DATA}")
+            con.sql(f"CREATE SCHEMA {SCHEMA_LOOKUP_DATA}")
+            con.sql(f"CREATE SCHEMA {SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}")
         return store
 
     @classmethod
@@ -64,9 +65,9 @@ class DuckDbDataStore(DataStoreInterface):
         return cls(base_path)
 
     def read_table(self, dataset_id: str, version: str) -> DataFrame:
-        con = self._get_connection()
-        table_name = _make_table_full_name("data", dataset_id, version)
-        df = con.sql(f"SELECT * FROM {table_name}").to_df()
+        with self._connect() as con:
+            table_name = _make_table_full_name("data", dataset_id, version)
+            df = con.sql(f"SELECT * FROM {table_name}").to_df()
         return get_spark_session().createDataFrame(df)
 
     def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
@@ -75,9 +76,9 @@ class DuckDbDataStore(DataStoreInterface):
         self._replace_table(df, schema, short_name)
 
     def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
-        con = self._get_connection()
-        table_name = _make_table_full_name("lookup", dataset_id, version)
-        df = con.sql(f"SELECT * FROM {table_name}").to_df()
+        with self._connect() as con:
+            table_name = _make_table_full_name("lookup", dataset_id, version)
+            df = con.sql(f"SELECT * FROM {table_name}").to_df()
         return get_spark_session().createDataFrame(df)
 
     def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
@@ -88,56 +89,56 @@ class DuckDbDataStore(DataStoreInterface):
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
     ) -> dict[str, DataFrame]:
-        con = self._get_connection()
-        dfs: dict[str, DataFrame] = {}
-        names = self._list_dim_associations_table_names(dataset_id, version)
-        if not names:
+        with self._connect() as con:
+            dfs: dict[str, DataFrame] = {}
+            names = self._list_dim_associations_table_names(dataset_id, version)
+            if not names:
+                return dfs
+            for name in names:
+                full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
+                df = con.sql(f"SELECT * FROM {full_name}").to_df()
+                dfs[name] = get_spark_session().createDataFrame(df)
             return dfs
-        for name in names:
-            full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
-            df = con.sql(f"SELECT * FROM {full_name}").to_df()
-            dfs[name] = get_spark_session().createDataFrame(df)
-        return dfs
 
     def write_table(
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
-        con = self._get_connection()
-        table_name = _make_table_full_name("data", dataset_id, version)
-        if overwrite:
-            con.sql(f"DROP TABLE IF EXISTS {table_name}")
-        _create_table_from_dataframe(con, df, table_name)
-
-    def write_lookup_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
-    ) -> None:
-        con = self._get_connection()
-        table_name = _make_table_full_name("lookup", dataset_id, version)
-        if overwrite:
-            con.sql(f"DROP TABLE IF EXISTS {table_name}")
-        _create_table_from_dataframe(con, df, table_name)
-
-    def write_missing_associations_tables(
-        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
-    ) -> None:
-        con = self._get_connection()
-        for tag, df in dfs.items():
-            table_name = _make_table_full_name(
-                "missing_dimension_associations", dataset_id, version
-            )
-            table_name = f"{table_name}__{tag}"
+        with self._connect() as con:
+            table_name = _make_table_full_name("data", dataset_id, version)
             if overwrite:
                 con.sql(f"DROP TABLE IF EXISTS {table_name}")
             _create_table_from_dataframe(con, df, table_name)
 
+    def write_lookup_table(
+        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        with self._connect() as con:
+            table_name = _make_table_full_name("lookup", dataset_id, version)
+            if overwrite:
+                con.sql(f"DROP TABLE IF EXISTS {table_name}")
+            _create_table_from_dataframe(con, df, table_name)
+
+    def write_missing_associations_tables(
+        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        with self._connect() as con:
+            for tag, df in dfs.items():
+                table_name = _make_table_full_name(
+                    "missing_dimension_associations", dataset_id, version
+                )
+                table_name = f"{table_name}__{tag}"
+                if overwrite:
+                    con.sql(f"DROP TABLE IF EXISTS {table_name}")
+                _create_table_from_dataframe(con, df, table_name)
+
     def remove_tables(self, dataset_id: str, version: str) -> None:
-        con = self._get_connection()
-        for table_type in ("data", "lookup"):
-            table_name = _make_table_full_name(table_type, dataset_id, version)
-            con.sql(f"DROP TABLE IF EXISTS {table_name}")
-        for name in self._list_dim_associations_table_names(dataset_id, version):
-            full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
-            con.sql(f"DROP TABLE IF EXISTS {full_name}")
+        with self._connect() as con:
+            for table_type in ("data", "lookup"):
+                table_name = _make_table_full_name(table_type, dataset_id, version)
+                con.sql(f"DROP TABLE IF EXISTS {table_name}")
+            for name in self._list_dim_associations_table_names(dataset_id, version):
+                full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
+                con.sql(f"DROP TABLE IF EXISTS {full_name}")
 
     @property
     def _data_dir(self) -> Path:
@@ -147,8 +148,14 @@ class DuckDbDataStore(DataStoreInterface):
     def _db_file(self) -> Path:
         return self.base_path / DATABASE_FILENAME
 
-    def _get_connection(self) -> duckdb.DuckDBPyConnection:
-        return duckdb.connect(self._db_file)
+    @contextmanager
+    def _connect(self) -> Generator[DuckDBPyConnection, None, None]:
+        """Yield a DuckDB connection that is guaranteed to be closed."""
+        con = duckdb.connect(self._db_file)
+        try:
+            yield con
+        finally:
+            con.close()
 
     def _has_table(self, con: DuckDBPyConnection, schema: str, table_name: str) -> bool:
         return (
@@ -163,25 +170,26 @@ class DuckDbDataStore(DataStoreInterface):
         )
 
     def _replace_table(self, df: DataFrame, schema: str, table_name: str) -> None:
-        con = self._get_connection()
-        if not self._has_table(con, schema, table_name):
-            _create_table_from_dataframe(con, df, table_name)
-            return
+        with self._connect() as con:
+            full_name = f"{schema}.{table_name}"
+            if not self._has_table(con, schema, table_name):
+                _create_table_from_dataframe(con, df, full_name)
+                return
 
-        tmp_name = f"{schema}.{table_name}_tmp"
-        _create_table_from_dataframe(con, df, tmp_name)
-        con.sql(f"DROP TABLE {table_name}")
-        con.sql(f"ALTER TABLE {tmp_name} RENAME TO {table_name}")
+            tmp_name = f"{full_name}_tmp"
+            _create_table_from_dataframe(con, df, tmp_name)
+            con.sql(f"DROP TABLE {full_name}")
+            con.sql(f"ALTER TABLE {tmp_name} RENAME TO {full_name}")
 
     def _list_dim_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
-        con = self._get_connection()
-        short_name = _make_table_short_name(dataset_id, version)
-        query = f"""
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = '{TABLE_TYPE_TO_SCHEMA["missing_dimension_associations"]}' AND table_name LIKE '%{short_name}%'
-        """
-        return [row[0] for row in con.sql(query).fetchall()]
+        with self._connect() as con:
+            short_name = _make_table_short_name(dataset_id, version)
+            query = f"""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = '{TABLE_TYPE_TO_SCHEMA["missing_dimension_associations"]}' AND table_name LIKE '%{short_name}%'
+            """
+            return [row[0] for row in con.sql(query).fetchall()]
 
 
 def _create_table_from_dataframe(

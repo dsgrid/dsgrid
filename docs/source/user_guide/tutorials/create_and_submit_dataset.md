@@ -118,12 +118,10 @@ If you prefer working in an interactive Python session, here is example code to 
 ```python
 In [1]: from dsgrid.dimension.base_models import DimensionType
    ...: from dsgrid.registry.registry_manager import RegistryManager
-   ...: from dsgrid.registry.registry_database import DatabaseConnection
+   ...: from dsgrid.registry.common import DatabaseConnection
    ...:
    ...: manager = RegistryManager.load(
-   ...:     DatabaseConnection(
-   ...:         url="sqlite:////projects/dsgrid/standard-scenarios.db",
-   ...:     )
+   ...:     DatabaseConnection.from_file("/projects/dsgrid/standard-scenarios.db")
    ...: )
    ...: project = manager.project_manager.load_project("dsgrid_conus_2022")
    ...: project.config.get_dimension_records("transportation_end_uses").show()

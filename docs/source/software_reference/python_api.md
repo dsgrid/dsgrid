@@ -9,7 +9,7 @@ key classes for each workflow.
 ## Connecting to a Registry
 
 ```{eval-rst}
-.. autopydantic_model:: dsgrid.registry.registry_database.DatabaseConnection
+.. autopydantic_model:: dsgrid.registry.common.DatabaseConnection
 ```
 
 ```{eval-rst}
@@ -22,9 +22,9 @@ key classes for each workflow.
 
 ```python
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 
-conn = DatabaseConnection(url="sqlite:///path/to/registry.db")
+conn = DatabaseConnection.from_file("path/to/registry.db")
 manager = RegistryManager.load(conn, offline_mode=True)
 ```
 
@@ -33,9 +33,9 @@ manager = RegistryManager.load(conn, offline_mode=True)
 ```python
 from pathlib import Path
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 
-conn = DatabaseConnection(url="sqlite:///my_registry.db")
+conn = DatabaseConnection.from_file("my_registry.db")
 manager = RegistryManager.create(
     conn,
     data_path=Path("registry_data"),

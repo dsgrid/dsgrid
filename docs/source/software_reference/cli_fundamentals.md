@@ -52,8 +52,8 @@ To demonstrate the value, let's suppose that you want to see the commands availa
 ```bash
 $ dsgrid <tab>
 config             -- Config commands
+create-registry    -- Create a new registry.
 download           -- Download a dataset.
-install-notebooks  -- Install dsgrid notebooks to a local path.
 query              -- Query group commands
 registry           -- Manage a registry.
 ```
@@ -100,16 +100,15 @@ All dsgrid commands require connecting to the database. We recommend that you us
 
 ### dsgrid RC File
 
-dsgrid allows you to store common configuration settings in a config file in your home directory. Here's how to create it with a database on the local computer. Change the hostname and database name as needed.
+dsgrid allows you to store common configuration settings in a config file in your home directory. Here's how to create it with a database on the local computer.
 
 ```bash
-$ dsgrid config create sqlite:///<your-db-path> -N standard-scenarios
+$ dsgrid config create sqlite:///<your-db-path>
 Wrote dsgrid config to /Users/username/.dsgrid.json5
 ```
 
 This creates a configuration file that stores:
 - Database connection URL
-- Named connection profiles
 - Default settings
 
 **Example `.dsgrid.json5` file:**

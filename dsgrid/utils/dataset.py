@@ -421,7 +421,7 @@ def localize_time_zone_with_chronify_duckdb(
 ) -> DataFrame:
     """Create a single time zone-localized table with chronify and DuckDB.
     All operations are performed in memory.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
 
@@ -447,7 +447,8 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and DuckDB.
     All operations are performed in memory.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
+    the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_in_memory_db()
@@ -506,7 +507,10 @@ def convert_time_zone_with_chronify_spark_hive(
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark and a Hive Metastore."""
+    """Create a single time zone-converted table with chronify and Spark and a Hive Metastore.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps with the specified time zone as a new column.
+    """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     with store.engine.begin() as conn:
@@ -535,6 +539,8 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps of the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -562,7 +568,9 @@ def localize_time_zone_with_chronify_spark_hive(
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-localized table with chronify and Spark and a Hive Metastore."""
+    """Create a single time zone-localized table with chronify and Spark and a Hive Metastore.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
+    """
 
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -591,6 +599,8 @@ def localize_time_zone_by_column_with_chronify_spark_hive(
 ) -> DataFrame:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
+    the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -647,7 +657,10 @@ def convert_time_zone_with_chronify_spark_path(
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark using the local filesystem."""
+    """Create a single time zone-converted table with chronify and Spark using the local filesystem.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps with the specified time zone as a new column.
+    """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
@@ -672,6 +685,8 @@ def convert_time_zone_by_column_with_chronify_spark_path(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
+    Time zone conversion converts from tz-aware timestamps to
+    tz-naive timestamps of the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -695,7 +710,9 @@ def localize_time_zone_with_chronify_spark_path(
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Create a single time zone-localized table with chronify and Spark using the local filesystem."""
+    """Create a single time zone-localized table with chronify and Spark using the local filesystem.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
+    """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
@@ -719,6 +736,8 @@ def localize_time_zone_by_column_with_chronify_spark_path(
 ) -> DataFrame:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
+    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
+    the time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -991,7 +1010,12 @@ def localize_timestamps_if_necessary(
     config: DatasetConfig,
     scratch_dir_context: ScratchDirContext,
 ) -> tuple[DataFrame, bool]:
-    """Localize tz-naive timestamps to time zone(s) in the dataframe if necessary using Chronify."""
+    """Localize tz-naive timestamps to time zone(s) in the dataframe if necessary using Chronify.
+    Timestamps will be localized if the time dimension has a localization plan.
+    The localization plan will specify whether to localize to a single time zone
+    or multiple time zones based on a time zone column for tz-naive timestamps.
+    If the time dimension doesn't have a localization plan, the dataframe will be returned unchanged.
+    """
     time_dim = config.get_dimension(DimensionType.TIME)
     if not isinstance(time_dim, DateTimeDimensionConfig):
         msg = f"Only DateTimeDimensionConfig allowed for time zone localization. {time_dim.__class__.__name__}"

@@ -239,7 +239,7 @@ class DimensionModel(DimensionBaseModel):
 class TimeFormatDateTimeTZModel(DSGBaseModel):
     """Format of timestamps in a dataset is timezone-aware datetime."""
 
-    dtype: Literal["TIMESTAMP_TZ"] = "TIMESTAMP_TZ"
+    dtype: Literal["timestamp_tz"] = "timestamp_tz"
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
@@ -251,10 +251,9 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
 
 
 class TimeFormatDateTimeNTZModel(DSGBaseModel):
-    """Format of timestamps in a dataset is timezone-naive datetime,
-    timestamps can be localized to time zone(s)."""
+    """Format of timestamps in a dataset is timezone-naive datetime"""
 
-    dtype: Literal["TIMESTAMP_NTZ"] = "TIMESTAMP_NTZ"
+    dtype: Literal["timestamp_ntz"] = "timestamp_ntz"
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
@@ -468,7 +467,12 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
 
 
 class LocalTimeMultipleTimeZones(DSGBaseModel):
-    """For each geography, data has the same set of timestamps when interpreted in local standard time.
+    """Across geographies, timestamps cover the same interval of local time,
+    e.g., all of 2018 as experienced locally, in clock time.
+    This means, for example, that all data would have the same set of timestamps
+    if timestamps are first interpreted in geography-specific local standard time
+    and are then made timezone unaware.
+
     data table must contain TIME_ZONE_COLUMN column with IANA time zones for each record.
 
     E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
@@ -477,8 +481,8 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     """
 
     format_type: Literal[
-        TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME
-    ] = TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME
+        TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
+    ] = TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
     time_zones: list[str] = Field(
         title="time_zones",
         description="List of unique IANA time zones in the dataset. Does not allow 'None' as a time zone.",
@@ -654,7 +658,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         return _check_time_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
-        if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME:
+        if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME:
             return True
         return False
 

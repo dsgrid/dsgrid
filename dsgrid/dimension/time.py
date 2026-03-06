@@ -27,7 +27,7 @@ class TimeZoneFormat(str, Enum):
     """Defines the time format of the datetime config model"""
 
     ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"
-    ALIGNED_IN_LOCAL_STD_TIME = "aligned_in_local_std_time"
+    ALIGNED_IN_STD_CLOCK_TIME = "aligned_in_std_clock_time"
     LOCAL_AS_STRINGS = "local_as_strings"
 
     @classmethod
@@ -35,11 +35,11 @@ class TimeZoneFormat(str, Enum):
         """Provide backward-compatible handling for legacy enum values.
 
         The value ``"aligned_in_clock_time"`` was used in older configurations and
-        has since been renamed to ``"aligned_in_local_std_time"``. Map the legacy
+        has since been renamed to ``"aligned_in_std_clock_time"``. Map the legacy
         value to the new enum member so that existing configs continue to work.
         """
         if value == "aligned_in_clock_time":
-            return cls.ALIGNED_IN_LOCAL_STD_TIME
+            return cls.ALIGNED_IN_STD_CLOCK_TIME
         return None
 
 

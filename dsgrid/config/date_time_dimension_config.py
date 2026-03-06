@@ -46,7 +46,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     measurement_type=self._model.measurement_type,
                     interval_type=self._model.time_interval_type,
                 )
-            case TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME:
+            case TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME:
                 return chronify.DatetimeRangeWithTZColumn(
                     dtype=col_dtype,
                     time_column=time_cols[0],
@@ -114,8 +114,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return self.model.time_interval_type
 
     def get_localization_plan(self) -> str | None:
-        """Return a plan for localizing TIMESTAMP_NTZ datetime data."""
-        if self.model.column_format.dtype == "TIMESTAMP_TZ":
+        """Return a plan for localizing timestamp_ntz datetime data."""
+        if self.model.column_format.dtype == "timestamp_tz":
             return None
 
         tz_aware_post_reformat = len(self.get_time_zones()) > 0
@@ -124,9 +124,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 return "localize_to_single_tz"
             case (TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME, False):
                 return None
-            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, True):
+            case (TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME, True):
                 return "localize_to_multi_tz"
-            case (TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME, False):
+            case (TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME, False):
                 return None
 
             case _:
@@ -138,9 +138,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def _get_chronify_dtype(self) -> chronify.TimeDataType:
         match self.model.column_format.dtype:
-            case "TIMESTAMP_NTZ":
+            case "timestamp_ntz":
                 return chronify.TimeDataType.TIMESTAMP_NTZ
-            case "TIMESTAMP_TZ":
+            case "timestamp_tz":
                 return chronify.TimeDataType.TIMESTAMP_TZ
             case _:
                 msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
@@ -148,7 +148,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def _get_chronify_start_time(self) -> pd.Timestamp:
         """Modify start time for chronify depending on localization plan.
-        Modification is necessary only for TIMESTAMP_NTZ data localized to a single time zone.
+        Modification is necessary only for timestamp_ntz data localized to a single time zone.
         because of the way self.get_start_times() works.
         Returns:
             pd.Timestamp: start time for chronify
@@ -158,7 +158,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         start_time = start_times[0]
 
         if self.get_localization_plan() == "localize_to_single_tz":
-            # dtype is TIMESTAMP_NTZ, so drop tzinfo
+            # dtype is timestamp_ntz, so drop tzinfo
             return pd.Timestamp(start_time.replace(tzinfo=None))
         return pd.Timestamp(start_time)
 

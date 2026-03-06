@@ -2,7 +2,7 @@
 
 Focus:
 - Build timestamp string/SQL from `TimeFormatInPartsModel`.
-- Parse numeric and string UTC offsets into `TIMESTAMP_TZ`.
+- Parse numeric and string UTC offsets into `timestamp_tz`.
 - Validate DuckDB UTC rendering and Spark parity (conditional).
 
 Localization call-order tests have been moved to
@@ -72,7 +72,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
     # Verify new column format is timezone-aware
-    assert new_col_format.dtype == "TIMESTAMP_TZ"
+    assert new_col_format.dtype == "timestamp_tz"
     assert new_col_format.time_column == TIME_COLUMN
 
     # Cast timestamp back to string to verify absolute instants.
@@ -120,7 +120,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
-    assert new_col_format.dtype == "TIMESTAMP_TZ"
+    assert new_col_format.dtype == "timestamp_tz"
     check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS VARCHAR) AS ts_str"])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
@@ -163,7 +163,7 @@ def test_offset_parsing_in_parts_backend_agnostic():
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
-    assert new_col_format.dtype == "TIMESTAMP_TZ"
+    assert new_col_format.dtype == "timestamp_tz"
     check_df = select_expr(out_df, [f"CAST({TIME_COLUMN} AS STRING) AS ts_str"])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]

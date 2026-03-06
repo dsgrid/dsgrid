@@ -610,7 +610,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
             ]
             timestamp_data_type = (
-                "TIMESTAMP_TZ" if new_col_format.dtype == "TIMESTAMP_TZ" else "TIMESTAMP_NTZ"
+                "timestamp_tz" if new_col_format.dtype == "timestamp_tz" else "timestamp_ntz"
             )
             updated_columns.append(Column(name=TIME_COLUMN, data_type=timestamp_data_type))
             config.model.data_layout.data_file.columns = updated_columns
@@ -645,6 +645,17 @@ class DatasetRegistryManager(RegistryManagerBase):
         # update time_dim
         time_column = time_dim.model.column_format.time_column
         time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=time_column)
+
+        # update data_file columns schema, if present, to reflect TIMESTAMP_TZ
+        data_file = config.model.data_layout.data_file
+        if data_file.columns is not None:
+            updated_columns: list[Column] = []
+            for col in data_file.columns:
+                if col.name == time_column:
+                    updated_columns.append(Column(name=time_column, data_type="TIMESTAMP_TZ"))
+                else:
+                    updated_columns.append(col)
+            data_file.columns = updated_columns
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None

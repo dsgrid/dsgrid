@@ -1,8 +1,8 @@
 """Tests for `localize_timestamps_if_necessary` pathways.
 
 Covers:
-- No-op when timestamps are already `TIMESTAMP_TZ`.
-- Single time zone localization for `TIMESTAMP_NTZ`.
+- No-op when timestamps are already `timestamp_tz`.
+- Single time zone localization for `timestamp_ntz`.
 - Multi time zone localization via `time_zone` column (adds if missing).
 - Backend routing: DuckDB, Spark+Hive Metastore, Spark+Path.
 - Edge cases: multiple value columns (first is used), NTZ with no time zone
@@ -114,7 +114,7 @@ def make_datetime_config_multi_tz_ntz(time_zones=["Etc/GMT+5", "Etc/GMT+8"]):
         class_name="Time",
         column_format=TimeFormatDateTimeNTZModel(),
         time_zone_format=LocalTimeMultipleTimeZones(
-            format_type=TimeZoneFormat.ALIGNED_IN_LOCAL_STD_TIME,
+            format_type=TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME,
             time_zones=time_zones,
         ),
         measurement_type=MeasurementType.TOTAL,
@@ -433,7 +433,7 @@ def test_invalid_time_dimension_raises():
 
 
 def test_ntz_no_time_zone_is_noop(monkeypatch):
-    # TIMESTAMP_NTZ with aligned format and None time_zone should not localize
+    # timestamp_ntz with aligned format and None time_zone should not localize
     time_dim = make_datetime_config_single_aligned_no_tz_ntz()
     config = DummyDatasetConfig(time_dim)
 

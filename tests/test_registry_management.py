@@ -831,7 +831,7 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
                 "test register with data-base-dir",
                 "-D",
                 str(data_base_dir),
-                "-M",
+                "-A",
                 str(data_base_dir),
             ],
         )
@@ -918,7 +918,7 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
                 "test register-and-submit with data-base-dir",
                 "-D",
                 str(data_base_dir),
-                "-M",
+                "-A",
                 str(data_base_dir),
             ],
         )

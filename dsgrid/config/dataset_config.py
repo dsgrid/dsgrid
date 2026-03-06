@@ -48,6 +48,11 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.json",
 )
 ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILENAMES
+ALLOWED_EXPECTED_DIMENSION_ASSOCIATIONS_FILENAMES = (
+    "expected_associations.csv",
+    "expected_associations.parquet",
+)
+EXPECTED_ASSOCIATIONS_DIR_NAME = "expected_associations"
 ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES = (
     "missing_associations.csv",
     "missing_associations.parquet",
@@ -208,6 +213,15 @@ class UserDataLayout(DSGBaseModel):
         default=None,
         title="lookup_data_file",
         description="Defines the lookup data file. Required if the table format is 'two_table'.",
+    )
+    expected_associations: list[str] = Field(
+        default=[],
+        title="expected_associations",
+        description="List of paths to expected associations files (e.g., "
+        "expected_associations.parquet) or directories of files containing expected combinations "
+        "by dimension type (e.g., geography__subsector.csv, subsector__metric.csv). "
+        "When provided, only these dimension combinations are required to be present in the "
+        "data, rather than the full cross-join of all dimension records.",
     )
     missing_associations: list[str] = Field(
         default=[],
@@ -631,6 +645,34 @@ def make_unvalidated_dataset_config(
 class DatasetConfig(ConfigBase):
     """Provides an interface to a DatasetConfigModel."""
 
+    @staticmethod
+    def _resolve_path(
+        raw_path: str,
+        base_dir: Path | None,
+        config_file_parent: Path,
+    ) -> Path:
+        """Resolve a possibly-relative path against a base directory.
+
+        Parameters
+        ----------
+        raw_path
+            Path string from the config (may be relative or absolute).
+        base_dir
+            If set and the path is relative, resolve against this directory.
+        config_file_parent
+            Fallback directory when *base_dir* is None.
+
+        Returns
+        -------
+        Path
+            Resolved absolute path.
+        """
+        path = Path(raw_path)
+        if not path.is_absolute():
+            parent = base_dir if base_dir is not None else config_file_parent
+            path = (parent / path).resolve()
+        return path
+
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}  # ConfigKey to DimensionConfig
@@ -652,7 +694,7 @@ class DatasetConfig(ConfigBase):
         cls,
         config_file: Path,
         data_base_dir: Path | None = None,
-        missing_associations_base_dir: Path | None = None,
+        associations_base_dir: Path | None = None,
     ) -> "DatasetConfig":
         """Load a dataset config from a user-provided config file.
 
@@ -666,9 +708,10 @@ class DatasetConfig(ConfigBase):
         data_base_dir : Path | None, optional
             Base directory for data files. If set and data file paths are relative,
             prepend them with this path instead of using the config file's parent directory.
-        missing_associations_base_dir : Path | None, optional
-            Base directory for missing associations files. If set and paths are relative,
-            prepend them with this path instead of using the config file's parent directory.
+        associations_base_dir : Path | None, optional
+            Base directory for missing/expected associations files. If set and paths are
+            relative, prepend them with this path instead of using the config file's
+            parent directory.
 
         Returns
         -------
@@ -694,12 +737,9 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidParameter(msg)
 
         # Resolve data file path
-        data_path = Path(user_layout.data_file.path)
-        if not data_path.is_absolute():
-            if data_base_dir is not None:
-                data_path = (data_base_dir / data_path).resolve()
-            else:
-                data_path = (config_file.parent / data_path).resolve()
+        data_path = cls._resolve_path(
+            user_layout.data_file.path, data_base_dir, config_file.parent
+        )
         if str(data_path).startswith("s3://"):
             msg = "Registering a dataset from an S3 path is not supported."
             raise DSGInvalidParameter(msg)
@@ -714,28 +754,25 @@ class DatasetConfig(ConfigBase):
             if user_layout.lookup_data_file is None:
                 msg = "Two-table format requires lookup_data_file in data_layout"
                 raise DSGInvalidParameter(msg)
-            lookup_path = Path(user_layout.lookup_data_file.path)
-            if not lookup_path.is_absolute():
-                if data_base_dir is not None:
-                    lookup_path = (data_base_dir / lookup_path).resolve()
-                else:
-                    lookup_path = (config_file.parent / lookup_path).resolve()
+            lookup_path = cls._resolve_path(
+                user_layout.lookup_data_file.path, data_base_dir, config_file.parent
+            )
             if not lookup_path.exists():
                 msg = f"Lookup data file does not exist: {lookup_path}"
                 raise DSGInvalidParameter(msg)
             user_layout.lookup_data_file.path = str(lookup_path)
 
+        # Resolve expected associations paths
+        user_layout.expected_associations = [
+            str(cls._resolve_path(p, associations_base_dir, config_file.parent))
+            for p in user_layout.expected_associations
+        ]
+
         # Resolve missing associations paths
-        resolved_missing_paths: list[str] = []
-        for missing_assoc in user_layout.missing_associations:
-            missing_path = Path(missing_assoc)
-            if not missing_path.is_absolute():
-                if missing_associations_base_dir is not None:
-                    missing_path = (missing_associations_base_dir / missing_path).resolve()
-                else:
-                    missing_path = (config_file.parent / missing_path).resolve()
-            resolved_missing_paths.append(str(missing_path))
-        user_layout.missing_associations = resolved_missing_paths
+        user_layout.missing_associations = [
+            str(cls._resolve_path(p, associations_base_dir, config_file.parent))
+            for p in user_layout.missing_associations
+        ]
 
         return config
 
@@ -757,6 +794,13 @@ class DatasetConfig(ConfigBase):
         if self.model.data_layout is not None:
             return self.model.data_layout.lookup_data_file
         return None
+
+    @property
+    def expected_associations_paths(self) -> list[Path]:
+        """Return the list of expected associations paths if available."""
+        if self.model.data_layout is not None:
+            return [Path(p) for p in self.model.data_layout.expected_associations]
+        return []
 
     @property
     def missing_associations_paths(self) -> list[Path]:

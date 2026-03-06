@@ -867,11 +867,11 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "prepend them with this path.",
 )
 @click.option(
-    "-M",
-    "--missing-associations-base-dir",
+    "-A",
+    "--associations-base-dir",
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Base directory for missing associations files. If set and missing associations "
+    help="Base directory for missing/expected associations files. If set and associations "
     "paths are relative, prepend them with this path.",
 )
 @click.pass_obj
@@ -886,7 +886,7 @@ def register_and_submit_dataset(
     project_id,
     log_message,
     data_base_dir,
-    missing_associations_base_dir,
+    associations_base_dir,
 ):
     """Register a dataset and then submit it to a dsgrid project.
 
@@ -906,7 +906,7 @@ def register_and_submit_dataset(
         dimension_mapping_references_file=dimension_mapping_references_file,
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
         data_base_dir=data_base_dir,
-        missing_associations_base_dir=missing_associations_base_dir,
+        associations_base_dir=associations_base_dir,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1463,11 +1463,11 @@ $ dsgrid registry datasets register dataset.json5 --data-base-dir /path/to/data 
     "prepend them with this path.",
 )
 @click.option(
-    "-M",
-    "--missing-associations-base-dir",
+    "-A",
+    "--associations-base-dir",
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Base directory for missing associations files. If set and missing associations "
+    help="Base directory for missing/expected associations files. If set and associations "
     "paths are relative, prepend them with this path.",
 )
 @click.pass_obj
@@ -1478,7 +1478,7 @@ def register_dataset(
     dataset_config_file: Path,
     log_message: str,
     data_base_dir: Path | None,
-    missing_associations_base_dir: Path | None,
+    associations_base_dir: Path | None,
 ):
     """Register a new dataset with the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
@@ -1496,7 +1496,7 @@ def register_dataset(
         submitter,
         log_message,
         data_base_dir=data_base_dir,
-        missing_associations_base_dir=missing_associations_base_dir,
+        associations_base_dir=associations_base_dir,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1794,11 +1794,11 @@ $ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f7
     "prepend them with this path.",
 )
 @click.option(
-    "-M",
-    "--missing-associations-base-dir",
+    "-A",
+    "--associations-base-dir",
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Base directory for missing associations files. If set and missing associations "
+    help="Base directory for missing/expected associations files. If set and associations "
     "paths are relative, prepend them with this path.",
 )
 @click.option(
@@ -1825,7 +1825,7 @@ def bulk_register_cli(
     registry_manager: RegistryManager,
     registration_file: Path,
     data_base_dir: Path | None,
-    missing_associations_base_dir: Path | None,
+    associations_base_dir: Path | None,
     repo_base_dir: Path | None,
     journal_file: Path | None,
 ):
@@ -1844,7 +1844,7 @@ def bulk_register_cli(
         registry_manager,
         registration_file,
         data_base_dir=data_base_dir,
-        missing_associations_base_dir=missing_associations_base_dir,
+        associations_base_dir=associations_base_dir,
         repo_base_dir=repo_base_dir,
         journal_file=journal_file,
     )

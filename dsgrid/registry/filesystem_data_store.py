@@ -11,6 +11,7 @@ from dsgrid.utils.spark import read_dataframe, write_dataframe, write_dataframe_
 
 TABLE_FILENAME = "table.parquet"
 LOOKUP_TABLE_FILENAME = "lookup_table.parquet"
+EXPECTED_ASSOCIATIONS_TABLE_FILENAME = "expected_associations_table.parquet"
 MISSING_ASSOCIATIONS_TABLE_FILENAME = "missing_associations_table.parquet"
 # We used to write these filenames. Keep support for old registries, for now.
 ALT_TABLE_FILENAME = "load_data.parquet"
@@ -64,6 +65,14 @@ class FilesystemDataStore(DataStoreInterface):
             return
         self._replace_table(df, filename)
 
+    def read_expected_associations_tables(
+        self, dataset_id: str, version: str
+    ) -> dict[str, DataFrame]:
+        assoc_dir = self._expected_associations_dir(dataset_id, version)
+        if not assoc_dir.exists():
+            return {}
+        return {x.stem: read_dataframe(x) for x in assoc_dir.iterdir()}
+
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
     ) -> dict[str, DataFrame]:
@@ -86,6 +95,14 @@ class FilesystemDataStore(DataStoreInterface):
         filename.parent.mkdir(parents=True, exist_ok=True)
         write_dataframe(coalesce(df, 1), filename, overwrite=overwrite)
 
+    def write_expected_associations_tables(
+        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        for name, df in dfs.items():
+            filename = self._expected_associations_table_filename(name, dataset_id, version)
+            filename.parent.mkdir(parents=True, exist_ok=True)
+            write_dataframe_and_auto_partition(df, filename)
+
     def write_missing_associations_tables(
         self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
@@ -106,6 +123,14 @@ class FilesystemDataStore(DataStoreInterface):
 
     def _lookup_table_filename(self, dataset_id: str, version: str) -> Path:
         return self._data_dir / dataset_id / version / LOOKUP_TABLE_FILENAME
+
+    def _expected_associations_dir(self, dataset_id: str, version: str) -> Path:
+        return self._data_dir / dataset_id / version / "expected_associations"
+
+    def _expected_associations_table_filename(
+        self, name: str, dataset_id: str, version: str
+    ) -> Path:
+        return self._expected_associations_dir(dataset_id, version) / f"{name}.parquet"
 
     def _missing_associations_dir(self, dataset_id: str, version: str) -> Path:
         return self._data_dir / dataset_id / version / "missing_associations"

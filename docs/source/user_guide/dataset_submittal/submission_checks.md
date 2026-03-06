@@ -88,9 +88,11 @@ project requires.
 
 1. **Build the project's expected dimension table** — dsgrid computes the
    cross-join of the project's base dimension records (excluding time) for the
-   dimension types relevant to this dataset. Any missing-dimension-association
-   tables declared for the dataset are subtracted from this expected set (after
-   applying the same mappings).
+   dimension types relevant to this dataset, filtered by the project's
+   `required_dimensions` configuration for the dataset.
+   Any missing-dimension-association tables declared for the dataset at
+   registration time are then subtracted from this expected set (after applying
+   the same dimension mappings).
 
 2. **Build the mapped dataset dimension table** — dsgrid takes the dataset's
    actual dimension combinations (excluding time), applies the registered
@@ -135,9 +137,14 @@ logged patterns to identify which specific combinations are missing.
 
 Missing-dimension-association tables that were declared at registration time
 are automatically accounted for during the submission check. dsgrid applies
-the same dimension mappings to the missing-association tables before
-subtracting them from the expected project table. You do not need to declare
-them again.
+the same dimension mappings to these tables before subtracting them from the
+expected project table. You do not need to declare them again.
+
+```{note}
+`expected_associations` are a registration-time feature only. At submission
+time, the project's `required_dimensions` configuration controls which
+dimension combinations the dataset must cover.
+```
 
 ### Skipping this check
 

@@ -205,6 +205,7 @@ User-defined data layout for dataset registration.
 |------|------|---------|-------------|
 | `data_file` | [FileSchema](dataset_model.md#fileschema) | *(required)* | Defines the data file |
 | `lookup_data_file` | [FileSchema](dataset_model.md#fileschema) \| None | `None` | Defines the lookup data file. Required if the table format is 'two_table'. |
+| `expected_associations` | list[`str`] | `[]` | List of paths to expected associations files or directories. When provided, these define the exact dimension combinations required in the data, replacing the full cross-join. |
 | `missing_associations` | list[`str`] | `[]` | List of paths to missing associations files (e.g., missing_associations.parquet) or directories of files containing missing combinations by dimension type (e.g., geography__subsector.csv, subsector__metric.csv). |
 | `table_format` | [TableFormat](enums.md#tableformat) | *(required)* | Table structure: one_table (all data in single table) or two_table (time series data separate from lookup metadata). |
 | `value_format` | [ValueFormat](enums.md#valueformat) | *(required)* | Value column format: stacked (single value column) or pivoted (one dimension's records as columns). |

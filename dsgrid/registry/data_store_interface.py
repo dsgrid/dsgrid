@@ -42,7 +42,7 @@ class DataStoreInterface(abc.ABC):
     def read_expected_associations_tables(
         self, dataset_id: str, version: str
     ) -> dict[str, DataFrame]:
-        """Read expected dimensions association tables from the data store."""        
+        """Read expected dimensions association tables from the data store."""
 
     @abc.abstractmethod
     def read_missing_associations_tables(

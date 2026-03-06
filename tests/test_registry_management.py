@@ -836,6 +836,7 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
         # Change paths to be relative to the data_base_dir
         data["data_layout"]["data_file"]["path"] = "load_data.csv"
         data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["expected_associations"] = ["expected_associations"]
         data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 
@@ -918,6 +919,7 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
         # Change paths to be relative to the data_base_dir
         data["data_layout"]["data_file"]["path"] = "load_data.csv"
         data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["expected_associations"] = ["expected_associations"]
         data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 

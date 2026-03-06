@@ -416,7 +416,7 @@ def dim_records():
     }
 
 
-def _make_df(rows: list[dict[str, str]]) -> "DataFrame":
+def _make_df(rows: list[dict[str, str]]):
     return create_dataframe_from_dicts(rows)
 
 
@@ -446,8 +446,8 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        assert len(rows) == 3
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
 
     def test_identical_columns_union(self, tmp_path, dim_records):
         """Two tables with the same column set are unioned."""
@@ -470,8 +470,8 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        assert len(rows) == 3
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
 
     def test_disjoint_columns_cross_join(self, tmp_path, dim_records):
         """Disjoint column sets are cross-joined, remaining dims filled in."""
@@ -479,17 +479,15 @@ class TestMergeExpectedAssociationsTables:
 
         # Each table must include all records for its dimension columns.
         dfs = {
-            "geo": _make_df(
-                [{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]
-            ),
+            "geo": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
             "sector": _make_df([{"sector": "res"}, {"sector": "com"}]),
         }
         # subsector is uncovered -> cross-joined with all 3 records.
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        # 3 geo * 2 sector * 3 subsector = 18 (full cross-join)
-        assert len(rows) == 18
+            rows = _sorted_rows(result)
+            # 3 geo * 2 sector * 3 subsector = 18 (full cross-join)
+            assert len(rows) == 18
 
     def test_overlapping_columns_inner_join(self, tmp_path, dim_records):
         """Overlapping-but-not-identical column sets are inner-joined on shared columns."""
@@ -513,14 +511,14 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        # geo A+C pair with res -> sf,mf (4); geo B pairs with com -> office (1)
-        assert len(rows) == 5
-        combos = {(r.geography, r.sector, r.subsector) for r in rows}
-        assert ("A", "res", "mf") in combos
-        assert ("B", "com", "office") in combos
-        # geo B should NOT appear with res (only paired with com).
-        assert ("B", "res", "sf") not in combos
+            rows = _sorted_rows(result)
+            # geo A+C pair with res -> sf,mf (4); geo B pairs with com -> office (1)
+            assert len(rows) == 5
+            combos = {(r.geography, r.sector, r.subsector) for r in rows}
+            assert ("A", "res", "mf") in combos
+            assert ("B", "com", "office") in combos
+            # geo B should NOT appear with res (only paired with com).
+            assert ("B", "res", "sf") not in combos
 
     def test_partial_table_fills_remaining_dims(self, tmp_path, dim_records):
         """A single-column table cross-joins with full records of all other dims."""
@@ -528,15 +526,13 @@ class TestMergeExpectedAssociationsTables:
 
         # Table must have all geography records.
         dfs = {
-            "geo_only": _make_df(
-                [{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]
-            ),
+            "geo_only": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        # 3 geo * 2 sector * 3 subsector = 18
-        assert len(rows) == 18
+            rows = _sorted_rows(result)
+            # 3 geo * 2 sector * 3 subsector = 18
+            assert len(rows) == 18
 
     def test_entry_check_fails_on_missing_record(self, tmp_path, dim_records):
         """A table missing a dimension record is caught at entry validation."""
@@ -624,8 +620,8 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        rows = _sorted_rows(result)
-        assert len(rows) == 3
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
 
     def test_three_groups_with_remaining_dims(self, tmp_path, dim_records):
         """Two overlapping groups + a remaining uncovered dimension."""
@@ -657,10 +653,10 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records_4d, ctx)
-        rows = _sorted_rows(result)
-        # Inner join: (A,res) + (C,res) get sf/mf/office (6); (B,com) gets sf/mf/office (3) = 9
-        # * 2 model_years = 18
-        assert len(rows) == 18
+            rows = _sorted_rows(result)
+            # Inner join: (A,res) + (C,res) get sf/mf/office (6); (B,com) gets sf/mf/office (3) = 9
+            # * 2 model_years = 18
+            assert len(rows) == 18
 
     def test_column_not_in_dim_records(self, tmp_path):
         """A table column not in all_dim_records is passed through without validation."""
@@ -679,5 +675,5 @@ class TestMergeExpectedAssociationsTables:
         }
         with ScratchDirContext(tmp_path) as ctx:
             result = merge_expected_associations_tables(dfs, dim_records, ctx)
-        assert set(result.columns) == {"geography", "extra_col"}
-        assert result.count() == 2
+            assert set(result.columns) == {"geography", "extra_col"}
+            assert result.count() == 2

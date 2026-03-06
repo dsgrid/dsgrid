@@ -39,6 +39,7 @@ from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
     TEST_DATASET_DIRECTORY,
+    TEST_PROJECT_REPO,
 )
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.id_remappings import (
@@ -49,6 +50,29 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_mapping_names_with_current_ids,
 )
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
+
+
+EXPECTED_ASSOCIATIONS_VARIANTS = [
+    # (dataset_dir_name, config_filename, description)
+    # Variant 1: expected_associations + missing_associations (partial)
+    (
+        "comstock",
+        "dataset_expected_and_missing.json5",
+        "expected_associations + missing_associations",
+    ),
+    # Variant 2: full_missing_associations.csv (single flat file with all dims)
+    (
+        "comstock_time_in_parts",
+        "dataset_full_missing.json5",
+        "full_missing_associations.csv",
+    ),
+    # Variant 3: missing_associations_all directory (split files, no expected_associations)
+    (
+        "comstock_unpivoted",
+        "dataset_missing_all.json5",
+        "missing_associations_all directory",
+    ),
+]
 
 
 def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
@@ -1030,3 +1054,61 @@ def test_time_in_parts_matches_timestamp(cached_registry):
 
         # Compare the dataframes
         assert_frame_equal(comstock_pd, time_parts_pd)
+
+
+@pytest.mark.parametrize(
+    "dataset_dir_name,config_filename,description",
+    EXPECTED_ASSOCIATIONS_VARIANTS,
+    ids=[v[2] for v in EXPECTED_ASSOCIATIONS_VARIANTS],
+)
+def test_register_dataset_with_associations_variant(
+    tmp_registry_db, dataset_dir_name, config_filename, description
+):
+    """Test dataset registration with each expected/missing associations variant.
+
+    Three equivalent ways to declare missing dimension combinations:
+    1. expected_associations + missing_associations (comstock)
+    2. full_missing_associations.csv (comstock_time_in_parts)
+    3. missing_associations_all directory (comstock_unpivoted)
+
+    Follows the same pattern as bulk_register: make a temp copy of the config
+    in its original directory so that relative paths resolve correctly.
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        # Use the original config location (not the tmp copy) so that relative
+        # data/association paths resolve correctly, just like bulk_register does.
+        original_config = (
+            TEST_PROJECT_REPO
+            / "dsgrid_project"
+            / "datasets"
+            / "modeled"
+            / dataset_dir_name
+            / config_filename
+        )
+        assert original_config.exists(), f"Variant config not found: {original_config}"
+
+        data = load_data(original_config)
+        dataset_id = data["dataset_id"]
+
+        # Copy to a temp file in the same directory so relative paths still work.
+        tmp_config = original_config.with_stem(original_config.stem + "__test_tmp")
+        shutil.copyfile(original_config, tmp_config)
+        try:
+            mappings = map_dimension_names_to_ids(manager.dimension_manager)
+            replace_dimension_names_with_current_ids(tmp_config, mappings)
+
+            manager.dataset_manager.register(
+                tmp_config,
+                getpass.getuser(),
+                f"Register {dataset_id} with {description}",
+            )
+            assert dataset_id in manager.dataset_manager.list_ids()
+        finally:
+            tmp_config.unlink(missing_ok=True)

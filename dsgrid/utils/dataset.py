@@ -849,9 +849,7 @@ def merge_expected_associations_tables(
         else:
             groups[key] = df
 
-    if not groups:
-        msg = "Bug: expected_dfs is empty"
-        raise Exception(msg)
+    assert groups, "Bug: expected_dfs is empty"
 
     # Step 2: Merge groups.
     # - Disjoint column sets   -> cross join
@@ -900,9 +898,7 @@ def merge_expected_associations_tables(
                                 get_unique_values(df, col)
                             )
 
-                merged = join_multiple_columns(
-                    merged, df, sorted(overlap), how="inner"
-                )
+                merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
 
                 # Check for values lost by the inner join.
                 for col in sorted(overlap):

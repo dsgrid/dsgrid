@@ -383,8 +383,6 @@ def test_invalid_dataset_id(tmp_path):
         / "comstock"
         / "dataset.json5"
     )
-    if not config_file.exists():
-        pytest.skip("dsgrid-project-StandardScenarios submodule is not initialized")
     DatasetConfigModel.load(config_file)
 
     data = load_data(config_file)

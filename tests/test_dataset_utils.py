@@ -658,6 +658,59 @@ class TestMergeExpectedAssociationsTables:
             # * 2 model_years = 18
             assert len(rows) == 18
 
+    def test_inner_join_drops_shared_column_value(self, tmp_path):
+        """Inner join that drops a shared-column value is caught post-join.
+
+        Both tables individually contain all records for every shared column
+        (passing entry validation), but the inner join drops a value because
+        the two tables have no matching rows for it.
+
+        Table 1 (geo_sector):  sector=s3 pairs only with geography=C
+        Table 2 (sector_sub):  sector=s3 pairs only with subsector=r
+
+        Overlap is {sector}. Both tables have s1, s2, s3 for sector so entry
+        validation passes. After inner join on {sector}, s3 survives. To
+        actually lose a value we need a *multi-column* overlap where a value
+        vanishes.
+
+        Use a 2-column overlap {sector, subsector}:
+        Table 1: sector=s1 only with subsector=p
+        Table 2: sector=s1 only with subsector=q
+        Inner join on {sector, subsector} finds no match for (s1, p) or
+        (s1, q), so sector=s1 is dropped entirely.
+        """
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dim_records = {
+            "geography": ["A", "B"],
+            "sector": ["s1", "s2"],
+            "subsector": ["p", "q"],
+        }
+
+        dfs = {
+            "geo_sector_sub": _make_df(
+                [
+                    # Has sector s1 only with subsector p, and s2 with both.
+                    {"geography": "A", "sector": "s1", "subsector": "p"},
+                    {"geography": "A", "sector": "s2", "subsector": "p"},
+                    {"geography": "B", "sector": "s1", "subsector": "p"},
+                    {"geography": "B", "sector": "s2", "subsector": "q"},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    # Has sector s1 only with subsector q (no match for s1+p).
+                    # s2 appears with both p and q.
+                    {"sector": "s1", "subsector": "q"},
+                    {"sector": "s2", "subsector": "p"},
+                    {"sector": "s2", "subsector": "q"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
     def test_column_not_in_dim_records(self, tmp_path):
         """A table column not in all_dim_records is passed through without validation."""
         from dsgrid.utils.dataset import merge_expected_associations_tables

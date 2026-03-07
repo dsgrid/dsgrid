@@ -1,7 +1,6 @@
 # Dimension Concepts
 
-The datasets dsgrid works with are typically highly multi-dimensional. A single data point might represent energy use for a particular end use and fuel type, in a certain type of building, at a specific hour in a particular county under a future scenario.
-One of the key challenges of assembling coherent analyses from many such different datasets is aligning across all relevant *dimensions*.
+The datasets dsgrid works with are typically highly multi-dimensional. A single data point might represent energy use for a particular end use and fuel type, in a certain type of building, at a specific hour in a particular county under a future scenario. One of the key challenges of assembling coherent analyses from many disparate datasets is aligning across all relevant *dimensions*.
 
 ## Dimension Types
 
@@ -16,7 +15,7 @@ From previous work, the dsgrid team has found it important to define and map dat
 - **subsector** - Detailed sector breakdowns (e.g., building types, industries, transportation modes)
 - **metric** - Measured quantities and their attributes (e.g., energy end use, energy intensity, population, stock)
 
-Individual datasets might have 0, 1, or more fields that could be mapped to an individual dimension type, but we have generally found this list to be sufficient and workable, and important for enabling many disparate datasets to be mapped to a common set of dimensions and then analyzed as a whole.
+Individual datasets may have zero, one, or more fields that map to any given dimension type. This list of eight types has proven sufficient and workable for mapping many disparate datasets to a common set of dimensions for joint analysis.
 
 ## Dimension Configs and Records
 
@@ -62,7 +61,11 @@ Records can also be listed directly in the configuration. For example:
 
 ### Time Dimensions
 
-Time dimensions work differently. Instead of a records CSV, they are defined entirely by parameters in the config, for example:
+Time dimensions work differently. Instead of a records CSV, they are defined entirely by parameters in the config. The `time_type` field selects the time dimension variant, and the `class` field must reference the matching class from `dsgrid.dimension.standard`.
+
+A time dimension config serves two purposes: it describes how the timestamp column is stored in the data table (via `column_format`), and it describes what the time data represents (via the remaining fields) so that dsgrid can validate the data table on registration.
+
+The following example shows a `datetime` time dimension with hourly timestamps aligned to a single time zone:
 
 ```javascript
 {
@@ -70,17 +73,106 @@ Time dimensions work differently. Instead of a records CSV, they are defined ent
   name: "Hourly 2012 EST",
   "class": "Time",
   time_type: "datetime",
+  column_format: {
+    dtype: "timestamp_tz",
+    time_column: "timestamp",
+  },
   ranges: [
     {
-      start: "2012-01-01 01:00:00",
-      end: "2013-01-01 00:00:00",
+      start: "2012-01-01 00:00:00",
+      end: "2012-12-31 23:00:00",
+      frequency: "01:00:00",
     },
   ],
-  frequency: "01:00:00",
-  timezone: "Etc/GMT+5",
-  time_interval_type: "period_ending",
+  time_zone_format: {
+    format_type: "aligned_in_absolute_time",
+    time_zone: "Etc/GMT+5",
+  },
+  time_interval_type: "period_beginning",
   measurement_type: "total",
 }
+```
+
+The `column_format` field specifies how time is stored in the data table. Three dtypes are supported:
+
+- **`timestamp_tz`** — a single timezone-aware timestamp column (default). The `time_column` field sets the column name (default: `"timestamp"`).
+- **`timestamp_ntz`** — a single timezone-naive timestamp column. Same `time_column` field. Any time zone specified in the config must be null or in standard time for localization (see [Time Zone Localization](#time-zone-localization)). It does not work with time zones with daylight savings.
+- **`time_format_in_parts`** — time is split across multiple integer columns instead of a single timestamp column. Required columns are `year_column`, `month_column`, and `day_column`; optional columns are `hour_column` (defaults to 0 for all rows if omitted) and `offset_column` (UTC offset in hours, e.g. `-8` or `"-08:00"`). dsgrid automatically combines the part columns into a single column named `timestamp` on registration.
+
+```javascript
+  // timezone-aware single column (default):
+  column_format: {dtype: "timestamp_tz", time_column: "timestamp"}
+
+  // timezone-naive single column:
+  column_format: {dtype: "timestamp_ntz", time_column: "timestamp"}
+
+  // time split across multiple columns:
+  column_format: {
+    dtype: "time_format_in_parts",
+    year_column: "year",
+    month_column: "month",
+    day_column: "day",
+    hour_column: "hour",       // optional; omit to default all hours to 0
+    offset_column: "utc_offset",  // optional
+  }
+```
+
+Although the schema accepts multiple `ranges` entries, dsgrid currently only supports a single continuous range. The time zone is specified through `time_zone_format`, which supports two variants:
+
+- **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/Chicago"` or `"Etc/GMT+5"`).
+- **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone` column with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table.
+
+Example using local standard clock time (multiple time zones):
+
+```javascript
+{
+  type: "time",
+  name: "Local Hourly 2012",
+  "class": "Time",
+  time_type: "datetime",
+  column_format: {
+    dtype: "timestamp_ntz",
+    time_column: "timestamp",
+  },
+  ranges: [
+    {
+      start: "2012-01-01 00:00:00",
+      end: "2012-12-31 23:00:00",
+      frequency: "01:00:00",
+    },
+  ],
+  time_zone_format: {
+    format_type: "aligned_in_std_clock_time",
+    time_zones: ["Etc/GMT+5", "Etc/GMT+6", "Etc/GMT+7", "Etc/GMT+8"],
+  },
+  time_interval_type: "period_beginning",
+  measurement_type: "total",
+}
+```
+`Etc/GMT+5` through `Etc/GMT+8` are the IANA fixed-offset zones corresponding to UTC−5 through UTC−8 (US Eastern through Pacific standard time offsets). Note the POSIX sign convention: `Etc/GMT+N` is UTC−N.
+
+All time zones must be those observing standard time (no daylight savings) when `column_format.dtype` is `timestamp_ntz` due to localization need (see [Time Zone Localization](#time-zone-localization)). The time zones can be those observing daylight savings time if the timestamps in the data table are tz-aware (`timestamp_tz`).
+
+
+#### Time Zone Localization
+When a data table stores timestamps as timezone-naive (`timestamp_ntz`) but the config specifies a timezone, dsgrid automatically localizes the timestamps during dataset registration. All time zone(s) must be in standard time (without daylight savings) for time zone localization because duplicated tz-naive timestamps cannot be parsed accurately.
+
+For `aligned_in_absolute_time` with `column_format.dtype = "timestamp_ntz"`, localization uses `time_zone_format.time_zone`.
+
+For `aligned_in_std_clock_time`, localization uses the per-row `time_zone` column in the data table. Every value in that column must be one of the IANA time zone strings listed in `time_zone_format.time_zones`.
+
+To store timezone-naive timestamps without any localization, set `time_zone` to `null`:
+
+```javascript
+  ...
+  column_format: {
+    dtype: "timestamp_ntz",
+    time_column: "timestamp",
+  },
+  time_zone_format: {
+    format_type: "aligned_in_absolute_time",
+    time_zone: null,
+  },
 ```
 
 ### Trivial Dimensions
@@ -89,7 +181,7 @@ Not all dimension types need to be present in every dataset. A dimension with on
 
 ## Dimension Record Classes
 
-Every dimension config has a `class` field that selects a **record class**. The record class determines what columns are required or optional in the dimension records CSV. All record classes require `id` and `name` columns; each class may add additional fields.For example, a metric dimension using the `EnergyEndUse` class requires `fuel_id` and `unit` columns in addition to `id` and `name`.
+Every dimension config has a `class` field that selects a **record class**. The record class determines what columns are required or optional in the dimension records CSV. All record classes require `id` and `name` columns; each class may add additional fields. For example, a metric dimension using the `EnergyEndUse` class requires `fuel_id` and `unit` columns in addition to `id` and `name`.
 
 The `class` field must reference a class from the `dsgrid.dimension.standard` module. The available classes for each dimension type are listed in the [Dimension Record Classes](../../software_reference/data_models/dimension_classes) reference. Metric dimensions have the most variety. Choose the class that best matches what your data represents, or {ref}`contact-us` to suggest a new metric type:
 
@@ -113,14 +205,15 @@ See the [Dimension Record Classes](../../software_reference/data_models/dimensio
 
 ## Time Dimensions
 
-Time dimensions work differently from other dimensions. Instead of records in a CSV file, they are defined by parameters like time ranges and frequency. dsgrid supports the following time dimension types:
+Time dimensions work differently from other dimensions. Instead of records in a CSV file, they are defined by parameters like time ranges and time zone format. dsgrid supports the following time dimension types, selected via the `time_type` field:
 
-- [**DateTimeDimensionModel**](../../software_reference/data_models/dimension_model.md#datetimedimensionmodel) - Standard datetime timestamps with configurable time zones, ranges, and frequency
-- [**AnnualTimeDimensionModel**](../../software_reference/data_models/dimension_model.md#annualtimedimensionmodel) - Yearly aggregated data with configurable year ranges
-- [**RepresentativePeriodTimeDimensionModel**](../../software_reference/data_models/dimension_model.md#representativeperiodtimedimensionmodel) - Typical periods (e.g., typical week or day)
-- [**DatetimeExternalTimeZoneDimensionModel**](../../software_reference/data_models/dimension_model.md#datetimeexternaltimezonedimensionmodel) - Datetime data where time zones are defined outside dsgrid (e.g., in a separate column)
-- [**IndexTimeDimensionModel**](../../software_reference/data_models/dimension_model.md#indextimedimensionmodel) - Integer-indexed time steps mapped to a starting timestamp and frequency
-- [**NoOpTimeDimensionModel**](../../software_reference/data_models/dimension_model.md#nooptimedimensionmodel) - Time-invariant data (no time component)
+| `time_type` | `class` | Description |
+|---|---|---|
+| `datetime` | `Time` | Standard datetime timestamps; specify `time_zone_format` for single or per-geography time zones |
+| `annual` | `AnnualTime` | Yearly aggregated totals; ranges use year strings (e.g., `"2020"`) |
+| `representative_period` | `Time` | Typical periods (e.g., one week per month by hour); specify `format` and month `ranges` |
+| `index` | `Time` | Integer-indexed time steps mapped to a starting timestamp and frequency |
+| `noop` | `NoOpTime` | Time-invariant data; no time component in the dataset |
 
 ## Learn More
 

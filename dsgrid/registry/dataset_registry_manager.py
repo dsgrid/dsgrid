@@ -569,26 +569,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         """Return all expected association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
-        dfs: dict[str, DataFrame] = {}
-        expected_paths = config.expected_associations_paths
-        if not expected_paths:
-            return dfs
-
-        def add_df(path):
-            df = self._read_associations_file(path)
-            key = make_unique_key(path.stem, dfs)
-            dfs[key] = df
-
-        for path in expected_paths:
-            if path.suffix.lower() == ".parquet":
-                add_df(path)
-            elif path.is_dir():
-                for file_path in path.iterdir():
-                    if file_path.suffix.lower() in (".csv", ".parquet"):
-                        add_df(file_path)
-            elif path.suffix.lower() in (".csv", ".parquet"):
-                add_df(path)
-        return dfs
+        return self._read_associations_tables_from_user_path(config.expected_associations_paths)
 
     def _read_missing_associations_tables_from_user_path(
         self, config: DatasetConfig
@@ -596,9 +577,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         """Return all missing association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
+        return self._read_associations_tables_from_user_path(config.missing_associations_paths)
+
+    def _read_associations_tables_from_user_path(self, paths: list[Path]) -> dict[str, DataFrame]:
+        """Return all missing association tables keyed by the file path stem.
+        Tables can be all-dimension-types-in-one or split by groups of dimension types.
+        """
         dfs: dict[str, DataFrame] = {}
-        missing_paths = config.missing_associations_paths
-        if not missing_paths:
+        if not paths:
             return dfs
 
         def add_df(path):
@@ -606,15 +592,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             key = make_unique_key(path.stem, dfs)
             dfs[key] = df
 
-        for path in missing_paths:
-            if path.suffix.lower() == ".parquet":
+        for path in paths:
+            if path.suffix.lower() in (".csv", ".parquet"):
                 add_df(path)
             elif path.is_dir():
                 for file_path in path.iterdir():
                     if file_path.suffix.lower() in (".csv", ".parquet"):
                         add_df(file_path)
-            elif path.suffix.lower() in (".csv", ".parquet"):
-                add_df(path)
         return dfs
 
     @staticmethod
@@ -721,9 +705,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
-                        self._merge_missing_associations(
-                            missing_df1, expected_dfs, missing_dfs2
-                        )
+                        self._merge_missing_associations(missing_df1, expected_dfs, missing_dfs2)
                     )
 
             case TableFormat.TWO_TABLE:
@@ -758,9 +740,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
-                        self._merge_missing_associations(
-                            missing_df1, expected_dfs, missing_dfs2
-                        )
+                        self._merge_missing_associations(missing_df1, expected_dfs, missing_dfs2)
                     )
             case _:
                 msg = f"Unsupported table format: {config.get_table_format()}"

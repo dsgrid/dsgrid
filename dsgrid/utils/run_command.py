@@ -58,7 +58,8 @@ def run_command(cmd: str, output=None, cwd=None):
     # console encoding (e.g. cp1252) cannot represent all Unicode characters
     # produced by rich_click and similar libraries.
     env = os.environ.copy()
-    env["PYTHONUTF8"] = "1"
+    if sys.platform.startswith("win"):
+        env["PYTHONUTF8"] = "1"
 
     if output is not None:
         pipe = subprocess.Popen(

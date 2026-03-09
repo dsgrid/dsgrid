@@ -85,6 +85,9 @@ class FilesystemDataStore(DataStoreInterface):
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         filename = self._table_filename(dataset_id, version)
+        if not overwrite and filename.exists():
+            msg = f"Table already exists at {filename}. Set overwrite=True to overwrite."
+            raise FileExistsError(msg)
         filename.parent.mkdir(parents=True, exist_ok=True)
         write_dataframe_and_auto_partition(df, filename)
 
@@ -100,6 +103,9 @@ class FilesystemDataStore(DataStoreInterface):
     ) -> None:
         for name, df in dfs.items():
             filename = self._expected_associations_table_filename(name, dataset_id, version)
+            if not overwrite and filename.exists():
+                msg = f"Expected associations table already exists at {filename}. Set overwrite=True to overwrite."
+                raise FileExistsError(msg)
             filename.parent.mkdir(parents=True, exist_ok=True)
             write_dataframe_and_auto_partition(df, filename)
 
@@ -108,6 +114,9 @@ class FilesystemDataStore(DataStoreInterface):
     ) -> None:
         for name, df in dfs.items():
             filename = self._missing_associations_table_filename(name, dataset_id, version)
+            if not overwrite and filename.exists():
+                msg = f"Missing associations table already exists at {filename}. Set overwrite=True to overwrite."
+                raise FileExistsError(msg)
             filename.parent.mkdir(parents=True, exist_ok=True)
             write_dataframe_and_auto_partition(df, filename)
 

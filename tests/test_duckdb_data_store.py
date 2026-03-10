@@ -3,7 +3,10 @@
 import pytest
 
 from dsgrid.registry.duckdb_data_store import DuckDbDataStore
+from dsgrid.spark.types import use_duckdb
 from dsgrid.utils.spark import create_dataframe_from_dicts
+
+pytestmark = pytest.mark.skipif(not use_duckdb(), reason="DuckDbDataStore requires DuckDB backend")
 
 
 def _make_df():

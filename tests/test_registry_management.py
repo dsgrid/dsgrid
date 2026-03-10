@@ -15,7 +15,7 @@ from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsListModel,
     InputDatasetListModel,
 )
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
@@ -1114,3 +1114,90 @@ def test_register_dataset_with_associations_variant(
             assert dataset_id in manager.dataset_manager.list_ids()
         finally:
             tmp_config.unlink(missing_ok=True)
+
+
+def test_register_dataset_with_all_checks_disabled(tmp_registry_db):
+    """Test that valid data registers successfully when all dimension checks are disabled.
+
+    Verifies the skip-paths for each field in DatasetDimensionRequirements:
+    - check_time_consistency=False
+    - check_dimension_associations=False
+    - require_all_dimension_types=False
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        original_config = (
+            TEST_PROJECT_REPO
+            / "dsgrid_project"
+            / "datasets"
+            / "modeled"
+            / "comstock"
+            / "dataset.json5"
+        )
+        assert original_config.exists()
+
+        data = load_data(original_config)
+        dataset_id = data["dataset_id"]
+
+        tmp_config = original_config.with_stem(original_config.stem + "__test_checks_disabled")
+        shutil.copyfile(original_config, tmp_config)
+        try:
+            mappings = map_dimension_names_to_ids(manager.dimension_manager)
+            replace_dimension_names_with_current_ids(tmp_config, mappings)
+
+            requirements = DatasetDimensionRequirements(
+                check_time_consistency=False,
+                check_dimension_associations=False,
+                require_all_dimension_types=False,
+            )
+            manager.dataset_manager.register(
+                tmp_config,
+                getpass.getuser(),
+                "Register with all checks disabled",
+                requirements=requirements,
+            )
+            assert dataset_id in manager.dataset_manager.list_ids()
+        finally:
+            tmp_config.unlink(missing_ok=True)
+
+
+def test_dimension_record_mismatch_error(tmp_registry_db):
+    """Test that a per-column dimension mismatch is detected when no expected_associations exist.
+
+    The comstock_unpivoted dataset has no expected_associations, so registration
+    uses the full cross-join check. Adding a fake record to the subsector dimension
+    CSV causes a mismatch between dimension records and actual data, triggering the
+    per-column error in _check_dimension_associations.
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock_unpivoted"
+        config_file = dataset_dir / "dataset.json5"
+        assert config_file.exists()
+
+        # Add a fake subsector record that doesn't exist in the data.
+        subsectors_file = dataset_dir / "dimensions" / "comstock_subsectors.csv"
+        original_text = subsectors_file.read_text()
+        subsectors_file.write_text(original_text.rstrip() + "\ncom__FakeBuilding,Fake Building\n")
+
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(config_file, mappings)
+
+        with pytest.raises(DSGInvalidDataset, match="do not match expected"):
+            manager.dataset_manager.register(
+                config_file,
+                getpass.getuser(),
+                "Register with dimension mismatch",
+            )

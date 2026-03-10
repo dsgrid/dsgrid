@@ -20,6 +20,7 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
 )
 from dsgrid.exceptions import (
+    DSGFileInputError,
     DSGInvalidField,
     DSGInvalidDimensionMapping,
     DSGInvalidDataset,
@@ -867,7 +868,8 @@ def merge_expected_associations_tables(
         # Validate that this group covers every record for its dimensions.
         for col in sorted(col_set):
             if col not in all_dim_records:
-                continue
+                msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
+                raise DSGFileInputError(msg)
             actual_ids = get_unique_values(df, col)
             expected_ids = set(all_dim_records[col])
             missing = sorted(expected_ids - actual_ids)

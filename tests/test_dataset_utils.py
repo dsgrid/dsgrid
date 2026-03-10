@@ -7,7 +7,7 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.spark.functions import (
     aggregate_single_value,
@@ -714,7 +714,7 @@ class TestMergeExpectedAssociationsTables:
                 merge_expected_associations_tables(dfs, dim_records, ctx)
 
     def test_column_not_in_dim_records(self, tmp_path):
-        """A table column not in all_dim_records is passed through without validation."""
+        """A table column not in all_dim_records raises DSGFileInputError."""
         from dsgrid.utils.dataset import merge_expected_associations_tables
 
         dim_records = {
@@ -729,6 +729,5 @@ class TestMergeExpectedAssociationsTables:
             ),
         }
         with ScratchDirContext(tmp_path) as ctx:
-            result = merge_expected_associations_tables(dfs, dim_records, ctx)
-            assert set(result.columns) == {"geography", "extra_col"}
-            assert result.count() == 2
+            with pytest.raises(DSGFileInputError, match="Unexpected dimension type"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)

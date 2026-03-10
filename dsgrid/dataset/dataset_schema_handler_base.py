@@ -177,9 +177,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dim is not None:
                 data[dim_type.value] = list(dim.get_unique_ids())
 
-        if not data:
-            msg = "Bug: did not find any dimension records"
-            raise Exception(msg)
+        assert data, "Bug: did not find any dimension records"
         return create_dataframe_from_product(data, context)
 
     def _make_expected_dimension_association_table_from_user(

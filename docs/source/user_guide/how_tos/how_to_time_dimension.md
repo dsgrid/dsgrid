@@ -142,9 +142,7 @@ The `time_zone` column must contain only IANA time zone strings that also appear
   ],
   time_zone_format: {
     format_type: "aligned_in_std_clock_time",
-    // All unique IANA time zones that appear in the data table's time_zone column.
-    // Use fixed-offset zones (e.g., "Etc/GMT+5") for standard time, or named prevailing
-    // zones (e.g., "EasternPrevailing") when data is in local daylight-adjusted time.
+    // All unique IANA fixed-offset time zones that appear in the data table's time_zone column.
     time_zones: ["Etc/GMT+5", "Etc/GMT+6", "Etc/GMT+7", "Etc/GMT+8"],
   },
   time_interval_type: "period_beginning",
@@ -209,7 +207,7 @@ If `offset_column` is provided, the resulting timestamp column will be timezone-
 |---|---|
 | `ranges[].start` / `end` | First and last timestamps in the data (inclusive), parsed by `str_format` |
 | `ranges[].str_format` | `strftime` format string for parsing `start`/`end` (default: `"%Y-%m-%d %H:%M:%S"`) |
-| `ranges[].frequency` | Time step size as an ISO 8601 duration (e.g., `"01:00:00"`, `"P1D"`, `"00:15:00"`) |
+| `ranges[].frequency` | Time step size as a `timedelta` string (`"01:00:00"`, `"00:15:00"`) or ISO 8601 duration (`"P1D"`, `"PT1H"`) |
 | `time_zone_format.format_type` | `"aligned_in_absolute_time"` or `"aligned_in_std_clock_time"` |
 | `time_interval_type` | `"period_beginning"` -- timestamp labels the start of the interval; `"period_ending"` -- labels the end; `"instantaneous"` -- a point measurement |
 | `measurement_type` | `"total"`, `"mean"`, `"min"`, `"max"`, or `"measured"` |
@@ -254,7 +252,7 @@ time_index | time_zone  | geography | value
 }
 ```
 
-Index time always requires a `time_zone` column in both the geography dimension records and the data table (used to convert indices to localized datetimes when mapping to a project's datetime dimension). All time zones (including those observing daylight savings) are accepted.
+Index time always requires a `time_zone` column in both the geography dimension records and the data table (used to convert indices to localized datetimes when mapping to a project's datetime dimension). All time zones (including those observing daylight savings) are accepted in this time class.
 
 ---
 
@@ -275,11 +273,11 @@ Data has one representative week per month. The data table must have three colum
 **Example data table**:
 
 ```
-month | day_of_week | hour | time_zone  | geography | value
-------|-------------|------|------------|-----------|------
-    1 |           0 |    0 | Etc/GMT+5  | g1        | 1.2
-    1 |           0 |    1 | Etc/GMT+5  | g1        | 0.9
-    1 |           6 |   23 | Etc/GMT+5  | g1        | 0.8
+month | day_of_week | hour | geography | value
+------|-------------|------|-----------|------
+    1 |           0 |    0 | g1        | 1.2
+    1 |           0 |    1 | g1        | 0.9
+    1 |           6 |   23 | g1        | 0.8
 ...
 ```
 
@@ -314,11 +312,11 @@ Data has one weekday and one weekend day per month. The data table must have thr
 **Example data table**:
 
 ```
-month | is_weekday | hour | time_zone  | geography | value
-------|------------|------|------------|-----------|------
-    1 |       true |    0 | Etc/GMT+5  | g1        | 1.2
-    1 |       true |    1 | Etc/GMT+5  | g1        | 0.9
-    1 |      false |    0 | Etc/GMT+5  | g1        | 0.7
+month | is_weekday | hour | geography | value
+------|------------|------|-----------|------
+    1 |       true |    0 | g1        | 1.2
+    1 |       true |    1 | g1        | 0.9
+    1 |      false |    0 | g1        | 0.7
 ...
 ```
 
@@ -342,7 +340,7 @@ month | is_weekday | hour | time_zone  | geography | value
 }
 ```
 
-Both representative period formats require a `time_zone` column in the geography dimension records because representative periods must be localized when mapping to a project's datetime dimension.
+Both representative period formats require a `time_zone` column in the geography dimension records because representative periods must be localized when mapping to a project's datetime dimension. All time zones (including those observing daylight savings) are accepted in this time class.
 
 ---
 

@@ -63,7 +63,7 @@ Records can also be listed directly in the configuration. For example:
 
 Time dimensions work differently. Instead of a records CSV, they are defined entirely by parameters in the config. The `time_type` field selects the time dimension variant, and the `class` field must reference the matching class from `dsgrid.dimension.standard`.
 
-A time dimension config serves two purposes: it describes how the timestamp column is stored in the data table (via `column_format`), and it describes what the time data represents (via the remaining fields) so that dsgrid can validate the data table on registration.
+A datetime time dimension config serves two purposes: it describes how the timestamp column is stored in the data table (via `column_format`), and it describes what the time data represents (via the remaining fields) so that dsgrid can validate the data table on registration.
 
 The following example shows a `datetime` time dimension with hourly timestamps aligned to a single time zone:
 
@@ -155,7 +155,7 @@ All time zones must be those observing standard time (no daylight savings) when 
 
 
 #### Time Zone Localization
-When a data table stores timestamps as timezone-naive (`timestamp_ntz`) but the config specifies a timezone, dsgrid automatically localizes the timestamps during dataset registration. All time zone(s) must be in standard time (without daylight savings) for time zone localization because duplicated tz-naive timestamps cannot be parsed accurately.
+When a data table stores timestamps as timezone-naive (`timestamp_ntz`) but the config specifies a timezone, dsgrid automatically localizes the timestamps during dataset registration. All time zone(s) must be in standard time (without daylight savings) for time zone localization because duplicated tz-naive timestamps cannot be localized accurately.
 
 For `aligned_in_absolute_time` with `column_format.dtype = "timestamp_ntz"`, localization uses `time_zone_format.time_zone`.
 

@@ -6,10 +6,13 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Union, Literal
 import copy
+from zoneinfo import ZoneInfo
 
 from pydantic import field_serializer, field_validator, model_validator, Field, ValidationInfo
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
+
+from chronify.time_utils import is_standard_time_zone
 
 from dsgrid.common import TIME_COLUMN
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
@@ -492,6 +495,29 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
         return self.time_zones
 
 
+def _check_standard_time_only(tz_name: str) -> None:
+    """Raise ValueError if the named IANA time zone observes DST.
+
+    Parameters
+    ----------
+    tz_name : str
+        IANA time zone name to validate.
+
+    Raises
+    ------
+    ValueError
+        If the time zone observes daylight saving time.
+    """
+    if not is_standard_time_zone(ZoneInfo(tz_name)):
+        msg = (
+            f"Time zone {tz_name!r} observes daylight saving time. "
+            "Only fixed-offset (standard) time zones are allowed when localizing "
+            "tz-naive timestamps. Use a fixed-offset IANA zone such as 'Etc/GMT+5' "
+            "instead of a DST-observing zone like 'America/New_York'."
+        )
+        raise ValueError(msg)
+
+
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
 
@@ -651,6 +677,24 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     #             "use class=AnnualTime, time_type=annual to specify a year series."
     #         )
     #     return self
+
+    @model_validator(mode="after")
+    def check_standard_time_zones_for_localization(self) -> "DateTimeDimensionModel":
+        """Validate that only fixed-offset time zones are used when localizing tz-naive timestamps.
+
+        Localization is required when the column format is tz-naive and at least one time zone
+        is specified in `time_zone_format`. DST-observing zones are rejected because they
+        produce ambiguous or missing timestamps at daylight saving time transitions.
+        """
+        is_tz_naive = self.column_format.dtype == "timestamp_ntz" or (
+            self.column_format.dtype == "time_format_in_parts"
+            and self.column_format.offset_column is None
+        )
+        if not is_tz_naive:
+            return self
+        for tz_name in self.time_zone_format.get_time_zones():
+            _check_standard_time_only(tz_name)
+        return self
 
     @field_validator("ranges")
     @classmethod

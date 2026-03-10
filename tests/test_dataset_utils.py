@@ -1,7 +1,9 @@
-from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
+from typing import Any
 
 import pytest
+
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
@@ -420,7 +422,7 @@ def _make_df(rows: list[dict[str, str]]):
     return create_dataframe_from_dicts(rows)
 
 
-def _sorted_rows(df) -> list[tuple]:
+def _sorted_rows(df) -> list[Any]:
     """Collect a DataFrame into a sorted list of tuples for easy comparison."""
     cols = sorted(df.columns)
     return sorted(df.select(*cols).distinct().collect(), key=lambda r: tuple(r))

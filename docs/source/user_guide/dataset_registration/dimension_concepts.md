@@ -15,7 +15,7 @@ From previous work, the dsgrid team has found it important to define and map dat
 - **subsector** - Detailed sector breakdowns (e.g., building types, industries, transportation modes)
 - **metric** - Measured quantities and their attributes (e.g., energy end use, energy intensity, population, stock)
 
-Individual datasets may have zero, one, or more fields that map to any given dimension type. This list of eight types has proven sufficient and workable for mapping many disparate datasets to a common set of dimensions for joint analysis.
+Individual datasets might have zero, one, or more fields that map to any given dimension type. Although the actual dimensionality of datasets varies, this list of eight types has proven sufficient and workable for mapping many disparate datasets to a common set of dimensions for combined analysis.
 
 ## Dimension Configs and Records
 

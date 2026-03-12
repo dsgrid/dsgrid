@@ -220,4 +220,6 @@ Time dimensions work differently from other dimensions. Instead of records in a 
 - [Dimension Data Models](../../software_reference/data_models/dimension_model.md) - Config model specifications
 - [Dimension Record Classes](../../software_reference/data_models/dimension_classes.md) - Full listing and tables of fields for all record classes
 - [How to Define Dimensions](../how_tos/how_to_dimensions) - Step-by-step workflow
+- [How to Define a Time Dimension](../how_tos/how_to_time_dimension) - Detailed examples for each time dimension type
+- [How to Convert Time Zones](../how_tos/how_to_convert_time_zone) - Converting tz-aware timestamps to local time in query results
 - [Dataset Concepts](dataset_concepts) - Learn about datasets, including dataset types and file formats

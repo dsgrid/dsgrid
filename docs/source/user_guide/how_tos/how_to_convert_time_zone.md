@@ -156,3 +156,11 @@ Time zone *conversion* and time zone *localization* are inverses:
 | `convert_time_zone` | `timestamp_tz` | `timestamp_ntz` + `time_zone` column |
 
 Localization is applied automatically during dataset registration when the time dimension's `column_format.dtype` is `timestamp_ntz` and the `time_zone_format` identifies one or more target zones. Conversion is applied in query results to express the registered absolute times back in local clock time.
+
+---
+
+## Related References
+
+- [Dimension Concepts -- Time Dimensions](../dataset_registration/dimension_concepts.md#time-dimensions) -- conceptual overview of time dimension config and `column_format` variants
+- [How to Define a Time Dimension](how_to_time_dimension.md) -- step-by-step examples for each `time_type`
+- [Dimension Data Models](../../software_reference/data_models/dimension_model.md) -- complete config schema reference

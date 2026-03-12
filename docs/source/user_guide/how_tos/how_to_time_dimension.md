@@ -416,3 +416,4 @@ NoOp time does not require a `time_zone` column in the geography dimension.
 - [Dimension Concepts -- Time Dimensions](../dataset_registration/dimension_concepts.md#time-dimensions) -- conceptual overview and `column_format` details
 - [Dimension Data Models](../../software_reference/data_models/dimension_model.md) -- complete config schema reference
 - [How to Define Dimensions](how_to_dimensions.md) -- general dimension workflow
+- [How to Convert Time Zones](how_to_convert_time_zone.md) -- converting tz-aware timestamps to local time in query results

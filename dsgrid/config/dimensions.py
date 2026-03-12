@@ -313,8 +313,11 @@ class TimeFormatInPartsModel(DSGBaseModel):
     )
     offset_column: str | None = Field(
         title="offset_column",
-        description="Name of the offset column in the dataset. Value is the UTC offset in hours (e.g., -8 or -08:00). "
-        "If None, the offset will not be set.",
+        description="Name of the offset column in the dataset. "
+        "Value is the UTC offset, either as a numeric offset in hours (e.g., -8) or as a string in ±HH:MM format (e.g., -08:00). "
+        "If None, no offset is applied and the resulting timestamp will be timezone-naive. "
+        "Example: '2024-01-01 00:00:00-05:00' is the start of 2024 in New York; the offset column records '-05:00' for that row. "
+        "For America/New_York, the offset is -05:00 during standard time and -04:00 during daylight saving time.",
         default=None,
     )
 
@@ -490,17 +493,25 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
 
 
 class LocalTimeMultipleTimeZones(DSGBaseModel):
-    """Across geographies, timestamps cover the same interval of local time,
-    e.g., all of 2018 as experienced locally, in clock time.
-    This means, for example, that all data would have the same set of timestamps
-    if timestamps are first interpreted in geography-specific local standard time
-    and are then made timezone unaware.
+    """Timestamps cover the same interval of local clock time across geographies.
 
-    data table must contain TIME_ZONE_COLUMN column with IANA time zones for each record.
+    All data represents the same interval of standard clock time as experienced locally
+    in each geography's time zone. For example, all geographies have data from
+    2018-01-01 00:00 to 2018-12-31 23:00 in their respective local standard times,
+    but these represent different absolute UTC instants.
 
-    E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
-    They are aligned in local standard time but not in absolute time.
+    The data table must contain a `time_zone` column with IANA time zone names
+    (one per row) that match the entries in the `time_zones` list below.
 
+    Example: California data starts at 2018-01-01 00:00-08:00, while
+    New York data starts at 2018-01-01 00:00-05:00. Both rows have the
+    same local clock time but represent different absolute UTC instants.
+
+    Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
+    from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
+    a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York"
+    have multiple offsets depending on the calendar date (UTC-5 during standard time,
+    UTC-4 during daylight saving time).
     """
 
     format_type: Literal[

@@ -23,24 +23,47 @@ All time dimension configs require `type: "time"` and a `class` referencing `dsg
 Datetime is the most common time type. The config describes two things:
 
 - **`column_format`** -- how timestamps are stored in the data table (`timestamp_tz`, `timestamp_ntz`, or `time_format_in_parts`)
-- **All other fields** -- what the time data represents, used for validation on registration
+- **`time_zone_format`** -- whether timestamps are aligned in absolute time (single timezone for all geographies) or local standard clock time (one timezone per geography)
 
-### 1a. Globally aligned -- single time zone
+### Difference between time zones and offsets
 
-All geographies share identical timestamps in **absolute time**. This is the simplest case: every row with the same timestamp represents the same instant everywhere.
+IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5). Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during daylight saving time).
 
-**Example data table** (hourly, UTC-5):
+In general, dsgrid performs time zone localization automatically when the input data has timezone-naive timestamps. However, the input timestamps must be laid out in standard time (without daylight savings skips and duplicates) for correct localization, as standard libraries cannot handle fallback duplicates correctly.
+
+To ingest timestamps that observe daylight savings, they must already be timezone-aware in the data table, or stored with per-row UTC offsets via `offset_column`. Additionally, even when timestamps are timezone-aware or offset values are provided, the `time_zone` field must still be specified in `time_zone_format` because dsgrid uses it to construct validation data independent of the column format.
+
+### 1a. Column Format Distinctions
+
+Three formats are supported for storing time data:
+
+**`timestamp_tz` (timezone-aware)** — A single timestamp column with embedded UTC offset/timezone information. Timestamps represent absolute UTC instants and include offset information (e.g., `2012-01-01 00:00:00-05:00`). Use this format when input data already has timezone information. See Examples 1 and 5 below.
+
+**`timestamp_ntz` (timezone-naive)** — A single timestamp column with no offset/timezone information (e.g., `2012-01-01 00:00:00`). dsgrid automatically localizes these to the zone(s) specified in `time_zone_format` during registration. Input data must use standard time (no DST observance) for accurate localization. See Examples 2 and 6 below.
+
+**`time_format_in_parts`** — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single `timestamp` column during registration. Optionally, per-row UTC offsets can be provided via `offset_column` to construct timezone-aware timestamps directly; otherwise, localization is applied using `time_zone_format`. See Examples 3 and 4 below.
+
+---
+
+### 1b. Globally Aligned — Single Time Zone
+
+All geographies share identical timestamps in **absolute time**. Every row with the same timestamp represents the same instant everywhere. Use a single `time_zone` in `time_zone_format`.
+
+#### With `timestamp_tz` (timezone-aware single column)
+
+**Example 1 data table** (hourly, timezone-aware):
 
 ```
-timestamp                  | geography | value
----------------------------|-----------|------
-2012-01-01 00:00:00-05:00  | g1        | 1.2
-2012-01-01 01:00:00-05:00  | g1        | 0.9
-2012-01-01 00:00:00-05:00  | g2        | 3.1
+timestamp | geography | value
+---------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | g_east | 0.9
+2012-06-01 00:00:00-04:00 | g_east | 2.1
+2012-06-01 01:00:00-04:00 | g_east | 1.8
 ...
 ```
 
-**Config** (`column_format.dtype = "timestamp_tz"`, the default):
+**Config 1**:
 
 ```javascript
 {
@@ -48,6 +71,10 @@ timestamp                  | geography | value
   name: "Hourly 2012 EST",
   "class": "Time",
   time_type: "datetime",
+  column_format: {
+    dtype: "timestamp_tz",
+    time_column: "timestamp",
+  },
   ranges: [
     {
       start: "2012-01-01 00:00:00",
@@ -57,14 +84,42 @@ timestamp                  | geography | value
   ],
   time_zone_format: {
     format_type: "aligned_in_absolute_time",
-    time_zone: "Etc/GMT+5",         // IANA fixed-offset zone; Etc/GMT+5 = UTC-5
+    time_zone: "America/New_York",         // IANA DST-observing time zone
   },
   time_interval_type: "period_beginning",
   measurement_type: "total",
 }
 ```
 
-**Config** with timezone-naive timestamps (`column_format.dtype = "timestamp_ntz"`). dsgrid will localize the data table timestamps to `Etc/GMT+5` during registration:
+**Data table 1 after registration**:
+
+```
+timestamp | geography | value
+---------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | g_east | 0.9
+2012-06-01 00:00:00-04:00 | g_east | 2.1
+2012-06-01 01:00:00-04:00 | g_east | 1.8
+...
+```
+
+The input data is already timezone-aware with explicit UTC offsets, so no localization is needed. The timestamps are preserved as-is.
+
+#### With `timestamp_ntz` (timezone-naive single column)
+
+**Example 2 data table** (hourly, timezone-naive, standard time only):
+
+```
+timestamp | geography | value
+-------------------|-----------|-----
+2012-01-01 00:00:00 | g_east | 1.2
+2012-01-01 01:00:00 | g_east | 0.9
+2012-05-31 23:00:00 | g_east | 2.1
+2012-06-01 00:00:00 | g_east | 1.8
+...
+```
+
+**Config 2** — dsgrid will automatically localize these timestamps to `Etc/GMT+5` during registration:
 
 ```javascript
 {
@@ -85,16 +140,28 @@ timestamp                  | geography | value
   ],
   time_zone_format: {
     format_type: "aligned_in_absolute_time",
-    time_zone: "Etc/GMT+5",
+    time_zone: "Etc/GMT+5",         // IANA fixed-offset zone; must be standard time (no DST)
   },
   time_interval_type: "period_beginning",
   measurement_type: "total",
 }
 ```
 
-Note dsgrid can only localize timezone-naive timestamps to standard time, and only when the timestamps contain no daylight saving time gaps or duplicates, because standard libraries cannot handle fallback duplicates correctly.
+**Data table 2 after registration**:
 
-To store timezone-naive timestamps **without any localization** (e.g., data already in UTC with no offset to apply), set `time_zone` to `null`:
+```
+timestamp | geography | value
+---------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | g_east | 0.9
+2012-05-31 23:00:00-05:00 | g_east | 2.1
+2012-06-01 00:00:00-05:00 | g_east | 1.8
+...
+```
+
+The timezone-naive timestamps are localized to `Etc/GMT+5` during registration, resulting in timezone-aware timestamps.
+
+To store timezone-naive timestamps **without any localization**, set `time_zone` to `null`:
 
 ```javascript
   time_zone_format: {
@@ -103,25 +170,207 @@ To store timezone-naive timestamps **without any localization** (e.g., data alre
   },
 ```
 
-### 1b. Locally aligned -- multiple time zones
+#### With `time_format_in_parts` (separate columns, no offset)
 
-Timestamps cover the **same interval of local clock time** across geographies -- e.g., every geography has data from midnight to midnight in its own local time. Because the clocks read the same local standard time but represent different absolute instants, each row must include a `time_zone` column.
-
-**Example data table** (hourly, NTZ, two time zones):
+**Example 3 data table**:
 
 ```
-timestamp            | time_zone  | geography | value
----------------------|------------|-----------|------
-2012-01-01 00:00:00  | Etc/GMT+5  | g_east    | 1.2
-2012-01-01 01:00:00  | Etc/GMT+5  | g_east    | 0.9
-2012-01-01 00:00:00  | Etc/GMT+8  | g_west    | 3.1
-2012-01-01 01:00:00  | Etc/GMT+8  | g_west    | 2.7
+year | month | day | hour | geography | value
+-----|-------|-----|------|-----------|-----
+2012 | 1 | 1 | 0 | g_east | 1.2
+2012 | 1 | 1 | 1 | g_east | 0.9
+2012 | 5 | 31 | 23 | g_east | 2.1
+2012 | 6 | 1 | 0 | g_east | 1.8
 ...
 ```
 
-The `time_zone` column must contain only IANA time zone strings that also appear in `time_zone_format.time_zones`.
+**Config 3** — dsgrid combines the parts and localizes to `Etc/GMT+5`:
 
-**Config**:
+```javascript
+{
+  type: "time",
+  name: "Hourly 2012 in Parts",
+  "class": "Time",
+  time_type: "datetime",
+  column_format: {
+    dtype: "time_format_in_parts",
+    year_column: "year",
+    month_column: "month",
+    day_column: "day",
+    hour_column: "hour",
+  },
+  ranges: [
+    {
+      start: "2012-01-01 00:00:00",
+      end: "2012-12-31 23:00:00",
+      frequency: "01:00:00",
+    },
+  ],
+  time_zone_format: {
+    format_type: "aligned_in_absolute_time",
+    time_zone: "Etc/GMT+5",
+  },
+  time_interval_type: "period_beginning",
+  measurement_type: "total",
+}
+```
+
+**Data table 3 after registration**:
+
+```
+timestamp | geography | value
+---------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | g_east | 0.9
+2012-05-31 23:00:00-05:00 | g_east | 2.1
+2012-06-01 00:00:00-05:00 | g_east | 1.8
+...
+```
+
+The input columns (`year`, `month`, `day`, `hour`) are combined into a single `timestamp` column and then localized to `Etc/GMT+5`, resulting in a timezone-aware timestamp.
+
+#### With `time_format_in_parts` (separate columns, with offset)
+
+**Example 4 data table** (capturing daylight saving time variations):
+
+```
+year | month | day | hour | utc_offset | geography | value
+-----|-------|-----|------|------------|-----------|-----
+2012 | 1 | 1 | 0 | -5.0 | g_east | 1.2
+2012 | 1 | 1 | 1 | -5.0 | g_east | 0.9
+2012 | 6 | 1 | 0 | -4.0 | g_east | 2.1
+2012 | 6 | 1 | 1 | -4.0 | g_east | 1.8
+...
+```
+
+Winter (January) has a UTC offset of -5.0 (standard time), while summer (June) has -4.0 (daylight saving time).
+
+**Config 4** — dsgrid combines the parts and applies each row's offset:
+
+```javascript
+{
+  type: "time",
+  name: "Hourly 2012 in Parts with DST",
+  "class": "Time",
+  time_type: "datetime",
+  column_format: {
+    dtype: "time_format_in_parts",
+    year_column: "year",
+    month_column: "month",
+    day_column: "day",
+    hour_column: "hour",
+    offset_column: "utc_offset",    // numeric offset in hours (e.g., -5.0) or string (e.g., "-05:00")
+  },
+  ranges: [
+    {
+      start: "2012-01-01 00:00:00",
+      end: "2012-12-31 23:00:00",
+      frequency: "01:00:00",
+    },
+  ],
+  time_zone_format: {
+    format_type: "aligned_in_absolute_time",
+    time_zone: "America/New_York",        // required: reference timezone for validation and truth data creation
+  },
+  time_interval_type: "period_beginning",
+  measurement_type: "total",
+}
+```
+
+**Data table 4 after registration**:
+
+```
+timestamp | geography | value
+---------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | g_east | 0.9
+2012-06-01 00:00:00-04:00 | g_east | 2.1
+2012-06-01 01:00:00-04:00 | g_east | 1.8
+...
+```
+
+The input columns (`year`, `month`, `day`, `hour`) are combined with the `offset_column` values to produce timezone-aware timestamps, preserving daylight saving time variations.
+
+---
+
+### 1c. Locally Aligned — Multiple Time Zones
+
+Timestamps cover the **same interval of local standard time** across geographies — e.g., every geography has data from midnight to midnight in its own local time. Because the clocks read the same local time but represent different absolute instants, each row must include a `time_zone` column. Use `format_type: "aligned_in_std_clock_time"` in `time_zone_format`.
+
+#### With `timestamp_tz` (timezone-aware single column)
+
+**Example 5 data table**:
+
+```
+timestamp | time_zone | geography | value
+---------------------------|-------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | America/New_York | g_east | 1.2
+2012-01-01 01:00:00-05:00 | America/New_York | g_east | 0.9
+2012-01-01 00:00:00-08:00 | America/Los_Angeles | g_west | 3.1
+2012-01-01 01:00:00-08:00 | America/Los_Angeles | g_west | 2.7
+...
+```
+
+The `time_zone` column contains IANA time zone strings that must match entries in `time_zone_format.time_zones`. Timezone-aware format supports both fixed-offset and DST-observing time zones.
+
+**Config 5**:
+
+```javascript
+{
+  type: "time",
+  name: "Local Hourly 2012",
+  "class": "Time",
+  time_type: "datetime",
+  column_format: {
+    dtype: "timestamp_tz",
+    time_column: "timestamp",
+  },
+  ranges: [
+    {
+      start: "2012-01-01 00:00:00",
+      end: "2012-12-31 23:00:00",
+      frequency: "01:00:00",
+    },
+  ],
+  time_zone_format: {
+    format_type: "aligned_in_std_clock_time",
+    time_zones: ["America/New_York", "America/Los_Angeles"],
+  },
+  time_interval_type: "period_beginning",
+  measurement_type: "total",
+}
+```
+
+**Data table 5 after registration**:
+
+```
+timestamp | time_zone | geography | value
+---------------------------|-------------------------|-----------|-----
+2012-01-01 00:00:00-05:00 | America/New_York | g_east | 1.2
+2012-01-01 01:00:00-05:00 | America/New_York | g_east | 0.9
+2012-01-01 00:00:00-08:00 | America/Los_Angeles | g_west | 3.1
+2012-01-01 01:00:00-08:00 | America/Los_Angeles | g_west | 2.7
+```
+
+The input data is already timezone-aware with matching time zone values, so no localization is needed. The time zone column preserves which IANA zone each row belongs to.
+
+#### With `timestamp_ntz` (timezone-naive single column)
+
+**Example 6 data table**:
+
+```
+timestamp | time_zone | geography | value
+-------------------|-----------|-----------|-----
+2012-01-01 00:00:00 | Etc/GMT+5 | g_east | 1.2
+2012-01-01 01:00:00 | Etc/GMT+5 | g_east | 0.9
+2012-01-01 00:00:00 | Etc/GMT+8 | g_west | 3.1
+2012-01-01 01:00:00 | Etc/GMT+8 | g_west | 2.7
+...
+```
+
+For timezone-naive data, the `time_zone` column must contain **only fixed-offset IANA zones** (no DST observance), and the timestamps must be laid out in standard time for proper localization.
+
+**Config 6**:
 
 ```javascript
 {
@@ -142,64 +391,30 @@ The `time_zone` column must contain only IANA time zone strings that also appear
   ],
   time_zone_format: {
     format_type: "aligned_in_std_clock_time",
-    // All unique IANA fixed-offset time zones that appear in the data table's time_zone column.
-    time_zones: ["Etc/GMT+5", "Etc/GMT+6", "Etc/GMT+7", "Etc/GMT+8"],
+    // All unique IANA fixed-offset time zones that appear in the data table's time_zone column
+    time_zones: ["Etc/GMT+5", "Etc/GMT+8"],
   },
   time_interval_type: "period_beginning",
   measurement_type: "total",
 }
 ```
 
-dsgrid localizes each row's tz-naive timestamp to the IANA zone in its `time_zone` column during registration. Note dsgrid can only localize timezone-naive timestamps to standard time, and only when the timestamps contain no daylight saving time gaps or duplicates, because standard libraries cannot handle fallback duplicates correctly.
-
-If this is a problem, consider using timezone-aware timestamps or timestamps broken out in parts, including offset in the data table.
-
-### 1c. Time stored in separate columns (`time_format_in_parts`)
-
-Some datasets store the date and time as separate integer columns rather than a single timestamp. Use `dtype: "time_format_in_parts"` in `column_format`. dsgrid combines the part columns into a single `timestamp` column during registration.
-
-**Example data table**:
+**Data table 6 after registration**:
 
 ```
-year | month | day | hour | geography | value
------|-------|-----|------|-----------|------
-2012 |     1 |   1 |    0 | g1        | 1.2
-2012 |     1 |   1 |    1 | g1        | 0.9
+timestamp | time_zone | geography | value
+---------------------------|-----------|-----------|-----
+2012-01-01 00:00:00-05:00 | Etc/GMT+5 | g_east | 1.2
+2012-01-01 01:00:00-05:00 | Etc/GMT+5 | g_east | 0.9
+2012-01-01 00:00:00-08:00 | Etc/GMT+8 | g_west | 3.1
+2012-01-01 01:00:00-08:00 | Etc/GMT+8 | g_west | 2.7
 ```
 
-**Config**:
+Each row's tz-naive timestamp is localized to the IANA zone in its `time_zone` column during registration, resulting in timezone-aware timestamps with the appropriate offsets. To store timezone-naive timestamps **without localization**, use `aligned_in_absolute_time` with `time_zone: null`.
 
-```javascript
-{
-  type: "time",
-  name: "Hourly 2012 in Parts",
-  "class": "Time",
-  time_type: "datetime",
-  column_format: {
-    dtype: "time_format_in_parts",
-    year_column: "year",
-    month_column: "month",
-    day_column: "day",
-    hour_column: "hour",          // optional; omit to treat all rows as hour 0
-    // offset_column: "utc_offset"  // optional; UTC offset in hours, e.g. -8 or "-08:00"
-  },
-  ranges: [
-    {
-      start: "2012-01-01 00:00:00",
-      end: "2012-12-31 23:00:00",
-      frequency: "01:00:00",
-    },
-  ],
-  time_zone_format: {
-    format_type: "aligned_in_absolute_time",
-    time_zone: "Etc/GMT+5",
-  },
-  time_interval_type: "period_beginning",
-  measurement_type: "total",
-}
-```
+The `time_format_in_parts` column format is also supported for locally aligned time. See Examples 3 and 4 for additional configuration options.
 
-If `offset_column` is provided, the resulting timestamp column will be timezone-aware (`timestamp_tz`); otherwise it will be timezone-naive (`timestamp_ntz`).
+---
 
 ### Key fields for `datetime`
 
@@ -223,11 +438,11 @@ Index time is a variant of datetime where the data table uses sequential **integ
 ```
 time_index | time_zone  | geography | value
 -----------|------------|-----------|------
-         0 | Etc/GMT+5  | g1        | 1.2
-         1 | Etc/GMT+5  | g1        | 0.9
-         2 | Etc/GMT+5  | g1        | 1.4
+         0 | Etc/GMT+5  | g_east    | 1.2
+         1 | Etc/GMT+5  | g_east    | 0.9
+         2 | Etc/GMT+5  | g_east    | 1.4
 ...
-      8783 | Etc/GMT+5  | g1        | 2.0
+      8783 | Etc/GMT+5  | g_east    | 2.0
 ```
 
 **Config**:

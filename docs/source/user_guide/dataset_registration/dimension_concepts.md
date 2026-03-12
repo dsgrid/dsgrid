@@ -119,7 +119,7 @@ The `column_format` field specifies how time is stored in the data table. Three 
 
 Although the schema accepts multiple `ranges` entries, dsgrid currently only supports a single continuous range. The time zone is specified through `time_zone_format`, which supports two variants:
 
-- **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/Chicago"` or `"Etc/GMT+5"`).
+- **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/New_York"` or `"Etc/GMT+5"`).
 - **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone` column with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table.
 
 Example using local standard clock time (multiple time zones):

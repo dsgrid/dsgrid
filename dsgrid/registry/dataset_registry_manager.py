@@ -46,7 +46,7 @@ from dsgrid.spark.functions import (
     is_dataframe_empty,
     select_expr,
 )
-from dsgrid.spark.types import get_str_type
+from dsgrid.spark.types import get_str_type, DUCKDB_COLUMN_TYPES, SPARK_COLUMN_TYPES, use_duckdb
 from dsgrid.spark.types import DataFrame, F, StringType
 from dsgrid.utils.dataset import (
     split_expected_missing_rows,
@@ -487,8 +487,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         # Build string-offset and numeric-offset fragments for readability.
         offset_string_expr = (
             f"(CASE WHEN SUBSTR(CAST({offset_col} AS {str_type}), 1, 1) = '-' THEN '-' ELSE '+' END) "
-            f"|| LPAD(CAST(CAST(SUBSTR(CAST({offset_col} AS {str_type}), 2, 2) AS INTEGER) AS {str_type}), 2, '0') "
-            f"|| ':' || LPAD(CAST(CAST(SUBSTR(CAST({offset_col} AS {str_type}), 5, 2) AS INTEGER) AS {str_type}), 2, '0')"
+            f"|| SUBSTR(CAST({offset_col} AS {str_type}), 2, 2) "
+            f"|| ':' || SUBSTR(CAST({offset_col} AS {str_type}), 5, 2)"
         )
         offset_numeric_pos_expr = (
             f"'+' || LPAD(CAST(CAST(FLOOR(CAST({offset_col} AS DOUBLE)) AS INTEGER) AS {str_type}), 2, '0') "
@@ -568,11 +568,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         timestamp_str_expr: str, col_format: TimeFormatInPartsModel
     ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
         """Build the final timestamp SQL expression and determine the column format."""
-        sql = f"CAST({timestamp_str_expr} AS TIMESTAMP) AS {TIME_COLUMN}"
+        col_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
         if col_format.offset_column:
+            ts_type = col_types["TIMESTAMP_TZ"]
             new_col_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
         else:
+            ts_type = col_types["TIMESTAMP_NTZ"]
             new_col_format = TimeFormatDateTimeNTZModel(time_column=TIME_COLUMN)
+        sql = f"CAST({timestamp_str_expr} AS {ts_type}) AS {TIME_COLUMN}"
         return sql, new_col_format
 
     @staticmethod

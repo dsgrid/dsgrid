@@ -359,7 +359,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as context:
             load_data_df = read_data_file(file_schema, scratch_dir_context=context)
-            chronify_schema = self._get_chronify_schema(load_data_df)
+            chronify_schema = self.get_chronify_schema(load_data_df)
             assert file_schema.path is not None
             data_file_path = Path(file_schema.path)
             if data_file_path.suffix == ".parquet" or not use_duckdb():
@@ -388,7 +388,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
             self._check_model_year_time_consistency(load_data_df)
 
-    def _get_chronify_schema(self, df: DataFrame):
+    def get_chronify_schema(self, df: DataFrame):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = time_dim.get_load_data_time_columns()
         time_array_id_columns = [
@@ -886,10 +886,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 load_data_df = map_time_dimension_with_chronify_spark_hive(
                     df=save_to_warehouse(load_data_df, table_name),
                     table_name=table_name,
-                    value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
+                    value_column=value_column,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
@@ -903,20 +903,20 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 load_data_df = map_time_dimension_with_chronify_spark_path(
                     df=read_dataframe(filename),
                     filename=filename,
-                    value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
+                    value_column=value_column,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
             case (BackendEngine.DUCKDB, _):
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
-                    value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
+                    value_column=value_column,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )

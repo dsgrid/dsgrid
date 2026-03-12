@@ -32,8 +32,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: issue #341: this is actually tied to the weather_year problem #340
         # If there are no ranges, all of this must be dynamic.
         # The two issues should be solved together.
-        col_dtype = self._get_chronify_dtype()
-        start = self._get_chronify_start_time()
+        col_dtype = self.get_chronify_dtype()
+        start = self.get_chronify_start_time()
 
         match self.model.time_zone_format.format_type:
             case TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
@@ -54,7 +54,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     length=self.get_lengths()[0],
                     resolution=self.get_frequency(),
                     time_zone_column=TIME_ZONE_COLUMN,
-                    time_zones=self._get_chronify_time_zones(),
+                    time_zones=self.get_chronify_time_zones(),
                     measurement_type=self._model.measurement_type,
                     interval_type=self._model.time_interval_type,
                 )
@@ -136,7 +136,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 )
                 raise ValueError(msg)
 
-    def _get_chronify_dtype(self) -> chronify.TimeDataType:
+    def get_chronify_dtype(self) -> chronify.TimeDataType:
         match self.model.column_format.dtype:
             case "timestamp_ntz":
                 return chronify.TimeDataType.TIMESTAMP_NTZ
@@ -146,7 +146,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 msg = f"Unsupported datetime dtype for chronify: {self.model.column_format.dtype}"
                 raise ValueError(msg)
 
-    def _get_chronify_start_time(self) -> pd.Timestamp:
+    def get_chronify_start_time(self) -> pd.Timestamp:
         """Modify start time for chronify depending on localization plan.
         Modification is necessary only for timestamp_ntz data localized to a single time zone.
         because of the way self.get_start_times() works.
@@ -162,11 +162,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             return pd.Timestamp(start_time.replace(tzinfo=None))
         return pd.Timestamp(start_time)
 
-    def _get_chronify_time_zone(self) -> tzinfo | None:
+    def get_chronify_time_zone(self) -> tzinfo | None:
         time_zone = self.get_time_zone()
         return ZoneInfo(time_zone) if time_zone else None
 
-    def _get_chronify_time_zones(self) -> list[tzinfo]:
+    def get_chronify_time_zones(self) -> list[tzinfo]:
         # Does not allow mix of time zones and None because databases do not
         # allow mix of tz-aware and tz-naive timestamps in a single column.
         time_zones = self.get_time_zones()

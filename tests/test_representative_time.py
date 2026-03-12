@@ -77,7 +77,9 @@ def one_weekday_day_and_one_weekend_day_per_month_by_hour_table():
         ]
     )
     return spark.read.csv(
-        ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE.as_posix(), schema=schema, header=True
+        ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE.as_posix(),
+        schema=schema,
+        header=True,
     )
 
 
@@ -139,11 +141,10 @@ def test_time_mapping(
     project_time_config = make_date_time_config()
     if use_duckdb():
         mapped_df = map_time_dimension_with_chronify_duckdb(
-            df,
-            VALUE_COLUMN,
-            config,
-            project_time_config,
-            scratch_dir_context,
+            df=df,
+            from_time_config=config,
+            to_time_config=project_time_config,
+            scratch_dir_context=scratch_dir_context,
         )
     else:
         filename = persist_table(
@@ -154,7 +155,6 @@ def test_time_mapping(
         mapped_df = map_time_dimension_with_chronify_spark_path(
             df=read_dataframe(filename),
             filename=filename,
-            value_column=VALUE_COLUMN,
             from_time_dim=config,
             to_time_dim=project_time_config,
             scratch_dir_context=scratch_dir_context,

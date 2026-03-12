@@ -252,6 +252,16 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
 
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if values.get("dtype") == "TIMESTAMP_TZ":
+            logger.warning(
+                "Renaming legacy dtype 'TIMESTAMP_TZ' to 'timestamp_tz' within TimeFormatDateTimeTZModel."
+            )
+            values["dtype"] = "timestamp_tz"
+        return values
+
 
 class TimeFormatDateTimeNTZModel(DSGBaseModel):
     """Format of timestamps in a dataset is timezone-naive datetime"""
@@ -265,6 +275,16 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
 
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if values.get("dtype") == "TIMESTAMP_NTZ":
+            logger.warning(
+                "Renaming legacy dtype 'TIMESTAMP_NTZ' to 'timestamp_ntz' within TimeFormatDateTimeNTZModel."
+            )
+            values["dtype"] = "timestamp_ntz"
+        return values
 
 
 class TimeFormatInPartsModel(DSGBaseModel):

@@ -142,8 +142,8 @@ def test_time_mapping(
     if use_duckdb():
         mapped_df = map_time_dimension_with_chronify_duckdb(
             df=df,
-            from_time_config=config,
-            to_time_config=project_time_config,
+            from_time_dim=config,
+            to_time_dim=project_time_config,
             scratch_dir_context=scratch_dir_context,
         )
     else:

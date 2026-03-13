@@ -26,21 +26,33 @@ Use this when you want to convert all rows to the **same** target time zone.
 - **Input**: a DataFrame with a `timestamp_tz` column.
 - **Output**: a DataFrame with a `timestamp_ntz` column (local time in the target zone) and a `time_zone` column containing the target zone name.
 
-**Example** — convert a nationally aggregated hourly dataset to US Mountain Standard Time (`Etc/GMT+7`):
+**Example** — convert an `aligned_in_absolute_time` hourly dataset to US Eastern Standard Time (`Etc/GMT+5`):
 
 ```python
 from zoneinfo import ZoneInfo
 from dsgrid.utils.dataset import convert_time_zone_with_chronify_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
-mst = ZoneInfo("Etc/GMT+7")
+est = ZoneInfo("Etc/GMT+5")
 result_df = convert_time_zone_with_chronify_duckdb(
     df=load_data_df,           # DataFrame with timestamp_tz column
     from_time_dim=time_dim,    # DateTimeDimensionConfig describing the input
-    time_zone=mst,
+    time_zone=est,
     scratch_dir_context=ScratchDirContext(scratch_dir),
     value_column="value",
 )
+```
+
+**Input** (`load_data_df` before conversion):
+
+```
+timestamp               | geography | value
+------------------------|-----------|------
+2012-01-01 05:00:00+00  | g_east    | 1.2
+2012-01-01 06:00:00+00  | g_east    | 0.9
+2012-01-01 05:00:00+00  | g_west    | 3.1
+2012-01-01 06:00:00+00  | g_west    | 2.7
+...
 ```
 
 After conversion `result_df` has:
@@ -48,8 +60,10 @@ After conversion `result_df` has:
 ```
 timestamp            | time_zone  | geography | value
 ---------------------|------------|-----------|------
-2012-01-01 00:00:00  | Etc/GMT+7  | g1        | 1.2
-2012-01-01 01:00:00  | Etc/GMT+7  | g1        | 0.9
+2012-01-01 00:00:00  | Etc/GMT+5  | g_east    | 1.2
+2012-01-01 01:00:00  | Etc/GMT+5  | g_east    | 0.9
+2012-01-01 00:00:00  | Etc/GMT+5  | g_west    | 3.1
+2012-01-01 01:00:00  | Etc/GMT+5  | g_west    | 2.7
 ...
 ```
 
@@ -62,7 +76,7 @@ Use this when different rows should be converted to **different** target time zo
 - **Input**: a DataFrame with a `timestamp_tz` column **and** a `time_zone` column that contains the target IANA zone name for each row.
 - **Output**: a DataFrame with a `timestamp_ntz` column (local clock time in each row's target zone); the `time_zone` column is preserved as-is.
 
-**Example** — convert a dataset so each geography's timestamps reflect its local standard time:
+**Example** — convert an `aligned_in_absolute_time` dataset so each geography's timestamps reflect its local standard time:
 
 ```python
 from dsgrid.utils.dataset import (
@@ -80,26 +94,53 @@ result_df = convert_time_zone_by_column_with_chronify_duckdb(
     scratch_dir_context=ScratchDirContext(scratch_dir),
     value_column="value",
     time_zone_column="time_zone",   # default; column added by add_time_zone
+    wrap_time_allowed=False,    # default
 )
 ```
 
-After conversion `result_df` has:
+**Input** (`df_with_tz` after `add_time_zone` and before conversion):
+
+```
+timestamp               | time_zone  | geography | value
+------------------------|------------|-----------|------
+2012-01-01 05:00:00+00  | Etc/GMT+5  | g_east    | 1.2
+2012-01-01 06:00:00+00  | Etc/GMT+5  | g_east    | 0.9
+2013-01-01 03:00:00+00  | Etc/GMT+5  | g_east    | 11.2
+2013-01-01 04:00:00+00  | Etc/GMT+5  | g_east    | 10.9
+...
+2012-01-01 05:00:00+00  | Etc/GMT+6  | g_central | 5.3
+2012-01-01 06:00:00+00  | Etc/GMT+6  | g_central | 2.0
+2013-01-01 03:00:00+00  | Etc/GMT+6  | g_central | 15.3
+2013-01-01 04:00:00+00  | Etc/GMT+6  | g_central | 12.0
+...
+```
+
+After conversion (with `wrap_time_allowed=False`) `result_df` has:
 
 ```
 timestamp            | time_zone  | geography | value
 ---------------------|------------|-----------|------
 2012-01-01 00:00:00  | Etc/GMT+5  | g_east    | 1.2
-2012-01-01 00:00:00  | Etc/GMT+8  | g_west    | 3.1
+2012-01-01 01:00:00  | Etc/GMT+5  | g_east    | 0.9
+2012-12-31 22:00:00  | Etc/GMT+5  | g_east    | 11.2
+2012-12-31 23:00:00  | Etc/GMT+5  | g_east    | 10.9
+...
+2011-12-31 23:00:00  | Etc/GMT+6  | g_west    | 5.3
+2012-01-01 00:00:00  | Etc/GMT+6  | g_west    | 2.0
+2012-12-31 21:00:00  | Etc/GMT+6  | g_west    | 15.3
+2012-12-31 22:00:00  | Etc/GMT+6  | g_west    | 12.0
 ...
 ```
 
-The same absolute UTC instant (`2012-01-01 05:00:00+00`) appears as midnight Eastern or midnight Pacific depending on the row's `time_zone`.
+The same absolute UTC instant (`2012-01-01 05:00:00+00`) appears as midnight Eastern but one hours before midnight for the Central time zone.
+
+To convert the timestamps so that each geography observes the full 2012 calendar year, set `wrap_time_allowed` to `true` (see next section for details).
 
 ### `wrap_time_allowed`
 
 The `convert_time_zone_by_column` functions accept an optional `wrap_time_allowed: bool` parameter (default `False`). It controls what happens when the per-row timezone offsets shift some timestamps **outside** the nominal time range of the source data.
 
-**Why this arises**: suppose your tz-aware source data covers the calendar year 2012 in UTC. Converting a row in Eastern time (`UTC-5`) shifts the first 5 hours backward to `2011-12-31 19:00–23:00 EST`, which falls before the 2012 boundary. Without wrapping, those hours are preserved at their true local clock positions, so the output starts on `2011-12-31` for Eastern rows.
+**Why this arises**: suppose your tz-aware source data covers the calendar year 2012 in UTC. Converting a row in Eastern standard time (`UTC-5`) shifts the first 5 hours backward to `2011-12-31 19:00–23:00 EST`, which falls before the 2012 boundary. Without wrapping, those hours are preserved at their true local clock positions, so the output starts on `2011-12-31` for Eastern rows.
 
 **Effect of `wrap_time_allowed=True`**: Chronify reorders the timestamps cyclically so the output covers the *same nominal range* as the source schema in tz-naive clock time. The 5 early-morning hours that would have landed in 2011 are instead placed at the end of the year (after `2012-12-31 19:00 EST`). The result is still 8760 hours, all within 2012, just reordered.
 
@@ -120,6 +161,25 @@ result_df = convert_time_zone_by_column_with_chronify_duckdb(
     wrap_time_allowed=True,   # keep each geography's output within the same nominal year
 )
 ```
+
+Using the same `aligned_in_absolute_time` dataset example in section 2 above.
+After conversion (with `wrap_time_allowed=True`) `result_df` has:
+
+```
+timestamp            | time_zone  | geography | value
+---------------------|------------|-----------|------
+2012-01-01 00:00:00  | Etc/GMT+5  | g_east    | 1.2
+2012-01-01 01:00:00  | Etc/GMT+5  | g_east    | 0.9
+2012-12-31 22:00:00  | Etc/GMT+5  | g_east    | 11.2
+2012-12-31 23:00:00  | Etc/GMT+5  | g_east    | 10.9
+...
+2012-01-01 00:00:00  | Etc/GMT+6  | g_west    | 2.0
+2012-12-31 21:00:00  | Etc/GMT+6  | g_west    | 15.3
+2012-12-31 22:00:00  | Etc/GMT+6  | g_west    | 12.0
+2012-12-31 23:00:00  | Etc/GMT+6  | g_west    | 5.3
+...
+
+Each geography now covers the full 2012 calendar year.
 
 ---
 

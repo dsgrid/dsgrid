@@ -398,7 +398,7 @@ def convert_time_zone_by_column_with_chronify_duckdb(
     using chronify and DuckDB.
     All operations are performed in memory.
     Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps of the time zones specified in the time_zone_column.
+    tz-naive timestamps with time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_in_memory_db()
@@ -542,7 +542,7 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
     Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps of the time zones specified in the time_zone_column.
+    tz-naive timestamps with time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -690,7 +690,7 @@ def convert_time_zone_by_column_with_chronify_spark_path(
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
     Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps of the time zones specified in the time_zone_column.
+    tz-naive timestamps with time zones specified in the time_zone_column.
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)

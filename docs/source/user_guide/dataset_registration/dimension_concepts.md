@@ -86,7 +86,7 @@ The following example shows a `datetime` time dimension with hourly timestamps a
   ],
   time_zone_format: {
     format_type: "aligned_in_absolute_time",
-    time_zone: "Etc/GMT+5",
+    time_zone: "America/New_York",
   },
   time_interval_type: "period_beginning",
   measurement_type: "total",
@@ -95,8 +95,8 @@ The following example shows a `datetime` time dimension with hourly timestamps a
 
 The `column_format` field specifies how time is stored in the data table. Three dtypes are supported:
 
-- **`timestamp_tz`** — a single timezone-aware timestamp column (default). The `time_column` field sets the column name (default: `"timestamp"`).
-- **`timestamp_ntz`** — a single timezone-naive timestamp column. Same `time_column` field. Any time zone specified in the config must be null or in standard time for localization (see [Time Zone Localization](#time-zone-localization)). It does not work with time zones with daylight savings.
+- **`timestamp_tz`** — a single timezone-aware timestamp column (default). The `time_column` field sets the column name (default: `"timestamp"`). Works with both fixed offset time zones and daylight savings observing time zones in the config.
+- **`timestamp_ntz`** — a single timezone-naive timestamp column. Same `time_column` field. Any time zone specified in the config must be null for no localization or in standard time (fixed offset) for localization (see [Time Zone Localization](#time-zone-localization)). Localization does not work with time zones that observe daylight savings due to inability to localize fallback duplicate timestamps accurately.
 - **`time_format_in_parts`** — time is split across multiple integer columns instead of a single timestamp column. Required columns are `year_column`, `month_column`, and `day_column`; optional columns are `hour_column` (defaults to 0 for all rows if omitted) and `offset_column` (UTC offset in hours, e.g. `-8` or `"-08:00"`). dsgrid automatically combines the part columns into a single column named `timestamp` on registration.
 
 ```javascript
@@ -149,19 +149,20 @@ Example using local standard clock time (multiple time zones):
   measurement_type: "total",
 }
 ```
-`Etc/GMT+5` through `Etc/GMT+8` are the IANA fixed-offset zones corresponding to UTC−5 through UTC−8 (US Eastern through Pacific standard time offsets). Note the POSIX sign convention: `Etc/GMT+N` is UTC−N.
+`Etc/GMT+5` through `Etc/GMT+8` are the IANA fixed-offset zones corresponding to UTC−5 through UTC−8 (US Eastern through Pacific standard time offsets). Note the POSIX sign convention: `Etc/GMT+N` is UTC−N. These time zones observe standard time (no daylight savings) because `column_format.dtype` is `timestamp_ntz` due to localization need (see [Time Zone Localization](#time-zone-localization)).
 
-All time zones must be those observing standard time (no daylight savings) when `column_format.dtype` is `timestamp_ntz` due to localization need (see [Time Zone Localization](#time-zone-localization)). The time zones can be those observing daylight savings time if the timestamps in the data table are tz-aware (`timestamp_tz`).
+For detailed examples for each time dimension type, see [How to Define a Time Dimension](../how_tos/how_to_time_dimension).
+
 
 
 #### Time Zone Localization
-When a data table stores timestamps as timezone-naive (`timestamp_ntz`) but the config specifies a timezone, dsgrid automatically localizes the timestamps during dataset registration. All time zone(s) must be in standard time (without daylight savings) for time zone localization because duplicated tz-naive timestamps cannot be localized accurately.
+When the timestamps in the data table are parsed as timezone-naive (`timestamp_ntz`, `time_format_in_parts` without `offset_column`) but the config specifies a timezone, dsgrid automatically localizes the timestamps during dataset registration. All time zone(s) must be in standard time (fixed offset without daylight savings) for time zone localization because duplicated tz-naive timestamps cannot be localized accurately.
 
-For `aligned_in_absolute_time` with `column_format.dtype = "timestamp_ntz"`, localization uses `time_zone_format.time_zone`.
+For `aligned_in_absolute_time`, localization uses `time_zone_format.time_zone`.
 
 For `aligned_in_std_clock_time`, localization uses the per-row `time_zone` column in the data table. Every value in that column must be one of the IANA time zone strings listed in `time_zone_format.time_zones`.
 
-To store timezone-naive timestamps without any localization, set `time_zone` to `null`:
+To store timezone-naive timestamps without any localization, set `format_type` to `aligned_in_absolute_time` and `time_zone` to `null`:
 
 ```javascript
   ...

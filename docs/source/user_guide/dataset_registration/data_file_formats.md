@@ -704,31 +704,6 @@ In the data file, time components appear as separate integer columns:
 The time-in-parts columns are dropped from the data during registration and replaced by a single `timestamp` column. The original data files are not modified.
 :::
 
-#### Datetime with External Time Zone
-
-For datasets where timestamps are timezone-naive and the time zone is derived from the geography dimension. This uses a dedicated time dimension model ([DatetimeExternalTimeZoneDimensionModel](../../software_reference/data_models/dimension_model.md#datetimeexternaltimezonedimensionmodel)) rather than the `column_format` field used by the standard [DateTime](#datetime) format.
-
-The data files look the same as [TIMESTAMP_NTZ](#timestamp-ntz) — naive timestamps with no time zone suffix. The geography dimension's records must include a `time_zone` column with IANA time zone strings so dsgrid can localize the timestamps.
-
-```javascript
-// Time dimension config
-time_type: "datetime_external_tz",
-time_zone_format: {
-  format_type: "aligned_in_clock_time",
-  time_zones: ["US/Eastern", "US/Central", "US/Mountain", "US/Pacific"],
-},
-ranges: [{
-  start: "2012-01-01 00:00:00",
-  end: "2012-12-31 23:00:00",
-  str_format: "%Y-%m-%d %H:%M:%S",
-  frequency: "01:00:00",
-}],
-time_interval_type: "period_beginning",
-measurement_type: "total",
-```
-
-See [DatetimeExternalTimeZoneDimensionModel](../../software_reference/data_models/dimension_model.md#datetimeexternaltimezonedimensionmodel) for all config fields.
-
 #### Annual
 
 Annual time dimensions contain one value per year per dimension combination. The time dimension config specifies the range of years:

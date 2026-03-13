@@ -18,7 +18,6 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
-    DATETIME_EXTERNAL_TZ = "datetime_external_tz"
     INDEX = "index"
     NOOP = "noop"
 
@@ -28,7 +27,6 @@ class TimeZoneFormat(str, Enum):
 
     ALIGNED_IN_ABSOLUTE_TIME = "aligned_in_absolute_time"
     ALIGNED_IN_STD_CLOCK_TIME = "aligned_in_std_clock_time"
-    LOCAL_AS_STRINGS = "local_as_strings"
 
     @classmethod
     def _missing_(cls, value):

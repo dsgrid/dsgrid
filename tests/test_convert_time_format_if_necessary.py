@@ -20,7 +20,6 @@ from dsgrid.common import TIME_COLUMN
 from dsgrid.spark.functions import (
     get_spark_session,
     select_expr,
-    set_current_time_zone,
 )
 import pandas as pd
 
@@ -133,49 +132,6 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
         "2019-12-31 19:00:00",  # +05:00
         "2020-01-01 08:00:00",  # -08:00
         "2020-01-01 07:45:00",  # -07:45
-    ]
-    assert got == expected
-
-
-def test_offset_parsing_in_parts_backend_agnostic():
-    # Backend-agnostic: run under current engine (DuckDB or Spark).
-
-    spark = get_spark_session()
-    set_current_time_zone("UTC")
-
-    col_format = TimeFormatInPartsModel(
-        year_column="year",
-        month_column="month",
-        day_column="day",
-        hour_column="hour",
-        offset_column="utc_offset",
-    )
-
-    pdf = pd.DataFrame(
-        {
-            "year": [2020, 2020],
-            "month": [1, 1],
-            "day": [1, 1],
-            "hour": [0, 0],
-            "utc_offset": [5.5, -8.0],
-        }
-    )
-    df = spark.createDataFrame(pdf)
-    mgr = make_manager()
-    ts_str = mgr._build_timestamp_string_expr(col_format)
-    ts_sql, new_col_format = mgr._build_timestamp_sql(ts_str, col_format)
-    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
-    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
-
-    assert new_col_format.dtype == "timestamp_tz"
-    check_df = select_expr(
-        out_df, [f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"]
-    )
-    rows = check_df.collect()
-    got = [row.ts_str for row in rows]
-    expected = [
-        "2019-12-31 18:30:00",
-        "2020-01-01 08:00:00",
     ]
     assert got == expected
 

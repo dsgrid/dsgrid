@@ -51,7 +51,6 @@ Defines the supported time formats in the load data.
 | `DATETIME` | `'datetime'` |
 | `ANNUAL` | `'annual'` |
 | `REPRESENTATIVE_PERIOD` | `'representative_period'` |
-| `DATETIME_EXTERNAL_TZ` | `'datetime_external_tz'` |
 | `INDEX` | `'index'` |
 | `NOOP` | `'noop'` |
 

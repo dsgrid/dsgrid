@@ -492,11 +492,7 @@ Defines a supplemental dimension.
 
 *dsgrid.dimension.time.TimeBasedDataAdjustmentModel*
 
-Defines how data needs to be adjusted with respect to time.
-For leap day adjustment, up to one full day of timestamps and data are dropped.
-For daylight savings, the dataframe is adjusted alongside the timestamps.
-This is useful when the load profiles are modeled in standard time and
-need to be converted to get clock time load profiles.
+Defines adjustments to timestamps and associated data when time representation changes (e.g., mapping from index-based to datetime format). Adjustments are applied to both the time column and its associated data values.
 
 ### Fields
 
@@ -504,7 +500,7 @@ need to be converted to get clock time load profiles.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `leap_day_adjustment` | [LeapDayAdjustmentType](enums.md#leapdayadjustmenttype) | `LeapDayAdjustmentType.NONE` | Leap day adjustment method applied to time data. The dsgrid default is None, i.e., no adjustment made to leap years. Adjustments are made to leap years only. |
-| `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Daylight saving adjustment method applied to time data |
+| `leap_day_adjustment` | [LeapDayAdjustmentType](enums.md#leapdayadjustmenttype) | `LeapDayAdjustmentType.NONE` | Method for handling leap year dates. Options specify which day (if any) to drop from leap years to make them 365 days. Default is `NONE` (no adjustment). |
+| `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Method for handling daylight saving time transitions when converting tz-naive timestamps from standard time to clock time that can observe daylight saving. Specifies how to adjust data during spring-forward and fall-back hours. Default is `NONE` (no adjustment). Typically used when mapping a special case of index-based time dimensions to datetime format. See [How to Define a Time Dimension](../../user_guide/how_tos/how_to_time_dimension.md) for details. |
 
 </div>

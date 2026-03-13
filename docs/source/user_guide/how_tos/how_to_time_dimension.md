@@ -2,6 +2,8 @@
 
 Time dimensions work differently from other dimension types: instead of a records CSV, they are defined entirely by parameters in the config file. This guide covers each supported time type with example data tables and configs.
 
+**Note:** DST = Daylight Saving Time
+
 ## Overview
 
 Select the right `time_type` based on how your dataset represents time:
@@ -27,11 +29,11 @@ Datetime is the most common time type. The config describes two things:
 
 ### Difference between time zones and offsets
 
-IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5). Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during daylight saving time).
+IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5). Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
 
-In general, dsgrid performs time zone localization automatically when the input data has timezone-naive timestamps. However, the input timestamps must be laid out in standard time (without daylight savings skips and duplicates) for correct localization, as standard libraries cannot handle fallback duplicates correctly.
+In general, dsgrid performs time zone localization automatically when the input data has timezone-naive timestamps. However, the input timestamps must be laid out in standard time (without DST skips and duplicates) for correct localization, as standard libraries cannot handle fallback duplicates correctly.
 
-To ingest timestamps that observe daylight savings, they must already be timezone-aware in the data table, or stored with per-row UTC offsets via `offset_column`. Additionally, even when timestamps are timezone-aware or offset values are provided, the `time_zone` field must still be specified in `time_zone_format` because dsgrid uses it to construct validation data independent of the column format.
+To ingest timestamps that observe DST, they must already be timezone-aware in the data table, or stored with per-row UTC offsets via `offset_column`. Additionally, even when timestamps are timezone-aware or offset values are provided, the `time_zone` field must still be specified in `time_zone_format` because dsgrid uses it to construct validation data independent of the column format.
 
 ### 1a. Column Format Distinctions
 
@@ -231,7 +233,7 @@ The input columns (`year`, `month`, `day`, `hour`) are combined into a single `t
 
 #### With `time_format_in_parts` (separate columns, with offset)
 
-**Example 4 data table** (capturing daylight saving time variations):
+**Example 4 data table** (capturing DST variations):
 
 ```
 year | month | day | hour | utc_offset | geography | value
@@ -243,7 +245,7 @@ year | month | day | hour | utc_offset | geography | value
 ...
 ```
 
-Winter (January) has a UTC offset of -5.0 (standard time), while summer (June) has -4.0 (daylight saving time).
+Winter (January) has a UTC offset of -5.0 (standard time), while summer (June) has -4.0 (DST).
 
 **Config 4** — dsgrid combines the parts and applies each row's offset:
 
@@ -289,7 +291,7 @@ timestamp | geography | value
 ...
 ```
 
-The input columns (`year`, `month`, `day`, `hour`) are combined with the `offset_column` values to produce timezone-aware timestamps, preserving daylight saving time variations.
+The input columns (`year`, `month`, `day`, `hour`) are combined with the `offset_column` values to produce timezone-aware timestamps, preserving DST variations.
 
 ---
 
@@ -431,9 +433,25 @@ The `time_format_in_parts` column format is also supported for locally aligned t
 
 ## 2. Index Time
 
-Index time is a variant of datetime where the data table uses sequential **integer indices** (`time_index`) instead of timestamps. The config maps those indices to a real time range via a `starting_timestamp` and `frequency`. This is useful when source data uses row numbers or model time steps rather than calendar timestamps.
+Index time uses sequential **integer indices** instead of explicit timestamps. The config maps these indices to a real time range using `starting_timestamp`, `frequency`, and the range of start/end indices. This is useful when source data is indexed (e.g., 1-8760 or 0-8783) rather than timestamped directly.
 
-**Example data table** (index 0 = 2012-01-01 00:00 EST, hourly):
+**How it works**: Index `start` corresponds to `starting_timestamp`, and each subsequent index shifts forward by one `frequency` increment.
+
+**Requirements**:
+- **`time_zone` column required**: Must exist in both the geography dimension records and the data table. Used when converting indices to datetimes during dataset-to-project mapping.
+- **All time zones allowed**: Including DST-observing zones like `"America/New_York"` and fixed-offset zones like `"Etc/GMT+5"`.
+
+**Conversion behavior**: Index-to-datetime conversion happens only when the dataset (with index time) maps to a project (with datetime time). The conversion respects time adjustments specified in the project config, such as `daylight_saving_adjustment`, `leap_day_adjustment`, and `wrap_time_allowed`.
+
+---
+
+### Common use cases
+
+**Example 1: Electricity data with standard 8760 indexing**
+
+Electricity datasets commonly index hourly values from 0-8759 (or 1-8760). The config records the starting point to preserve time specificity (day of week, season, etc.).
+
+**Example data table**:
 
 ```
 time_index | time_zone  | geography | value
@@ -467,9 +485,50 @@ time_index | time_zone  | geography | value
 }
 ```
 
-Index time always requires a `time_zone` column in both the geography dimension records and the data table (used to convert indices to localized datetimes when mapping to a project's datetime dimension). All time zones (including those observing daylight savings) are accepted in this time class.
+**Example 2: Industrial data with DST adjustment**
 
----
+Some datasets (e.g., IEF industrial profiles) are stitched together from representative diurnal profiles in local standard time. When mapping to a project, both the timestamps and data values must be adjusted for DST transitions. Geographies observing DST will have dropped (spring-forward) or duplicated (fall-back) hours. Interpolation is available for the fall-back hour adjustment.
+
+**Dataset config**:
+
+```javascript
+{
+  type: "time",
+  "class": "Time",
+  time_type: "index",
+  name: "ind_time",
+  description: "Industrial 8760-indexed time with 2018-01-01 00:00:00 start, stitched from representative diurnal profiles in local standard time. Requires DST adjustment during mapping to account for DST transitions.",
+  time_interval_type: "period_beginning",
+  ranges: [
+    {
+      start: 0,
+      end: 8759,
+      starting_timestamp: "2018-01-01 00:00:00",
+      str_format: "%Y-%m-%d %H:%M:%S",
+      frequency: "01:00:00",
+    },
+  ],
+  measurement_type: "total",
+}
+```
+
+**Project config** to apply daylight saving adjustment:
+
+```javascript
+{
+  dataset_id: 'ief_2025_industry',
+  wrap_time_allowed: true,
+  time_based_data_adjustment: {
+    daylight_saving_adjustment: {
+      spring_forward_hour: "drop",
+      fall_back_hour: "duplicate",
+    },
+  },
+  ...
+}
+```
+
+When the dataset maps to the project, the index time is first converted to standard time datetimes. Then, for each geography's time zone, data rows are adjusted according to the `daylight_saving_adjustment` setting if that zone observes DST. Hours during spring-forward are dropped and hours during fall-back are duplicated, affecting both timestamps and their associated data values.
 
 ## 3. Representative Time
 
@@ -555,7 +614,7 @@ month | is_weekday | hour | geography | value
 }
 ```
 
-Both representative period formats require a `time_zone` column in the geography dimension records because representative periods must be localized when mapping to a project's datetime dimension. All time zones (including those observing daylight savings) are accepted in this time class.
+Both representative period formats require a `time_zone` column in the geography dimension records because representative periods must be localized when mapping to a project's datetime dimension. All time zones (including those observing DST) are accepted in this time class.
 
 ---
 

@@ -458,10 +458,9 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
 
 
 class AlignedTimeSingleTimeZone(DSGBaseModel):
-    """For each geography, data has the same set of timestamps in absolute time.
-    Timestamps in the data must be tz-aware.
+    """All geographies have data with the same set of timestamps in absolute time.
 
-    E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
+    E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
     """
 
     format_type: Literal[

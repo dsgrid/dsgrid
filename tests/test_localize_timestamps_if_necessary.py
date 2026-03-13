@@ -38,6 +38,7 @@ from dsgrid.config.dimensions import (
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import DSGInvalidOperation
+import dsgrid
 from dsgrid.spark.types import DataFrame
 from dsgrid.spark.functions import get_spark_session
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
@@ -45,6 +46,16 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
 spark = get_spark_session()
+
+
+def _skip_unless_spark():
+    """Skip test unless backend_engine is SPARK.
+
+    Spark routing tests should only run when Spark is the active backend,
+    to avoid false failures in DuckDB-only CI jobs.
+    """
+    if dsgrid.runtime_config.backend_engine != BackendEngine.SPARK:
+        pytest.skip("Spark routing tests only run when backend_engine is SPARK")
 
 
 def make_datetime_config_single_tz_ntz(time_zone="Etc/GMT+7"):
@@ -270,6 +281,7 @@ def test_single_tz_duckdb_calls_duckdb(monkeypatch, tmp_path):
 
 
 def test_single_tz_spark_hive(monkeypatch, tmp_path):
+    _skip_unless_spark()
     monkeypatch.setattr("dsgrid.runtime_config.backend_engine", BackendEngine.SPARK)
     monkeypatch.setattr("dsgrid.runtime_config.use_hive_metastore", True)
 
@@ -304,6 +316,7 @@ def test_single_tz_spark_hive(monkeypatch, tmp_path):
 
 
 def test_single_tz_spark_path(monkeypatch, tmp_path):
+    _skip_unless_spark()
     monkeypatch.setattr("dsgrid.runtime_config.backend_engine", BackendEngine.SPARK)
     monkeypatch.setattr("dsgrid.runtime_config.use_hive_metastore", False)
 
@@ -449,6 +462,7 @@ def test_multi_tz_duckdb_existing_tz_column(monkeypatch, tmp_path):
 
 
 def test_multi_tz_spark_hive_existing_tz_column(monkeypatch, tmp_path):
+    _skip_unless_spark()
     monkeypatch.setattr("dsgrid.runtime_config.backend_engine", BackendEngine.SPARK)
     monkeypatch.setattr("dsgrid.runtime_config.use_hive_metastore", True)
 
@@ -488,6 +502,7 @@ def test_multi_tz_spark_hive_existing_tz_column(monkeypatch, tmp_path):
 
 
 def test_multi_tz_spark_path(monkeypatch, tmp_path):
+    _skip_unless_spark()
     monkeypatch.setattr("dsgrid.runtime_config.backend_engine", BackendEngine.SPARK)
     monkeypatch.setattr("dsgrid.runtime_config.use_hive_metastore", False)
 

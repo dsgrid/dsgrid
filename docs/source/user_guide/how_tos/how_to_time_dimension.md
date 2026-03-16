@@ -27,11 +27,11 @@ Datetime is the most common time type. The config describes two things:
 - **`column_format`** -- how timestamps are stored in the data table (`timestamp_tz`, `timestamp_ntz`, or `time_format_in_parts`)
 - **`time_zone_format`** -- whether timestamps are aligned in absolute time (single timezone for all geographies) or local standard clock time (one timezone per geography)
 
-### Difference between time zones and offsets
+### Time zones, UTC offsets, Localization, and Validation
 
 IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5). Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
 
-In general, dsgrid performs time zone localization automatically when the input data has timezone-naive timestamps. However, the input timestamps must be laid out in standard time (without DST skips and duplicates) for correct localization, as standard libraries cannot handle fallback duplicates correctly.
+dsgrid automatically localizes timezone-naive timestamps to the zone(s) specified in `time_zone_format` during registration. Timezone-naive data is indicated by `column_format.dtype` as `timestamp_ntz` or `time_format_in_parts` without `offset_column`. For correct localization, input timestamps must be laid out in standard time (without DST skips and duplicates), because standard libraries cannot safely handle ambiguous or missing hours at DST transitions. Consequently, when using timezone-naive data, `time_zone_format` can only reference IANA zones with constant UTC offsets (e.g., "Etc/GMT+5"), not DST-observing zones like "America/New_York". This restriction applies only to timezone-naive localization; for all other scenarios, both zone types are supported.
 
 To ingest timestamps that observe DST, they must already be timezone-aware in the data table, or stored with per-row UTC offsets via `offset_column`. Additionally, even when timestamps are timezone-aware or offset values are provided, the `time_zone` field must still be specified in `time_zone_format` because dsgrid uses it to construct validation data independent of the column format.
 
@@ -43,7 +43,7 @@ Three formats are supported for storing time data:
 
 **`timestamp_ntz` (timezone-naive)** — A single timestamp column with no offset/timezone information (e.g., `2012-01-01 00:00:00`). dsgrid automatically localizes these to the zone(s) specified in `time_zone_format` during registration. Input data must use standard time (no DST observance) for accurate localization. See Examples 2 and 6 below.
 
-**`time_format_in_parts`** — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single `timestamp` column during registration. Optionally, per-row UTC offsets can be provided via `offset_column` to construct timezone-aware timestamps directly; otherwise, localization is applied using `time_zone_format`. See Examples 3 and 4 below.
+**`time_format_in_parts`** — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single `timestamp` column during registration. Optionally, per-row UTC offsets can be provided via `offset_column` to construct timezone-aware timestamps directly; otherwise, the constructed timestamps are timezone-naive. Localization can be applied using `time_zone_format`. See Examples 3 and 4 below.
 
 ---
 
@@ -690,4 +690,3 @@ NoOp time does not require a `time_zone` column in the geography dimension.
 - [Dimension Concepts -- Time Dimensions](../dataset_registration/dimension_concepts.md#time-dimensions) -- conceptual overview and `column_format` details
 - [Dimension Data Models](../../software_reference/data_models/dimension_model.md) -- complete config schema reference
 - [How to Define Dimensions](how_to_dimensions.md) -- general dimension workflow
-- [How to Convert Time Zones](how_to_convert_time_zone.md) -- converting tz-aware timestamps to local time in query results

@@ -119,8 +119,8 @@ The `column_format` field specifies how time is stored in the data table. Three 
 
 Although the schema accepts multiple `ranges` entries, dsgrid currently only supports a single continuous range. The time zone is specified through `time_zone_format`, which supports two variants:
 
-- **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/New_York"` or `"Etc/GMT+5"`).
-- **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone` column with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table.
+- **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/New_York"` or `"Etc/GMT+5"`) or `None` for no time zone. Accepted `time_zones` types depend on `column_format`. When input timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive, only fixed UTC offset zones (due to localization requirement) or `None` are allowed.
+- **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone_column` with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table. Accepted `time_zones` types depend on `column_format`. When input timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive, only fixed UTC offset zones are allowed due to localization requirement. `None` is not allowed as timestamps cannot be a mix of timezone-aware and -naive types.
 
 Example using local standard clock time (multiple time zones):
 
@@ -222,5 +222,4 @@ Time dimensions work differently from other dimensions. Instead of records in a 
 - [Dimension Record Classes](../../software_reference/data_models/dimension_classes.md) - Full listing and tables of fields for all record classes
 - [How to Define Dimensions](../how_tos/how_to_dimensions) - Step-by-step workflow
 - [How to Define a Time Dimension](../how_tos/how_to_time_dimension) - Detailed examples for each time dimension type
-- [How to Convert Time Zones](../how_tos/how_to_convert_time_zone) - Converting tz-aware timestamps to local time in query results
 - [Dataset Concepts](dataset_concepts) - Learn about datasets, including dataset types and file formats

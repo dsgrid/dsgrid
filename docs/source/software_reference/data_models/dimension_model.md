@@ -103,6 +103,26 @@ All geographies have data with the same set of timestamps in absolute time.
 
 E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
 
+For time zone, only an IANA time zone name or None is accepted. The types of time zones
+supported (fixed offset or DST-observing) depend on column_format, which in part defines
+whether the timestamps are tz-naive after parsing:
+
+1. When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+("America/New_York") are accepted.
+
+2. When the input timestamps are tz-naive (i.e., 'timestamp_ntz' or TimeFormatInParts without
+offset column), only IANA time zones with constant UTC offsets (e.g., "Etc/GMT+5") are allowed
+because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+definition, the timestamps in the data table must also be in standard time without skips and
+duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+missing timestamps at DST transitions when localizing tz-naive timestamps.
+
+Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
+from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
+a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York"
+have multiple offsets depending on the calendar date (UTC-5 during standard time,
+UTC-4 during daylight saving time).
+
 ### Fields
 
 <div class="model-fields-table">
@@ -110,7 +130,7 @@ E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME"` |  |
-| `time_zone` | `str` \| None | *(required)* | IANA time zone of data. Accepts None for no time zone. |
+| `time_zone` | `str` \| None | *(required)* | IANA time zone of data. Accepts `None` for no time zone. The types of time zones supported (fixed offset or DST-observing) depend on `column_format.dtype`. When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), only fixed UTC offset zones are allowed. |
 
 </div>
 
@@ -134,21 +154,26 @@ E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
 Timestamps cover the same interval of local clock time across geographies.
 
 All data represents the same interval of standard clock time as experienced locally
-in each geography's time zone. For example, all geographies have data from
-2018-01-01 00:00 to 2018-12-31 23:00 in their respective local standard times,
-but these represent different absolute UTC instants.
-
-The data table must contain a `time_zone` column with IANA time zone names
-(one per row) that match the entries in the `time_zones` list below. Furthermore,
-only IANA time zones with constant UTC offsets are allowed. For example, "Etc/GMT+5",
-as the IANA representation of Eastern Standard Time (EST), is allowed, but
-"America/New_York" is not because it observes daylight saving time. This restriction
-is necessary to avoid ambiguous or missing timestamps at daylight saving time
-transitions when localizing tz-naive timestamps.
+in each geography's time zone, but the intervals represent different absolute UTC instants.
 
 Example: California data starts at 2018-01-01 00:00-08:00, while
 New York data starts at 2018-01-01 00:00-05:00. Both rows have the
 same local clock time but represent different absolute UTC instants.
+
+The data table must contain a `time_zone` column with IANA time zone names
+(one per row) that match the entries in the `time_zones` list below. The types of of time
+zones supported (fixed offset or DST-observing) depend on column_format, which in part defines
+whether the timestamps are tz-naive after parsing:
+
+1. When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+("America/New_York") are accepted.
+
+2. When the input timestamps are tz-naive (i.e., 'timestamp_ntz' or TimeFormatInParts without
+offset column), only IANA time zones with constant UTC offsets (e.g., "Etc/GMT+5") are allowed
+because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+definition, the timestamps in the data table must also be in standard time without skips and
+duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+missing timestamps at DST transitions when localizing tz-naive timestamps.
 
 Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
 from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
@@ -163,7 +188,7 @@ UTC-4 during daylight saving time).
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME"` |  |
-| `time_zones` | list[`str`] | *(required)* | List of unique, fixed-offset IANA time zones in the dataset. Does not allow 'None' as a time zone. Does not allow time zones that observe daylight saving time. |
+| `time_zones` | list[`str`] | *(required)* | List of unique IANA time zones in the dataset. Does not allow `None` as a time zone. The types of time zones supported (fixed offset or DST-observing) depend on `column_format.dtype`. When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), only fixed UTC offset zones are allowed. |
 
 </div>
 

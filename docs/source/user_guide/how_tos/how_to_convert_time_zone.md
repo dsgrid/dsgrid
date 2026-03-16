@@ -1,12 +1,14 @@
 # How to Convert Time Zones
 
+Time zone conversion shifts a timestamp from one time zone to another, changing its local time representation. The underlying UTC instant—the actual moment in time—remains unchanged.
+
 dsgrid provides time zone conversion through [Chronify](https://github.com/NREL/chronify), a time series mapping library. The relevant functions live in `dsgrid/utils/dataset.py`. This guide covers when and how to use them, what the input and output time columns look like, and how the query backend affects the output.
 
 ## Why the output is always timezone-naive
 
 Both conversion functions described below produce a **timezone-naive** (`timestamp_ntz`) output timestamp column, even though the input is timezone-aware (`timestamp_tz`). This is intentional.
 
-Query backends (DuckDB, Spark) display `timestamp_tz` columns relative to the **system session time zone**, not the input offset or time zone. This means that if you keep timestamps tz-aware after conversion, the value you see when you query the table depends on where the query is run, making the conversion effectively invisible. To make the local time unambiguous and portable, dsgrid converts back to tz-naive timestamps, pairing them with a `time_zone` column that records the target zone for each row.
+Query backends (DuckDB, Spark) display `timestamp_tz` columns relative to the **system session time zone**, not the input offset or time zone. This means that if you keep timestamps tz-aware after conversion, the value you see when you query the table depends on where the query is run (i.e., system time zone), making the conversion effectively invisible. To make the local time unambiguous and portable, dsgrid converts back to tz-naive timestamps, pairing them with a `time_zone` column that records the target zone for each row.
 
 In summary:
 
@@ -132,7 +134,7 @@ timestamp            | time_zone  | geography | value
 ...
 ```
 
-The same absolute UTC instant (`2012-01-01 05:00:00+00`) appears as midnight Eastern but one hours before midnight for the Central time zone.
+The same absolute UTC instant (`2012-01-01 05:00:00+00`) appears as midnight Eastern but one hour before midnight for the Central time zone.
 
 To convert the timestamps so that each geography observes the full 2012 calendar year, set `wrap_time_allowed` to `true` (see next section for details).
 
@@ -146,7 +148,7 @@ The `convert_time_zone_by_column` functions accept an optional `wrap_time_allowe
 
 | `wrap_time_allowed` | Behavior |
 |---|---|
-| `False` (default) | Output timestamps reflect true local clock time; range may shift relative to the source |
+| `False` (default) | Output timestamps reflect true local clock time; range may shift relative to the input data, or may vary by geography |
 | `True` | Output timestamps are wrapped so the local-time range matches the source schema's nominal range |
 
 Use `wrap_time_allowed=True` when the source dataset represents a *repeating typical period* (e.g., a representative year) and you want each geography's output to cover the same nominal period in local time rather than an offset window.

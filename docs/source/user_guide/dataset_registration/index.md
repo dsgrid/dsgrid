@@ -17,7 +17,6 @@ registration_checks
 
 - [How to Create Dataset Dimensions](../how_tos/how_to_dimensions)
 - [How to Define a Time Dimension](../how_tos/how_to_time_dimension)
-- [How to Convert Time Zones](../how_tos/how_to_convert_time_zone)
 
 ## Tutorials
 

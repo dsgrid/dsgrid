@@ -68,13 +68,11 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `cls` | `Any` | `None` | Dimension record model class |
 | `description` | `str` \| None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.DATETIME` | Type of time dimension |
-| `column_format` | [TimeFormatDateTimeTZModel](dimension_model.md#timeformatdatetimetzmodel) \| [TimeFormatDateTimeNTZModel](dimension_model.md#timeformatdatetimentzmodel) \| [TimeFormatInPartsModel](dimension_model.md#timeformatinpartsmodel) | `dtype='TIMESTAMP_TZ' time_column='timestamp'` | Specifies the format of the timestamps in the dataset. |
-| `time_zone_format` | [AlignedTimeSingleTimeZone](dimension_model.md#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](dimension_model.md#localtimemultipletimezones) | *(required)* | Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone. |
+| `column_format` | [TimeFormatDateTimeTZModel](dimension_model.md#timeformatdatetimetzmodel) \| [TimeFormatDateTimeNTZModel](dimension_model.md#timeformatdatetimentzmodel) \| [TimeFormatInPartsModel](dimension_model.md#timeformatinpartsmodel) | `dtype='timestamp_tz' time_column='timestamp'` | Specifies the format of the timestamps in the dataset. |
+| `time_zone_format` | [AlignedTimeSingleTimeZone](dimension_model.md#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](dimension_model.md#localtimemultipletimezones) | *(required)* | Specifies whether timestamps are aligned in absolute time or in local standard time when adjusted for time zone. |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: mean, min, max, measured, total |
 | `ranges` | list[[TimeRangeModel](dimension_model.md#timerangemodel)] | *(required)* | Defines the continuous ranges of datetime in the data, inclusive of start and end time. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
-| `time_column` | `str` | `"timestamp"` | Name of time column in the dataframe. It should be updated during the query process to reflect any changes to the dataframe time column. |
-| `localize_to_time_zone` | `bool` | `True` | Whether to localize timestamps to time zone(s). If True, timestamps in the dataframe must be tz-naive. |
 
 </div>
 
@@ -90,6 +88,7 @@ Defines a time dimension where timestamps translate to datetime objects.
 | `get_dimension_class` | `get_dimension_class` | No description |
 | `check_times` | `check_times` | No description |
 | `handle_legacy_fields` | `*(model)*` | No description |
+| `check_standard_time_zones_for_localization` | `*(model)*` | Validate that only fixed-offset time zones are used when localizing tz-naive timestamps. |
 
 </div>
 
@@ -100,10 +99,9 @@ Defines a time dimension where timestamps translate to datetime objects.
 
 *dsgrid.config.dimensions.AlignedTimeSingleTimeZone*
 
-For each geography, data has the same set of timestamps in absolute time.
-Timestamps in the data must be tz-aware.
+All geographies have data with the same set of timestamps in absolute time.
 
-E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
+E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
 
 ### Fields
 
@@ -112,7 +110,7 @@ E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME"` |  |
-| `time_zone` | `str` | *(required)* | IANA time zone of data |
+| `time_zone` | `str` \| None | *(required)* | IANA time zone of data. Accepts None for no time zone. |
 
 </div>
 
@@ -133,12 +131,25 @@ E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
 
 *dsgrid.config.dimensions.LocalTimeMultipleTimeZones*
 
-For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
-for the time zone of each geography.
-Timestamps in the data must be tz-aware.
+Timestamps cover the same interval of local clock time across geographies.
 
-E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
-They are aligned in clock time but not in absolute time.
+All data represents the same interval of standard clock time as experienced locally
+in each geography's time zone. For example, all geographies have data from
+2018-01-01 00:00 to 2018-12-31 23:00 in their respective local standard times,
+but these represent different absolute UTC instants.
+
+The data table must contain a `time_zone` column with IANA time zone names
+(one per row) that match the entries in the `time_zones` list below.
+
+Example: California data starts at 2018-01-01 00:00-08:00, while
+New York data starts at 2018-01-01 00:00-05:00. Both rows have the
+same local clock time but represent different absolute UTC instants.
+
+Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
+from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
+a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York"
+have multiple offsets depending on the calendar date (UTC-5 during standard time,
+UTC-4 during daylight saving time).
 
 ### Fields
 
@@ -146,8 +157,8 @@ They are aligned in clock time but not in absolute time.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_CLOCK_TIME"` |  |
-| `time_zones` | list[`str`] | *(required)* | List of unique IANA time zones in the dataset |
+| `format_type` | `Literal` | `"TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME"` |  |
+| `time_zones` | list[`str`] | *(required)* | List of unique IANA time zones in the dataset. Does not allow 'None' as a time zone. |
 
 </div>
 
@@ -158,8 +169,7 @@ They are aligned in clock time but not in absolute time.
 
 *dsgrid.config.dimensions.TimeFormatDateTimeNTZModel*
 
-Format of timestamps in a dataset is timezone-naive datetime,
-requiring localization to time zones.
+Format of timestamps in a dataset is timezone-naive datetime
 
 ### Fields
 
@@ -167,8 +177,18 @@ requiring localization to time zones.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `dtype` | `Literal` | `"TIMESTAMP_NTZ"` |  |
+| `dtype` | `Literal` | `"timestamp_ntz"` |  |
 | `time_column` | `str` | `"timestamp"` | Name of the timestamp column in the dataset. |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `handle_legacy_fields` | `*(model)*` | No description |
 
 </div>
 
@@ -187,8 +207,18 @@ Format of timestamps in a dataset is timezone-aware datetime.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `dtype` | `Literal` | `"TIMESTAMP_TZ"` |  |
+| `dtype` | `Literal` | `"timestamp_tz"` |  |
 | `time_column` | `str` | `"timestamp"` | Name of the timestamp column in the dataset. |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `handle_legacy_fields` | `*(model)*` | No description |
 
 </div>
 
@@ -213,7 +243,7 @@ requiring conversion to datetime.
 | `month_column` | `str` | *(required)* | Name of the month column in the dataset. Value is the month in a year (1 - 12) |
 | `day_column` | `str` | *(required)* | Name of the day column in the dataset. Value is the day in a month (1 - 31). |
 | `hour_column` | `str` \| None | `None` | Name of the hour column in the dataset. Value is the hour in a day (0 - 23). If None, the hour will be set to 0 for all rows. |
-| `time_zone` | `str` \| None | `None` | IANA time zone of the timestamps. Use None for time zone-naive timestamps. |
+| `offset_column` | `str` \| None | `None` | Name of the offset column in the dataset. Value is the UTC offset, either as a numeric offset in hours (e.g., -8) or as a string in ±HH:MM format (e.g., -08:00). If None, no offset is applied and the resulting timestamp will be timezone-naive. Example: '2024-01-01 00:00:00-05:00' is the start of 2024 in New York; the offset column records '-05:00' for that row. For America/New_York, the offset is -05:00 during standard time and -04:00 during daylight saving time. |
 
 </div>
 

@@ -118,7 +118,7 @@ Contains dimensions defined by a project
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `base_dimensions` | list[[DimensionModel](dimension_model.md#dimensionmodel) \| [DateTimeDimensionModel](dimension_model.md#datetimedimensionmodel) \| [AnnualTimeDimensionModel](dimension_model.md#annualtimedimensionmodel) \| [RepresentativePeriodTimeDimensionModel](dimension_model.md#representativeperiodtimedimensionmodel) \| [DatetimeExternalTimeZoneDimensionModel](dimension_model.md#datetimeexternaltimezonedimensionmodel) \| [IndexTimeDimensionModel](dimension_model.md#indextimedimensionmodel) \| [NoOpTimeDimensionModel](dimension_model.md#nooptimedimensionmodel)] | `[]` | List of dimensions for a project's base dimensions. They will be automatically registered during project registration and then converted to base_dimension_references. |
+| `base_dimensions` | list[[DimensionModel](dimension_model.md#dimensionmodel) \| [DateTimeDimensionModel](dimension_model.md#datetimedimensionmodel) \| [AnnualTimeDimensionModel](dimension_model.md#annualtimedimensionmodel) \| [RepresentativePeriodTimeDimensionModel](dimension_model.md#representativeperiodtimedimensionmodel) \| [IndexTimeDimensionModel](dimension_model.md#indextimedimensionmodel) \| [NoOpTimeDimensionModel](dimension_model.md#nooptimedimensionmodel)] | `[]` | List of dimensions for a project's base dimensions. They will be automatically registered during project registration and then converted to base_dimension_references. |
 | `base_dimension_references` | list[[DimensionReferenceModel](dimension_model.md#dimensionreferencemodel)] | `[]` | List of registry references (``DimensionReferenceModel``) for a project's base dimensions. |
 | `subset_dimensions` | list[[SubsetDimensionGroupModel](project_model.md#subsetdimensiongroupmodel)] | `[]` | List of subset dimension groups. Subset dimension groups are used to specify subsets of base dimension records that a dataset must support, dimensionality of derived datasets, and query filters. Subset dimension groups also define a new supplemental dimension whose records correspond to the table columns/subset selectors, such that defining a subset dimension group can be a convenient way to define reporting at a different level of aggregation as compared to the project's base dimensions. |
 | `supplemental_dimensions` | list[[SupplementalDimensionModel](project_model.md#supplementaldimensionmodel)] | `[]` | List of supplemental dimensions. They will be automatically registered. during project registration and then converted to supplemental_dimension_references. Supplemental dimensions are used to support additional querying and transformations (e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's base data. |
@@ -492,7 +492,11 @@ Defines a supplemental dimension.
 
 *dsgrid.dimension.time.TimeBasedDataAdjustmentModel*
 
-Defines adjustments to timestamps and associated data when time representation changes (e.g., mapping from index-based to datetime format). Adjustments are applied to both the time column and its associated data values.
+Defines how data needs to be adjusted with respect to time.
+For leap day adjustment, up to one full day of timestamps and data are dropped.
+For daylight savings, the dataframe is adjusted alongside the timestamps.
+This is useful when the load profiles are modeled in standard time and
+need to be converted to get clock time load profiles.
 
 ### Fields
 
@@ -500,7 +504,7 @@ Defines adjustments to timestamps and associated data when time representation c
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `leap_day_adjustment` | [LeapDayAdjustmentType](enums.md#leapdayadjustmenttype) | `LeapDayAdjustmentType.NONE` | Method for handling leap year dates. Options specify which day (if any) to drop from leap years to make them 365 days. Default is `NONE` (no adjustment). |
-| `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Method for handling daylight saving time transitions when converting tz-naive timestamps from standard time to clock time that can observe daylight saving. Specifies how to adjust data during spring-forward and fall-back hours. Default is `NONE` (no adjustment). Typically used when mapping a special case of index-based time dimensions to datetime format. See [How to Define a Time Dimension](../../user_guide/how_tos/how_to_time_dimension.md) for details. |
+| `leap_day_adjustment` | [LeapDayAdjustmentType](enums.md#leapdayadjustmenttype) | `LeapDayAdjustmentType.NONE` | Leap day adjustment method applied to time data. The dsgrid default is None, i.e., no adjustment made to leap years. Adjustments are made to leap years only. |
+| `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Daylight saving adjustment method applied to time data |
 
 </div>

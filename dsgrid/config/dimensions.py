@@ -500,7 +500,12 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     but these represent different absolute UTC instants.
 
     The data table must contain a `time_zone` column with IANA time zone names
-    (one per row) that match the entries in the `time_zones` list below.
+    (one per row) that match the entries in the `time_zones` list below. Furthermore,
+    only IANA time zones with constant UTC offsets are allowed. For example, "Etc/GMT+5",
+    as the IANA representation of Eastern Standard Time (EST), is allowed, but
+    "America/New_York" is not because it observes daylight saving time. This restriction
+    is necessary to avoid ambiguous or missing timestamps at daylight saving time
+    transitions when localizing tz-naive timestamps.
 
     Example: California data starts at 2018-01-01 00:00-08:00, while
     New York data starts at 2018-01-01 00:00-05:00. Both rows have the
@@ -518,7 +523,7 @@ class LocalTimeMultipleTimeZones(DSGBaseModel):
     ] = TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
     time_zones: list[str] = Field(
         title="time_zones",
-        description="List of unique IANA time zones in the dataset. Does not allow 'None' as a time zone.",
+        description="List of unique, fixed-offset IANA time zones in the dataset. Does not allow 'None' as a time zone. Does not allow time zones that observe daylight saving time.",
     )
 
     def get_time_zones(self) -> list[str]:

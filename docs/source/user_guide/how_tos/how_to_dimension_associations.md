@@ -4,6 +4,10 @@ Datasets may have missing dimension combinations (associations) — for example,
 
 dsgrid validates that datasets provide data for all expected dimension combinations. When a dataset legitimately lacks data for certain combinations, you must explicitly declare these using **expected associations**, **missing associations**, or both.
 
+:::{tip}
+For a worked example walking through the reasoning behind each step, see the [Define Dimension Associations](../tutorials/define_dimension_associations) tutorial.
+:::
+
 ## Prerequisites
 
 - A dataset config file ready for registration (see [Data File Formats](../dataset_registration/data_file_formats))

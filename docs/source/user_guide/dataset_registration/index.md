@@ -21,6 +21,7 @@ registration_checks
 ## Tutorials
 
 - [Create and Submit a Dataset](../tutorials/create_and_submit_dataset)
+- [Define Dimension Associations](../tutorials/define_dimension_associations.md)
 - [Map a Dataset](../tutorials/map_dataset)
 
 ## Software Reference

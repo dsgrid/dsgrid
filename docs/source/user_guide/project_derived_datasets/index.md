@@ -16,6 +16,6 @@ residuals
 workflows
 ```
 
-:::{note}
-See also: [Derived Dataset Tutorial](../tutorials/create_derived_dataset)
-:::
+## Tutorials
+
+- [Derived Dataset Tutorial](../tutorials/create_derived_dataset)

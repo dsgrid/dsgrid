@@ -39,6 +39,18 @@ class DataStoreInterface(abc.ABC):
         """Read a lookup table from the data store."""
 
     @abc.abstractmethod
+    def read_expected_associations_tables(
+        self, dataset_id: str, version: str
+    ) -> dict[str, DataFrame]:
+        """Read expected dimensions association tables from the data store."""
+
+    @abc.abstractmethod
+    def read_missing_associations_tables(
+        self, dataset_id: str, version: str
+    ) -> dict[str, DataFrame]:
+        """Read a missing dimensions association tables from the data store."""
+
+    @abc.abstractmethod
     def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
         """Replace a lookup table in the data store."""
 
@@ -55,6 +67,17 @@ class DataStoreInterface(abc.ABC):
         """Write a lookup table to the data store."""
 
     @abc.abstractmethod
+    def write_expected_associations_tables(
+        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        """Write a set of tables of expected dimension associations to the data store.
+        The dictionary keys of the dfs argument should be human-readable tags for the contents of
+        the tables, but are not otherwise significant.
+        When provided, only the dimension combinations in these tables are required to be
+        present in the data (instead of the full cross-join of all dimension records).
+        """
+
+    @abc.abstractmethod
     def write_missing_associations_tables(
         self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
@@ -62,12 +85,6 @@ class DataStoreInterface(abc.ABC):
         The dictionary keys of the dfs argument should human-readable tags for the contents of
         the tables, but are not otherwise significant.
         """
-
-    @abc.abstractmethod
-    def read_missing_associations_tables(
-        self, dataset_id: str, version: str
-    ) -> dict[str, DataFrame]:
-        """Read a missing dimensions association tables from the data store."""
 
     @abc.abstractmethod
     def remove_tables(self, dataset_id: str, version: str) -> None:

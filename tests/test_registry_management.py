@@ -15,7 +15,7 @@ from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsListModel,
     InputDatasetListModel,
 )
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
@@ -39,6 +39,7 @@ from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
     TEST_DATASET_DIRECTORY,
+    TEST_PROJECT_REPO,
 )
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.id_remappings import (
@@ -49,6 +50,29 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_mapping_names_with_current_ids,
 )
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
+
+
+EXPECTED_ASSOCIATIONS_VARIANTS = [
+    # (dataset_dir_name, config_filename, description)
+    # Variant 1: expected_associations + missing_associations (partial)
+    (
+        "comstock",
+        "dataset_expected_and_missing.json5",
+        "expected_associations + missing_associations",
+    ),
+    # Variant 2: full_missing_associations.csv (single flat file with all dims)
+    (
+        "comstock_time_in_parts",
+        "dataset_full_missing.json5",
+        "full_missing_associations.csv",
+    ),
+    # Variant 3: missing_associations_all directory (split files, no expected_associations)
+    (
+        "comstock_unpivoted",
+        "dataset_missing_all.json5",
+        "missing_associations_all directory",
+    ),
+]
 
 
 def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
@@ -812,6 +836,7 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
         # Change paths to be relative to the data_base_dir
         data["data_layout"]["data_file"]["path"] = "load_data.csv"
         data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["expected_associations"] = ["expected_associations"]
         data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 
@@ -831,7 +856,7 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
                 "test register with data-base-dir",
                 "-D",
                 str(data_base_dir),
-                "-M",
+                "-A",
                 str(data_base_dir),
             ],
         )
@@ -894,6 +919,7 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
         # Change paths to be relative to the data_base_dir
         data["data_layout"]["data_file"]["path"] = "load_data.csv"
         data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["expected_associations"] = ["expected_associations"]
         data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 
@@ -918,7 +944,7 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
                 "test register-and-submit with data-base-dir",
                 "-D",
                 str(data_base_dir),
-                "-M",
+                "-A",
                 str(data_base_dir),
             ],
         )
@@ -1030,3 +1056,148 @@ def test_time_in_parts_matches_timestamp(cached_registry):
 
         # Compare the dataframes
         assert_frame_equal(comstock_pd, time_parts_pd)
+
+
+@pytest.mark.parametrize(
+    "dataset_dir_name,config_filename,description",
+    EXPECTED_ASSOCIATIONS_VARIANTS,
+    ids=[v[2] for v in EXPECTED_ASSOCIATIONS_VARIANTS],
+)
+def test_register_dataset_with_associations_variant(
+    tmp_registry_db, dataset_dir_name, config_filename, description
+):
+    """Test dataset registration with each expected/missing associations variant.
+
+    Three equivalent ways to declare missing dimension combinations:
+    1. expected_associations + missing_associations (comstock)
+    2. full_missing_associations.csv (comstock_time_in_parts)
+    3. missing_associations_all directory (comstock_unpivoted)
+
+    Follows the same pattern as bulk_register: make a temp copy of the config
+    in its original directory so that relative paths resolve correctly.
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        # Use the original config location (not the tmp copy) so that relative
+        # data/association paths resolve correctly, just like bulk_register does.
+        original_config = (
+            TEST_PROJECT_REPO
+            / "dsgrid_project"
+            / "datasets"
+            / "modeled"
+            / dataset_dir_name
+            / config_filename
+        )
+        assert original_config.exists(), f"Variant config not found: {original_config}"
+
+        data = load_data(original_config)
+        dataset_id = data["dataset_id"]
+
+        # Copy to a temp file in the same directory so relative paths still work.
+        tmp_config = original_config.with_stem(original_config.stem + "__test_tmp")
+        shutil.copyfile(original_config, tmp_config)
+        try:
+            mappings = map_dimension_names_to_ids(manager.dimension_manager)
+            replace_dimension_names_with_current_ids(tmp_config, mappings)
+
+            manager.dataset_manager.register(
+                tmp_config,
+                getpass.getuser(),
+                f"Register {dataset_id} with {description}",
+            )
+            assert dataset_id in manager.dataset_manager.list_ids()
+        finally:
+            tmp_config.unlink(missing_ok=True)
+
+
+def test_register_dataset_with_all_checks_disabled(tmp_registry_db):
+    """Test that valid data registers successfully when all dimension checks are disabled.
+
+    Verifies the skip-paths for each field in DatasetDimensionRequirements:
+    - check_time_consistency=False
+    - check_dimension_associations=False
+    - require_all_dimension_types=False
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        original_config = (
+            TEST_PROJECT_REPO
+            / "dsgrid_project"
+            / "datasets"
+            / "modeled"
+            / "comstock"
+            / "dataset.json5"
+        )
+        assert original_config.exists()
+
+        data = load_data(original_config)
+        dataset_id = data["dataset_id"]
+
+        tmp_config = original_config.with_stem(original_config.stem + "__test_checks_disabled")
+        shutil.copyfile(original_config, tmp_config)
+        try:
+            mappings = map_dimension_names_to_ids(manager.dimension_manager)
+            replace_dimension_names_with_current_ids(tmp_config, mappings)
+
+            requirements = DatasetDimensionRequirements(
+                check_time_consistency=False,
+                check_dimension_associations=False,
+                require_all_dimension_types=False,
+            )
+            manager.dataset_manager.register(
+                tmp_config,
+                getpass.getuser(),
+                "Register with all checks disabled",
+                requirements=requirements,
+            )
+            assert dataset_id in manager.dataset_manager.list_ids()
+        finally:
+            tmp_config.unlink(missing_ok=True)
+
+
+def test_dimension_record_mismatch_error(tmp_registry_db):
+    """Test that a per-column dimension mismatch is detected when no expected_associations exist.
+
+    The comstock_unpivoted dataset has no expected_associations, so registration
+    uses the full cross-join check. Adding a fake record to the subsector dimension
+    CSV causes a mismatch between dimension records and actual data, triggering the
+    per-column error in _check_dimension_associations.
+    """
+    src_dir, registry_tmp_path, url = tmp_registry_db
+    with make_test_data_registry(
+        registry_tmp_path,
+        src_dir,
+        include_projects=True,
+        include_datasets=False,
+        database_url=url,
+    ) as manager:
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock_unpivoted"
+        config_file = dataset_dir / "dataset.json5"
+        assert config_file.exists()
+
+        # Add a fake subsector record that doesn't exist in the data.
+        subsectors_file = dataset_dir / "dimensions" / "comstock_subsectors.csv"
+        original_text = subsectors_file.read_text()
+        subsectors_file.write_text(original_text.rstrip() + "\ncom__FakeBuilding,Fake Building\n")
+
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(config_file, mappings)
+
+        with pytest.raises(DSGInvalidDataset, match="do not match expected"):
+            manager.dataset_manager.register(
+                config_file,
+                getpass.getuser(),
+                "Register with dimension mismatch",
+            )

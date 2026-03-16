@@ -45,7 +45,10 @@ def delete_if_exists(path: Path | str) -> None:
     """Delete a file or directory if it exists.
 
     On Windows, retries up to 5 times with short delays to handle files that
-    may still be locked by recently-closed database connections.
+    may still be locked by recently-closed database connections. Uses short
+    exponential backoff (0.05s, 0.1s, 0.2s, 0.4s, 0.8s) instead of long
+    linear delays, since most file locks are released within milliseconds
+    after gc.collect().
     """
     path = Path(path) if isinstance(path, str) else path
     if not path.exists():
@@ -62,12 +65,14 @@ def delete_if_exists(path: Path | str) -> None:
         except PermissionError:
             if attempt < max_retries - 1:
                 gc.collect()
-                time.sleep(1.0 * (attempt + 1))
+                delay = 0.05 * (2**attempt)
+                time.sleep(delay)
                 logger.debug(
-                    "Retry %s/%s deleting %s due to PermissionError",
+                    "Retry %s/%s deleting %s due to PermissionError (waited %.2fs)",
                     attempt + 1,
                     max_retries,
                     path,
+                    delay,
                 )
             else:
                 raise

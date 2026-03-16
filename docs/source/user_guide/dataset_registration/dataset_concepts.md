@@ -79,7 +79,7 @@ Datasets are **standalone entities** — they can be registered independently of
 
 Getting a dataset into a project involves up to three operations:
 
-1. **Registration** — validates the dataset's internal consistency: schema, dimensions, and data completeness. The dataset becomes a versioned entity in the registry. No project is required. (`dsgrid registry datasets register`)
+1. **Registration** — validates the dataset's internal consistency: schema, dimensions, and data completeness. Data completeness can be customized via `expected_associations` and `missing_associations` (see [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations)). The dataset becomes a versioned entity in the registry. No project is required. (`dsgrid registry datasets register`)
 
 2. **Submission** — submits a registered dataset to a specific project. This step requires **dimension mappings** that align each dataset dimension to the corresponding project base dimension. dsgrid validates that the mappings are consistent and that the dataset provides all expected data points. (`dsgrid registry projects submit-dataset`)
 

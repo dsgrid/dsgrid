@@ -17,10 +17,12 @@ from dsgrid.spark.types import DataFrame
 DATABASE_FILENAME = "data.duckdb"
 SCHEMA_DATA = "dsgrid_data"
 SCHEMA_LOOKUP_DATA = "dsgrid_lookup"
+SCHEMA_EXPECTED_DIMENSION_ASSOCIATIONS = "dsgrid_expected_dimension_associations"
 SCHEMA_MISSING_DIMENSION_ASSOCIATIONS = "dsgrid_missing_dimension_associations"
 TABLE_TYPE_TO_SCHEMA = {
     "data": SCHEMA_DATA,
     "lookup": SCHEMA_LOOKUP_DATA,
+    "expected_dimension_associations": SCHEMA_EXPECTED_DIMENSION_ASSOCIATIONS,
     "missing_dimension_associations": SCHEMA_MISSING_DIMENSION_ASSOCIATIONS,
 }
 
@@ -51,6 +53,7 @@ class DuckDbDataStore(DataStoreInterface):
         with store._connect() as con:
             con.sql(f"CREATE SCHEMA {SCHEMA_DATA}")
             con.sql(f"CREATE SCHEMA {SCHEMA_LOOKUP_DATA}")
+            con.sql(f"CREATE SCHEMA {SCHEMA_EXPECTED_DIMENSION_ASSOCIATIONS}")
             con.sql(f"CREATE SCHEMA {SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}")
         return store
 
@@ -86,12 +89,26 @@ class DuckDbDataStore(DataStoreInterface):
         short_name = _make_table_short_name(dataset_id, version)
         self._replace_table(df, schema, short_name)
 
+    def read_expected_associations_tables(
+        self, dataset_id: str, version: str
+    ) -> dict[str, DataFrame]:
+        with self._connect() as con:
+            dfs: dict[str, DataFrame] = {}
+            names = self._list_expected_associations_table_names(dataset_id, version)
+            if not names:
+                return dfs
+            for name in names:
+                full_name = f"{SCHEMA_EXPECTED_DIMENSION_ASSOCIATIONS}.{name}"
+                df = con.sql(f"SELECT * FROM {full_name}").to_df()
+                dfs[name] = get_spark_session().createDataFrame(df)
+            return dfs
+
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
     ) -> dict[str, DataFrame]:
         with self._connect() as con:
             dfs: dict[str, DataFrame] = {}
-            names = self._list_dim_associations_table_names(dataset_id, version)
+            names = self._list_missing_associations_table_names(dataset_id, version)
             if not names:
                 return dfs
             for name in names:
@@ -118,6 +135,19 @@ class DuckDbDataStore(DataStoreInterface):
                 con.sql(f"DROP TABLE IF EXISTS {table_name}")
             _create_table_from_dataframe(con, df, table_name)
 
+    def write_expected_associations_tables(
+        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        with self._connect() as con:
+            for tag, df in dfs.items():
+                table_name = _make_table_full_name(
+                    "expected_dimension_associations", dataset_id, version
+                )
+                table_name = f"{table_name}__{tag}"
+                if overwrite:
+                    con.sql(f"DROP TABLE IF EXISTS {table_name}")
+                _create_table_from_dataframe(con, df, table_name)
+
     def write_missing_associations_tables(
         self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
@@ -136,7 +166,10 @@ class DuckDbDataStore(DataStoreInterface):
             for table_type in ("data", "lookup"):
                 table_name = _make_table_full_name(table_type, dataset_id, version)
                 con.sql(f"DROP TABLE IF EXISTS {table_name}")
-            for name in self._list_dim_associations_table_names(dataset_id, version):
+            for name in self._list_expected_associations_table_names(dataset_id, version):
+                full_name = f"{SCHEMA_EXPECTED_DIMENSION_ASSOCIATIONS}.{name}"
+                con.sql(f"DROP TABLE IF EXISTS {full_name}")
+            for name in self._list_missing_associations_table_names(dataset_id, version):
                 full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
                 con.sql(f"DROP TABLE IF EXISTS {full_name}")
 
@@ -181,7 +214,17 @@ class DuckDbDataStore(DataStoreInterface):
             con.sql(f"DROP TABLE {full_name}")
             con.sql(f"ALTER TABLE {tmp_name} RENAME TO {full_name}")
 
-    def _list_dim_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
+    def _list_expected_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
+        with self._connect() as con:
+            short_name = _make_table_short_name(dataset_id, version)
+            query = f"""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = '{TABLE_TYPE_TO_SCHEMA["expected_dimension_associations"]}' AND table_name LIKE '%{short_name}%'
+            """
+            return [row[0] for row in con.sql(query).fetchall()]
+
+    def _list_missing_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
         with self._connect() as con:
             short_name = _make_table_short_name(dataset_id, version)
             query = f"""
@@ -200,7 +243,7 @@ def _create_table_from_dataframe(
 
 
 def _make_table_full_name(
-    base_name: Literal["data", "lookup", "missing_dimension_associations"],
+    base_name: Literal["data", "lookup", "expected_dimension_associations", "missing_dimension_associations"],
     dataset_id: str,
     version: str,
 ) -> str:

@@ -1,10 +1,13 @@
-from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
+from typing import Any
 
 import pytest
 
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
+
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.spark.functions import (
     aggregate_single_value,
@@ -400,48 +403,331 @@ def test_convert_types_if_necessary(data_type):
     assert row.bystander == 2040
 
 
-@pytest.fixture
-def missing_dimension_associations(tmp_path):
-    filename = tmp_path / "missing_associations.csv"
-    with open(filename, "w") as f:
-        f.write("sector,subsector\n")
-        f.write("com,midrise_apartment\n")
-        f.write("res,hotel\n")
-        f.write("res,hospital\n")
+# ---------------------------------------------------------------------------
+# merge_expected_associations_tables tests
+# ---------------------------------------------------------------------------
 
-    df_from_records_cross_join = create_dataframe_from_dicts(
-        [
-            {
-                "sector": "res",
-                "subsector": "midrise_apartment",
-                "geography": "36047",
-            },
-            {
-                "sector": "com",
-                "subsector": "midrise_apartment",
-                "geography": "36047",
-            },
-            {
-                "sector": "com",
-                "subsector": "hotel",
-                "geography": "36047",
-            },
-            {
-                "sector": "res",
-                "subsector": "hotel",
-                "geography": "36047",
-            },
-            {
-                "sector": "com",
-                "subsector": "hospital",
-                "geography": "36047",
-            },
-            {
-                "sector": "res",
-                "subsector": "hospital",
-                "geography": "36047",
-            },
-        ]
-    )
-    yield filename, df_from_records_cross_join
-    filename.unlink()
+
+@pytest.fixture
+def dim_records():
+    """Complete dimension records for a small toy dataset."""
+    return {
+        "geography": ["A", "B", "C"],
+        "sector": ["res", "com"],
+        "subsector": ["sf", "mf", "office"],
+    }
+
+
+def _make_df(rows: list[dict[str, str]]):
+    return create_dataframe_from_dicts(rows)
+
+
+def _sorted_rows(df) -> list[Any]:
+    """Collect a DataFrame into a sorted list of tuples for easy comparison."""
+    cols = sorted(df.columns)
+    return sorted(df.select(*cols).distinct().collect(), key=lambda r: tuple(r))
+
+
+class TestMergeExpectedAssociationsTables:
+    """Tests for merge_expected_associations_tables in dsgrid.utils.dataset."""
+
+    def test_single_full_table(self, tmp_path, dim_records):
+        """A single table covering all dimensions is returned as-is (minus dups)."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "all": _make_df(
+                [
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                    {"geography": "B", "sector": "com", "subsector": "office"},
+                    {"geography": "C", "sector": "res", "subsector": "mf"},
+                    # Duplicate of first row — should be deduplicated.
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
+
+    def test_identical_columns_union(self, tmp_path, dim_records):
+        """Two tables with the same column set are unioned."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "part1": _make_df(
+                [
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                    {"geography": "B", "sector": "com", "subsector": "office"},
+                ]
+            ),
+            "part2": _make_df(
+                [
+                    {"geography": "C", "sector": "res", "subsector": "mf"},
+                    # Overlap with part1 — should be deduplicated.
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
+
+    def test_disjoint_columns_cross_join(self, tmp_path, dim_records):
+        """Disjoint column sets are cross-joined, remaining dims filled in."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        # Each table must include all records for its dimension columns.
+        dfs = {
+            "geo": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
+            "sector": _make_df([{"sector": "res"}, {"sector": "com"}]),
+        }
+        # subsector is uncovered -> cross-joined with all 3 records.
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            # 3 geo * 2 sector * 3 subsector = 18 (full cross-join)
+            assert len(rows) == 18
+
+    def test_overlapping_columns_inner_join(self, tmp_path, dim_records):
+        """Overlapping-but-not-identical column sets are inner-joined on shared columns."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "res"},
+                    {"geography": "B", "sector": "com"},
+                    {"geography": "C", "sector": "res"},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    {"sector": "res", "subsector": "sf"},
+                    {"sector": "res", "subsector": "mf"},
+                    {"sector": "com", "subsector": "office"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            # geo A+C pair with res -> sf,mf (4); geo B pairs with com -> office (1)
+            assert len(rows) == 5
+            combos = {(r.geography, r.sector, r.subsector) for r in rows}
+            assert ("A", "res", "mf") in combos
+            assert ("B", "com", "office") in combos
+            # geo B should NOT appear with res (only paired with com).
+            assert ("B", "res", "sf") not in combos
+
+    def test_partial_table_fills_remaining_dims(self, tmp_path, dim_records):
+        """A single-column table cross-joins with full records of all other dims."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        # Table must have all geography records.
+        dfs = {
+            "geo_only": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            # 3 geo * 2 sector * 3 subsector = 18
+            assert len(rows) == 18
+
+    def test_entry_check_fails_on_missing_record(self, tmp_path, dim_records):
+        """A table missing a dimension record is caught at entry validation."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "res"},
+                    {"geography": "B", "sector": "com"},
+                    # geography C is missing!
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    {"sector": "res", "subsector": "sf"},
+                    {"sector": "com", "subsector": "office"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="geography.*missing.*C"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
+    def test_entry_check_fails_on_missing_shared_value(self, tmp_path, dim_records):
+        """A table missing a shared-column value is caught before the inner join."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "res"},
+                    {"geography": "B", "sector": "com"},
+                    {"geography": "C", "sector": "res"},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    # Only "res" — "com" is missing from this table.
+                    {"sector": "res", "subsector": "sf"},
+                    {"sector": "res", "subsector": "mf"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="sector.*missing.*com"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
+    def test_entry_check_on_single_table(self, tmp_path, dim_records):
+        """A single full-dim table missing a record is caught (first group)."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "all": _make_df(
+                [
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                    {"geography": "B", "sector": "com", "subsector": "office"},
+                    # geography C is missing
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="geography.*missing.*C"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
+    def test_union_partners_complement_each_other(self, tmp_path, dim_records):
+        """Two tables with identical columns can individually be incomplete
+        as long as their union covers all dimension records."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "part1": _make_df(
+                [
+                    # Only geography A and sector res.
+                    {"geography": "A", "sector": "res", "subsector": "sf"},
+                ]
+            ),
+            "part2": _make_df(
+                [
+                    # Adds B, C, com, mf, office.
+                    {"geography": "B", "sector": "com", "subsector": "mf"},
+                    {"geography": "C", "sector": "res", "subsector": "office"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records, ctx)
+            rows = _sorted_rows(result)
+            assert len(rows) == 3
+
+    def test_three_groups_with_remaining_dims(self, tmp_path, dim_records):
+        """Two overlapping groups + a remaining uncovered dimension."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "res"},
+                    {"geography": "B", "sector": "com"},
+                    {"geography": "C", "sector": "res"},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    {"sector": "res", "subsector": "sf"},
+                    {"sector": "res", "subsector": "mf"},
+                    {"sector": "res", "subsector": "office"},
+                    {"sector": "com", "subsector": "sf"},
+                    {"sector": "com", "subsector": "mf"},
+                    {"sector": "com", "subsector": "office"},
+                ]
+            ),
+        }
+        # Add a 4th dimension not covered by any table.
+        dim_records_4d = {
+            **dim_records,
+            "model_year": ["2020", "2025"],
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            result = merge_expected_associations_tables(dfs, dim_records_4d, ctx)
+            rows = _sorted_rows(result)
+            # Inner join: (A,res) + (C,res) get sf/mf/office (6); (B,com) gets sf/mf/office (3) = 9
+            # * 2 model_years = 18
+            assert len(rows) == 18
+
+    def test_inner_join_drops_shared_column_value(self, tmp_path):
+        """Inner join that drops a shared-column value is caught post-join.
+
+        Both tables individually contain all records for every shared column
+        (passing entry validation), but the inner join drops a value because
+        the two tables have no matching rows for it.
+
+        Table 1 (geo_sector):  sector=s3 pairs only with geography=C
+        Table 2 (sector_sub):  sector=s3 pairs only with subsector=r
+
+        Overlap is {sector}. Both tables have s1, s2, s3 for sector so entry
+        validation passes. After inner join on {sector}, s3 survives. To
+        actually lose a value we need a *multi-column* overlap where a value
+        vanishes.
+
+        Use a 2-column overlap {sector, subsector}:
+        Table 1: sector=s1 only with subsector=p
+        Table 2: sector=s1 only with subsector=q
+        Inner join on {sector, subsector} finds no match for (s1, p) or
+        (s1, q), so sector=s1 is dropped entirely.
+        """
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dim_records = {
+            "geography": ["A", "B"],
+            "sector": ["s1", "s2"],
+            "subsector": ["p", "q"],
+        }
+
+        dfs = {
+            "geo_sector_sub": _make_df(
+                [
+                    # Has sector s1 only with subsector p, and s2 with both.
+                    {"geography": "A", "sector": "s1", "subsector": "p"},
+                    {"geography": "A", "sector": "s2", "subsector": "p"},
+                    {"geography": "B", "sector": "s1", "subsector": "p"},
+                    {"geography": "B", "sector": "s2", "subsector": "q"},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    # Has sector s1 only with subsector q (no match for s1+p).
+                    # s2 appears with both p and q.
+                    {"sector": "s1", "subsector": "q"},
+                    {"sector": "s2", "subsector": "p"},
+                    {"sector": "s2", "subsector": "q"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
+    def test_column_not_in_dim_records(self, tmp_path):
+        """A table column not in all_dim_records raises DSGFileInputError."""
+        from dsgrid.utils.dataset import merge_expected_associations_tables
+
+        dim_records = {
+            "geography": ["A", "B"],
+        }
+        dfs = {
+            "all": _make_df(
+                [
+                    {"geography": "A", "extra_col": "x"},
+                    {"geography": "B", "extra_col": "y"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGFileInputError, match="Unexpected dimension type"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)

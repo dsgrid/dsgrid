@@ -211,5 +211,5 @@ pyspark --master=spark://$(hostname):7077
 ## Next Steps
 
 - Learn how to [filter queries](../how_tos/how_to_filter) for more specific results
-- Understand [query concepts](../project_queries/concepts) in more detail
+- Understand [query concepts](../project_queries/query_concepts) in more detail
 - Explore [creating derived datasets](create_derived_dataset) from query results

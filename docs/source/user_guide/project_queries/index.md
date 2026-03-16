@@ -8,7 +8,6 @@ Learn how to query dsgrid projects and analyze energy demand data.
 :maxdepth: 1
 
 concepts
-query_concepts
 aggregations
 filters
 output_formats

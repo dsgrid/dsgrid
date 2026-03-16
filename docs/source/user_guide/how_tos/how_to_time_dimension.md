@@ -2,7 +2,11 @@
 
 Time dimensions work differently from other dimension types: instead of a records CSV, they are defined entirely by parameters in the config file. This guide covers each supported time type with example data tables and configs.
 
-**Note:** DST = Daylight Saving Time
+:::{note}
+DST = Daylight Saving Time
+
+IANA = Internet Assigned Numbers Authority
+:::
 
 ## Overview
 
@@ -29,11 +33,15 @@ Datetime is the most common time type. The config describes two things:
 
 ### Time zones, UTC offsets, Localization, and Validation
 
-IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5). Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
+Data table timestamps are either *timezone-aware* (`timestamp_tz` or `time_format_in_parts` with per-row UTC offsets in `offset_column`) or *timezone-naive* (`timestamp_ntz` or `time_format_in_parts` with no offset column) and dsgrid provides time checks based on IANA time zones. *If input timestamps are timezone-aware, dsgrid supports all IANA time zones*, including time zones like "America/New York" that include DST. *If input timestamps are timezone-naive, dsgrid requires standard time* or fixed-offset time zones that do not include DST. In either case, the `time_zone` field must be specified in `time_zone_format`. The `time_zone` field is required even for timezone-aware timestamps because dsgrid uses it to construct validation data independent of the column format.
 
-dsgrid automatically localizes timezone-naive timestamps to the zone(s) specified in `time_zone_format` during registration. Timezone-naive data is indicated by `column_format.dtype` as `timestamp_ntz` or `time_format_in_parts` without `offset_column`. For correct localization, input timestamps must be laid out in standard time (without DST skips and duplicates), because standard libraries cannot safely handle ambiguous or missing hours at DST transitions. Consequently, when using timezone-naive data, `time_zone_format` can only reference IANA zones with constant UTC offsets (e.g., "Etc/GMT+5"), not DST-observing zones like "America/New_York". This restriction applies only to timezone-naive localization; for all other scenarios, both zone types are supported.
+dsgrid automatically localizes timezone-naive timestamps to the zone(s) specified in `time_zone_format` during registration. Timezone-naive data is indicated by `column_format.dtype` as `timestamp_ntz` or `time_format_in_parts` without `offset_column`. For correct localization, input timestamps must be laid out in standard time (without DST skips and duplicates), because standard libraries cannot safely handle ambiguous or missing hours at DST transitions. Consequently, when using timezone-naive data, `time_zone_format` can only reference IANA zones with constant UTC offsets (e.g., "Etc/GMT+5"), not DST-observing zones like "America/New_York". This restriction applies only to timezone-naive localization; for all other scenarios, both time zone types are supported.
 
-To ingest timestamps that observe DST, they must already be timezone-aware in the data table, or stored with per-row UTC offsets via `offset_column`. Additionally, even when timestamps are timezone-aware or offset values are provided, the `time_zone` field must still be specified in `time_zone_format` because dsgrid uses it to construct validation data independent of the column format.
+:::{note}
+IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5).
+
+Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
+:::
 
 ### 1a. Column Format Distinctions
 

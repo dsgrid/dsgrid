@@ -223,6 +223,6 @@ Localization is applied automatically during dataset registration when the time 
 
 ## Related References
 
-- [Dimension Concepts -- Time Dimensions](../dataset_registration/dimension_concepts.md#time-dimensions) -- conceptual overview of time dimension config and `column_format` variants
-- [How to Define a Time Dimension](how_to_time_dimension.md) -- step-by-step examples for each `time_type`
+- [Dimension Concepts -- Time Dimensions](../../user_guide/dataset_registration/dimension_concepts.md#time-dimensions) -- conceptual overview of time dimension config and `column_format` variants
+- [How to Define a Time Dimension](../../user_guide/how_tos/how_to_time_dimension.md) -- step-by-step examples for each `time_type`
 - [Dimension Data Models](../../software_reference/data_models/dimension_model.md) -- complete config schema reference

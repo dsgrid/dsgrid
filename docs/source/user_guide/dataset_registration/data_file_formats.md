@@ -569,7 +569,7 @@ When writing timezone-aware timestamps to Parquet files, they must be stored in 
 ### Time Formats
 
 Datetime time dimensions support three timestamp storage formats. This section shows how each format appears in Parquet files. For detailed configuration requirements, conceptual explanations, and practical examples, see:
-- [Dimension Concepts — Column Format](dimension_concepts.md#column-format) — configuration options, requirements, and when to use each format
+- [Dimension Concepts — Time Dimensions](dimension_concepts.md#time-dimensions) — configuration options, requirements, and when to use each format
 - [How to Define a Time Dimension](../how_tos/how_to_time_dimension.md) — step-by-step examples for all time dimension types
 
 #### Timezone-aware timestamps (`TIMESTAMP_TZ`)
@@ -627,11 +627,11 @@ There are two ways to source the `time_zone` column:
 
 In both cases, the resulting data table has a `time_zone` column containing IANA time zone strings, with one value per row. The `time_zones` list in your time dimension config must include all unique values that appear in this column.
 
-For configuration requirements, see [Dimension Concepts — Time Zone Format](dimension_concepts.md#column-format).
+For configuration requirements, see [Dimension Concepts — Time Dimensions](dimension_concepts.md#time-dimensions).
 
 #### Time-in-parts
 
-Time components (year, month, day, hour) are stored in separate integer columns. dsgrid automatically combines these into a single timestamp column during registration. For configuration options and examples, see [Dimension Concepts — Column Format](dimension_concepts.md#column-format).
+Time components (year, month, day, hour) are stored in separate integer columns. dsgrid automatically combines these into a single timestamp column during registration. For configuration options and examples, see [Dimension Concepts — Time Dimensions](dimension_concepts.md#time-dimensions).
 
 **Data example (two-table, stacked):**
 
@@ -682,24 +682,24 @@ The time-in-parts columns are removed and replaced with a single `timestamp` col
 
 #### Annual
 
-Annual time dimensions contain one value per year per dimension combination. The data file includes a `model_year` column with integer year values. For configuration details and examples, see [How to Define a Time Dimension — Annual Time](../how_tos/how_to_time_dimension.md#annual-time).
+Annual time dimensions contain one value per year per dimension combination. The data file includes a `model_year` column with integer year values. For configuration details and examples, see [How to Define a Time Dimension — Annual Time](../how_tos/how_to_time_dimension.md#4-annual-time).
 
 See [AnnualTimeDimensionModel](../../software_reference/data_models/dimension_model.md#annualtimedimensionmodel) for all config fields.
 
 #### Index
 
-Index time dimensions use integer time steps rather than timestamp values. Data files include an integer time column (typically `time_index`) that dsgrid converts to proper timestamps during registration using the config's starting timestamp and frequency. For detailed examples, configurations, and use cases, see [How to Define a Time Dimension — Index Time](../how_tos/how_to_time_dimension.md#index-time).
+Index time dimensions use integer time steps rather than timestamp values. Data files include an integer time column (typically `time_index`) that dsgrid converts to proper timestamps during registration using the config's starting timestamp and frequency. For detailed examples, configurations, and use cases, see [How to Define a Time Dimension — Index Time](../how_tos/how_to_time_dimension.md#2-index-time).
 
 See [IndexTimeDimensionModel](../../software_reference/data_models/dimension_model.md#indextimedimensionmodel) for all config fields.
 
 #### Representative Period
 
-Representative period time dimensions represent typical patterns (e.g., a typical week per month) rather than actual calendar dates, specified using integer columns (month, day_of_week or is_weekday, hour). Two formats are supported: `one_week_per_month_by_hour` and `one_weekday_day_and_one_weekend_day_per_month_by_hour`. During dataset-to-project mapping, representative periods are expanded to actual calendar dates with DST transition handling. For detailed examples, column requirements, and conversion behavior, see [How to Define a Time Dimension — Representative Time](../how_tos/how_to_time_dimension.md#representative-time).
+Representative period time dimensions represent typical patterns (e.g., a typical week per month) rather than actual calendar dates, specified using integer columns (month, day_of_week or is_weekday, hour). Two formats are supported: `one_week_per_month_by_hour` and `one_weekday_day_and_one_weekend_day_per_month_by_hour`. During dataset-to-project mapping, representative periods are expanded to actual calendar dates with DST transition handling. For detailed examples, column requirements, and conversion behavior, see [How to Define a Time Dimension — Representative Time](../how_tos/how_to_time_dimension.md#3-representative-time).
 
 See [RepresentativePeriodTimeDimensionModel](../../software_reference/data_models/dimension_model.md#representativeperiodtimedimensionmodel) and [RepresentativePeriodFormat](../../software_reference/data_models/enums.md#representativeperiodformat) for all config fields and supported formats.
 
 #### NoOp (No Time Dimension)
 
-Use NoOp time for datasets with no time component — for example, static lookup tables or single-year snapshots where time is not a relevant data axis. Data files contain no time columns. For examples and configuration details, see [How to Define a Time Dimension — NoOp Time](../how_tos/how_to_time_dimension.md#noop-time).
+Use NoOp time for datasets with no time component — for example, static lookup tables or single-year snapshots where time is not a relevant data axis. Data files contain no time columns. For examples and configuration details, see [How to Define a Time Dimension — NoOp Time](../how_tos/how_to_time_dimension.md#5-noop-time).
 
 See [NoOpTimeDimensionModel](../../software_reference/data_models/dimension_model.md#nooptimedimensionmodel) for all config fields.

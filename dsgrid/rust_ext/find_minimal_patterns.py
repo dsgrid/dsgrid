@@ -120,10 +120,10 @@ def _write_patterns_to_csv(patterns: list[Pattern], output_dir: str | Path) -> N
         filename = "__".join(columns) + ".csv"
         filepath = output_path / filename
 
+        rows = sorted(p.values for p in group_patterns)
         with open(filepath, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(list(columns))
-            for pattern in group_patterns:
-                writer.writerow(pattern.values)
+            writer.writerows(rows)
 
         logger.info("Wrote %d patterns to %s", len(group_patterns), filepath)

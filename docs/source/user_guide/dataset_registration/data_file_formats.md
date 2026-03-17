@@ -335,7 +335,10 @@ data_layout: {
     columns: [],                   // optional, same structure as data_file
     ignore_columns: [],            // optional, same as data_file
   },
-  missing_associations: [          // optional, list of paths
+  expected_associations: [         // optional
+    "expected_combos.parquet",
+  ],
+  missing_associations: [          // optional
     "missing_associations.parquet",
     "additional_missing",
   ],
@@ -355,7 +358,10 @@ data_layout: {
     - `dimension_type`: The dsgrid dimension type this column represents (optional, but required if this column is not a time column and `name` is not already a [dimension type](../../software_reference/data_models/enums.md#dimensiontype)). When specified, the column will be renamed to match the dimension type.
   - `ignore_columns`: Optional list of column names to drop when reading the file. Cannot overlap with columns defined in `columns`.
 - `lookup_data_file`: Lookup file configuration (required for `two_table` format). Has the same structure as `data_file`.
-- `missing_associations`: List of paths to files or directories defining missing dimension combinations (optional). Paths can be absolute or relative to the config file. You can also use the `--missing-associations-base-dir` CLI option to specify a different base directory for resolving relative paths. See [How to Handle Missing Dimension Associations](../how_tos/how_to_missing_associations) for details.
+- `expected_associations`: Paths to files or directories defining the exact dimension combinations expected in the data (optional). When provided, these replace the full cross-join as the required set. See [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations).
+- `missing_associations`: Paths to files or directories of missing dimension combinations (optional). See [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations).
+
+Both `expected_associations` and `missing_associations` accept absolute or relative paths. Relative paths resolve against the config file's directory, or against `--associations-base-dir` (`-A`) if provided. The two fields can be used together: `expected_associations` defines the baseline of required combinations, and `missing_associations` subtracts corner-case exceptions from it.
 
 ## Column Configuration
 

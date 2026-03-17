@@ -1,6 +1,7 @@
 """Contains helper functions to run commands as subprocesses."""
 
 import logging
+import os
 import shlex
 import subprocess
 import sys
@@ -53,14 +54,23 @@ def run_command(cmd: str, output=None, cwd=None):
     # Disable posix if on Windows.
     command = shlex.split(cmd, posix="win" not in sys.platform)
 
+    # Ensure UTF-8 encoding for subprocesses on Windows where the default
+    # console encoding (e.g. cp1252) cannot represent all Unicode characters
+    # produced by rich_click and similar libraries.
+    env = os.environ.copy()
+    if sys.platform.startswith("win"):
+        env["PYTHONUTF8"] = "1"
+
     if output is not None:
-        pipe = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        pipe = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd, env=env
+        )
         out, err = pipe.communicate()
         output["stdout"] = out.decode("utf-8")
         output["stderr"] = err.decode("utf-8")
         ret = pipe.returncode
     else:
-        ret = subprocess.call(command, cwd=cwd)
+        ret = subprocess.call(command, cwd=cwd, env=env)
 
     if ret != 0:
         logger.debug("Command [%s] failed: %s", cmd, ret)

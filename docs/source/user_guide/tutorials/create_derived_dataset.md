@@ -105,5 +105,5 @@ spark-submit \
 ## Next Steps
 
 - Learn about [derived dataset concepts](../project_derived_datasets/concepts)
-- Understand [query processing](../project_queries/concepts) in more detail
+- Understand [query processing](../project_queries/query_concepts) in more detail
 - Explore [querying project data](query_project) for analysis

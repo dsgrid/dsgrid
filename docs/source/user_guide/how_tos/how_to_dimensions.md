@@ -28,13 +28,17 @@ Identify the unique records of each dimension type in your dataset. Record them 
 
 For any dimensions that match the project, record the existing dimension ID in the dataset config.
 
-### 5. Create Dimension Mappings
-
-For any dimensions that differ from the project, create mappings. See the [dataset mapping guide](../dataset_mapping/index) for details.
-
-### 6. Define Dimensions in Config
+### 5. Define Dimensions in Config
 
 Define your dimensions in the dataset config. See the [dimension model reference](../../software_reference/data_models/dimension_model) for the complete schema.
+
+### 6. Define Expected Dimension Associations
+
+Create files that specify which combinations of dimensions are expected. See [how to handle dimension associations](./how_to_dimension_associations.md) for more information.
+
+### 7. Create Dimension Mappings
+
+For any dimensions that differ from the project, create mappings. See the [dataset mapping guide](../dataset_mapping/index) for details.
 
 ## Next Steps
 

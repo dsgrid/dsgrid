@@ -180,6 +180,6 @@ CSV files can be very large and slower to load than Parquet. Consider using Opti
 
 ## Next Steps
 
-- Learn about [query optimization](../../user_guide/project_queries/concepts) for preparing data
+- Learn about [query optimization](../../user_guide/project_queries/query_concepts) for preparing data
 - Understand [aggregations](../../user_guide/project_queries/aggregations)
 - Follow the [query project tutorial](../../user_guide/tutorials/query_project)

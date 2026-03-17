@@ -811,7 +811,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
         data_base_dir: Path | None = None,
-        missing_associations_base_dir: Path | None = None,
+        associations_base_dir: Path | None = None,
     ):
         with RegistrationContext(
             self.db, log_message, VersionUpdateType.MINOR, submitter
@@ -824,7 +824,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_config = DatasetConfig.load_from_user_path(
                 dataset_config_file,
                 data_base_dir=data_base_dir,
-                missing_associations_base_dir=missing_associations_base_dir,
+                associations_base_dir=associations_base_dir,
             )
             dataset_id = dataset_config.model.dataset_id
             config = self.get_by_id(project_id, conn=conn)
@@ -836,7 +836,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 dataset_config_file,
                 context=context,
                 data_base_dir=data_base_dir,
-                missing_associations_base_dir=missing_associations_base_dir,
+                associations_base_dir=associations_base_dir,
             )
             self.submit_dataset(
                 project_id,

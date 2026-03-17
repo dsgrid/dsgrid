@@ -131,6 +131,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
+        expected_dimension_associations: dict[str, DataFrame],
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
@@ -144,6 +145,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._check_dataset_consistency(
                 conn,
                 config,
+                expected_dimension_associations,
                 missing_dimension_associations,
                 scratch_dir_context,
                 requirements,
@@ -153,6 +155,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
+        expected_dimension_associations: dict[str, DataFrame],
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
@@ -165,7 +168,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             store=self._store,
         )
         schema_handler.check_consistency(
-            missing_dimension_associations, scratch_dir_context, requirements
+            expected_dimension_associations,
+            missing_dimension_associations,
+            scratch_dir_context,
+            requirements,
         )
 
     @property
@@ -265,13 +271,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         log_message: str | None = None,
         context: RegistrationContext | None = None,
         data_base_dir: Path | None = None,
-        missing_associations_base_dir: Path | None = None,
+        associations_base_dir: Path | None = None,
         requirements: DatasetDimensionRequirements | None = None,
     ):
         config = DatasetConfig.load_from_user_path(
             config_file,
             data_base_dir=data_base_dir,
-            missing_associations_base_dir=missing_associations_base_dir,
+            associations_base_dir=associations_base_dir,
         )
 
         if context is None:
@@ -371,6 +377,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                 logger.info("Skip dataset time checks for %s", config.model.dataset_id)
             self._write_to_registry(config, scratch_dir_context=scratch_dir_context)
 
+            expected_dfs = self._store.read_expected_associations_tables(
+                config.model.dataset_id, config.model.version
+            )
             assoc_dfs = self._store.read_missing_associations_tables(
                 config.model.dataset_id, config.model.version
             )
@@ -378,6 +387,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 self._run_checks(
                     context.connection,
                     config,
+                    expected_dfs,
                     assoc_dfs,
                     scratch_dir_context,
                     reqs,
@@ -680,15 +690,28 @@ class DatasetRegistryManager(RegistryManagerBase):
                 missing_df = missing_df.drop(SCALING_FACTOR_COLUMN)
         return df, missing_df
 
+    def _read_expected_associations_tables_from_user_path(
+        self, config: DatasetConfig
+    ) -> dict[str, DataFrame]:
+        """Return all expected association tables keyed by the file path stem.
+        Tables can be all-dimension-types-in-one or split by groups of dimension types.
+        """
+        return self._read_associations_tables_from_user_path(config.expected_associations_paths)
+
     def _read_missing_associations_tables_from_user_path(
         self, config: DatasetConfig
     ) -> dict[str, DataFrame]:
         """Return all missing association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
+        return self._read_associations_tables_from_user_path(config.missing_associations_paths)
+
+    def _read_associations_tables_from_user_path(self, paths: list[Path]) -> dict[str, DataFrame]:
+        """Return all missing association tables keyed by the file path stem.
+        Tables can be all-dimension-types-in-one or split by groups of dimension types.
+        """
         dfs: dict[str, DataFrame] = {}
-        missing_paths = config.missing_associations_paths
-        if not missing_paths:
+        if not paths:
             return dfs
 
         def add_df(path):
@@ -696,15 +719,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             key = make_unique_key(path.stem, dfs)
             dfs[key] = df
 
-        for path in missing_paths:
-            if path.suffix.lower() == ".parquet":
+        for path in paths:
+            if path.suffix.lower() in (".csv", ".parquet"):
                 add_df(path)
             elif path.is_dir():
                 for file_path in path.iterdir():
                     if file_path.suffix.lower() in (".csv", ".parquet"):
                         add_df(file_path)
-            elif path.suffix.lower() in (".csv", ".parquet"):
-                add_df(path)
         return dfs
 
     @staticmethod
@@ -782,6 +803,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         scratch_dir_context: ScratchDirContext | None = None,
     ) -> None:
         lk_df: DataFrame | None = None
+        expected_dfs: dict[str, DataFrame] = {}
         missing_dfs: dict[str, DataFrame] = {}
         match config.get_table_format():
             case TableFormat.ONE_TABLE:
@@ -789,6 +811,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                     assert (
                         orig_version is not None
                     ), "orig_version must be set if config came from the registry"
+                    expected_dfs.update(
+                        self._store.read_expected_associations_tables(
+                            config.model.dataset_id, orig_version
+                        )
+                    )
                     missing_dfs.update(
                         self._store.read_missing_associations_tables(
                             config.model.dataset_id, orig_version
@@ -800,9 +827,12 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ld_df, missing_df1 = self._read_table_from_user_path(
                         config, scratch_dir_context=scratch_dir_context
                     )
+                    expected_dfs.update(
+                        self._read_expected_associations_tables_from_user_path(config)
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
-                        self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
+                        self._merge_missing_associations(missing_df1, expected_dfs, missing_dfs2)
                     )
 
             case TableFormat.TWO_TABLE:
@@ -812,6 +842,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ), "orig_version must be set if config came from the registry"
                     lk_df = self._store.read_lookup_table(config.model.dataset_id, orig_version)
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
+                    expected_dfs = self._store.read_expected_associations_tables(
+                        config.model.dataset_id, orig_version
+                    )
                     missing_dfs = self._store.read_missing_associations_tables(
                         config.model.dataset_id, orig_version
                     )
@@ -829,9 +862,12 @@ class DatasetRegistryManager(RegistryManagerBase):
                     lk_df, missing_df1 = self._read_lookup_table_from_user_path(
                         config, scratch_dir_context=scratch_dir_context
                     )
+                    expected_dfs.update(
+                        self._read_expected_associations_tables_from_user_path(config)
+                    )
                     missing_dfs2 = self._read_missing_associations_tables_from_user_path(config)
                     missing_dfs.update(
-                        self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
+                        self._merge_missing_associations(missing_df1, expected_dfs, missing_dfs2)
                     )
             case _:
                 msg = f"Unsupported table format: {config.get_table_format()}"
@@ -840,25 +876,54 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._store.write_table(ld_df, config.model.dataset_id, config.model.version)
         if lk_df is not None:
             self._store.write_lookup_table(lk_df, config.model.dataset_id, config.model.version)
+        if expected_dfs:
+            self._store.write_expected_associations_tables(
+                expected_dfs, config.model.dataset_id, config.model.version
+            )
         if missing_dfs:
             self._store.write_missing_associations_tables(
                 missing_dfs, config.model.dataset_id, config.model.version
             )
 
     @staticmethod
-    def _check_duplicate_missing_associations(
-        df1: DataFrame | None, dfs2: dict[str, DataFrame]
+    def _merge_missing_associations(
+        df1: DataFrame | None,
+        expected_dfs: dict[str, DataFrame],
+        missing_dfs: dict[str, DataFrame],
     ) -> dict[str, DataFrame]:
-        if df1 is not None and dfs2:
-            msg = "A dataset cannot have expected missing rows in the data and "
-            "provide a missing_associations file. Provide one or the other."
-            raise DSGInvalidDataset(msg)
+        """Merge missing associations from NULL rows in the data with missing
+        associations from files. Both sources are allowed.
 
+        Parameters
+        ----------
+        df1 : DataFrame | None
+            Missing associations derived from NULL rows in the data.
+        expected_dfs : dict[str, DataFrame]
+            Expected associations from user-provided files (used only for
+            the mutual-exclusivity check below).
+        missing_dfs : dict[str, DataFrame]
+            Missing associations from user-provided files.
+        """
+        # Uncomment the check below to disallow combining inline NULL rows
+        # with expected/missing association files.  The current policy is to
+        # merge all sources, but if that proves error-prone we can restore
+        # mutual exclusivity here — the single place that sees all three
+        # inputs for both ONE_TABLE and TWO_TABLE formats.
+        #
+        # if df1 is not None and (expected_dfs or missing_dfs):
+        #     msg = (
+        #         "A dataset cannot declare missing dimension combinations via "
+        #         "inline NULL rows and also provide expected_associations or "
+        #         "missing_associations files.  Use one mechanism or the other."
+        #     )
+        #     raise DSGInvalidDataset(msg)
+
+        result: dict[str, DataFrame] = {}
         if df1 is not None:
-            return {"missing_associations": df1}
-        elif dfs2:
-            return dfs2
-        return {}
+            result["missing_associations_from_nulls"] = df1
+        if missing_dfs:
+            result.update(missing_dfs)
+        return result
 
     def _copy_dataset_config(self, conn: Connection, config: DatasetConfig) -> DatasetConfig:
         new_config = DatasetConfig(config.model)
@@ -930,11 +995,16 @@ class DatasetRegistryManager(RegistryManagerBase):
                 scratch_dir_context=scratch_dir_context,
             )
 
+            expected_df = self._store.read_expected_associations_tables(
+                updated_config.model.dataset_id, updated_config.model.version
+            )
             assoc_df = self._store.read_missing_associations_tables(
                 updated_config.model.dataset_id, updated_config.model.version
             )
             try:
-                self._run_checks(conn, updated_config, assoc_df, scratch_dir_context, reqs)
+                self._run_checks(
+                    conn, updated_config, expected_df, assoc_df, scratch_dir_context, reqs
+                )
             except Exception:
                 self._store.remove_tables(
                     updated_config.model.dataset_id, updated_config.model.version

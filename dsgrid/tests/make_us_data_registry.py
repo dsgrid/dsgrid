@@ -98,6 +98,23 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
             items.append(_relpath_or_absolute(missing_path, config_dir))
         data_layout["missing_associations"] = items
 
+    if (
+        "expected_associations" in data_layout
+        and data_layout["expected_associations"] is not None
+    ):
+        items = []
+        for item in data_layout["expected_associations"]:
+            stem = Path(item).stem
+            expected_path = _find_file_with_stem(dataset_data_dir, stem)
+            if expected_path is None:
+                msg = (
+                    f"Could not find expected associations with stem '{stem}' "
+                    f"in {dataset_data_dir}"
+                )
+                raise FileNotFoundError(msg)
+            items.append(_relpath_or_absolute(expected_path, config_dir))
+        data_layout["expected_associations"] = items
+
     dump_data(data, config_file)
 
 

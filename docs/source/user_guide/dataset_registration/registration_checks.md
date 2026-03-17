@@ -156,7 +156,8 @@ non-time dimension records.
    messages.
 
 2. **Full cross-join check** — dsgrid computes the expected cross-join of all
-   non-time dimension records, subtracts any rows listed in the dataset's
+   non-time dimension records (or uses the dataset's `expected_associations`
+   if provided), subtracts any rows listed in the dataset's
    missing-dimension-associations tables, and compares the result to the
    distinct dimension combinations actually present in the data.
 
@@ -179,12 +180,19 @@ county 06037 is absent — likely the county ID is wrong or the county was
 omitted from your data.
 ```
 
-### Declaring expected missing associations
+### Declaring expected and missing associations
 
 If your dataset intentionally omits certain dimension combinations (for
 example, a technology that does not apply in certain states), you can declare
 them as *missing dimension associations* so that dsgrid subtracts them before
-checking. See {doc}`../how_tos/how_to_missing_associations` for details.
+checking.
+
+If the dataset is inherently sparse, you can instead (or additionally) provide
+*expected dimension associations* that replace the full cross-join with only the
+combinations that should be present.
+
+See {doc}`../how_tos/how_to_dimension_associations` for details on both
+approaches.
 
 ### Skipping this check
 

@@ -82,6 +82,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self,
+        expected_dimension_associations: dict[str, DataFrame],
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
@@ -89,7 +90,10 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_lookup_data_consistency()
         self._check_dataset_internal_consistency()
         self._check_dimension_associations(
-            missing_dimension_associations, scratch_dir_context, requirements
+            expected_dimension_associations,
+            missing_dimension_associations,
+            scratch_dir_context,
+            requirements,
         )
 
     @track_timing(timer_stats_collector)

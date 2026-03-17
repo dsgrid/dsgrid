@@ -1,13 +1,57 @@
-# How to Handle Missing Dimension Associations
+# How to Handle Dimension Associations
 
 Datasets may have missing dimension combinations (associations) — for example, a building model might not have data for certain geography-subsector combinations because those building types don't exist in those regions.
 
-dsgrid validates that datasets provide data for all expected dimension combinations. When a dataset legitimately lacks data for certain combinations, you must explicitly declare these **missing associations**.
+dsgrid validates that datasets provide data for all expected dimension combinations. When a dataset legitimately lacks data for certain combinations, you must explicitly declare these using **expected associations**, **missing associations**, or both.
+
+:::{tip}
+For a worked example walking through the reasoning behind each step, see the [Define Dimension Associations](../tutorials/define_dimension_associations) tutorial.
+:::
 
 ## Prerequisites
 
 - A dataset config file ready for registration (see [Data File Formats](../dataset_registration/data_file_formats))
 - Familiarity with [Dimension Concepts](../dataset_registration/dimension_concepts)
+
+## Declaring Expected Associations
+
+Use `expected_associations` when your dataset is intentionally sparse — that is, only certain combinations of dimension records should have data. Instead of starting from a full cross-join and listing everything that is *missing*, you list the combinations that *should* be present.
+
+Specify expected associations in the `data_layout` section of your dataset config:
+
+```javascript
+data_layout: {
+  table_format: "one_table",
+  value_format: "stacked",
+  data_file: { path: "load_data.parquet" },
+  expected_associations: [
+    "expected_combos.parquet",
+  ],
+}
+```
+
+Each entry in the list can be a single file (CSV or Parquet) or a directory of files. Files follow the same format as missing associations files (see [File Format](#file-format) below). Files that contain a subset of non-time dimension columns are cross-joined with the full set of records for the omitted dimensions.
+
+### When to use expected associations
+
+- The dataset is inherently sparse (e.g., only certain building types exist in certain geographies) and listing the valid combinations is easier than listing every missing one.
+- You have an authoritative table of valid dimension combinations from an upstream data pipeline.
+
+### Combining with missing associations
+
+After declaring expected associations, you can further subtract corner-case missing combinations using `missing_associations`:
+
+```javascript
+data_layout: {
+  table_format: "one_table",
+  value_format: "stacked",
+  data_file: { path: "load_data.parquet" },
+  expected_associations: ["expected_combos.parquet"],
+  missing_associations: ["corner_cases.csv"],
+}
+```
+
+dsgrid will require exactly the combinations in `expected_associations` minus those in `missing_associations`. This two-step approach lets you define the broad structure with expected associations and then handle edge cases with missing associations — potentially with the help of dsgrid's iterative workflow described below.
 
 ## Declaring Missing Associations
 
@@ -30,7 +74,7 @@ Each entry in the list can be:
 1. **A single file** (CSV or Parquet) containing missing combinations
 2. **A directory** containing multiple files, each for different dimension combinations
 
-Paths can be absolute or relative. Relative paths are resolved relative to the dataset configuration file by default. Alternatively, a different base directory can be specified using the `--missing-associations-base-dir` (`-M`) CLI option.
+Paths can be absolute or relative. Relative paths are resolved relative to the dataset configuration file by default. Alternatively, a different base directory can be specified using the `--associations-base-dir` (`-A`) CLI option.
 
 ## File Format
 
@@ -152,12 +196,12 @@ Run registration again. If successful, the missing associations will be stored i
 
 ## Using Custom Base Directories
 
-When registering a dataset, you can specify a custom base directory for resolving missing associations paths using `--missing-associations-base-dir` (or `-M`):
+When registering a dataset, you can specify a custom base directory for resolving missing associations paths using `--associations-base-dir` (or `-A`):
 
 ```bash
 dsgrid registry datasets register dataset.json5 \
   -l "Register my dataset" \
-  -M /path/to/missing/files
+  -A /path/to/missing/files
 ```
 
 When this option is provided, any relative paths in the `missing_associations` list will be resolved relative to the specified directory instead of the dataset configuration file's directory.
@@ -168,7 +212,7 @@ You can combine this with `--data-base-dir` (or `-D`) for data files:
 dsgrid registry datasets register dataset.json5 \
   -l "Register my dataset" \
   -D /path/to/data/files \
-  -M /path/to/missing/files
+  -A /path/to/missing/files
 ```
 
 These options are also available for the `register-and-submit-dataset` command:
@@ -179,7 +223,7 @@ dsgrid registry projects register-and-submit-dataset \
   -p my-project-id \
   -l "Register and submit dataset" \
   -D /path/to/data/files \
-  -M /path/to/missing/files
+  -A /path/to/missing/files
 ```
 
 ## Validation Behavior

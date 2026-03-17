@@ -58,13 +58,17 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self,
+        expected_dimension_associations: dict[str, DataFrame],
         missing_dimension_associations: dict[str, DataFrame],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
         self._check_one_table_data_consistency()
         self._check_dimension_associations(
-            missing_dimension_associations, scratch_dir_context, requirements
+            expected_dimension_associations,
+            missing_dimension_associations,
+            scratch_dir_context,
+            requirements,
         )
 
     @track_timing(timer_stats_collector)

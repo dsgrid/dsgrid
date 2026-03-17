@@ -17,11 +17,11 @@ registration_checks
 
 - [How to Create Dataset Dimensions](../how_tos/how_to_dimensions)
 - [How to Define a Time Dimension](../how_tos/how_to_time_dimension)
+- [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations.md)
 
 ## Tutorials
 
-- [Create and Submit a Dataset](../tutorials/create_and_submit_dataset)
-- [Map a Dataset](../tutorials/map_dataset)
+- [Define Dimension Associations](../tutorials/define_dimension_associations.md)
 
 ## Software Reference
 

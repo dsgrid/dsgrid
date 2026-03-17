@@ -22,6 +22,7 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
 )
 from dsgrid.exceptions import (
+    DSGFileInputError,
     DSGInvalidField,
     DSGInvalidDimensionMapping,
     DSGInvalidDataset,
@@ -31,6 +32,7 @@ from dsgrid.spark.functions import (
     coalesce,
     count_distinct_on_group_by,
     create_temp_view,
+    cross_join,
     handle_column_spaces,
     make_temp_view_name,
     read_parquet,
@@ -971,6 +973,145 @@ def convert_types_if_necessary(df: DataFrame) -> DataFrame:
         if column in existing_columns and df.schema[column].dataType in int_types:
             df = df.withColumn(column, F.col(column).cast(StringType()))
     return df
+
+
+def merge_expected_associations_tables(
+    expected_dfs: dict[str, DataFrame],
+    all_dim_records: dict[str, list[str]],
+    context: ScratchDirContext,
+) -> DataFrame:
+    """Merge user-provided expected association tables into a single DataFrame.
+
+    Tables are combined according to their column sets:
+
+    - **Identical** column sets are unioned (different subsets of the same
+      dimension space).
+    - **Disjoint** column sets are cross-joined (each table constrains
+      independent dimensions).
+    - **Overlapping but not identical** column sets are inner-joined on the
+      shared columns (each table further constrains the other).
+
+    After each inner join the function verifies that no values of the shared
+    dimension columns were lost.  This catches inconsistent tables early and
+    the error message identifies which pair of tables caused the problem.
+
+    After merging, any dimension columns not covered by any table are filled
+    in by cross-joining with the full set of records for those dimensions.
+
+    Parameters
+    ----------
+    expected_dfs
+        Dictionary of DataFrames with expected dimension combinations.
+    all_dim_records
+        Mapping from dimension column name to the complete list of record
+        ids for that dimension (excluding TIME).
+    context
+        Scratch directory context for temporary files.
+
+    Returns
+    -------
+    DataFrame
+        A single DataFrame with one row per expected dimension combination.
+
+    Raises
+    ------
+    DSGInvalidDataset
+        If a dimension column loses records during the merge.
+    """
+    from dsgrid.utils.spark import create_dataframe_from_product, get_unique_values
+
+    # Step 1: Group by column set; union tables with identical columns.
+    groups: dict[frozenset[str], DataFrame] = {}
+    for df in expected_dfs.values():
+        key = frozenset(df.columns)
+        if key in groups:
+            groups[key] = groups[key].union(df)
+        else:
+            groups[key] = df
+
+    assert groups, "Bug: expected_dfs is empty"
+
+    # Step 2: Merge groups.
+    # - Disjoint column sets   -> cross join
+    # - Overlapping column sets -> inner join on the shared columns
+    # Each group is checked on entry: every column that corresponds to a
+    # known dimension must contain all of that dimension's records.
+    # After each inner join, shared columns are re-checked to catch losses.
+    merged: DataFrame | None = None
+    covered_columns: set[str] = set()
+    merged_label: str = ""
+    for col_set, df in groups.items():
+        df = df.distinct()
+        group_label = "{" + ", ".join(sorted(col_set)) + "}"
+
+        # Validate that this group covers every record for its dimensions.
+        for col in sorted(col_set):
+            if col not in all_dim_records:
+                msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
+                raise DSGFileInputError(msg)
+            actual_ids = get_unique_values(df, col)
+            expected_ids = set(all_dim_records[col])
+            missing = sorted(expected_ids - actual_ids)
+            if missing:
+                msg = (
+                    f"Expected associations table with columns {group_label} is missing "
+                    f"dimension '{col}' records: {missing}. Every record for a dimension "
+                    f"must appear in at least one row of each table that contains that "
+                    f"dimension column."
+                )
+                raise DSGInvalidDataset(msg)
+
+        if merged is None:
+            merged = df
+            covered_columns = set(col_set)
+            merged_label = group_label
+        else:
+            overlap = covered_columns & set(col_set)
+            if overlap:
+                pre_join_values: dict[str, set[str]] = {}
+                all_cols = covered_columns | set(col_set)
+                for col in sorted(all_cols):
+                    if col in all_dim_records:
+                        if col in covered_columns:
+                            pre_join_values[col] = get_unique_values(merged, col)
+                        if col in col_set:
+                            pre_join_values.setdefault(col, set()).update(
+                                get_unique_values(df, col)
+                            )
+
+                merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
+
+                # Check for values lost by the inner join.
+                for col in sorted(overlap):
+                    if col not in all_dim_records:
+                        continue
+                    post_ids = get_unique_values(merged, col)
+                    lost = sorted(pre_join_values.get(col, set()) - post_ids)
+                    if lost:
+                        msg = (
+                            f"Inner join of expected associations tables with columns "
+                            f"{merged_label} and {group_label} on {sorted(overlap)} "
+                            f"dropped dimension '{col}' records: {lost}. "
+                            f"Both tables must contain every record for shared dimensions."
+                        )
+                        raise DSGInvalidDataset(msg)
+                merged_label = f"({merged_label} ⋈ {group_label})"
+            else:
+                merged = cross_join(merged, df)
+                merged_label = f"({merged_label} × {group_label})"
+            covered_columns |= set(col_set)
+
+    assert merged is not None
+
+    # Step 3: Cross-join with full records of any remaining uncovered dimensions.
+    all_dim_columns = set(all_dim_records)
+    remaining_columns = all_dim_columns - covered_columns
+    if remaining_columns:
+        remaining_data = {c: all_dim_records[c] for c in remaining_columns}
+        remaining_df = create_dataframe_from_product(remaining_data, context)
+        merged = cross_join(merged, remaining_df)
+
+    return merged.distinct()
 
 
 def filter_out_expected_missing_associations(

@@ -31,7 +31,7 @@ Datetime is the most common time type. The config describes two things:
 - **`column_format`** -- how timestamps are stored in the data table (`timestamp_tz`, `timestamp_ntz`, or `time_format_in_parts`)
 - **`time_zone_format`** -- whether timestamps are aligned in absolute time (single timezone for all geographies) or local standard clock time (one timezone per geography)
 
-### Time zones, UTC offsets, Localization, and Validation
+### Key concepts
 
 Data table timestamps are either *timezone-aware* (`timestamp_tz` or `time_format_in_parts` with per-row UTC offsets in `offset_column`) or *timezone-naive* (`timestamp_ntz` or `time_format_in_parts` with no offset column) and dsgrid provides time checks based on IANA time zones. *If input timestamps are timezone-aware, dsgrid supports all IANA time zones*, including time zones like "America/New York" that include DST. *If input timestamps are timezone-naive, dsgrid requires standard time* or fixed-offset time zones that do not include DST. In either case, the `time_zone` field must be specified in `time_zone_format`. The `time_zone` field is required even for timezone-aware timestamps because dsgrid uses it to construct validation data independent of the column format.
 
@@ -40,7 +40,7 @@ dsgrid automatically localizes timezone-naive timestamps to the zone(s) specifie
 :::{note}
 IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct from UTC offsets (e.g., UTC-5).
 
-Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
+Fixed-offset or standard time time zones like "Etc/GMT+5" observe a single UTC offset (UTC-5) year-round. Note the POSIX sign convention: `Etc/GMT+N` is UTC−N. DST-observing zones like "America/New_York" have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).
 :::
 
 ### 1a. Column Format Distinctions
@@ -49,9 +49,9 @@ Three formats are supported for storing time data:
 
 **`timestamp_tz` (timezone-aware)** — A single timestamp column with embedded UTC offset/timezone information. Timestamps represent absolute UTC instants and include offset information (e.g., `2012-01-01 00:00:00-05:00`). Use this format when input data already has timezone information. See Examples 1 and 5 below.
 
-**`timestamp_ntz` (timezone-naive)** — A single timestamp column with no offset/timezone information (e.g., `2012-01-01 00:00:00`). dsgrid automatically localizes these to the zone(s) specified in `time_zone_format` during registration. Input data must use standard time (no DST observance) for accurate localization. See Examples 2 and 6 below.
+**`timestamp_ntz` (timezone-naive)** — A single timestamp column with no offset/timezone informatxion (e.g., `2012-01-01 00:00:00`). dsgrid automatically localizes these to the zone(s) specified in `time_zone_format` during registration. Input data must use standard time (no DST observance) for accurate localization. See Examples 2 and 6 below.
 
-**`time_format_in_parts`** — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single `timestamp` column during registration. Optionally, per-row UTC offsets can be provided via `offset_column` to construct timezone-aware timestamps directly; otherwise, the constructed timestamps are timezone-naive. Localization can be applied using `time_zone_format`. See Examples 3 and 4 below.
+**`time_format_in_parts`** — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single `timestamp` column during registration. Optionally, per-row UTC offsets can be provided via `offset_column` to construct timezone-aware timestamps directly (see Example 4); otherwise, the constructed timestamps are timezone-naive (see Example 3). Localization can be applied to timezone-naive timstamps using `time_zone_format`.
 
 ---
 
@@ -307,6 +307,17 @@ The input columns (`year`, `month`, `day`, `hour`) are combined with the `offset
 
 Timestamps cover the **same interval of local standard time** across geographies — e.g., every geography has data from midnight to midnight in its own local time. Because the clocks read the same local time but represent different absolute instants, each row must include a `time_zone` column. Use `format_type: "aligned_in_std_clock_time"` in `time_zone_format`.
 
+**Where does the `time_zone` column come from?**
+
+dsgrid automatically adds a `time_zone` column to the data table by joining it with geography records. The source of the time zone information is configurable:
+
+- **Dataset geography records** (default) — dsgrid reads time zones from a `time_zone` column in the dataset's geography dimension records file. This is the common case.
+- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config to read time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+
+The `time_zones` list in the config must include all unique IANA time zone strings that appear in the geography records.
+
+For details on how time zone columns are structured in actual data files, see [Data File Formats — Time Zone Column Sourcing](../dataset_registration/data_file_formats.md#time-zone-column-sourcing).
+
 #### With `timestamp_tz` (timezone-aware single column)
 
 **Example 5 data table**:
@@ -422,7 +433,13 @@ timestamp | time_zone | geography | value
 
 Each row's tz-naive timestamp is localized to the IANA zone in its `time_zone` column during registration, resulting in timezone-aware timestamps with the appropriate offsets. To store timezone-naive timestamps **without localization**, use `aligned_in_absolute_time` with `time_zone: null`.
 
-The `time_format_in_parts` column format is also supported for locally aligned time. See Examples 3 and 4 for additional configuration options.
+#### With `time_format_in_parts` (separate columns, no offset)
+
+The `time_format_in_parts` column format is supported for locally aligned time, similar to globally aligned time. See Examples 3 for configuration options.
+
+#### With `time_format_in_parts` (separate columns, with offset)
+
+The `time_format_in_parts` column format is also supported for locally aligned time, similar to globally aligned time. See Examples 4 for configuration options.
 
 ---
 
@@ -449,7 +466,7 @@ Index time uses sequential **integer indices** instead of explicit timestamps. T
 - **`time_zone` column required**: Must exist in both the geography dimension records and the data table. Used when converting indices to datetimes during dataset-to-project mapping.
 - **All time zones allowed**: Including DST-observing zones like `"America/New_York"` and fixed-offset zones like `"Etc/GMT+5"`.
 
-**Conversion behavior**: Index-to-datetime conversion happens only when the dataset (with index time) maps to a project (with datetime time). The conversion respects time adjustments specified in the project config, such as `daylight_saving_adjustment`, `leap_day_adjustment`, and `wrap_time_allowed`.
+**Conversion behavior**: Index-to-datetime conversion happens only when the dataset (with index time) maps to a project (with datetime time), not during dataset registration. The conversion respects time adjustments specified in the project config, such as `daylight_saving_adjustment`, `leap_day_adjustment`, and `wrap_time_allowed`.
 
 ---
 
@@ -459,19 +476,19 @@ Index time uses sequential **integer indices** instead of explicit timestamps. T
 
 Electricity datasets commonly index hourly values from 0-8759 (or 1-8760). The config records the starting point to preserve time specificity (day of week, season, etc.).
 
-**Example data table**:
+**Example 1 data table** (indexed, before mapping to project):
 
 ```
 time_index | time_zone  | geography | value
------------|------------|-----------|------
+-----------|------------|-----------|-------
          0 | Etc/GMT+5  | g_east    | 1.2
          1 | Etc/GMT+5  | g_east    | 0.9
-         2 | Etc/GMT+5  | g_east    | 1.4
-...
-      8783 | Etc/GMT+5  | g_east    | 2.0
+         2 | Etc/GMT+5  | g_east    | 2.1
+       ... | ...        | ...       | ...
+      8783 | Etc/GMT+5  | g_east    | 1.8
 ```
 
-**Config**:
+**Config 1**:
 
 ```javascript
 {
@@ -493,11 +510,37 @@ time_index | time_zone  | geography | value
 }
 ```
 
+**Data table 1 after mapping to project**:
+
+```
+timestamp           | time_zone  | geography | value
+--------------------|------------|-----------|-------
+2012-01-01 00:00:00 | Etc/GMT+5  | g_east    | 1.2
+2012-01-01 01:00:00 | Etc/GMT+5  | g_east    | 0.9
+2012-01-01 02:00:00 | Etc/GMT+5  | g_east    | 2.1
+...                 | ...        | ...       | ...
+2012-12-31 23:00:00 | Etc/GMT+5  | g_east    | 1.8
+```
+
+During registration, dsgrid converts the integer `time_index` column to a proper `timestamp` column by combining the starting timestamp with the index and frequency. The resulting timestamps are timezone-naive, paired with the `time_zone` column to fully specify each point in time.
+
 **Example 2: Industrial data with DST adjustment**
 
 Some datasets (e.g., IEF industrial profiles) are stitched together from representative diurnal profiles in local standard time. When mapping to a project, both the timestamps and data values must be adjusted for DST transitions. Geographies observing DST will have dropped (spring-forward) or duplicated (fall-back) hours. Interpolation is available for the fall-back hour adjustment.
 
-**Dataset config**:
+**Example 2 data table** (before mapping to project, showing hours around spring-forward DST transition):
+
+```
+time_index | time_zone        | geography | value
+-----------|------------------|-----------|-------
+      1560 | America/Chicago   | g_midwest | 1.5
+      1561 | America/Chicago   | g_midwest | 1.4
+      1562 | America/Chicago   | g_midwest | 1.3
+      1563 | America/Chicago   | g_midwest | 1.2
+       ... | ...              | ...       | ...
+```
+
+**Config 2 (dataset)**:
 
 ```javascript
 {
@@ -520,7 +563,7 @@ Some datasets (e.g., IEF industrial profiles) are stitched together from represe
 }
 ```
 
-**Project config** to apply daylight saving adjustment:
+**Config 2 (project)** to apply daylight saving adjustment:
 
 ```javascript
 {
@@ -536,34 +579,63 @@ Some datasets (e.g., IEF industrial profiles) are stitched together from represe
 }
 ```
 
-When the dataset maps to the project, the index time is first converted to standard time datetimes. Then, for each geography's time zone, data rows are adjusted according to the `daylight_saving_adjustment` setting if that zone observes DST. Hours during spring-forward are dropped and hours during fall-back are duplicated, affecting both timestamps and their associated data values.
+**Data table 2 after mapping to project** (showing hours around spring-forward DST transition where 2:00 AM is dropped):
+
+```
+timestamp                    | time_zone        | geography | value
+-----------------------------|------------------|-----------|-------
+2018-03-11 01:00:00-06:00    | America/Chicago   | g_midwest | 1.5
+2018-03-11 03:00:00-05:00    | America/Chicago   | g_midwest | 1.3
+2018-03-11 04:00:00-05:00    | America/Chicago   | g_midwest | 1.2
+       ...                   | ...              | ...       | ...
+```
+
+When the dataset maps to a project with geographies observing DST, the index time is first converted to standard time datetimes. Then, for each geography's time zone, data rows are adjusted according to the `daylight_saving_adjustment` setting. Hours during spring-forward (2:00--2:59 AM when clocks jump to 3:00 AM) are dropped as configured. Hours during fall-back (1:00--1:59 AM when clocks repeat) are duplicated, affecting both timestamps and their associated data values.
 
 ## 3. Representative Time
 
-Representative time is used when data covers a **typical period** rather than actual calendar dates -- for example, a typical week for each month (used by TEMPO). The data table uses integer columns instead of timestamps.
+Representative time is used when data covers a **typical period** rather than actual calendar dates -- for example, a typical week for each month -- in local clock time. Representative periods are useful for modeling based on synthetic or averaged time patterns rather than actual historical dates.
 
 Two formats are currently supported, selected by the `format` field.
 
+**How it works**: Data is structured using integer columns (month, day_of_week/is_weekday, hour) that define typical periods independent of actual calendar dates. When the dataset maps to a project, these typical periods are repeated across a selected calendar year, matching the day-of-week or weekday/weekend patterns.
+
+**Requirements**:
+- **`time_zone` column required**: Must exist in both the geography dimension records and the data table. Used when localizing the representative periods to a specific project year.
+- **All time zones allowed**: Including DST-observing zones like `"America/New_York"` and fixed-offset zones like `"Etc/GMT+5"`.
+- **Two formats supported**: `one_week_per_month_by_hour` or `one_weekday_day_and_one_weekend_day_per_month_by_hour`.
+
+**Conversion behavior**: Representative-to-datetime conversion happens only when the dataset (with representative time) maps to a project (with datetime time), not during dataset registration. Each hour in the typical period is assumed to represent local clock time. When the represented calendar date experiences a DST spring-forward transition, the hour 2:00--2:59 AM does not exist and is not mapped; consequently, any data value associated with 2 AM in the input is not used.
+
 ### 3a. `one_week_per_month_by_hour`
 
-Data has one representative week per month. The data table must have three columns: `month`, `day_of_week`, and `hour`.
+Data has one representative week per month (168 hours = 7 days × 24 hours per month). The data table must have three columns: `month`, `day_of_week`, and `hour`.
 
-- `month`: 1--12
+- `month`: 1--12 (one-based, January=1)
 - `day_of_week`: 0 (Monday) -- 6 (Sunday), following Python's `datetime.weekday()` convention
 - `hour`: 0--23
 
-**Example data table**:
+**Example 3a data table** (before mapping to project, showing March data around spring-forward DST transition):
 
 ```
 month | day_of_week | hour | geography | value
-------|-------------|------|-----------|------
-    1 |           0 |    0 | g1        | 1.2
-    1 |           0 |    1 | g1        | 0.9
-    1 |           6 |   23 | g1        | 0.8
+------|-------------|------|-----------|-------
+    3 |           0 |    0 | g1        | 30.0
+    3 |           0 |    1 | g1        | 30.1
+    3 |           0 |    2 | g1        | 30.2
+    3 |           0 |    3 | g1        | 30.3
+    3 |           1 |    0 | g1        | 31.0
+    3 |           1 |    1 | g1        | 31.1
+    3 |           1 |    2 | g1        | 31.2
+    3 |           1 |    3 | g1        | 31.3
 ...
+    3 |           6 |    0 | g1        | 36.0
+    3 |           6 |    1 | g1        | 36.1
+    3 |           6 |    2 | g1        | 36.2
+    3 |           6 |    3 | g1        | 36.3
 ```
 
-**Config**:
+**Config 3a**:
 
 ```javascript
 {
@@ -575,7 +647,7 @@ month | day_of_week | hour | geography | value
   ranges: [
     {
       start: 1,    // first month (January)
-      end: 12,     // last month (December); use a subset for partial-year data
+      end: 12,     // last month (December)
     },
   ],
   time_interval_type: "period_beginning",
@@ -583,26 +655,54 @@ month | day_of_week | hour | geography | value
 }
 ```
 
+**Data table 3a after mapping to project** (showing March 5-11, 2018 with spring-forward transition on March 11):
+
+```
+timestamp                     | time_zone        | geography | value
+-------------------------------|------------------|-----------|-------
+2018-03-05 00:00:00-05:00      | America/New_York | g1        | 30.0
+2018-03-05 01:00:00-05:00      | America/New_York | g1        | 30.1
+2018-03-05 02:00:00-05:00      | America/New_York | g1        | 30.2
+2018-03-05 03:00:00-05:00      | America/New_York | g1        | 30.3
+...                           | ...              | ...       | ...
+2018-03-10 00:00:00-05:00      | America/New_York | g1        | 31.0
+2018-03-10 01:00:00-05:00      | America/New_York | g1        | 31.1
+2018-03-10 02:00:00-05:00      | America/New_York | g1        | 31.2
+2018-03-10 03:00:00-05:00      | America/New_York | g1        | 31.3
+...                           | ...              | ...       | ...
+2018-03-11 00:00:00-05:00      | America/New_York | g1        | 36.0
+2018-03-11 01:00:00-05:00      | America/New_York | g1        | 36.1
+2018-03-11 03:00:00-04:00      | America/New_York | g1        | 36.3
+```
+
+The March representative week (day_of_week 0-6, where 0=Monday through 6=Sunday) maps to actual calendar dates. Note that on March 11, 2018, the spring-forward transition occurs at 2:00 AM: the 2:00-2:59 AM hour is skipped and the clock jumps directly to 3:00 AM. Consequently, the 2 AM data row (36.2) is not mapped, and the 3 AM value (36.3) is used instead.
+
 ### 3b. `one_weekday_day_and_one_weekend_day_per_month_by_hour`
 
-Data has one weekday and one weekend day per month. The data table must have three columns: `month`, `is_weekday`, and `hour`.
+Data has one representative weekday and one representative weekend day per month (48 hours = 2 days × 24 hours per month). The data table must have three columns: `month`, `is_weekday`, and `hour`.
 
-- `month`: 1--12
-- `is_weekday`: `true` or `false`
+- `month`: 1--12 (one-based, January=1)
+- `is_weekday`: `true` (weekday profile) or `false` (weekend profile)
 - `hour`: 0--23
 
-**Example data table**:
+**Example 3b data table** (before mapping to project, showing March weekday and weekend profiles around spring-forward DST transition):
 
 ```
 month | is_weekday | hour | geography | value
-------|------------|------|-----------|------
-    1 |       true |    0 | g1        | 1.2
-    1 |       true |    1 | g1        | 0.9
-    1 |      false |    0 | g1        | 0.7
+------|------------|------|-----------|-------
+    3 |       true |    0 | 06037     | 31.00
+    3 |       true |    1 | 06037     | 31.01
+    3 |       true |    2 | 06037     | 31.02
+    3 |       true |    3 | 06037     | 31.03
+...
+    3 |      false |    0 | 06037     | 30.00
+    3 |      false |    1 | 06037     | 30.01
+    3 |      false |    2 | 06037     | 30.02
+    3 |      false |    3 | 06037     | 30.03
 ...
 ```
 
-**Config**:
+**Config 3b**:
 
 ```javascript
 {
@@ -622,7 +722,9 @@ month | is_weekday | hour | geography | value
 }
 ```
 
-Both representative period formats require a `time_zone` column in the geography dimension records because representative periods must be localized when mapping to a project's datetime dimension. All time zones (including those observing DST) are accepted in this time class.
+**Data table 3b after mapping to project** (showing March 8-11, 2018 with spring-forward transition affecting the weekend day):
+
+Weekday profiles (is_weekday=true) repeat on all weekdays throughout the year; in this example, March 8 and 10 use the weekday profile. The weekend profile (is_weekday=false) repeats on all weekend days; March 11 (Sunday) uses the weekend profile. During the spring-forward transition on March 11, the 2 AM data row (30.02) is not mapped due to the missing hour.
 
 ---
 

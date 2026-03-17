@@ -99,6 +99,8 @@ The `column_format` field specifies how time is stored in the data table. Three 
 - **`timestamp_ntz`** — a single timezone-naive timestamp column. Same `time_column` field. Any time zone specified in the config must be null for no localization or in standard time (fixed offset) for localization (see [Time Zone Localization](#time-zone-localization)). Localization does not work with time zones that observe daylight savings due to inability to localize fallback duplicate timestamps accurately.
 - **`time_format_in_parts`** — time is split across multiple integer columns instead of a single timestamp column. Required columns are `year_column`, `month_column`, and `day_column`; optional columns are `hour_column` (defaults to 0 for all rows if omitted) and `offset_column` (UTC offset in hours, e.g. `-8` or `"-08:00"`). dsgrid automatically combines the part columns into a single column named `timestamp` on registration.
 
+For practical examples of how these formats appear in actual Parquet data files (including both single and two-table layouts), see [Data File Formats — Time Formats](../data_file_formats.md#time-formats).
+
 ```javascript
   // timezone-aware single column (default):
   column_format: {dtype: "timestamp_tz", time_column: "timestamp"}
@@ -120,7 +122,11 @@ The `column_format` field specifies how time is stored in the data table. Three 
 Although the schema accepts multiple `ranges` entries, dsgrid currently only supports a single continuous range. The time zone is specified through `time_zone_format`, which supports two variants:
 
 - **`aligned_in_absolute_time`** — all geographies share the same timestamps in absolute time. Provide a single `time_zone` (an IANA time zone string such as `"America/New_York"` or `"Etc/GMT+5"`) or `None` for no time zone. Accepted `time_zones` types depend on `column_format`. When input timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive, only fixed UTC offset zones (due to localization requirement) or `None` are allowed.
-- **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone_column` with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table. Accepted `time_zones` types depend on `column_format`. When input timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive, only fixed UTC offset zones are allowed due to localization requirement. `None` is not allowed as timestamps cannot be a mix of timezone-aware and -naive types.
+- **`aligned_in_std_clock_time`** — timestamps cover the same interval of standard clock time across geographies (e.g., all of 2012 as experienced locally in standard time). The data table must have a `time_zone` column with per-row IANA time zones. Provide a `time_zones` list of all unique time zones in the data table. Accepted `time_zones` types depend on `column_format`. When input timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive, only fixed UTC offset zones are allowed due to localization requirement. `None` is not allowed as timestamps cannot be a mix of timezone-aware and -naive types.
+
+(column-format)=
+
+For details on how `time_zone` columns are sourced and structured in actual data files, see [Data File Formats — Time Zone Column Sourcing](../data_file_formats.md#time-zone-column-sourcing).
 
 Example using local standard clock time (multiple time zones):
 
@@ -149,7 +155,7 @@ Example using local standard clock time (multiple time zones):
   measurement_type: "total",
 }
 ```
-`Etc/GMT+5` through `Etc/GMT+8` are the IANA fixed-offset zones corresponding to UTC−5 through UTC−8 (US Eastern through Pacific standard time offsets). Note the POSIX sign convention: `Etc/GMT+N` is UTC−N. These time zones observe standard time (no daylight savings) because `column_format.dtype` is `timestamp_ntz` due to localization need (see [Time Zone Localization](#time-zone-localization)).
+`Etc/GMT+5` through `Etc/GMT+8` are the IANA fixed-offset zones corresponding to UTC−5 through UTC−8 (US Eastern through Pacific standard time offsets). These time zones must observe standard time (no daylight savings) because dsgrid will localize the timezone-naive timestamps (`timestamp_ntz`) (see [Time Zone Localization](#time-zone-localization)).
 
 For detailed examples for each time dimension type, see [How to Define a Time Dimension](../how_tos/how_to_time_dimension).
 
@@ -163,6 +169,8 @@ For `aligned_in_absolute_time`, localization uses `time_zone_format.time_zone`.
 For `aligned_in_std_clock_time`, localization uses the per-row `time_zone` column in the data table. Every value in that column must be one of the IANA time zone strings listed in `time_zone_format.time_zones`.
 
 To store timezone-naive timestamps without any localization, set `format_type` to `aligned_in_absolute_time` and `time_zone` to `null`:
+
+For practical examples of timezone-naive data in actual Parquet files, see [Data File Formats — Timezone-naive timestamps](../data_file_formats.md#timestamp-ntz).
 
 ```javascript
   ...

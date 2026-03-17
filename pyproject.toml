@@ -13,12 +13,13 @@ license = { file = "LICENSE" }
 readme = "README.md"
 keywords = ["dsgrid"]
 authors = [
-    {name = "Elaine Hale", email = "elaine.hale@nrel.gov"},
-    {name = "Lixi Liu", email = "lixi.liu@nrel.gov"},
-    {name = "Meghan Mooney", email = "meghan.mooney@nrel.gov"},
-    {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
+    {name = "Elaine Hale", email = "elaine.hale@nlr.gov"},
+    {name = "Daniel Thom", email = "daniel.thom@nlr.gov"},
+    {name = "Lixi Liu", email = "lixi.liu@nlr.gov"},
+    {name = "Meghan Mooney", email = "meghan.mooney@nlr.gov"},
+
 ]
-maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
+maintainers = [{name = "Elaine Hale", email = "elaine.hale@nlr.gov"}]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",

@@ -517,20 +517,20 @@ def convert_time_zone_with_chronify_spark_hive(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    with store.engine.begin() as conn:
-        # This bypasses checks because the table should already be valid.
-        store.schema_manager.add_schema(conn, src_schema)
+    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone hive src")
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     try:
-        dst_schema = store.convert_time_zone(
+        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        store.convert_time_zone(
             src_schema.name,
             time_zone,
             scratch_dir=scratch_dir_context.scratch_dir,
+            output_file=output_file,
         )
     finally:
-        with store.engine.begin() as conn:
-            store.schema_manager.remove_schema(conn, src_schema.name)
+        store.drop_view(src_schema.name)
 
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+    return df.sparkSession.read.load(str(output_file))
 
 
 def convert_time_zone_by_column_with_chronify_spark_hive(
@@ -548,21 +548,21 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    with store.engine.begin() as conn:
-        # This bypasses checks because the table should already be valid.
-        store.schema_manager.add_schema(conn, src_schema)
+    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone_by_column hive src")
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     try:
-        dst_schema = store.convert_time_zone_by_column(
+        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        store.convert_time_zone_by_column(
             src_schema.name,
             time_zone_column,
             wrap_time_allowed=wrap_time_allowed,
             scratch_dir=scratch_dir_context.scratch_dir,
+            output_file=output_file,
         )
     finally:
-        with store.engine.begin() as conn:
-            store.schema_manager.remove_schema(conn, src_schema.name)
+        store.drop_view(src_schema.name)
 
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+    return df.sparkSession.read.load(str(output_file))
 
 
 def localize_time_zone_with_chronify_spark_hive(
@@ -575,23 +575,22 @@ def localize_time_zone_with_chronify_spark_hive(
     """Create a single time zone-localized table with chronify and Spark and a Hive Metastore.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
-
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    with store.engine.begin() as conn:
-        # This bypasses checks because the table should already be valid.
-        store.schema_manager.add_schema(conn, src_schema)
+    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone hive src")
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     try:
-        dst_schema = store.localize_time_zone(
+        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        store.localize_time_zone(
             src_schema.name,
             time_zone,
             scratch_dir=scratch_dir_context.scratch_dir,
+            output_file=output_file,
         )
     finally:
-        with store.engine.begin() as conn:
-            store.schema_manager.remove_schema(conn, src_schema.name)
+        store.drop_view(src_schema.name)
 
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+    return df.sparkSession.read.load(str(output_file))
 
 
 def localize_time_zone_by_column_with_chronify_spark_hive(
@@ -608,20 +607,20 @@ def localize_time_zone_by_column_with_chronify_spark_hive(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    with store.engine.begin() as conn:
-        # This bypasses checks because the table should already be valid.
-        store.schema_manager.add_schema(conn, src_schema)
+    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone_by_column hive src")
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     try:
-        dst_schema = store.localize_time_zone_by_column(
+        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        store.localize_time_zone_by_column(
             src_schema.name,
             time_zone_column=time_zone_column,
             scratch_dir=scratch_dir_context.scratch_dir,
+            output_file=output_file,
         )
     finally:
-        with store.engine.begin() as conn:
-            store.schema_manager.remove_schema(conn, src_schema.name)
+        store.drop_view(src_schema.name)
 
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+    return df.sparkSession.read.load(str(output_file))
 
 
 def map_time_dimension_with_chronify_spark_path(

@@ -242,36 +242,45 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     required_assoc, missing_df
                 )
 
-        if not expected_dimension_associations:
-            # This first check is redundant with the except_all below. But, it is
-            # significantly easier for users to debug. Only apply when using the full
-            # cross-join; with expected_associations, individual dimension values may
-            # intentionally differ from the full set of dimension records.
-            # Performed after missing-association subtraction so that a dimension value
-            # that is entirely absent due to declared missing combinations does not
-            # produce a false positive.
-            for column in required_assoc.columns:
-                expected = get_unique_values(required_assoc, column)
-                actual = get_unique_values(assoc_by_data, column)
-                if actual != expected:
-                    missing = sorted(expected.difference(actual))
-                    extra = sorted(actual.difference(expected))
-                    num_matching = len(actual.intersection(expected))
-                    msg = (
-                        f"Dataset records for dimension type {column} do not match expected "
-                        f"values. {missing=} {extra=} {num_matching=}"
-                    )
-                    raise DSGInvalidDataset(msg)
-
-        cols = sorted(required_assoc.columns)
-        diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-        cache(diff)
+        # Cache both DataFrames before the per-column loop and the except_all below so
+        # that each of the multiple Spark actions that follow reads from memory rather
+        # than re-scanning and re-joining the source data from disk each time.
+        cache(required_assoc)
+        cache(assoc_by_data)
         try:
-            if not is_dataframe_empty(diff):
-                handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
-            logger.info("Successfully checked dataset dimension associations")
+            if not expected_dimension_associations:
+                # This first check is redundant with the except_all below. But, it is
+                # significantly easier for users to debug. Only apply when using the full
+                # cross-join; with expected_associations, individual dimension values may
+                # intentionally differ from the full set of dimension records.
+                # Performed after missing-association subtraction so that a dimension value
+                # that is entirely absent due to declared missing combinations does not
+                # produce a false positive.
+                for column in required_assoc.columns:
+                    expected = get_unique_values(required_assoc, column)
+                    actual = get_unique_values(assoc_by_data, column)
+                    if actual != expected:
+                        missing = sorted(expected.difference(actual))
+                        extra = sorted(actual.difference(expected))
+                        num_matching = len(actual.intersection(expected))
+                        msg = (
+                            f"Dataset records for dimension type {column} do not match expected "
+                            f"values. {missing=} {extra=} {num_matching=}"
+                        )
+                        raise DSGInvalidDataset(msg)
+
+            cols = sorted(required_assoc.columns)
+            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
+            cache(diff)
+            try:
+                if not is_dataframe_empty(diff):
+                    handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+                logger.info("Successfully checked dataset dimension associations")
+            finally:
+                unpersist(diff)
         finally:
-            unpersist(diff)
+            unpersist(required_assoc)
+            unpersist(assoc_by_data)
 
     def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time.

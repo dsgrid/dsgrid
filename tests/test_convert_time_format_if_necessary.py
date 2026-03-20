@@ -73,8 +73,8 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     df = spark.createDataFrame(pdf)
 
     # Build transformation SQL and apply
-    ts_str = mgr._build_timestamp_string_expr(col_format)
-    ts_sql, new_col_format = mgr._build_timestamp_sql(ts_str, col_format)
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, new_col_format = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
@@ -122,8 +122,8 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
     )
     df = spark.createDataFrame(pdf)
 
-    ts_str = mgr._build_timestamp_string_expr(col_format)
-    ts_sql, new_col_format = mgr._build_timestamp_sql(ts_str, col_format)
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, new_col_format = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
@@ -278,10 +278,10 @@ def test_valid_string_offset_24_allowed():
 
 
 def test_cast_with_offset_24_numeric_previous_behavior():
-    """Bypass validation and confirm CAST accepts numeric offset=24.0.
+    """Confirm numeric offset=24.0 is accepted and yields the correct UTC instant.
 
-    This mimics previous code path (no bounds check) by using helper methods
-    directly. Verifies that +24:00 is accepted and yields UTC instant.
+    The ±24 offset is normalized to ±00:00 with a 1-day adjustment so that
+    both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
     spark = get_spark_session()
@@ -303,8 +303,8 @@ def test_cast_with_offset_24_numeric_previous_behavior():
         hour_column="hour",
         offset_column="utc_offset",
     )
-    ts_str = mgr._build_timestamp_string_expr(col_format)
-    ts_sql, _ = mgr._build_timestamp_sql(ts_str, col_format)
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
@@ -314,10 +314,10 @@ def test_cast_with_offset_24_numeric_previous_behavior():
 
 
 def test_cast_with_offset_24_string_previous_behavior():
-    """Bypass validation and confirm CAST accepts string offset="+24:00".
+    """Confirm string offset="+24:00" is accepted and yields the correct UTC instant.
 
-    Uses helper methods directly to mimic previous behavior without bounds check.
-    Verifies that +24:00 is accepted and yields UTC instant.
+    The ±24 offset is normalized to +00:00 with a 1-day adjustment so that
+    both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
     spark = get_spark_session()
@@ -339,8 +339,8 @@ def test_cast_with_offset_24_string_previous_behavior():
         hour_column="hour",
         offset_column="utc_offset_str",
     )
-    ts_str = mgr._build_timestamp_string_expr(col_format)
-    ts_sql, _ = mgr._build_timestamp_sql(ts_str, col_format)
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)

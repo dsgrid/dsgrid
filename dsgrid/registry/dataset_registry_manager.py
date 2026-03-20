@@ -451,8 +451,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         if col_format.offset_column:
             self._validate_offset_bounds(df, col_format.offset_column)
 
-        timestamp_str_expr = self._build_timestamp_string_expr(col_format)
-        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, col_format)
+        base_ts_expr, offset_expr = self._build_timestamp_string_expr(col_format)
+        timestamp_sql, new_col_format = self._build_timestamp_sql(
+            base_ts_expr, offset_expr, col_format
+        )
 
         cols_to_drop = self._get_time_columns_to_drop(col_format)
         reformatted_df = self._apply_timestamp_transformation(df, cols_to_drop, timestamp_sql)
@@ -512,7 +514,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         # Support both numeric offsets (e.g., -8.0, 5.5) and string offsets (e.g., "+05:00", "-07:30").
         # Detect string offsets by presence of ':' and parse hours/minutes accordingly.
         offset_expr = (
-            f"|| CASE WHEN CAST({offset_col} AS {str_type}) LIKE '%:%' THEN {offset_string_expr} "
+            f"CASE WHEN CAST({offset_col} AS {str_type}) LIKE '%:%' THEN {offset_string_expr} "
             f" WHEN CAST({offset_col} AS DOUBLE) >= 0 THEN {offset_numeric_pos_expr} "
             f" WHEN CAST({offset_col} AS DOUBLE) < 0 THEN {offset_numeric_neg_expr} "
             f" ELSE CAST({offset_col} AS {str_type}) END"
@@ -551,10 +553,16 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
             raise DSGInvalidDataset(msg)
 
-    def _build_timestamp_string_expr(self, col_format: TimeFormatInPartsModel) -> str:
+    def _build_timestamp_string_expr(self, col_format: TimeFormatInPartsModel) -> tuple[str, str]:
         """Build a timestamp string SQL expression from time-in-parts columns.
-        Returns:
-            str: SQL expression producing timestamp string
+
+        Returns
+        -------
+        tuple[str, str]
+            (base_ts_expr, offset_expr) where base_ts_expr is the date/time
+            portion and offset_expr is a SQL CASE expression producing the
+            offset string (e.g. '+05:00'). offset_expr is empty when the
+            column format has no offset column.
         """
         str_type = get_str_type()
         hour_col = col_format.hour_column
@@ -565,27 +573,85 @@ class DatasetRegistryManager(RegistryManagerBase):
         else:
             offset_expr = ""
 
-        timestamp_str_expr = (
+        base_ts_expr = (
             f"CAST({col_format.year_column} AS {str_type}) || '-' || "
             f"LPAD(CAST({col_format.month_column} AS {str_type}), 2, '0') || '-' || "
             f"LPAD(CAST({col_format.day_column} AS {str_type}), 2, '0') || ' ' || "
-            f"{hour_expr} || ':00:00' {offset_expr}"
+            f"{hour_expr} || ':00:00'"
         )
-        return timestamp_str_expr
+        return base_ts_expr, offset_expr
+
+    @staticmethod
+    def _normalize_offset_24_sql(
+        base_ts_expr: str,
+        offset_expr: str,
+        offset_col: str,
+        ts_type: str,
+    ) -> str:
+        """Build SQL that handles ±24 offset by converting to +00:00 and adjusting by 1 day.
+
+        Spark rejects ±24:00 as a UTC offset in CAST. This method generates a
+        CASE expression that detects ±24 offsets (numeric or string) and
+        rewrites them as +00:00 with a ±1 day adjustment to preserve the same
+        UTC instant.
+
+        Parameters
+        ----------
+        base_ts_expr : str
+            SQL expression for the date/time string without offset.
+        offset_expr : str
+            SQL CASE expression that produces the offset string.
+        offset_col : str
+            Name of the offset column in the dataframe.
+        ts_type : str
+            Target timestamp type (e.g. TIMESTAMPTZ).
+
+        Returns
+        -------
+        str
+            SQL expression producing the correctly offset timestamp.
+        """
+        str_type = get_str_type()
+        str_cast = f"CAST({offset_col} AS {str_type})"
+
+        is_24 = (
+            f"(CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN SUBSTR({str_cast}, 2, 2) = '24' "
+            f"ELSE ABS(CAST({offset_col} AS DOUBLE)) = 24 END)"
+        )
+        is_positive = (
+            f"(CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN SUBSTR({str_cast}, 1, 1) = '+' "
+            f"ELSE CAST({offset_col} AS DOUBLE) >= 0 END)"
+        )
+
+        return (
+            f"CASE "
+            f"WHEN {is_24} AND {is_positive} "
+            f"THEN CAST({base_ts_expr} || '+00:00' AS {ts_type}) - INTERVAL 1 DAY "
+            f"WHEN {is_24} AND NOT {is_positive} "
+            f"THEN CAST({base_ts_expr} || '+00:00' AS {ts_type}) + INTERVAL 1 DAY "
+            f"ELSE CAST({base_ts_expr} || {offset_expr} AS {ts_type}) "
+            f"END"
+        )
 
     @staticmethod
     def _build_timestamp_sql(
-        timestamp_str_expr: str, col_format: TimeFormatInPartsModel
+        base_ts_expr: str, offset_expr: str, col_format: TimeFormatInPartsModel
     ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
         """Build the final timestamp SQL expression and determine the column format."""
         col_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
         if col_format.offset_column:
             ts_type = col_types["TIMESTAMP_TZ"]
             new_col_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
+            sql_expr = DatasetRegistryManager._normalize_offset_24_sql(
+                base_ts_expr, offset_expr, col_format.offset_column, ts_type
+            )
+            sql = f"{sql_expr} AS {TIME_COLUMN}"
         else:
             ts_type = col_types["TIMESTAMP_NTZ"]
             new_col_format = TimeFormatDateTimeNTZModel(time_column=TIME_COLUMN)
-        sql = f"CAST({timestamp_str_expr} AS {ts_type}) AS {TIME_COLUMN}"
+            sql = f"CAST({base_ts_expr} AS {ts_type}) AS {TIME_COLUMN}"
         return sql, new_col_format
 
     @staticmethod

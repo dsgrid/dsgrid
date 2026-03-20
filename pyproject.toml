@@ -55,7 +55,7 @@ dependencies = [
 [project.urls]
 GitHub = "https://github.com/dsgrid/dsgrid"
 Documentation = "https://dsgrid.github.io/dsgrid/"
-Homepage = "https://www.nrel.gov/analysis/dsgrid"
+Homepage = "https://www.nlr.gov/analysis/dsgrid"
 
 [tool.maturin]
 module-name = "dsgrid.minimal_patterns"

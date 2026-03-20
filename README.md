@@ -120,4 +120,4 @@ conda deactivate
 
 ## Software Record
 
-dsgrid is developed under NREL Software Record SWR-21-52, "demand-side grid model".
+dsgrid is developed under National Laboratory of the Rockies (formerly NREL) Software Record SWR-21-52, "demand-side grid model".

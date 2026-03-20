@@ -271,11 +271,11 @@ Install the Python package `sparkctl` to run the scripts described below:
 $ pip install "sparkctl[pyspark]"
 ```
 
-The [sparkctl documentation](https://nrel.github.io/sparkctl/) has generic instructions to run Spark in a variety of ways. The rest of this section calls out choices that you should make to run Spark jobs with dsgrid.
+The [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) has generic instructions to run Spark in a variety of ways. The rest of this section calls out choices that you should make to run Spark jobs with dsgrid.
 
 #### Steps to Start a Cluster
 
-1. **Choose compute node(s) with fast local storage.** This example will allocate one node. Refer to the [Kestrel Filesystems documentation](https://nrel.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system) for more information for this type of compute node.
+1. **Choose compute node(s) with fast local storage.** This example will allocate one node. Refer to the [Kestrel Filesystems documentation](https://natlabrockies.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system) for more information for this type of compute node.
 
 ```bash
 $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=nvme --mem=240G

@@ -10,13 +10,13 @@ Install the Python package `sparkctl` - a tool for managing Spark clusters on HP
 pip install "sparkctl[pyspark]"
 ```
 
-Refer to the [sparkctl documentation](https://nrel.github.io/sparkctl/) for more details.
+Refer to the [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) for more details.
 
 ## Compute Node Types
 
 Spark works best with fast local storage. The standard Kestrel nodes do not have any local storage. The best candidates are the **256 standard nodes (no GPUs) with 1.92 TB NVMe M.2 drives**.
 
-Please refer to the [Kestrel system configuration page](https://www.nrel.gov/hpc/kestrel-system-configuration.html) for specific hardware information. The GPU nodes will work as well, but at a greater cost in AUs.
+Please refer to the [Kestrel system configuration page](https://www.nlr.gov/hpc/kestrel-system-configuration.html) for specific hardware information. The GPU nodes will work as well, but at a greater cost in AUs.
 
 :::{tip}
 If those nodes are not available, you may be able to complete your queries by using the standard nodes and specifying a path on the Lustre filesystem in the Spark configuration file `conf/spark-env.sh`. Change `SPARK_LOCAL_DIRS` and `SPARK_WORKER_DIR`.

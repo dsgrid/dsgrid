@@ -10,7 +10,7 @@ The dsgrid toolkit is under active development and details are subject to change
 
 The **demand-side grid (dsgrid)** toolkit is a Python framework for compiling high-resolution energy demand datasets across multiple dimensions: time, geography, sector, subsector, end use, etc. dsgrid enables researchers, analysts, and planners to integrate diverse energy datasets into cohesive projects suitable for power system analysis, policy evaluation, and energy planning.
 
-For more information, please visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html).
+For more information, please visit [https://www.nlr.gov/analysis/dsgrid.html](https://www.nlr.gov/analysis/dsgrid.html).
 
 ---
 
@@ -66,7 +66,7 @@ If you're evaluating dsgrid for your organization:
 - **Capabilities Overview**: See [dsgrid Fundamentals](user_guide/fundamentals.md) for a high-level introduction
 - **Published Work**: Browse [Published Datasets](published_data/published_datasets.md) and [Publications](publications.md) to see dsgrid in action
 - **Technical Team**: Direct your technical staff to [Getting Started](getting_started/index.md)
-- **dsgrid Webpage**: Visit [https://www.nrel.gov/analysis/dsgrid.html](https://www.nrel.gov/analysis/dsgrid.html)
+- **dsgrid Webpage**: Visit [https://www.nlr.gov/analysis/dsgrid.html](https://www.nlr.gov/analysis/dsgrid.html)
 
 ---
 

@@ -216,7 +216,15 @@ def _make_multi_tz_dataframe(
         for tz in time_zones
         for ts in timestamps
     ]
-    return spark.createDataFrame(pd.DataFrame(rows))
+    schema = StructType(
+        [
+            StructField(TIME_COLUMN, TimestampNTZType(), True),
+            StructField("geography", StringType(), True),
+            StructField(VALUE_COLUMN, DoubleType(), True),
+            StructField(TIME_ZONE_COLUMN, StringType(), True),
+        ]
+    )
+    return spark.createDataFrame(pd.DataFrame(rows), schema=schema)
 
 
 def test_no_plan_returns_false(tmp_path):
@@ -270,10 +278,10 @@ def test_single_tz_spark_hive(tmp_path):
     session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
     res_df2 = res_df.toPandas()
 
-    single_tz = time_dim.model.time_zone_format.time_zone
+    tz = time_dim.model.time_zone_format.time_zone
     sdf2 = sdf.toPandas()
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
-        sdf2[TIME_COLUMN].dt.tz_localize(single_tz)
+        sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
 
 
@@ -291,10 +299,10 @@ def test_single_tz_spark_path(tmp_path):
     session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
     res_df2 = res_df.toPandas()
 
-    single_tz = time_dim.model.time_zone_format.time_zone
+    tz = time_dim.model.time_zone_format.time_zone
     sdf2 = sdf.toPandas()
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
-        sdf2[TIME_COLUMN].dt.tz_localize(single_tz)
+        sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
 
 
@@ -371,19 +379,24 @@ def test_multi_tz_spark_hive_existing_tz_column(tmp_path):
     config = DummyDatasetConfig(time_dim, geography_dim=None)
 
     sdf = _make_multi_tz_dataframe(time_zones=(tz,))
-    res_df, changed = localize_timestamps_if_necessary(
-        sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
-    )
+
+    original = dsgrid.runtime_config.use_hive_metastore
+    dsgrid.runtime_config.use_hive_metastore = True
+
+    try:
+        res_df, changed = localize_timestamps_if_necessary(
+            sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
+        )
+    finally:
+        dsgrid.runtime_config.use_hive_metastore = original
 
     assert changed is True
-    breakpoint()
     session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
     res_df2 = res_df.toPandas()
 
-    single_tz = time_dim.model.time_zone_format.time_zone
     sdf2 = sdf.toPandas()
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
-        sdf2[TIME_COLUMN].dt.tz_localize(single_tz)
+        sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
 
 
@@ -405,10 +418,10 @@ def test_multi_tz_spark_path(tmp_path):
     session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
     res_df2 = res_df.toPandas()
 
-    single_tz = time_dim.model.time_zone_format.time_zone
+    tz = "Etc/GMT+5"
     sdf2 = sdf.toPandas()
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
-        sdf2[TIME_COLUMN].dt.tz_localize(single_tz)
+        sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
 
 

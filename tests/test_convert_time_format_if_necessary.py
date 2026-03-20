@@ -21,7 +21,15 @@ from dsgrid.spark.functions import (
     get_spark_session,
     select_expr,
 )
+from dsgrid.spark.types import use_duckdb
 import pandas as pd
+
+
+def _utc_ts_str_expr() -> str:
+    """Return a SQL expression that renders a timestamp column as a UTC string."""
+    if use_duckdb():
+        return f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"
+    return f"date_format(to_utc_timestamp({TIME_COLUMN}, 'UTC'), 'yyyy-MM-dd HH:mm:ss') AS ts_str"
 
 
 def make_manager():
@@ -78,9 +86,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     # DuckDB TIMESTAMP WITH TIME ZONE displays in the
     # session time zone (default UTC).
     # These are the UTC instants corresponding to local times + offsets above.
-    check_df = select_expr(
-        out_df, [f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"]
-    )
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
     expected = [
@@ -122,9 +128,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
 
     assert new_col_format.dtype == "timestamp_tz"
-    check_df = select_expr(
-        out_df, [f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"]
-    )
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = check_df.collect()
     got = [row.ts_str for row in rows]
     # UTC instants corresponding to local time + string offsets
@@ -304,9 +308,7 @@ def test_cast_with_offset_24_numeric_previous_behavior():
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
-    check_df = select_expr(
-        out_df, [f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"]
-    )
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = check_df.collect()
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
 
@@ -342,8 +344,6 @@ def test_cast_with_offset_24_string_previous_behavior():
     cols_to_drop = mgr._get_time_columns_to_drop(col_format)
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
-    check_df = select_expr(
-        out_df, [f"CAST({TIME_COLUMN} AT TIME ZONE 'UTC' AS VARCHAR) AS ts_str"]
-    )
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = check_df.collect()
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]

@@ -48,7 +48,10 @@ from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
-spark = get_spark_session()
+@pytest.fixture(scope="module")
+def spark():
+    return get_spark_session()
+
 
 skip_unless_spark = pytest.mark.skipif(
     use_duckdb(), reason="Spark routing tests only run when backend_engine is SPARK"
@@ -176,12 +179,15 @@ class DummyDatasetConfig:
 class DummyGeoDim:
     """Minimal geography dimension stub that maps 'g1' to Etc/GMT+5."""
 
+    def __init__(self, spark):
+        self._spark = spark
+
     def get_records_dataframe(self):
         pdf = pd.DataFrame({"id": ["g1"], "time_zone": ["Etc/GMT+5"]})
-        return spark.createDataFrame(pdf)
+        return self._spark.createDataFrame(pdf)
 
 
-def _make_simple_dataframe(extra_columns: dict | None = None) -> DataFrame:
+def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> DataFrame:
     """Create a minimal real DataFrame for routing tests."""
     pdf = pd.DataFrame(
         {
@@ -207,6 +213,7 @@ def _make_simple_dataframe(extra_columns: dict | None = None) -> DataFrame:
 
 
 def _make_multi_tz_dataframe(
+    spark,
     time_zones: tuple[str, ...] = ("Etc/GMT+5", "Etc/GMT+8"),
 ) -> DataFrame:
     """Create a DataFrame with TIME_ZONE_COLUMN for multi-timezone localization tests."""
@@ -227,11 +234,11 @@ def _make_multi_tz_dataframe(
     return spark.createDataFrame(pd.DataFrame(rows), schema=schema)
 
 
-def test_no_plan_returns_false(tmp_path):
+def test_no_plan_returns_false(spark, tmp_path):
     time_dim = make_datetime_config_tz_aware()
     config = DummyDatasetConfig(time_dim)
 
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
     original_columns = sdf.columns
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
@@ -242,10 +249,10 @@ def test_no_plan_returns_false(tmp_path):
 
 
 @skip_unless_duckdb
-def test_single_tz_duckdb(tmp_path):
+def test_single_tz_duckdb(spark, tmp_path):
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
 
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
@@ -260,10 +267,10 @@ def test_single_tz_duckdb(tmp_path):
 
 
 @skip_unless_spark
-def test_single_tz_spark_hive(tmp_path):
+def test_single_tz_spark_hive(spark, tmp_path):
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
 
     original = dsgrid.runtime_config.use_hive_metastore
     dsgrid.runtime_config.use_hive_metastore = True
@@ -286,10 +293,10 @@ def test_single_tz_spark_hive(tmp_path):
 
 
 @skip_unless_spark
-def test_single_tz_spark_path(tmp_path):
+def test_single_tz_spark_path(spark, tmp_path):
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim)
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
 
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
@@ -307,12 +314,14 @@ def test_single_tz_spark_path(tmp_path):
 
 
 @skip_unless_duckdb
-def test_value_column_first_used(tmp_path):
+def test_value_column_first_used(spark, tmp_path):
     """All value columns are preserved in the output; timestamps become tz-aware."""
     time_dim = make_datetime_config_single_tz_ntz()
     config = DummyDatasetConfig(time_dim, value_columns=["val_a", "val_b", "val_c"])
 
-    sdf = _make_simple_dataframe({"val_a": [1.0, 2.0], "val_b": [3.0, 4.0], "val_c": [5.0, 6.0]})
+    sdf = _make_simple_dataframe(
+        spark, {"val_a": [1.0, 2.0], "val_b": [3.0, 4.0], "val_c": [5.0, 6.0]}
+    )
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
     )
@@ -323,14 +332,14 @@ def test_value_column_first_used(tmp_path):
 
 
 @skip_unless_duckdb
-def test_multi_tz_duckdb_adds_tz_column(tmp_path):
+def test_multi_tz_duckdb_adds_tz_column(spark, tmp_path):
     """When TIME_ZONE_COLUMN is absent it is added from the geography dimension."""
     tz = "Etc/GMT+5"
     time_dim = make_datetime_config_multi_tz_ntz(time_zones=[tz])
-    geo_dim = DummyGeoDim()  # maps g1 -> Etc/GMT+5
+    geo_dim = DummyGeoDim(spark)  # maps g1 -> Etc/GMT+5
     config = DummyDatasetConfig(time_dim, geography_dim=geo_dim)
 
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
     assert TIME_ZONE_COLUMN not in sdf.columns
 
     res_df, changed = localize_timestamps_if_necessary(
@@ -345,7 +354,7 @@ def test_multi_tz_duckdb_adds_tz_column(tmp_path):
 
 
 @skip_unless_duckdb
-def test_multi_tz_duckdb_existing_tz_column(tmp_path):
+def test_multi_tz_duckdb_existing_tz_column(spark, tmp_path):
     """When TIME_ZONE_COLUMN is already present, add_time_zone is not invoked.
 
     geography_dim is intentionally None: if add_time_zone were called it would fail.
@@ -354,7 +363,7 @@ def test_multi_tz_duckdb_existing_tz_column(tmp_path):
     time_dim = make_datetime_config_multi_tz_ntz(time_zones=[tz])
     config = DummyDatasetConfig(time_dim, geography_dim=None)
 
-    sdf = _make_multi_tz_dataframe(time_zones=(tz,))
+    sdf = _make_multi_tz_dataframe(spark, time_zones=(tz,))
     assert TIME_ZONE_COLUMN in sdf.columns
 
     res_df, changed = localize_timestamps_if_necessary(
@@ -369,7 +378,7 @@ def test_multi_tz_duckdb_existing_tz_column(tmp_path):
 
 
 @skip_unless_spark
-def test_multi_tz_spark_hive_existing_tz_column(tmp_path):
+def test_multi_tz_spark_hive_existing_tz_column(spark, tmp_path):
     """Spark+Hive multi-tz localization with TIME_ZONE_COLUMN already present.
 
     geography_dim is intentionally None: if add_time_zone were called it would fail.
@@ -378,7 +387,7 @@ def test_multi_tz_spark_hive_existing_tz_column(tmp_path):
     time_dim = make_datetime_config_multi_tz_ntz(time_zones=[tz])
     config = DummyDatasetConfig(time_dim, geography_dim=None)
 
-    sdf = _make_multi_tz_dataframe(time_zones=(tz,))
+    sdf = _make_multi_tz_dataframe(spark, time_zones=(tz,))
 
     original = dsgrid.runtime_config.use_hive_metastore
     dsgrid.runtime_config.use_hive_metastore = True
@@ -401,7 +410,7 @@ def test_multi_tz_spark_hive_existing_tz_column(tmp_path):
 
 
 @skip_unless_spark
-def test_multi_tz_spark_path(tmp_path):
+def test_multi_tz_spark_path(spark, tmp_path):
     """Spark+Path multi-tz localization with TIME_ZONE_COLUMN already present.
 
     geography_dim is intentionally None: if add_time_zone were called it would fail.
@@ -409,7 +418,7 @@ def test_multi_tz_spark_path(tmp_path):
     time_dim = make_datetime_config_multi_tz_ntz(time_zones=["Etc/GMT+5"])
     config = DummyDatasetConfig(time_dim, geography_dim=None)
 
-    sdf = _make_multi_tz_dataframe(time_zones=("Etc/GMT+5",))
+    sdf = _make_multi_tz_dataframe(spark, time_zones=("Etc/GMT+5",))
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
     )
@@ -425,37 +434,37 @@ def test_multi_tz_spark_path(tmp_path):
     )
 
 
-def test_unknown_plan_raises(tmp_path):
+def test_unknown_plan_raises(spark, tmp_path):
     class _UnknownPlanConfig(DateTimeDimensionConfig):
         def get_localization_plan(self):
             return "unknown_plan"
 
     time_dim = _UnknownPlanConfig.load_from_model(make_datetime_config_single_tz_ntz().model)
     config = DummyDatasetConfig(time_dim)
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(
             sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
         )
 
 
-def test_invalid_time_dimension_raises(tmp_path):
+def test_invalid_time_dimension_raises(spark, tmp_path):
     class NotDateTimeConfig:
         pass
 
     config = DummyDatasetConfig(time_dim=NotDateTimeConfig())
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
     with pytest.raises(DSGInvalidOperation):
         localize_timestamps_if_necessary(
             sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
         )
 
 
-def test_ntz_no_time_zone_is_noop(tmp_path):
+def test_ntz_no_time_zone_is_noop(spark, tmp_path):
     time_dim = make_datetime_config_single_aligned_no_tz_ntz()
     config = DummyDatasetConfig(time_dim)
 
-    sdf = _make_simple_dataframe()
+    sdf = _make_simple_dataframe(spark)
     res_df, changed = localize_timestamps_if_necessary(
         sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
     )

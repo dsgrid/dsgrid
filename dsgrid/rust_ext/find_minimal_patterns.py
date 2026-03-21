@@ -26,6 +26,7 @@ def find_minimal_patterns_from_file(
     threads: int = 0,
     verbose: bool = False,
     output_dir: str | Path | None = "missing_associations",
+    expected_cardinalities: dict[str, int] | None = None,
 ) -> list[Pattern]:
     """Find minimal closed patterns in a Parquet file containing categorical data.
 
@@ -52,6 +53,13 @@ def find_minimal_patterns_from_file(
         Each unique combination of columns produces a separate CSV file named
         ``<col1>__<col2>__...__<colN>.csv``. If None, no files are written.
         Default: "missing_associations".
+    expected_cardinalities : dict[str, int] | None, optional
+        Mapping of column name to the total number of unique values expected in
+        the full dataset (not just the missing data). When provided, the closure
+        check uses these cardinalities instead of the cardinalities observed in
+        the input file. This prevents a pattern from being marked as closed when
+        it only covers a subset of dimension values that happen to be absent
+        from the non-missing data. Default: None.
 
     Returns
     -------
@@ -86,7 +94,7 @@ def find_minimal_patterns_from_file(
     parquet_path_str = str(file_path)
     logger.info("Finding minimal closed patterns in %s", parquet_path_str)
 
-    patterns = find_minimal_patterns(parquet_path_str, config)
+    patterns = find_minimal_patterns(parquet_path_str, config, expected_cardinalities)
 
     logger.info("Found %d minimal closed patterns", len(patterns))
 

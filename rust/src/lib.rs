@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 
 use anyhow::{Context, Result};
@@ -475,10 +475,11 @@ fn expand_one(
 
 /// Find minimal closed patterns in a Parquet file
 #[pyfunction]
-#[pyo3(signature = (input_path, config=None))]
+#[pyo3(signature = (input_path, config=None, expected_cardinalities=None))]
 fn find_minimal_patterns(
     input_path: String,
     config: Option<PatternConfig>,
+    expected_cardinalities: Option<HashMap<String, usize>>,
 ) -> PyResult<Vec<Pattern>> {
     let config = config.unwrap_or_else(|| PatternConfig::new(0, true, 50.0, 0, false, true));
 
@@ -499,6 +500,23 @@ fn find_minimal_patterns(
 
     let dict_sizes: Vec<usize> = dicts.iter().map(|d| d.len()).collect();
     eprintln!("Dictionary sizes: {:?}", dict_sizes);
+
+    // When expected_cardinalities are provided, use them for closure checks so that
+    // patterns are only marked closed when they cover the full cross-product of ALL
+    // dimension values (not just those present in the missing data).
+    // Use max(expected, actual) to guard against unexpected extra values in the data.
+    let effective_dict_sizes: Vec<usize> = match &expected_cardinalities {
+        Some(card_map) => {
+            let sizes: Vec<usize> = columns.iter().enumerate().map(|(i, col_name)| {
+                card_map.get(col_name).copied()
+                    .map(|expected| expected.max(dict_sizes[i]))
+                    .unwrap_or(dict_sizes[i])
+            }).collect();
+            eprintln!("Effective dictionary sizes (with expected cardinalities): {:?}", sizes);
+            sizes
+        }
+        None => dict_sizes.clone(),
+    };
 
     eprintln!("Building data index...");
     let index_data = build_index(&encoded_data, &dicts);
@@ -523,7 +541,7 @@ fn find_minimal_patterns(
                 closed: false,
             };
 
-            let is_closed = is_pattern_closed(&pat, &encoded_data, &dict_sizes, config.assume_unique_input);
+            let is_closed = is_pattern_closed(&pat, &encoded_data, &effective_dict_sizes, config.assume_unique_input);
             pat.closed = is_closed;
 
             if is_closed {
@@ -580,7 +598,7 @@ fn find_minimal_patterns(
         let mut next_level: Vec<InternalPattern> = Vec::new();
 
         for mut p in expanded {
-            let is_closed = is_pattern_closed(&p, &encoded_data, &dict_sizes, config.assume_unique_input);
+            let is_closed = is_pattern_closed(&p, &encoded_data, &effective_dict_sizes, config.assume_unique_input);
             p.closed = is_closed;
 
             if is_closed {

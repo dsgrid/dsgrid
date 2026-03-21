@@ -244,6 +244,7 @@ def handle_dimension_association_errors(
     diff: DataFrame,
     dataset_table: DataFrame,
     dataset_id: str,
+    expected_cardinalities: dict[str, int] | None = None,
 ) -> None:
     """Record missing dimension record combinations in a Parquet file and log an error."""
     out_file = Path(f"{dataset_id}__missing_dimension_record_combinations.parquet")
@@ -269,6 +270,7 @@ def handle_dimension_association_errors(
             filename,
             max_depth=0,
             verbose=False,
+            expected_cardinalities=expected_cardinalities,
         )
 
         if patterns:

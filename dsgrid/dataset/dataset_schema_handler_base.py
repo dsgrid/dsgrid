@@ -180,6 +180,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         assert data, "Bug: did not find any dimension records"
         return create_dataframe_from_product(data, context)
 
+    def _get_dimension_cardinalities(self) -> dict[str, int]:
+        """Return the number of unique record IDs for each non-time dimension."""
+        cardinalities: dict[str, int] = {}
+        for dim_type in DimensionType:
+            if dim_type == DimensionType.TIME:
+                continue
+            dim = self._config.get_dimension_with_records(dim_type)
+            if dim is not None:
+                cardinalities[dim_type.value] = len(list(dim.get_unique_ids()))
+        return cardinalities
+
     def _make_expected_dimension_association_table_from_user(
         self,
         expected_dimension_associations: dict[str, DataFrame],
@@ -274,7 +285,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
             cache(diff)
             try:
                 if not is_dataframe_empty(diff):
-                    handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+                    expected_cardinalities = self._get_dimension_cardinalities()
+                    handle_dimension_association_errors(
+                        diff, assoc_by_data, self.dataset_id, expected_cardinalities
+                    )
                 logger.info("Successfully checked dataset dimension associations")
             finally:
                 unpersist(diff)

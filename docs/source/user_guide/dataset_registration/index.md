@@ -16,6 +16,7 @@ registration_checks
 ## How-Tos
 
 - [How to Create Dataset Dimensions](../how_tos/how_to_dimensions)
+- [How to Define a Time Dimension](../how_tos/how_to_time_dimension)
 - [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations.md)
 
 ## Tutorials

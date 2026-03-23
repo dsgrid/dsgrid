@@ -6,11 +6,15 @@ import os
 from datetime import datetime, timedelta
 from typing import Any, Union, Literal
 import copy
+from zoneinfo import ZoneInfo
 
 from pydantic import field_serializer, field_validator, model_validator, Field, ValidationInfo
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
 
+from chronify.time_utils import is_standard_time_zone
+
+from dsgrid.common import TIME_COLUMN
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
@@ -20,11 +24,9 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
     TimeZoneFormat,
 )
-from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
-
 
 logger = logging.getLogger(__name__)
 
@@ -240,30 +242,49 @@ class DimensionModel(DimensionBaseModel):
 class TimeFormatDateTimeTZModel(DSGBaseModel):
     """Format of timestamps in a dataset is timezone-aware datetime."""
 
-    dtype: Literal["TIMESTAMP_TZ"] = "TIMESTAMP_TZ"
+    dtype: Literal["timestamp_tz"] = "timestamp_tz"
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
-        default=next(iter(DatetimeTimestampType._fields)),
+        default=TIME_COLUMN,
     )
 
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if values.get("dtype") == "TIMESTAMP_TZ":
+            logger.warning(
+                "Renaming legacy dtype 'TIMESTAMP_TZ' to 'timestamp_tz' within TimeFormatDateTimeTZModel."
+            )
+            values["dtype"] = "timestamp_tz"
+        return values
 
 
 class TimeFormatDateTimeNTZModel(DSGBaseModel):
-    """Format of timestamps in a dataset is timezone-naive datetime,
-    requiring localization to time zones."""
+    """Format of timestamps in a dataset is timezone-naive datetime"""
 
-    dtype: Literal["TIMESTAMP_NTZ"] = "TIMESTAMP_NTZ"
+    dtype: Literal["timestamp_ntz"] = "timestamp_ntz"
     time_column: str = Field(
         title="time_column",
         description="Name of the timestamp column in the dataset.",
-        default=next(iter(DatetimeTimestampType._fields)),
+        default=TIME_COLUMN,
     )
 
     def get_time_columns(self) -> list[str]:
         return [self.time_column]
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if values.get("dtype") == "TIMESTAMP_NTZ":
+            logger.warning(
+                "Renaming legacy dtype 'TIMESTAMP_NTZ' to 'timestamp_ntz' within TimeFormatDateTimeNTZModel."
+            )
+            values["dtype"] = "timestamp_ntz"
+        return values
 
 
 class TimeFormatInPartsModel(DSGBaseModel):
@@ -290,14 +311,24 @@ class TimeFormatInPartsModel(DSGBaseModel):
         "If None, the hour will be set to 0 for all rows.",
         default=None,
     )
-    time_zone: str | None = Field(
+    offset_column: str | None = Field(
+        title="offset_column",
+        description="Name of the offset column in the dataset. "
+        "Value is the UTC offset, either as a numeric offset in hours (e.g., -8) or as a string in ±HH:MM format (e.g., -08:00). "
+        "If None, no offset is applied and the resulting timestamp will be timezone-naive. "
+        "Example: '2024-01-01 00:00:00-05:00' is the start of 2024 in New York; the offset column records '-05:00' for that row. "
+        "For America/New_York, the offset is -05:00 during standard time and -04:00 during daylight saving time.",
         default=None,
-        title="time_zone",
-        description="IANA time zone of the timestamps. Use None for time zone-naive timestamps.",
     )
 
     def get_time_columns(self) -> list[str]:
-        cols = [self.year_column, self.month_column, self.day_column, self.hour_column]
+        cols = [
+            self.year_column,
+            self.month_column,
+            self.day_column,
+            self.hour_column,
+            self.offset_column,
+        ]
         return [col for col in cols if col is not None]
 
 
@@ -427,18 +458,42 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
 
 
 class AlignedTimeSingleTimeZone(DSGBaseModel):
-    """For each geography, data has the same set of timestamps in absolute time.
-    Timestamps in the data must be tz-aware.
+    """All geographies have data with the same set of timestamps in absolute time.
 
-    E.g., data in CA and NY both start in 2018-01-01 00:00 EST.
+    E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).
+
+    For time zone, only an IANA time zone name or None is accepted. The types of time zones
+    supported (fixed offset or DST-observing) depend on column_format, which in part defines
+    whether the timestamps are tz-naive after parsing:
+
+    1. When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+    ("America/New_York") are accepted.
+
+    2. When the input timestamps are tz-naive (i.e., 'timestamp_ntz' or TimeFormatInParts without
+    offset column), only IANA time zones with constant UTC offsets (e.g., "Etc/GMT+5") are allowed
+    because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+    definition, the timestamps in the data table must also be in standard time without skips and
+    duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+    missing timestamps at DST transitions when localizing tz-naive timestamps.
+
+    Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
+    from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
+    a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York"
+    have multiple offsets depending on the calendar date (UTC-5 during standard time,
+    UTC-4 during daylight saving time).
+
     """
 
     format_type: Literal[
         TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
     ] = TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME
-    time_zone: str = Field(
+    time_zone: str | None = Field(
         title="time_zone",
-        description="IANA time zone of data",
+        description="IANA time zone of data. Accepts `None` for no time zone. "
+        "The types of time zones supported (fixed offset or DST-observing) depend on `column_format.dtype`. "
+        "When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. "
+        "When timestamps are tz-naive (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), "
+        "only fixed UTC offset zones are allowed. ",
     )
 
     @model_validator(mode="before")
@@ -457,24 +512,79 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
             values["time_zone"] = values.pop("timezone")
         return values
 
+    def get_time_zones(self) -> list[str]:
+        return [self.time_zone] if self.time_zone else []
+
 
 class LocalTimeMultipleTimeZones(DSGBaseModel):
-    """For each geography, data has the same set of timestamps when interpreted as local clock time by adjusting
-    for the time zone of each geography.
-    Timestamps in the data must be tz-aware.
+    """Timestamps cover the same interval of local clock time across geographies.
 
-    E.g., data in CA may start in 2018-01-01 00:00 PST while data in NY may start in 2018-01-01 00:00 EST.
-    They are aligned in clock time but not in absolute time.
+    All data represents the same interval of standard clock time as experienced locally
+    in each geography's time zone, but the intervals represent different absolute UTC instants.
 
+    Example: California data starts at 2018-01-01 00:00-08:00, while
+    New York data starts at 2018-01-01 00:00-05:00. Both rows have the
+    same local clock time but represent different absolute UTC instants.
+
+    The data table must contain a `time_zone` column with IANA time zone names
+    (one per row) that match the entries in the `time_zones` list below. The types of of time
+    zones supported (fixed offset or DST-observing) depend on column_format, which in part defines
+    whether the timestamps are tz-naive after parsing:
+
+    1. When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+    ("America/New_York") are accepted.
+
+    2. When the input timestamps are tz-naive (i.e., 'timestamp_ntz' or TimeFormatInParts without
+    offset column), only IANA time zones with constant UTC offsets (e.g., "Etc/GMT+5") are allowed
+    because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+    definition, the timestamps in the data table must also be in standard time without skips and
+    duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+    missing timestamps at DST transitions when localizing tz-naive timestamps.
+
+    Note: IANA time zone names (e.g., "America/New_York", "Etc/GMT+5") are distinct
+    from UTC offsets (e.g., UTC-5). Fixed-offset zones like "Etc/GMT+5" observe
+    a single UTC offset (UTC-5) year-round, while DST-observing zones like "America/New_York"
+    have multiple offsets depending on the calendar date (UTC-5 during standard time,
+    UTC-4 during daylight saving time).
     """
 
     format_type: Literal[
-        TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
-    ] = TimeZoneFormat.ALIGNED_IN_CLOCK_TIME
+        TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
+    ] = TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
     time_zones: list[str] = Field(
         title="time_zones",
-        description="List of unique IANA time zones in the dataset",
+        description="List of unique IANA time zones in the dataset. Does not allow `None` as a time zone. "
+        "The types of time zones supported (fixed offset or DST-observing) depend on `column_format.dtype`. "
+        "When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. "
+        "When timestamps are tz-naive (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), "
+        "only fixed UTC offset zones are allowed. ",
     )
+
+    def get_time_zones(self) -> list[str]:
+        return self.time_zones
+
+
+def _check_standard_time_only(tz_name: str) -> None:
+    """Raise ValueError if the named IANA time zone observes DST.
+
+    Parameters
+    ----------
+    tz_name : str
+        IANA time zone name to validate.
+
+    Raises
+    ------
+    ValueError
+        If the time zone observes daylight saving time.
+    """
+    if not is_standard_time_zone(ZoneInfo(tz_name)):
+        msg = (
+            f"Time zone {tz_name!r} observes daylight saving time. "
+            "Only fixed-offset (standard) time zones are allowed when localizing "
+            "tz-naive timestamps. Use a fixed-offset IANA zone such as 'Etc/GMT+5' "
+            "instead of a DST-observing zone like 'America/New_York'."
+        )
+        raise ValueError(msg)
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
@@ -482,13 +592,13 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
     column_format: DateTimeFormat = Field(
         default=TimeFormatDateTimeTZModel(),
-        title="time_format",
+        title="column_format",
         description="Specifies the format of the timestamps in the dataset.",
     )
     time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
         title="time_zone_format",
         discriminator="format_type",
-        description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
+        description="Specifies whether timestamps are aligned in absolute time or in local standard time when adjusted for time zone.",
     )
 
     measurement_type: MeasurementType = Field(
@@ -513,17 +623,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         json_schema_extra={
             "options": TimeIntervalType.format_descriptions_for_docs(),
         },
-    )
-    time_column: str = Field(
-        title="time_column",
-        description="Name of time column in the dataframe. It should be updated during the query process to reflect "
-        "any changes to the dataframe time column.",
-        default=next(iter(DatetimeTimestampType._fields)),
-    )
-    localize_to_time_zone: bool = Field(
-        title="localize_to_time_zone",
-        default=True,
-        description="Whether to localize timestamps to time zone(s). If True, timestamps in the dataframe must be tz-naive.",
     )
 
     @model_validator(mode="before")
@@ -621,6 +720,22 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
                 else:
                     msg = f"Unexpected ranges type: {type(trange)}"
                     raise ValueError(msg)
+
+        if "time_column" in values:
+            logger.warning(
+                "Moving legacy time_column field to column_format struct within the datetime config."
+            )
+            time_column = values.pop("time_column")
+            if isinstance(values.get("column_format"), dict):
+                values["column_format"]["time_column"] = time_column
+            elif isinstance(values.get("column_format"), TimeFormatDateTimeTZModel) or isinstance(
+                values.get("column_format"), TimeFormatDateTimeNTZModel
+            ):
+                values["column_format"].time_column = time_column
+            else:
+                msg = f"Unexpected column_format type: {values['column_format']}"
+                raise ValueError(msg)
+
         return values
 
     # @model_validator(mode="after")
@@ -632,13 +747,31 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     #         )
     #     return self
 
+    @model_validator(mode="after")
+    def check_standard_time_zones_for_localization(self) -> "DateTimeDimensionModel":
+        """Validate that only fixed-offset time zones are used when localizing tz-naive timestamps.
+
+        Localization is required when the column format is tz-naive and at least one time zone
+        is specified in `time_zone_format`. DST-observing zones are rejected because they
+        produce ambiguous or missing timestamps at daylight saving time transitions.
+        """
+        is_tz_naive = self.column_format.dtype == "timestamp_ntz" or (
+            self.column_format.dtype == "time_format_in_parts"
+            and self.column_format.offset_column is None
+        )
+        if not is_tz_naive:
+            return self
+        for tz_name in self.time_zone_format.get_time_zones():
+            _check_standard_time_only(tz_name)
+        return self
+
     @field_validator("ranges")
     @classmethod
     def check_times(cls, ranges: list[TimeRangeModel]) -> list[TimeRangeModel]:
         return _check_time_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
-        if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_CLOCK_TIME:
+        if self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME:
             return True
         return False
 
@@ -739,51 +872,6 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         title="time_interval",
         description="The range of time that the value associated with a timestamp represents",
     )
-
-    def is_time_zone_required_in_geography(self) -> bool:
-        return True
-
-
-class DatetimeExternalTimeZoneDimensionModel(TimeDimensionBaseModel):
-    """Defines a time dimension where timestamps are tz-naive and require localizing to a time zone
-    using a time zone column."""
-
-    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
-        title="time_zone_format",
-        discriminator="format_type",
-        description="Specifies whether timestamps are aligned in absolute time or in local time when adjusted for time zone.",
-    )
-    time_type: TimeDimensionType = Field(default=TimeDimensionType.DATETIME_EXTERNAL_TZ)
-    measurement_type: MeasurementType = Field(
-        title="measurement_type",
-        default=MeasurementType.TOTAL,
-        description="""
-        The type of measurement represented by a value associated with a timestamp:
-            e.g., mean, total
-        """,
-        json_schema_extra={
-            "options": MeasurementType.format_for_docs(),
-        },
-    )
-    ranges: list[TimeRangeModel] = Field(
-        title="time_ranges",
-        description="""
-        Defines the continuous ranges of time in the data, inclusive of start and end time.
-        If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records.
-        """,
-    )
-    time_interval_type: TimeIntervalType = Field(
-        title="time_interval",
-        description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
-        json_schema_extra={
-            "options": TimeIntervalType.format_descriptions_for_docs(),
-        },
-    )
-
-    @field_validator("ranges")
-    @classmethod
-    def check_times(cls, ranges: list[TimeRangeModel]) -> list[TimeRangeModel]:
-        return _check_time_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
         return True
@@ -901,7 +989,6 @@ def handle_dimension_union(values):
             dim_type = value["dimension_type"]
         # NOTE: Errors inside DimensionModel or DateTimeDimensionModel will be duplicated by Pydantic
         if dim_type == DimensionType.TIME.value:
-            # TODO add support for DatetimeExternalTimeZoneDimensionModel
             if value["time_type"] == TimeDimensionType.DATETIME.value:
                 values[i] = DateTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.ANNUAL.value:
@@ -928,7 +1015,6 @@ DimensionsListModel = Annotated[
             DateTimeDimensionModel,
             AnnualTimeDimensionModel,
             RepresentativePeriodTimeDimensionModel,
-            DatetimeExternalTimeZoneDimensionModel,
             IndexTimeDimensionModel,
             NoOpTimeDimensionModel,
         ]

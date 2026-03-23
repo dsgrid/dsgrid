@@ -20,7 +20,6 @@ MODELS = [
             "dsgrid.config.dimensions.DateTimeDimensionModel",
             "dsgrid.config.dimensions.AnnualTimeDimensionModel",
             "dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel",
-            "dsgrid.config.dimensions.DatetimeExternalTimeZoneDimensionModel",
             "dsgrid.config.dimensions.IndexTimeDimensionModel",
             "dsgrid.config.dimensions.NoOpTimeDimensionModel",
             # Dimension reference

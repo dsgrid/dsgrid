@@ -2,16 +2,16 @@
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Self, Type, Union
-from zoneinfo import ZoneInfo
 
 import pandas as pd
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST, TIME_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
@@ -46,9 +46,13 @@ from dsgrid.spark.functions import (
     is_dataframe_empty,
     select_expr,
 )
-from dsgrid.spark.types import get_str_type, use_duckdb
+from dsgrid.spark.types import get_str_type, DUCKDB_COLUMN_TYPES, SPARK_COLUMN_TYPES, use_duckdb
 from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import add_time_zone, split_expected_missing_rows, unpivot_dataframe
+from dsgrid.utils.dataset import (
+    split_expected_missing_rows,
+    unpivot_dataframe,
+    localize_timestamps_if_necessary,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -275,6 +279,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             data_base_dir=data_base_dir,
             associations_base_dir=associations_base_dir,
         )
+
         if context is None:
             assert submitter is not None
             assert log_message is not None
@@ -414,20 +419,42 @@ class DatasetRegistryManager(RegistryManagerBase):
         if time_dim is None:
             return
 
-        if not isinstance(time_dim.model, DateTimeDimensionModel) or not isinstance(
+        df = handler.get_base_load_data_table()
+        if isinstance(time_dim.model, DateTimeDimensionModel) and isinstance(
             time_dim.model.column_format, TimeFormatInPartsModel
         ):
-            return
+            df = self._convert_time_format_in_parts_to_datetime(
+                df,
+                time_dim,
+                config,
+                scratch_dir_context,
+            )
+        if isinstance(time_dim.model, DateTimeDimensionModel):
+            df = self._localize_timestamps_if_necessary(
+                df,
+                time_dim,
+                config,
+                scratch_dir_context,
+            )
 
-        # TEMPORARY
-        # This code only exists because we lack full support for time zone naive timestamps.
-        # Refactor when the existing chronify work is complete.
-        df = handler.get_base_load_data_table()
+    def _convert_time_format_in_parts_to_datetime(
+        self,
+        df: DataFrame,
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        scratch_dir_context: ScratchDirContext,
+    ) -> DataFrame:
+        """Convert time-in-parts format to timestamp format."""
         col_format = time_dim.model.column_format
 
-        timestamp_str_expr = self._build_timestamp_string_expr(col_format)
-        df, fixed_tz = self._resolve_timezone(df, config, col_format)
-        timestamp_sql, new_col_format = self._build_timestamp_sql(timestamp_str_expr, fixed_tz)
+        # Validate UTC offset bounds if present
+        if col_format.offset_column:
+            self._validate_offset_bounds(df, col_format.offset_column)
+
+        base_ts_expr, offset_expr = self._build_timestamp_string_expr(col_format)
+        timestamp_sql, new_col_format = self._build_timestamp_sql(
+            base_ts_expr, offset_expr, col_format
+        )
 
         cols_to_drop = self._get_time_columns_to_drop(col_format)
         reformatted_df = self._apply_timestamp_transformation(df, cols_to_drop, timestamp_sql)
@@ -437,64 +464,203 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         self._update_time_dimension(time_dim, new_col_format, col_format.hour_column)
         logger.info("Replaced time columns %s with %s", cols_to_drop, new_col_format.time_column)
+        return reformatted_df
+
+    def _localize_timestamps_if_necessary(
+        self,
+        df: DataFrame,
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        scratch_dir_context: ScratchDirContext,
+    ) -> DataFrame:
+        """Localize tz-naive timestamps to time zone(s) if necessary."""
+        df, localized = localize_timestamps_if_necessary(df, config, scratch_dir_context)
+
+        if localized:
+            self._write_data_and_update_config_after_localization(
+                time_dim, config, df, scratch_dir_context
+            )
+            logger.info("Localized time column to timezone(s)")
+        return df
 
     @staticmethod
-    def _build_timestamp_string_expr(col_format: TimeFormatInPartsModel) -> str:
-        """Build SQL expression that creates a timestamp string from time-in-parts columns."""
+    def _build_timestamp_offset_string_expr(offset_col: str) -> str:
+        """Build SQL expression to convert offset column to ±HH:MM string.
+
+        Handles offsets in two formats:
+        - Numeric offsets (e.g., -8.0, 5.5): converted to a signed, zero-padded string (±HH:MM)
+            using CEIL/FLOOR for hours and ROUND for minutes.
+        - String offsets (e.g., "+05:00", "-07:30"): parsed directly via SUBSTR to extract
+            hours/minutes and reassembled as ±HH:MM.
+        """
+        assert offset_col, "Offset column is required for building offset string expression"
+        str_type = get_str_type()
+
+        # Build string-offset and numeric-offset fragments for readability.
+        offset_string_expr = (
+            f"(CASE WHEN SUBSTR(CAST({offset_col} AS {str_type}), 1, 1) = '-' THEN '-' ELSE '+' END) "
+            f"|| SUBSTR(CAST({offset_col} AS {str_type}), 2, 2) "
+            f"|| ':' || SUBSTR(CAST({offset_col} AS {str_type}), 5, 2)"
+        )
+        offset_numeric_pos_expr = (
+            f"'+' || LPAD(CAST(CAST(FLOOR(CAST({offset_col} AS DOUBLE)) AS INTEGER) AS {str_type}), 2, '0') "
+            f"|| ':' || LPAD(CAST(CAST(ROUND(CAST({offset_col} AS DOUBLE) % 1 * 60) AS INTEGER) AS {str_type}), 2, '0')"
+        )
+        offset_numeric_neg_expr = (
+            f"'-' || LPAD(CAST(CAST(ABS(CEIL(CAST({offset_col} AS DOUBLE))) AS INTEGER) AS {str_type}), 2, '0') "
+            f"|| ':' || LPAD(CAST(CAST(ROUND(ABS(CAST({offset_col} AS DOUBLE) % 1 * 60)) AS INTEGER) AS {str_type}), 2, '0')"
+        )
+
+        # Support both numeric offsets (e.g., -8.0, 5.5) and string offsets (e.g., "+05:00", "-07:30").
+        # Detect string offsets by presence of ':' and parse hours/minutes accordingly.
+        offset_expr = (
+            f"CASE WHEN CAST({offset_col} AS {str_type}) LIKE '%:%' THEN {offset_string_expr} "
+            f" WHEN CAST({offset_col} AS DOUBLE) >= 0 THEN {offset_numeric_pos_expr} "
+            f" WHEN CAST({offset_col} AS DOUBLE) < 0 THEN {offset_numeric_neg_expr} "
+            f" ELSE CAST({offset_col} AS {str_type}) END"
+        )
+        return offset_expr
+
+    def _validate_offset_bounds(self, df: DataFrame, offset_col: str) -> None:
+        """Ensure UTC offsets are within valid bounds and valid string format.
+
+        Rules:
+        - Numeric offsets: valid when `ABS(offset) <= 24`.
+        - String offsets: must match `^[+-]HH:MM` with `0 <= HH <= 24`, `0 <= MM < 60`,
+          and if `HH == 24` then `MM == 0`.
+        """
+        str_type = get_str_type()
+        str_cast = f"CAST({offset_col} AS {str_type})"
+        hours = f"CAST(SUBSTR({str_cast}, 2, 2) AS INTEGER)"
+        minutes = f"CAST(SUBSTR({str_cast}, 5, 2) AS INTEGER)"
+        # Invalid when format incorrect or bounds violated
+        invalid_expr = (
+            f"CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN CASE WHEN LENGTH({str_cast}) != 6 OR SUBSTR({str_cast}, 4, 1) != ':' "
+            f"          OR SUBSTR({str_cast}, 1, 1) NOT IN ('+','-') "
+            f"     THEN TRUE "
+            f"     WHEN {hours} > 24 OR {hours} < 0 THEN TRUE "
+            f"     WHEN {minutes} >= 60 OR {minutes} < 0 THEN TRUE "
+            f"     WHEN {hours} = 24 AND {minutes} > 0 THEN TRUE "
+            f"     ELSE FALSE END "
+            f"ELSE ABS(CAST({offset_col} AS DOUBLE)) > 24 END AS invalid_offset"
+        )
+        check_df = select_expr(df, [invalid_expr])
+        if not is_dataframe_empty(check_df.filter("invalid_offset")):
+            msg = (
+                "Invalid UTC offset detected. Offsets must be 24 hours or less "
+                f"in absolute value: column={offset_col}"
+            )
+            raise DSGInvalidDataset(msg)
+
+    def _build_timestamp_string_expr(self, col_format: TimeFormatInPartsModel) -> tuple[str, str]:
+        """Build a timestamp string SQL expression from time-in-parts columns.
+
+        Returns
+        -------
+        tuple[str, str]
+            (base_ts_expr, offset_expr) where base_ts_expr is the date/time
+            portion and offset_expr is a SQL CASE expression producing the
+            offset string (e.g. '+05:00'). offset_expr is empty when the
+            column format has no offset column.
+        """
         str_type = get_str_type()
         hour_col = col_format.hour_column
-        hour_expr = f"lpad(cast({hour_col} as {str_type}), 2, '0')" if hour_col else "'00'"
+        hour_expr = f"LPAD(CAST({hour_col} AS {str_type}), 2, '0')" if hour_col else "'00'"
+        offset_col = col_format.offset_column
+        if offset_col:
+            offset_expr = self._build_timestamp_offset_string_expr(offset_col)
+        else:
+            offset_expr = ""
+
+        base_ts_expr = (
+            f"CAST({col_format.year_column} AS {str_type}) || '-' || "
+            f"LPAD(CAST({col_format.month_column} AS {str_type}), 2, '0') || '-' || "
+            f"LPAD(CAST({col_format.day_column} AS {str_type}), 2, '0') || ' ' || "
+            f"{hour_expr} || ':00:00'"
+        )
+        return base_ts_expr, offset_expr
+
+    @staticmethod
+    def _normalize_offset_24_sql(
+        base_ts_expr: str,
+        offset_expr: str,
+        offset_col: str,
+        ts_type: str,
+    ) -> str:
+        """Build SQL that handles ±24 offset by converting to +00:00 and adjusting by 1 day.
+
+        Spark rejects ±24:00 as a UTC offset in CAST. This method generates a
+        CASE expression that detects ±24 offsets (numeric or string) and
+        rewrites them as +00:00 with a ±1 day adjustment to preserve the same
+        UTC instant.
+
+        Parameters
+        ----------
+        base_ts_expr : str
+            SQL expression for the date/time string without offset.
+        offset_expr : str
+            SQL CASE expression that produces the offset string.
+        offset_col : str
+            Name of the offset column in the dataframe.
+        ts_type : str
+            Target timestamp type (e.g. TIMESTAMPTZ).
+
+        Returns
+        -------
+        str
+            SQL expression producing the correctly offset timestamp.
+        """
+        str_type = get_str_type()
+        str_cast = f"CAST({offset_col} AS {str_type})"
+
+        is_24 = (
+            f"(CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN SUBSTR({str_cast}, 2, 2) = '24' "
+            f"ELSE ABS(CAST({offset_col} AS DOUBLE)) = 24 END)"
+        )
+        is_positive = (
+            f"(CASE WHEN {str_cast} LIKE '%:%' "
+            f"THEN SUBSTR({str_cast}, 1, 1) = '+' "
+            f"ELSE CAST({offset_col} AS DOUBLE) >= 0 END)"
+        )
 
         return (
-            f"cast({col_format.year_column} as {str_type}) || '-' || "
-            f"lpad(cast({col_format.month_column} as {str_type}), 2, '0') || '-' || "
-            f"lpad(cast({col_format.day_column} as {str_type}), 2, '0') || ' ' || "
-            f"{hour_expr} || ':00:00'"
+            f"CASE "
+            f"WHEN {is_24} AND {is_positive} "
+            f"THEN CAST({base_ts_expr} || '+00:00' AS {ts_type}) - INTERVAL 1 DAY "
+            f"WHEN {is_24} AND NOT {is_positive} "
+            f"THEN CAST({base_ts_expr} || '+00:00' AS {ts_type}) + INTERVAL 1 DAY "
+            f"ELSE CAST({base_ts_expr} || {offset_expr} AS {ts_type}) "
+            f"END"
         )
 
     @staticmethod
-    def _resolve_timezone(
-        df: DataFrame, config: DatasetConfig, col_format: TimeFormatInPartsModel
-    ) -> tuple[DataFrame, str | None]:
-        """Resolve timezone from config or geography dimension.
-
-        Returns the (possibly modified) dataframe and the fixed timezone if single-tz,
-        or None if multi-timezone.
-        """
-        if col_format.time_zone is not None:
-            return df, col_format.time_zone
-
-        geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
-        assert geo_dim is not None
-        return add_time_zone(df, geo_dim), None
-
-    @staticmethod
     def _build_timestamp_sql(
-        timestamp_str_expr: str, fixed_tz: str | None
+        base_ts_expr: str, offset_expr: str, col_format: TimeFormatInPartsModel
     ) -> tuple[str, TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel]:
         """Build the final timestamp SQL expression and determine the column format."""
-        if fixed_tz is not None:
-            if use_duckdb():
-                sql = f"cast({timestamp_str_expr} || ' {fixed_tz}' as timestamptz) as timestamp"
-            else:
-                tz = ZoneInfo(fixed_tz)
-                offset = datetime(2012, 1, 1, tzinfo=tz).strftime("%z")
-                offset_formatted = f"{offset[:3]}:{offset[3:]}"
-                sql = (
-                    f"cast({timestamp_str_expr} || '{offset_formatted}' as timestamp) as timestamp"
-                )
-            return sql, TimeFormatDateTimeTZModel(time_column="timestamp")
-
-        # Multi-timezone: create naive timestamp, keep time_zone column
-        sql = f"cast({timestamp_str_expr} as timestamp) as timestamp"
-        return sql, TimeFormatDateTimeNTZModel(time_column="timestamp")
+        col_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
+        if col_format.offset_column:
+            ts_type = col_types["TIMESTAMP_TZ"]
+            new_col_format = TimeFormatDateTimeTZModel(time_column=TIME_COLUMN)
+            sql_expr = DatasetRegistryManager._normalize_offset_24_sql(
+                base_ts_expr, offset_expr, col_format.offset_column, ts_type
+            )
+            sql = f"{sql_expr} AS {TIME_COLUMN}"
+        else:
+            ts_type = col_types["TIMESTAMP_NTZ"]
+            new_col_format = TimeFormatDateTimeNTZModel(time_column=TIME_COLUMN)
+            sql = f"CAST({base_ts_expr} AS {ts_type}) AS {TIME_COLUMN}"
+        return sql, new_col_format
 
     @staticmethod
     def _get_time_columns_to_drop(col_format: TimeFormatInPartsModel) -> set[str]:
         """Get the set of time-in-parts columns to drop, excluding dimension columns."""
         cols_to_drop = {col_format.year_column, col_format.month_column, col_format.day_column}
-        if col_format.hour_column:
-            cols_to_drop.add(col_format.hour_column)
+        for col in [col_format.hour_column, col_format.offset_column]:
+            if col:
+                cols_to_drop.add(col)
         return cols_to_drop - DimensionType.get_allowed_dimension_column_names()
 
     @staticmethod
@@ -523,25 +689,52 @@ class DatasetRegistryManager(RegistryManagerBase):
                 c for c in config.model.data_layout.data_file.columns if c.name not in cols_to_drop
             ]
             timestamp_data_type = (
-                "TIMESTAMP_TZ"
-                if isinstance(new_col_format, TimeFormatDateTimeTZModel)
-                else "TIMESTAMP_NTZ"
+                "timestamp_tz" if new_col_format.dtype == "timestamp_tz" else "timestamp_ntz"
             )
-            updated_columns.append(Column(name="timestamp", data_type=timestamp_data_type))
+            updated_columns.append(Column(name=TIME_COLUMN, data_type=timestamp_data_type))
             config.model.data_layout.data_file.columns = updated_columns
 
     @staticmethod
     def _update_time_dimension(
-        time_dim,
+        time_dim: DateTimeDimensionConfig,
         new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
         hour_col: str | None,
     ) -> None:
         """Update the time dimension model with the new format."""
         time_dim.model.column_format = new_col_format
-        time_dim.model.time_column = "timestamp"
         if hour_col is None:
             for time_range in time_dim.model.ranges:
                 time_range.frequency = timedelta(days=1)
+
+    @staticmethod
+    def _write_data_and_update_config_after_localization(
+        time_dim: DateTimeDimensionConfig,
+        config: DatasetConfig,
+        df: DataFrame,
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
+        """Write localized dataframe and update config paths and columns."""
+        # write dataframe
+        path = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        write_dataframe(df, path)
+
+        # update config
+        config.model.data_layout.data_file.path = str(path)
+
+        # update time_dim
+        time_column = time_dim.model.column_format.time_column
+        time_dim.model.column_format = TimeFormatDateTimeTZModel(time_column=time_column)
+
+        # update data_file columns schema, if present, to reflect TIMESTAMP_TZ
+        data_file = config.model.data_layout.data_file
+        if data_file.columns is not None:
+            updated_columns: list[Column] = []
+            for col in data_file.columns:
+                if col.name == time_column:
+                    updated_columns.append(Column(name=time_column, data_type="TIMESTAMP_TZ"))
+                else:
+                    updated_columns.append(col)
+            data_file.columns = updated_columns
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None

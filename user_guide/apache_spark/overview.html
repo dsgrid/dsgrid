@@ -1,0 +1,976 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="When to Use Spark" href="when_to_use_spark.html"><link rel="prev" title="Apache Spark" href="index.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Apache Spark Overview - dsgrid 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=04b6322e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.4.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.4.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_time_dimension.html">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_registration/index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/data_file_formats.html">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_types.html">Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_workflows.html">Mapping Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_submittal/index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_process.html">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/project_concepts.html">Project Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/base_dimensions.html">Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/supplemental_dimensions.html">Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/dataset_requirements.html">Dataset Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_queries/index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/query_concepts.html">Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/aggregations.html">Aggregations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/output_formats.html">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/derived_concepts.html">Derived Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/growth_rates.html">Growth Rates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/residuals.html">Residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/workflows.html">Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" checked="" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Apache Spark Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="when_to_use_spark.html">When to Use Spark</a></li>
+<li class="toctree-l3"><a class="reference internal" href="kestrel_setup.html">Kestrel Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spark_cluster.html">Spark Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../software_reference/index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../software_reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_model.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Citation and Data Attribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/user_guide/apache_spark/overview.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="apache-spark-overview">
+<h1>Apache Spark Overview<a class="headerlink" href="#apache-spark-overview" title="Link to this heading">¶</a></h1>
+<p>This page describes Spark concepts that are important to understand when using dsgrid.</p>
+<section id="windows-users">
+<h2>Windows Users<a class="headerlink" href="#windows-users" title="Link to this heading">¶</a></h2>
+<p>Spark does not offer a great user experience in Windows. While <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> and <code class="docutils literal notranslate"><span class="pre">spark-submit</span></code> work in local mode, running a cluster requires manual configuration. The developers provide cluster management scripts in bash, and so they do not work in Windows.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>When running a cluster on your laptop we recommend that you use dsgrid in a <strong>Windows Subsystem for Linux (WSL2)</strong> environment instead of a native Windows environment.</p>
+</div>
+<section id="windows-setup-requirements">
+<h3>Windows Setup Requirements<a class="headerlink" href="#windows-setup-requirements" title="Link to this heading">¶</a></h3>
+<p>If you are running in local mode, you will need Hadoop’s <code class="docutils literal notranslate"><span class="pre">winutils.exe</span></code> because Windows doesn’t support HDFS.</p>
+<ol class="arabic simple">
+<li><p>Download <code class="docutils literal notranslate"><span class="pre">winutils.exe</span></code> and <code class="docutils literal notranslate"><span class="pre">hadoop.dll</span></code> files from <a class="reference external" href="https://github.com/steveloughran/winutils">winutils repository</a> (select the Hadoop version you are using as winutils are specific to Hadoop versions)</p></li>
+<li><p>Copy them into a folder like <code class="docutils literal notranslate"><span class="pre">C:\hadoop\bin</span></code></p></li>
+<li><p>Set the environment variable <code class="docutils literal notranslate"><span class="pre">HADOOP_HOME</span></code> to <code class="docutils literal notranslate"><span class="pre">C:\hadoop</span></code></p></li>
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">%HADOOP_HOME%\bin</span></code> to your <code class="docutils literal notranslate"><span class="pre">PATH</span></code></p></li>
+</ol>
+<p>If you get an error like: <em>“Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut from Settings &gt; Manage App Execution Aliases.”</em> try setting this environment variable: <code class="docutils literal notranslate"><span class="pre">PYSPARK_PYTHON=python</span></code> (or set the value to <code class="docutils literal notranslate"><span class="pre">ipython</span></code>, if you would prefer).</p>
+</section>
+</section>
+<section id="conventions">
+<h2>Conventions<a class="headerlink" href="#conventions" title="Link to this heading">¶</a></h2>
+<p>This page uses UNIX conventions for environment variables and running commands in a shell. If you run any of these commands in a native Windows environment, you will have to adjust depending on whether you are running PowerShell or the old Command shell.</p>
+<section id="bash-functionality-explained">
+<h3>Bash Functionality Explained<a class="headerlink" href="#bash-functionality-explained" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">$VARIABLE_NAME</span></code> or <code class="docutils literal notranslate"><span class="pre">${VARIABLE_NAME}</span></code>: This uses the environment variable <code class="docutils literal notranslate"><span class="pre">VARIABLE_NAME</span></code>. If the variable isn’t defined, bash will use an empty string.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">export</span> <span class="pre">VARIABLE_NAME=x</span></code>: This sets the environment variable <code class="docutils literal notranslate"><span class="pre">VARIABLE_NAME</span></code> to the value <code class="docutils literal notranslate"><span class="pre">x</span></code> in the current shell. If you want to set this variable for all future shells as well, add the statement to your shell rc file (<code class="docutils literal notranslate"><span class="pre">$HOME/.bashrc</span></code> or <code class="docutils literal notranslate"><span class="pre">$HOME/.zshrc</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">export</span> <span class="pre">VARIABLE_NAME=$(hostname)</span></code>: This sets the environment variable <code class="docutils literal notranslate"><span class="pre">VARIABLE_NAME</span></code> to the string returned by the command <code class="docutils literal notranslate"><span class="pre">hostname</span></code>.</p></li>
+</ul>
+<p>In examples listed on this page where you need to enter text yourself, that text is enclosed in <code class="docutils literal notranslate"><span class="pre">&lt;&gt;</span></code> as in <code class="docutils literal notranslate"><span class="pre">http://&lt;master_hostname&gt;:4040</span></code>.</p>
+</section>
+</section>
+<section id="spark-cluster-modes">
+<h2>Spark Cluster Modes<a class="headerlink" href="#spark-cluster-modes" title="Link to this heading">¶</a></h2>
+<p>Apache provides an overview at <a class="reference external" href="https://spark.apache.org/docs/latest/cluster-overview.html">Spark Cluster Overview</a>.</p>
+<p>The most important parts to understand are how dsgrid uses different cluster modes in different environments:</p>
+<section id="local-computer-in-local-mode">
+<h3>Local Computer in Local Mode<a class="headerlink" href="#local-computer-in-local-mode" title="Link to this heading">¶</a></h3>
+<p>All Spark components run in a single process. This is great for testing and development but is not performant. It will not use all CPUs on your system. You run in this mode when you type <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> in your terminal.</p>
+<p><strong>Use for:</strong> Quick testing and development only.</p>
+</section>
+<section id="local-computer-with-standalone-cluster">
+<h3>Local Computer with Standalone Cluster<a class="headerlink" href="#local-computer-with-standalone-cluster" title="Link to this heading">¶</a></h3>
+<p>You must install Spark and then manually start the cluster. Refer to <a class="reference internal" href="#installing-on-laptop">Installing on Laptop</a>. This enables full performance on your system. It also allows you to debug your jobs in the Spark UI before or after they complete.</p>
+<p><strong>Use for:</strong> Development work that requires full system performance.</p>
+</section>
+<section id="hpc-compute-node-in-local-mode">
+<h3>HPC Compute Node in Local Mode<a class="headerlink" href="#hpc-compute-node-in-local-mode" title="Link to this heading">¶</a></h3>
+<p>Use this only for quick checks. Same points above for local computer in local mode apply.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you use this, set the environment variable <code class="docutils literal notranslate"><span class="pre">SPARK_LOCAL_DIRS=/tmp/scratch</span></code> so that you have enough space.</p>
+</div>
+<p><strong>Use for:</strong> Quick checks only. Create a standalone cluster for real work.</p>
+</section>
+<section id="hpc-compute-node-s-with-standalone-cluster">
+<h3>HPC Compute Node(s) with Standalone Cluster<a class="headerlink" href="#hpc-compute-node-s-with-standalone-cluster" title="Link to this heading">¶</a></h3>
+<p>Create a cluster on any number of compute nodes and then use all CPUs for your jobs. Refer to <a class="reference internal" href="#installing-on-hpc">Installing on HPC</a>.</p>
+<p><strong>Use for:</strong> Production workloads and large-scale queries.</p>
+</section>
+<section id="aws-emr-cluster">
+<h3>AWS EMR Cluster<a class="headerlink" href="#aws-emr-cluster" title="Link to this heading">¶</a></h3>
+<p>The EMR scripts in the dsgrid repo at <code class="docutils literal notranslate"><span class="pre">/emr</span></code> will create a Spark cluster on EC2 compute nodes with a cluster manager. The cluster manager allows multiple users to access a single cluster and offers better job scheduling. Refer to the <a class="reference external" href="http://README.md">README.md</a> in that directory.</p>
+<p><strong>Use for:</strong> Cloud-based large-scale production workloads.</p>
+</section>
+</section>
+<section id="running-spark-applications">
+<h2>Running Spark Applications<a class="headerlink" href="#running-spark-applications" title="Link to this heading">¶</a></h2>
+<p>There are three ways of running Spark applications in Python. <code class="docutils literal notranslate"><span class="pre">spark-submit</span></code> and <code class="docutils literal notranslate"><span class="pre">pyspark</span></code>, provided by the Spark and pyspark installations, are recommended because they allow you to fully customize the execution environment. More details follow in <a class="reference internal" href="#tuning-configuration-settings">Tuning Configuration</a>.</p>
+<section id="spark-submit">
+<h3>1. spark-submit<a class="headerlink" href="#spark-submit" title="Link to this heading">¶</a></h3>
+<p>This command will create a SparkSession, make that session available to the Python process, and run your code.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>spark-submit<span class="w"> </span><span class="o">[</span>options<span class="o">]</span><span class="w"> </span>your_script.py<span class="w"> </span><span class="o">[</span>your_script_options<span class="o">]</span>
+</pre></div>
+</div>
+<p><strong>Use for:</strong> Running Python scripts with Spark.</p>
+</section>
+<section id="pyspark">
+<h3>2. pyspark<a class="headerlink" href="#pyspark" title="Link to this heading">¶</a></h3>
+<p>This command will create a SparkSession, make that session available to the Python process, and leave you in the Python interpreter for an interactive session.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pyspark<span class="w"> </span><span class="o">[</span>options<span class="o">]</span>
+</pre></div>
+</div>
+<p><strong>Use for:</strong> Interactive exploration and development.</p>
+</section>
+<section id="inside-python">
+<h3>3. Inside Python<a class="headerlink" href="#inside-python" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">appName</span><span class="p">(</span><span class="s2">&quot;your_app_name&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Use for:</strong> Programmatic control within Python applications.</p>
+</section>
+</section>
+<section id="run-pyspark-through-ipython-or-jupyter">
+<h2>Run pyspark through IPython or Jupyter<a class="headerlink" href="#run-pyspark-through-ipython-or-jupyter" title="Link to this heading">¶</a></h2>
+<p>You can configure <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> to start <code class="docutils literal notranslate"><span class="pre">IPython</span></code> or <code class="docutils literal notranslate"><span class="pre">Jupyter</span></code> instead of the standard Python interpreter by setting the environment variables <code class="docutils literal notranslate"><span class="pre">PYSPARK_DRIVER_PYTHON</span></code> and <code class="docutils literal notranslate"><span class="pre">PYSPARK_DRIVER_PYTHON_OPTS</span></code>.</p>
+<section id="ipython">
+<h3>IPython<a class="headerlink" href="#ipython" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PYSPARK_DRIVER_PYTHON</span><span class="o">=</span>ipython
+</pre></div>
+</div>
+<p><strong>Local mode:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pyspark
+</pre></div>
+</div>
+<p><strong>Cluster mode:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pyspark<span class="w"> </span>--master<span class="o">=</span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077
+</pre></div>
+</div>
+<p>Now you are in IPython instead of the standard Python interpreter.</p>
+</section>
+<section id="jupyter">
+<h3>Jupyter<a class="headerlink" href="#jupyter" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PYSPARK_DRIVER_PYTHON</span><span class="o">=</span>jupyter
+$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PYSPARK_DRIVER_PYTHON_OPTS</span><span class="o">=</span><span class="s2">&quot;notebook --no-browser --port=8889 --ip=0.0.0.0&quot;</span>
+$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SPARK_HOME</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import pyspark;print(pyspark.__path__[0])&quot;</span><span class="k">)</span>
+</pre></div>
+</div>
+<p><strong>Local mode:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pyspark
+</pre></div>
+</div>
+<p><strong>Cluster mode:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pyspark<span class="w"> </span>--master<span class="o">=</span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077
+</pre></div>
+</div>
+<p>Pyspark will start a Jupyter notebook and you’ll see the URL printed in the terminal. If you’re on a remote server, like in an HPC environment, you’ll need to create an SSH tunnel in order to connect in a browser.</p>
+<p>Once you connect in a browser, enter the following in a cell in order to connect to this cluster:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">appName</span><span class="p">(</span><span class="s2">&quot;your_app_name&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="spark-ui">
+<h2>Spark UI<a class="headerlink" href="#spark-ui" title="Link to this heading">¶</a></h2>
+<p>The Spark master starts a web application at <code class="docutils literal notranslate"><span class="pre">http://&lt;master_hostname&gt;:8080</span></code>. Job information is available at port 4040. You can monitor and debug all aspects of your jobs in this application. You can also inspect all cluster configuration settings.</p>
+<section id="ssh-tunnel-for-remote-access">
+<h3>SSH Tunnel for Remote Access<a class="headerlink" href="#ssh-tunnel-for-remote-access" title="Link to this heading">¶</a></h3>
+<p>If your Spark cluster is running on a remote system, like an HPC, you may need to open an SSH tunnel to the master node. Here is how to do that on NLR’s Kestrel cluster.</p>
+<p><strong>On your laptop:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">COMPUTE_NODE</span><span class="o">=</span>&lt;compute_node_name&gt;
+$<span class="w"> </span>ssh<span class="w"> </span>-L<span class="w"> </span><span class="m">4040</span>:<span class="nv">$COMPUTE_NODE</span>:4040<span class="w"> </span>-L<span class="w"> </span><span class="m">8080</span>:<span class="nv">$COMPUTE_NODE</span>:8080<span class="w"> </span><span class="nv">$USER</span>@kestrel.hpc.nrel.gov
+</pre></div>
+</div>
+<p>Then access:</p>
+<ul class="simple">
+<li><p><strong>Master UI:</strong> <code class="docutils literal notranslate"><span class="pre">http://localhost:8080</span></code></p></li>
+<li><p><strong>Job UI:</strong> <code class="docutils literal notranslate"><span class="pre">http://localhost:4040</span></code></p></li>
+</ul>
+</section>
+</section>
+<section id="installing-a-spark-standalone-cluster">
+<h2>Installing a Spark Standalone Cluster<a class="headerlink" href="#installing-a-spark-standalone-cluster" title="Link to this heading">¶</a></h2>
+<p>The next sections describe how to install a standalone cluster on a local system and an HPC.</p>
+<section id="installing-on-laptop">
+<h3>Installing on Laptop<a class="headerlink" href="#installing-on-laptop" title="Link to this heading">¶</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>As stated earlier, the scripts mentioned in this section do not work in a native Windows environment. You can still start a cluster in Windows; you just have to run the Java commands yourself.</p>
+</div>
+<section id="download-spark">
+<h4>Download Spark<a class="headerlink" href="#download-spark" title="Link to this heading">¶</a></h4>
+<p>Download your desired version from <a class="reference external" href="https://spark.apache.org/downloads.html">Spark Downloads</a> and extract it on your system.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Choose the version that is set in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> for <code class="docutils literal notranslate"><span class="pre">pyspark</span></code>. Major, minor, and patch versions must match.</p>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>&lt;your-preferred-base-directory&gt;<span class="w">  </span><span class="c1"># directions below assume $HOME</span>
+$<span class="w"> </span>wget<span class="w"> </span>https://dlcdn.apache.org/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
+$<span class="w"> </span>tar<span class="w"> </span>-xzf<span class="w"> </span>spark-4.0.0-bin-hadoop3.tgz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rm<span class="w"> </span>spark-4.0.0-bin-hadoop3.tgz
+</pre></div>
+</div>
+<p>The full instructions to create a cluster are at <a class="reference external" href="http://spark.apache.org/docs/latest/spark-standalone.html">Spark Standalone Mode</a>. The rest of this section documents the requirements for dsgrid.</p>
+</section>
+<section id="set-environment-variables">
+<h4>Set Environment Variables<a class="headerlink" href="#set-environment-variables" title="Link to this heading">¶</a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SPARK_HOME</span><span class="o">=</span><span class="nv">$HOME</span>/spark-4.0.0-bin-hadoop3
+$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="nv">$PATH</span>:<span class="nv">$SPARK_HOME</span>/sbin
+</pre></div>
+</div>
+<p>Note that after doing this your system will have two versions of <code class="docutils literal notranslate"><span class="pre">pyspark</span></code>:</p>
+<ul class="simple">
+<li><p>In your Python virtual environment where you installed dsgrid (because dsgrid installs pyspark)</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">$HOME/spark-4.0.0-bin-hadoop3/bin</span></code></p></li>
+</ul>
+<p>If you use a conda virtual environment, when that environment is activated, its <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">SPARK_HOME</span></code> will affect operation of your Python <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> installation in local mode. That may not be what you want if you make settings specific to the standalone cluster.</p>
+</div>
+</section>
+<section id="customize-spark-configuration-settings">
+<h4>Customize Spark Configuration Settings<a class="headerlink" href="#customize-spark-configuration-settings" title="Link to this heading">¶</a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>cp<span class="w"> </span><span class="nv">$SPARK_HOME</span>/conf/spark-defaults.conf.template<span class="w"> </span><span class="nv">$SPARK_HOME</span>/conf/spark-defaults.conf
+$<span class="w"> </span>cp<span class="w"> </span><span class="nv">$SPARK_HOME</span>/conf/spark-env.sh.template<span class="w"> </span><span class="nv">$SPARK_HOME</span>/conf/spark-env.sh
+</pre></div>
+</div>
+<p><strong>Key settings in <code class="docutils literal notranslate"><span class="pre">spark-defaults.conf</span></code>:</strong></p>
+<ul>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">spark.driver.memory</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">spark.driver.maxResultSize</span></code></strong>: Set to the maximum data sizes that you expect to pull from Spark to Python, such as if you call <code class="docutils literal notranslate"><span class="pre">df.toPandas()</span></code>. <code class="docutils literal notranslate"><span class="pre">1g</span></code> is probably reasonable.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">spark.sql.shuffle.partitions</span></code></strong>: Set to 1-4x the number of cores in your system. Note that the default value is 200, and you probably don’t want that.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">spark.executor.cores</span></code></strong> and <strong><code class="docutils literal notranslate"><span class="pre">spark.executor.memory</span></code></strong>: Set to numbers that allow creation of your desired number of executors. Spark will try to create the most number of executors such that each executor has those resources.</p>
+<p>For example, if your system has 16 cores and you assign 16g of memory to the worker, <code class="docutils literal notranslate"><span class="pre">spark.executor.cores</span> <span class="pre">3</span></code> and <code class="docutils literal notranslate"><span class="pre">spark.executor.memory</span> <span class="pre">5g</span></code> will result in 3 executors.</p>
+</li>
+</ul>
+</section>
+<section id="start-the-spark-processes">
+<h4>Start the Spark Processes<a class="headerlink" href="#start-the-spark-processes" title="Link to this heading">¶</a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">$SPARK_HOME</span>/sbin/start-master.sh
+</pre></div>
+</div>
+<p>Start a worker with this command. Give the worker as much memory as you can afford. Executor memory comes from this pool. You can also configure this in <code class="docutils literal notranslate"><span class="pre">spark-env.sh</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">$SPARK_HOME</span>/sbin/start-worker.sh<span class="w"> </span>-m<span class="w"> </span>16g<span class="w"> </span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077
+</pre></div>
+</div>
+<p>If you add the <code class="docutils literal notranslate"><span class="pre">sbin</span></code> to your <code class="docutils literal notranslate"><span class="pre">PATH</span></code> environment variable, here is a one-liner:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>start-master.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>start-worker.sh<span class="w"> </span>-m<span class="w"> </span>24g<span class="w"> </span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077
+</pre></div>
+</div>
+</section>
+<section id="stop-the-spark-processes">
+<h4>Stop the Spark Processes<a class="headerlink" href="#stop-the-spark-processes" title="Link to this heading">¶</a></h4>
+<p>Stop all of the processes when you complete your work.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>stop-worker.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>stop-master.sh
+</pre></div>
+</div>
+</section>
+</section>
+<section id="installing-on-hpc">
+<h3>Installing on HPC<a class="headerlink" href="#installing-on-hpc" title="Link to this heading">¶</a></h3>
+<p>This section describes how you can run Spark jobs on any number of HPC compute nodes. The scripts and examples described here rely on the SLURM scheduling system and have been tested on NLR’s Kestrel cluster.</p>
+<section id="install-sparkctl">
+<h4>Install sparkctl<a class="headerlink" href="#install-sparkctl" title="Link to this heading">¶</a></h4>
+<p>Install the Python package <code class="docutils literal notranslate"><span class="pre">sparkctl</span></code> to run the scripts described below:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;sparkctl[pyspark]&quot;</span>
+</pre></div>
+</div>
+<p>The <a class="reference external" href="https://nrel.github.io/sparkctl/">sparkctl documentation</a> has generic instructions to run Spark in a variety of ways. The rest of this section calls out choices that you should make to run Spark jobs with dsgrid.</p>
+</section>
+<section id="steps-to-start-a-cluster">
+<h4>Steps to Start a Cluster<a class="headerlink" href="#steps-to-start-a-cluster" title="Link to this heading">¶</a></h4>
+<ol class="arabic simple">
+<li><p><strong>Choose compute node(s) with fast local storage.</strong> This example will allocate one node. Refer to the <a class="reference external" href="https://nrel.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system">Kestrel Filesystems documentation</a> for more information for this type of compute node.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>salloc<span class="w"> </span>-t<span class="w"> </span><span class="m">01</span>:00:00<span class="w"> </span>-N1<span class="w"> </span>--account<span class="o">=</span>dsgrid<span class="w"> </span>--partition<span class="o">=</span>nvme<span class="w"> </span>--mem<span class="o">=</span>240G
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><strong>Configure Spark parameters</strong> based on the amount of memory and CPU in each compute node.</p></li>
+</ol>
+<p>This command must be run on a compute node. The script will check for the environment variable <code class="docutils literal notranslate"><span class="pre">SLURM_JOB_ID</span></code>, which is set by <code class="docutils literal notranslate"><span class="pre">Slurm</span></code>. If you ssh’d into the compute node, it won’t be set and then you have to pass it as an argument.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sparkctl<span class="w"> </span>configure<span class="w"> </span>--start
+</pre></div>
+</div>
+<p>Run <code class="docutils literal notranslate"><span class="pre">sparkctl</span> <span class="pre">configure</span> <span class="pre">--help</span></code> to see all options.</p>
+<p>Alternatively, or in conjunction with the above command, customize the Spark configuration files in <code class="docutils literal notranslate"><span class="pre">./conf</span></code> as necessary.</p>
+<ol class="arabic simple" start="3">
+<li><p><strong>Ensure that the dsgrid application uses the Spark configuration</strong> that you just defined.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SPARK_CONF_DIR</span><span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/conf
+$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span>/datasets/images/apache_spark/jdk-21.0.7
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li><p><strong>Follow the rest of the sparkctl instructions</strong> for starting the cluster and running jobs.</p></li>
+</ol>
+<p>See also:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../how_tos/run_on_kestrel.html"><span class="doc std std-doc">Run dsgrid on Kestrel</span></a> for complete workflow</p></li>
+<li><p><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html"><span class="doc std std-doc">Start Spark Cluster on Kestrel</span></a> for detailed cluster setup</p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="tuning-configuration-settings">
+<h2>Tuning Configuration Settings<a class="headerlink" href="#tuning-configuration-settings" title="Link to this heading">¶</a></h2>
+<p>In general you want to run Spark with as many executors as possible on each worker node. The Amazon orchestration software along with the cluster manager <em>may</em> take care of that when running on AWS (you will still have to adjust <code class="docutils literal notranslate"><span class="pre">spark.sql.shuffle.partitions</span></code>). You will have to perform more customizations when running a standalone cluster on your laptop or an HPC.</p>
+<section id="configuration-priority-order">
+<h3>Configuration Priority Order<a class="headerlink" href="#configuration-priority-order" title="Link to this heading">¶</a></h3>
+<p>These are listed in order of priority - later methods will override the earlier methods when allowed.</p>
+<section id="global-spark-configuration-directory">
+<h4>1. Global Spark Configuration Directory<a class="headerlink" href="#global-spark-configuration-directory" title="Link to this heading">¶</a></h4>
+<p>This is <code class="docutils literal notranslate"><span class="pre">$SPARK_HOME/conf</span></code> or <code class="docutils literal notranslate"><span class="pre">$SPARK_CONF_DIR</span></code>. You can customize settings in <code class="docutils literal notranslate"><span class="pre">spark-defaults.conf</span></code> and <code class="docutils literal notranslate"><span class="pre">spark-env.sh</span></code>. Make customizations here if you will use the same settings in all jobs.</p>
+</section>
+<section id="spark-launch-scripts">
+<h4>2. Spark Launch Scripts<a class="headerlink" href="#spark-launch-scripts" title="Link to this heading">¶</a></h4>
+<p>Use <code class="docutils literal notranslate"><span class="pre">spark-submit</span></code> to run scripts. Use <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> to run interactively. Both scripts offer the same startup options. You can choose to run in local mode or attach to a cluster. You can override any setting from #1. Make changes here if you will use different settings across jobs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some settings must be made before the Spark JVM starts, like <code class="docutils literal notranslate"><span class="pre">spark.driver.memory</span></code>, and so this is your last chance to customize those values.</p>
+</div>
+</section>
+<section id="sparksession-construction-inside-python">
+<h4>3. SparkSession Construction Inside Python<a class="headerlink" href="#sparksession-construction-inside-python" title="Link to this heading">¶</a></h4>
+<p>You can customize things like executor settings when you construct the <code class="docutils literal notranslate"><span class="pre">SparkSession</span></code> in Python. For example, this code block will create a session where the job starts a single executor with a single core that uses all available memory.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyspark</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkConf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
+
+<span class="n">conf</span> <span class="o">=</span> <span class="n">SparkConf</span><span class="p">()</span><span class="o">.</span><span class="n">setAppName</span><span class="p">(</span><span class="s2">&quot;my_app&quot;</span><span class="p">)</span>
+<span class="n">conf</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;spark.executor.cores&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">conf</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;spark.executor.memory&quot;</span><span class="p">,</span> <span class="s2">&quot;16g&quot;</span><span class="p">)</span>
+<span class="n">conf</span><span class="o">.</span><span class="n">setMaster</span><span class="p">(</span><span class="n">cluster</span><span class="p">)</span>
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">config</span><span class="p">(</span><span class="n">conf</span><span class="o">=</span><span class="n">conf</span><span class="p">)</span><span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="dynamic-changes">
+<h4>4. Dynamic Changes<a class="headerlink" href="#dynamic-changes" title="Link to this heading">¶</a></h4>
+<p>You can make changes to a limited number of settings at runtime. You can’t change the number of executor cores because those have already been allocated. You can change the number of shuffle partitions that Spark will use. You may want to change that value if the sizes of the dataframes you’re working on change dramatically.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
+
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">getActiveSession</span><span class="p">()</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">conf</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;spark.sql.shuffle.partitions&quot;</span><span class="p">,</span> <span class="mi">500</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="creating-a-sparksession-with-dsgrid">
+<h2>Creating a SparkSession with dsgrid<a class="headerlink" href="#creating-a-sparksession-with-dsgrid" title="Link to this heading">¶</a></h2>
+<p>Ensure that the dsgrid software uses the cluster with optimized settings. If you start the dsgrid Python process with the Spark scripts <code class="docutils literal notranslate"><span class="pre">spark-submit</span></code> or <code class="docutils literal notranslate"><span class="pre">pyspark</span></code> and set the <code class="docutils literal notranslate"><span class="pre">--master</span></code> option, those scripts will create a SparkSession attached to the cluster and pass it to the Python process.</p>
+<p>You can optionally set the <code class="docutils literal notranslate"><span class="pre">SPARK_CLUSTER</span></code> environment variable to the cluster URL and then dsgrid will connect to it.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SPARK_CLUSTER</span><span class="o">=</span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077
+</pre></div>
+</div>
+<p>Using <code class="docutils literal notranslate"><span class="pre">SPARK_CLUSTER</span></code> is a bit simpler, but you cannot configure settings like <code class="docutils literal notranslate"><span class="pre">spark.driver.memory</span></code>, which, as stated earlier, must be set before the JVM is created.</p>
+<section id="using-spark-submit-with-dsgrid">
+<h3>Using spark-submit with dsgrid<a class="headerlink" href="#using-spark-submit-with-dsgrid" title="Link to this heading">¶</a></h3>
+<p>Running dsgrid CLI commands through <code class="docutils literal notranslate"><span class="pre">spark-submit</span></code> requires cumbersome syntax because the tool needs to:</p>
+<ol class="arabic simple">
+<li><p>Detect that the script is Python (which is why this example uses <a class="reference external" href="http://dsgrid-cli.py">dsgrid-cli.py</a> instead of dsgrid).</p></li>
+<li><p>Know the full path to the script (accomplished with the utility <code class="docutils literal notranslate"><span class="pre">which</span></code>).</p></li>
+</ol>
+<p>Here’s how to do that:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>spark-submit<span class="w"> </span>--master<span class="w"> </span>spark://<span class="k">$(</span>hostname<span class="k">)</span>:7077<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="k">$(</span>which<span class="w"> </span>dsgrid-cli.py<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>query<span class="w"> </span>project<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--registry-path<span class="o">=</span>/scratch/<span class="si">${</span><span class="nv">USER</span><span class="si">}</span>/.dsgrid-registry<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>query.json
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you want to set a breakpoint in your code for debug purposes, you cannot use spark-submit.</p>
+</div>
+</section>
+</section>
+<section id="troubleshooting-configuration-problems">
+<h2>Troubleshooting Configuration Problems<a class="headerlink" href="#troubleshooting-configuration-problems" title="Link to this heading">¶</a></h2>
+<p>Get used to monitoring Spark jobs in the Spark UI. The master is at <code class="docutils literal notranslate"><span class="pre">http://&lt;master_hostname&gt;:8080</span></code> and jobs are at <code class="docutils literal notranslate"><span class="pre">http://&lt;master_hostname&gt;:4040</span></code>. If a job seems stuck or slow, explore why. Then kill the job, make config changes, and retry. A misconfigured job will take too long or never finish.</p>
+<p>This section explains some common problems.</p>
+<section id="spark-sql-shuffle-partitions">
+<h3>spark.sql.shuffle.partitions<a class="headerlink" href="#spark-sql-shuffle-partitions" title="Link to this heading">¶</a></h3>
+<p>The most common performance issue we encounter when running complex queries is due to a non-ideal setting for <code class="docutils literal notranslate"><span class="pre">spark.sql.shuffle.partitions</span></code>. The default Spark value is 200. Some online sources recommend setting it to 1-4x the total number of CPUs in your cluster. This <a class="reference external" href="https://www.youtube.com/watch?v=daXEp4HmS-E&amp;amp;t=4251s">video</a> by a Spark developer offers a recommendation that has worked out better.</p>
+<p><strong>Use this formula:</strong></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">num_partitions</span> <span class="o">=</span> <span class="n">max_shuffle_write_size</span> <span class="o">/</span> <span class="n">target_partition_size</span>
+</pre></div>
+</div>
+<p>You will have to run your job once to determine <code class="docutils literal notranslate"><span class="pre">max_shuffle_write_size</span></code>. You can find it on the Spark UI Stages tab in the Shuffle Write column. Your <code class="docutils literal notranslate"><span class="pre">target_partition_size</span></code> should be between 128 - 200 MB.</p>
+<p>The minimum partitions value should be the total number of cores in the cluster unless you want to leave some cores available for other jobs that may be running simultaneously.</p>
+</section>
+<section id="running-out-of-space-in-local-mode-on-hpc">
+<h3>Running Out of Space in Local Mode on HPC<a class="headerlink" href="#running-out-of-space-in-local-mode-on-hpc" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">/tmp</span></code> directory on HPC filesystems is very small. If you run Spark local mode with default settings, it will try to use that directory for scratch space and then quickly fill it up and fail. Set the environment variable <code class="docutils literal notranslate"><span class="pre">SPARK_LOCAL_DIRS</span></code> to an appropriate directory.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">SPARK_LOCAL_DIRS</span><span class="o">=</span>/tmp/scratch
+</pre></div>
+</div>
+<p>The scripts discussed above set this environment variable for standalone clusters on an HPC.</p>
+</section>
+<section id="dynamic-allocation">
+<h3>Dynamic Allocation<a class="headerlink" href="#dynamic-allocation" title="Link to this heading">¶</a></h3>
+<p>This feature is disabled by default on standalone clusters. It is described in the <a class="reference external" href="https://spark.apache.org/docs/latest/job-scheduling.html#dynamic-resource-allocation">Spark documentation</a>.</p>
+<p>We have observed two cases where enabling dynamic allocation on a standalone cluster significantly improves performance:</p>
+<ul class="simple">
+<li><p>When a Spark job produces a huge number of tasks. This can happen when checking dimension associations as well as queries that map a dataset to project dimensions.</p></li>
+<li><p>When there is really only enough work for one executor but Spark distributes it to all executors anyway. The inter-process communication adds tons of overhead. The executors also appear to do a lot more work. With dynamic allocation Spark gradually adds executors and these problems don’t always occur.</p></li>
+</ul>
+<p>The second issue sometimes occurs when submitting a dataset to a project in the registry. We recommend enabling dynamic allocation when doing this. If that is enabled then dsgrid code will reconfigure the SparkSession to use a single executor with one core.</p>
+<p>Set these values in your <code class="docutils literal notranslate"><span class="pre">spark-defaults.conf</span></code>. <code class="docutils literal notranslate"><span class="pre">spark.shuffle.service.enabled</span></code> must be set before you start the workers.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">spark</span><span class="o">.</span><span class="n">dynamicAllocation</span><span class="o">.</span><span class="n">enabled</span> <span class="n">true</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">dynamicAllocation</span><span class="o">.</span><span class="n">shuffleTracking</span><span class="o">.</span><span class="n">enabled</span> <span class="n">true</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">shuffle</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">enabled</span> <span class="n">true</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">shuffle</span><span class="o">.</span><span class="n">service</span><span class="o">.</span><span class="n">db</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">true</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">worker</span><span class="o">.</span><span class="n">cleanup</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">true</span>
+</pre></div>
+</div>
+<p>We have not observed any downside to having this feature enabled.</p>
+</section>
+<section id="slow-local-storage">
+<h3>Slow Local Storage<a class="headerlink" href="#slow-local-storage" title="Link to this heading">¶</a></h3>
+<p>Spark will write lots of temporary data to local storage during shuffle operations. If your joins cause lots of shuffling, it is very important that your local storage be fast. If you direct Spark to use the Lustre filesystem for local storage, your mileage will vary. If the system is idle, it might work. If it is saturated, your job will likely fail.</p>
+</section>
+<section id="too-many-executors-involved-in-a-job">
+<h3>Too Many Executors Involved in a Job<a class="headerlink" href="#too-many-executors-involved-in-a-job" title="Link to this heading">¶</a></h3>
+<p>Some of our Spark jobs, particularly those that create large, in-memory tables from dimension records and mappings, perform much better when there is only one executor and only one CPU. If you think this is happening then set these values in your <code class="docutils literal notranslate"><span class="pre">spark-defaults.conf</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">spark</span><span class="o">.</span><span class="n">executor</span><span class="o">.</span><span class="n">cores</span> <span class="mi">1</span>
+<span class="c1"># This value should be greater than half of the memory allocated to the Spark workers, which</span>
+<span class="c1"># will ensure that Spark can only create one executor.</span>
+<span class="n">spark</span><span class="o">.</span><span class="n">executor</span><span class="o">.</span><span class="n">memory</span> <span class="mi">15</span><span class="n">g</span>
+</pre></div>
+</div>
+<p>One common symptom of this type of problem is that a job run in local mode works better than in a standalone cluster. The likely reason is that the standalone cluster has many executors and local mode only has one.</p>
+</section>
+<section id="partition-size-problems">
+<h3>Partition Size Problems<a class="headerlink" href="#partition-size-problems" title="Link to this heading">¶</a></h3>
+<p>Spark documentation recommends that Parquet partition files be in the range of 100-200 MiB, with 128 MiB being ideal. A very high compression ratio may change that. This affects how much data each task reads from storage into memory.</p>
+<p><strong>Check your partition sizes:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>find<span class="w"> </span>&lt;path_to_top_level_data.parquet&gt;<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.parquet&quot;</span><span class="w"> </span>-exec<span class="w"> </span>ls<span class="w"> </span>-lh<span class="w"> </span><span class="o">{}</span><span class="w"> </span>+
+</pre></div>
+</div>
+<p><strong>Check the total size:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>du<span class="w"> </span>-sh<span class="w"> </span>&lt;path_to_top_level_data.parquet&gt;
+</pre></div>
+</div>
+<p>Divide the total size by the target partition size to get the desired number of partitions.</p>
+<p><strong>If there are too few partitions currently:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="n">target_partitions</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>If there are too many partitions currently:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">coalesce</span><span class="p">(</span><span class="n">target_partitions</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>If you are partitioning by a column and find that there are many very small partition files:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="n">column_name</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">partitionBy</span><span class="p">(</span><span class="n">column_name</span><span class="p">)</span><span class="o">.</span><span class="n">parquet</span><span class="p">(</span><span class="s2">&quot;data.parquet&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="executors-spilling-to-disk">
+<h3>Executors Spilling to Disk<a class="headerlink" href="#executors-spilling-to-disk" title="Link to this heading">¶</a></h3>
+<p>You are observing that the Spark job seems stalled:</p>
+<ul class="simple">
+<li><p>Most of the work in a stage is complete, but one or two executors are still running.</p></li>
+<li><p>Only 1-2 CPUs out of the entire cluster show any activity.</p></li>
+<li><p>You see this log message over and over in the <code class="docutils literal notranslate"><span class="pre">stderr</span></code> log files (e.g., <code class="docutils literal notranslate"><span class="pre">spark_scratch/workers/app-20250115165825-0006/1/stderr</span></code>):</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">25</span><span class="o">/</span><span class="mi">07</span><span class="o">/</span><span class="mi">15</span> <span class="mi">14</span><span class="p">:</span><span class="mi">24</span><span class="p">:</span><span class="mi">06</span> <span class="n">INFO</span> <span class="n">UnsafeExternalSorter</span><span class="p">:</span> <span class="n">Thread</span> <span class="mi">60</span> <span class="n">spilling</span> <span class="n">sort</span> <span class="n">data</span> <span class="n">of</span> <span class="mf">4.6</span> <span class="n">GiB</span> <span class="n">to</span> <span class="n">disk</span> <span class="p">(</span><span class="mi">201</span> <span class="n">times</span> <span class="n">so</span> <span class="n">far</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If this has occurred 201 times over more than an hour, then you might be better off canceling the job and re-running with a different configuration.</p>
+<section id="solutions">
+<h4>Solutions<a class="headerlink" href="#solutions" title="Link to this heading">¶</a></h4>
+<ol class="arabic">
+<li><p><strong>Ensure <code class="docutils literal notranslate"><span class="pre">spark.sql.shuffle.partitions</span></code> is set to a reasonable value</strong>, as discussed above.</p></li>
+<li><p><strong>Increase executor memory.</strong> Kestrel compute nodes have disproportionate CPUs with respect to memory. By default, our configuration scripts will allocate 7 GB of memory per executor and this is insufficient for some queries. The error message indicates that the executor was not able to perform a sort in memory, and so spilled to disk. This is very slow.</p>
+<p>Try to double or triple the executor memory. You can do this by setting the <code class="docutils literal notranslate"><span class="pre">spark.executor.memory</span></code> value in <code class="docutils literal notranslate"><span class="pre">spark-defaults.conf</span></code>. You can set that value directly by editing the file or indirectly by setting <code class="docutils literal notranslate"><span class="pre">--executor-cores</span></code> to 10 or 15 (default is 5), thereby reducing the number of executors (by assigning each one more of the total available cores) and giving each executor more memory.</p>
+<p>You can also acquire a bigmem node, which has 2 TB of memory. On these nodes, our Spark scripts will allocate 70 GB of memory per executor. The debug partition on Kestrel usually has two bigmem nodes.</p>
+</li>
+<li><p><strong>Check for data skew.</strong> This has happened frequently when performing dimension mapping operations that explode data sizes by disaggregating or duplicating data. One or two executors end up with significantly more data than the others, and get stuck. Refer to the next section.</p></li>
+</ol>
+</section>
+</section>
+<section id="data-skew">
+<h3>Data Skew<a class="headerlink" href="#data-skew" title="Link to this heading">¶</a></h3>
+<p>If your query will produce high data skew, such as can happen with a query that produces results from large and small counties, you can use a salting technique to balance the data. For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">df</span><span class="o">.</span><span class="n">withColumn</span><span class="p">(</span><span class="s2">&quot;salt_column&quot;</span><span class="p">,</span> <span class="n">F</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">rand</span><span class="p">()</span> <span class="o">*</span> <span class="p">(</span><span class="n">num_partitions</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span> \
+    <span class="o">.</span><span class="n">groupBy</span><span class="p">(</span><span class="s2">&quot;county&quot;</span><span class="p">,</span> <span class="s2">&quot;salt_column&quot;</span><span class="p">)</span> \
+    <span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="s2">&quot;county&quot;</span><span class="p">))</span> \
+    <span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;salt_column&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>dsgrid will employ this technique for specific mapping types or when you enable <code class="docutils literal notranslate"><span class="pre">handle_data_skew</span></code> in a dataset’s mapping plan.</p>
+</section>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Learn about <a class="reference internal" href="../how_tos/run_on_kestrel.html"><span class="doc std std-doc">running dsgrid on Kestrel</span></a></p></li>
+<li><p>Set up a <a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html"><span class="doc std std-doc">Spark cluster on Kestrel</span></a></p></li>
+<li><p>Understand <a class="reference internal" href="../../software_reference/architecture.html"><span class="doc std std-doc">software architecture</span></a></p></li>
+<li><p>Explore <a class="reference internal" href="../project_queries/query_concepts.html"><span class="doc std std-doc">query concepts</span></a></p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="when_to_use_spark.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">When to Use Spark</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Apache Spark</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Apache Spark Overview</a><ul>
+<li><a class="reference internal" href="#windows-users">Windows Users</a><ul>
+<li><a class="reference internal" href="#windows-setup-requirements">Windows Setup Requirements</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#conventions">Conventions</a><ul>
+<li><a class="reference internal" href="#bash-functionality-explained">Bash Functionality Explained</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#spark-cluster-modes">Spark Cluster Modes</a><ul>
+<li><a class="reference internal" href="#local-computer-in-local-mode">Local Computer in Local Mode</a></li>
+<li><a class="reference internal" href="#local-computer-with-standalone-cluster">Local Computer with Standalone Cluster</a></li>
+<li><a class="reference internal" href="#hpc-compute-node-in-local-mode">HPC Compute Node in Local Mode</a></li>
+<li><a class="reference internal" href="#hpc-compute-node-s-with-standalone-cluster">HPC Compute Node(s) with Standalone Cluster</a></li>
+<li><a class="reference internal" href="#aws-emr-cluster">AWS EMR Cluster</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#running-spark-applications">Running Spark Applications</a><ul>
+<li><a class="reference internal" href="#spark-submit">1. spark-submit</a></li>
+<li><a class="reference internal" href="#pyspark">2. pyspark</a></li>
+<li><a class="reference internal" href="#inside-python">3. Inside Python</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#run-pyspark-through-ipython-or-jupyter">Run pyspark through IPython or Jupyter</a><ul>
+<li><a class="reference internal" href="#ipython">IPython</a></li>
+<li><a class="reference internal" href="#jupyter">Jupyter</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#spark-ui">Spark UI</a><ul>
+<li><a class="reference internal" href="#ssh-tunnel-for-remote-access">SSH Tunnel for Remote Access</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installing-a-spark-standalone-cluster">Installing a Spark Standalone Cluster</a><ul>
+<li><a class="reference internal" href="#installing-on-laptop">Installing on Laptop</a><ul>
+<li><a class="reference internal" href="#download-spark">Download Spark</a></li>
+<li><a class="reference internal" href="#set-environment-variables">Set Environment Variables</a></li>
+<li><a class="reference internal" href="#customize-spark-configuration-settings">Customize Spark Configuration Settings</a></li>
+<li><a class="reference internal" href="#start-the-spark-processes">Start the Spark Processes</a></li>
+<li><a class="reference internal" href="#stop-the-spark-processes">Stop the Spark Processes</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installing-on-hpc">Installing on HPC</a><ul>
+<li><a class="reference internal" href="#install-sparkctl">Install sparkctl</a></li>
+<li><a class="reference internal" href="#steps-to-start-a-cluster">Steps to Start a Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tuning-configuration-settings">Tuning Configuration Settings</a><ul>
+<li><a class="reference internal" href="#configuration-priority-order">Configuration Priority Order</a><ul>
+<li><a class="reference internal" href="#global-spark-configuration-directory">1. Global Spark Configuration Directory</a></li>
+<li><a class="reference internal" href="#spark-launch-scripts">2. Spark Launch Scripts</a></li>
+<li><a class="reference internal" href="#sparksession-construction-inside-python">3. SparkSession Construction Inside Python</a></li>
+<li><a class="reference internal" href="#dynamic-changes">4. Dynamic Changes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#creating-a-sparksession-with-dsgrid">Creating a SparkSession with dsgrid</a><ul>
+<li><a class="reference internal" href="#using-spark-submit-with-dsgrid">Using spark-submit with dsgrid</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#troubleshooting-configuration-problems">Troubleshooting Configuration Problems</a><ul>
+<li><a class="reference internal" href="#spark-sql-shuffle-partitions">spark.sql.shuffle.partitions</a></li>
+<li><a class="reference internal" href="#running-out-of-space-in-local-mode-on-hpc">Running Out of Space in Local Mode on HPC</a></li>
+<li><a class="reference internal" href="#dynamic-allocation">Dynamic Allocation</a></li>
+<li><a class="reference internal" href="#slow-local-storage">Slow Local Storage</a></li>
+<li><a class="reference internal" href="#too-many-executors-involved-in-a-job">Too Many Executors Involved in a Job</a></li>
+<li><a class="reference internal" href="#partition-size-problems">Partition Size Problems</a></li>
+<li><a class="reference internal" href="#executors-spilling-to-disk">Executors Spilling to Disk</a><ul>
+<li><a class="reference internal" href="#solutions">Solutions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#data-skew">Data Skew</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=1437fa6d"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

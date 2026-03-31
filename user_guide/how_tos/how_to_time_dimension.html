@@ -1,0 +1,1201 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="How to Filter a Query" href="how_to_filter.html"><link rel="prev" title="How to Create Project Supplemental Dimensions" href="how_to_supplemental_dimensions.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>How to Define a Time Dimension - dsgrid 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=04b6322e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.4.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.4.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" checked="" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_registration/index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/data_file_formats.html">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_types.html">Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_workflows.html">Mapping Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_submittal/index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_process.html">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/project_concepts.html">Project Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/base_dimensions.html">Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/supplemental_dimensions.html">Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/dataset_requirements.html">Dataset Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_queries/index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/query_concepts.html">Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/aggregations.html">Aggregations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/output_formats.html">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/derived_concepts.html">Derived Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/growth_rates.html">Growth Rates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/residuals.html">Residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/workflows.html">Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../apache_spark/index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/overview.html">Apache Spark Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/when_to_use_spark.html">When to Use Spark</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/kestrel_setup.html">Kestrel Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/spark_cluster.html">Spark Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../software_reference/index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../software_reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_model.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Citation and Data Attribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/user_guide/how_tos/how_to_time_dimension.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="how-to-define-a-time-dimension">
+<h1>How to Define a Time Dimension<a class="headerlink" href="#how-to-define-a-time-dimension" title="Link to this heading">¶</a></h1>
+<p>Time dimensions work differently from other dimension types: instead of a records CSV, they are defined entirely by parameters in the config file. This guide covers each supported time type with example data tables and configs.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>DST = Daylight Saving Time</p>
+<p>IANA = Internet Assigned Numbers Authority</p>
+</div>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>Select the right <code class="docutils literal notranslate"><span class="pre">time_type</span></code> based on how your dataset represents time:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">class</span></code></p></th>
+<th class="head"><p>Use when…</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">datetime</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Time</span></code></p></td>
+<td><p>Data has explicit timestamps (hourly, sub-hourly, daily, etc.)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">index</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Time</span></code></p></td>
+<td><p>Data uses sequential integer indices that map to a known start time</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">representative_period</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Time</span></code></p></td>
+<td><p>Data covers a representative period (e.g., a typical week per month)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">annual</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AnnualTime</span></code></p></td>
+<td><p>Data has one value per year</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">noop</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">NoOpTime</span></code></p></td>
+<td><p>Data has no time component at all</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>All time dimension configs require <code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">&quot;time&quot;</span></code> and a <code class="docutils literal notranslate"><span class="pre">class</span></code> referencing <code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code>. The <code class="docutils literal notranslate"><span class="pre">time_type</span></code> field selects the model variant.</p>
+</section>
+<hr class="docutils" />
+<section id="datetime">
+<h2>1. Datetime<a class="headerlink" href="#datetime" title="Link to this heading">¶</a></h2>
+<p>Datetime is the most common time type. The config describes two things:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">column_format</span></code></strong> – how timestamps are stored in the data table (<code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code>, <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code>, or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code>)</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code></strong> – whether timestamps are aligned in absolute time (single timezone for all geographies) or local standard clock time (one timezone per geography)</p></li>
+</ul>
+<section id="key-concepts">
+<h3>Key concepts<a class="headerlink" href="#key-concepts" title="Link to this heading">¶</a></h3>
+<p>Data table timestamps are either <em>timezone-aware</em> (<code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> with per-row UTC offsets in <code class="docutils literal notranslate"><span class="pre">offset_column</span></code>) or <em>timezone-naive</em> (<code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> with no offset column) and dsgrid provides time checks based on IANA time zones. <em>If input timestamps are timezone-aware, dsgrid supports all IANA time zones</em>, including time zones like “America/New York” that include DST. <em>If input timestamps are timezone-naive, dsgrid requires standard time</em> or fixed-offset time zones that do not include DST. In either case, the <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> field must be specified in <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code>. The <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> field is required even for timezone-aware timestamps because dsgrid uses it to construct validation data independent of the column format.</p>
+<p>dsgrid automatically localizes timezone-naive timestamps to the zone(s) specified in <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code> during registration. Timezone-naive data is indicated by <code class="docutils literal notranslate"><span class="pre">column_format.dtype</span></code> as <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> without <code class="docutils literal notranslate"><span class="pre">offset_column</span></code>. For correct localization, input timestamps must be laid out in standard time (without DST skips and duplicates), because standard libraries cannot safely handle ambiguous or missing hours at DST transitions. Consequently, when using timezone-naive data, <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code> can only reference IANA zones with constant UTC offsets (e.g., “Etc/GMT+5”), not DST-observing zones like “America/New_York”. This restriction applies only to timezone-naive localization; for all other scenarios, both time zone types are supported.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>IANA time zone names (e.g., “America/New_York”, “Etc/GMT+5”) are distinct from UTC offsets (e.g., UTC-5).</p>
+<p>Fixed-offset or standard time time zones like “Etc/GMT+5” observe a single UTC offset (UTC-5) year-round. Note the POSIX sign convention: <code class="docutils literal notranslate"><span class="pre">Etc/GMT+N</span></code> is UTC−N. DST-observing zones like “America/New_York” have multiple offsets depending on the calendar date (UTC-5 during standard time, UTC-4 during DST).</p>
+</div>
+</section>
+<section id="a-column-format-distinctions">
+<h3>1a. Column Format Distinctions<a class="headerlink" href="#a-column-format-distinctions" title="Link to this heading">¶</a></h3>
+<p>Three formats are supported for storing time data:</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> (timezone-aware)</strong> — A single timestamp column with embedded UTC offset/timezone information. Timestamps represent absolute UTC instants and include offset information (e.g., <code class="docutils literal notranslate"><span class="pre">2012-01-01</span> <span class="pre">00:00:00-05:00</span></code>). Use this format when input data already has timezone information. See Examples 1 and 5 below.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> (timezone-naive)</strong> — A single timestamp column with no offset/timezone informatxion (e.g., <code class="docutils literal notranslate"><span class="pre">2012-01-01</span> <span class="pre">00:00:00</span></code>). dsgrid automatically localizes these to the zone(s) specified in <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code> during registration. Input data must use standard time (no DST observance) for accurate localization. See Examples 2 and 6 below.</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code></strong> — Timestamps split across multiple integer columns (year, month, day, hour) instead of a single column. dsgrid combines these into a single <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> column during registration. Optionally, per-row UTC offsets can be provided via <code class="docutils literal notranslate"><span class="pre">offset_column</span></code> to construct timezone-aware timestamps directly (see Example 4); otherwise, the constructed timestamps are timezone-naive (see Example 3). Localization can be applied to timezone-naive timstamps using <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code>.</p>
+</section>
+<hr class="docutils" />
+<section id="b-globally-aligned-single-time-zone">
+<h3>1b. Globally Aligned — Single Time Zone<a class="headerlink" href="#b-globally-aligned-single-time-zone" title="Link to this heading">¶</a></h3>
+<p>All geographies share identical timestamps in <strong>absolute time</strong>. Every row with the same timestamp represents the same instant everywhere. Use a single <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> in <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code>.</p>
+<section id="with-timestamp-tz-timezone-aware-single-column">
+<h4>With <code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> (timezone-aware single column)<a class="headerlink" href="#with-timestamp-tz-timezone-aware-single-column" title="Link to this heading">¶</a></h4>
+<p><strong>Example 1 data table</strong> (hourly, timezone-aware):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p><strong>Config 1</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Hourly 2012 EST&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp_tz&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_absolute_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zone</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;America/New_York&quot;</span><span class="p">,</span><span class="w">         </span><span class="c1">// IANA DST-observing time zone</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 1 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The input data is already timezone-aware with explicit UTC offsets, so no localization is needed. The timestamps are preserved as-is.</p>
+</section>
+<section id="with-timestamp-ntz-timezone-naive-single-column">
+<h4>With <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> (timezone-naive single column)<a class="headerlink" href="#with-timestamp-ntz-timezone-naive-single-column" title="Link to this heading">¶</a></h4>
+<p><strong>Example 2 data table</strong> (hourly, timezone-naive, standard time only):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">31</span> <span class="mi">23</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p><strong>Config 2</strong> — dsgrid will automatically localize these timestamps to <code class="docutils literal notranslate"><span class="pre">Etc/GMT+5</span></code> during registration:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Hourly 2012 EST&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp_ntz&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_absolute_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zone</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Etc/GMT+5&quot;</span><span class="p">,</span><span class="w">         </span><span class="c1">// IANA fixed-offset zone; must be standard time (no DST)</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 2 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">31</span> <span class="mi">23</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The timezone-naive timestamps are localized to <code class="docutils literal notranslate"><span class="pre">Etc/GMT+5</span></code> during registration, resulting in timezone-aware timestamps.</p>
+<p>To store timezone-naive timestamps <strong>without any localization</strong>, set <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> to <code class="docutils literal notranslate"><span class="pre">null</span></code>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_absolute_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zone</span><span class="o">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+</pre></div>
+</div>
+</section>
+<section id="with-time-format-in-parts-separate-columns-no-offset">
+<h4>With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, no offset)<a class="headerlink" href="#with-time-format-in-parts-separate-columns-no-offset" title="Link to this heading">¶</a></h4>
+<p><strong>Example 3 data table</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">year</span> <span class="o">|</span> <span class="n">month</span> <span class="o">|</span> <span class="n">day</span> <span class="o">|</span> <span class="n">hour</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-----|-------|-----|------|-----------|-----</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">5</span> <span class="o">|</span> <span class="mi">31</span> <span class="o">|</span> <span class="mi">23</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">6</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p><strong>Config 3</strong> — dsgrid combines the parts and localizes to <code class="docutils literal notranslate"><span class="pre">Etc/GMT+5</span></code>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Hourly 2012 in Parts&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time_format_in_parts&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">year_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;year&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">month_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;month&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">day_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;day&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">hour_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;hour&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_absolute_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zone</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Etc/GMT+5&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 3 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">31</span> <span class="mi">23</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The input columns (<code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">month</span></code>, <code class="docutils literal notranslate"><span class="pre">day</span></code>, <code class="docutils literal notranslate"><span class="pre">hour</span></code>) are combined into a single <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> column and then localized to <code class="docutils literal notranslate"><span class="pre">Etc/GMT+5</span></code>, resulting in a timezone-aware timestamp.</p>
+</section>
+<section id="with-time-format-in-parts-separate-columns-with-offset">
+<h4>With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, with offset)<a class="headerlink" href="#with-time-format-in-parts-separate-columns-with-offset" title="Link to this heading">¶</a></h4>
+<p><strong>Example 4 data table</strong> (capturing DST variations):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">year</span> <span class="o">|</span> <span class="n">month</span> <span class="o">|</span> <span class="n">day</span> <span class="o">|</span> <span class="n">hour</span> <span class="o">|</span> <span class="n">utc_offset</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-----|-------|-----|------|------------|-----------|-----</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">0</span> <span class="o">|</span> <span class="o">-</span><span class="mf">5.0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="o">-</span><span class="mf">5.0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">6</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">0</span> <span class="o">|</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span> <span class="o">|</span> <span class="mi">6</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="mi">1</span> <span class="o">|</span> <span class="o">-</span><span class="mf">4.0</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>Winter (January) has a UTC offset of -5.0 (standard time), while summer (June) has -4.0 (DST).</p>
+<p><strong>Config 4</strong> — dsgrid combines the parts and applies each row’s offset:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Hourly 2012 in Parts with DST&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time_format_in_parts&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">year_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;year&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">month_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;month&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">day_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;day&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">hour_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;hour&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">offset_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;utc_offset&quot;</span><span class="p">,</span><span class="w">    </span><span class="c1">// numeric offset in hours (e.g., -5.0) or string (e.g., &quot;-05:00&quot;)</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_absolute_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zone</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;America/New_York&quot;</span><span class="p">,</span><span class="w">        </span><span class="c1">// required: reference timezone for validation and truth data creation</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 4 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">2.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">06</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.8</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The input columns (<code class="docutils literal notranslate"><span class="pre">year</span></code>, <code class="docutils literal notranslate"><span class="pre">month</span></code>, <code class="docutils literal notranslate"><span class="pre">day</span></code>, <code class="docutils literal notranslate"><span class="pre">hour</span></code>) are combined with the <code class="docutils literal notranslate"><span class="pre">offset_column</span></code> values to produce timezone-aware timestamps, preserving DST variations.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="c-locally-aligned-multiple-time-zones">
+<h3>1c. Locally Aligned — Multiple Time Zones<a class="headerlink" href="#c-locally-aligned-multiple-time-zones" title="Link to this heading">¶</a></h3>
+<p>Timestamps cover the <strong>same interval of local standard time</strong> across geographies — e.g., every geography has data from midnight to midnight in its own local time. Because the clocks read the same local time but represent different absolute instants, each row must include a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column. Use <code class="docutils literal notranslate"><span class="pre">format_type:</span> <span class="pre">&quot;aligned_in_std_clock_time&quot;</span></code> in <code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code>.</p>
+<p><strong>Where does the <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column come from?</strong></p>
+<p>dsgrid automatically adds a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column to the data table by joining it with geography records. The source of the time zone information is configurable:</p>
+<ul class="simple">
+<li><p><strong>Dataset geography records</strong> (default) — dsgrid reads time zones from a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column in the dataset’s geography dimension records file. This is the common case.</p></li>
+<li><p><strong>Project geography records</strong> — set <code class="docutils literal notranslate"><span class="pre">use_project_geography_time_zone:</span> <span class="pre">true</span></code> in the dataset config to read time zones from the project’s geography dimension instead. This is useful when the dataset’s geography records do not include time zone information.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">time_zones</span></code> list in the config must include all unique IANA time zone strings that appear in the geography records.</p>
+<p>For details on how time zone columns are structured in actual data files, see <a class="reference internal" href="../dataset_registration/data_file_formats.html#id8"><span class="std std-ref">Data File Formats — Time Zone Column Sourcing</span></a>.</p>
+<section id="id1">
+<h4>With <code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> (timezone-aware single column)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h4>
+<p><strong>Example 5 data table</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">time_zone</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Los_Angeles</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">3.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Los_Angeles</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">2.7</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column contains IANA time zone strings that must match entries in <code class="docutils literal notranslate"><span class="pre">time_zone_format.time_zones</span></code>. Timezone-aware format supports both fixed-offset and DST-observing time zones.</p>
+<p><strong>Config 5</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Local Hourly 2012&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp_tz&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_std_clock_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_zones</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;America/New_York&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;America/Los_Angeles&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 5 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">time_zone</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-------------------------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Los_Angeles</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">3.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Los_Angeles</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">2.7</span>
+</pre></div>
+</div>
+<p>The input data is already timezone-aware with matching time zone values, so no localization is needed. The time zone column preserves which IANA zone each row belongs to.</p>
+</section>
+<section id="id2">
+<h4>With <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> (timezone-naive single column)<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h4>
+<p><strong>Example 6 data table</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">time_zone</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-------------------|-----------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">8</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">3.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">8</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">2.7</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>For timezone-naive data, the <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column must contain <strong>only fixed-offset IANA zones</strong> (no DST observance), and the timestamps must be laid out in standard time for proper localization.</p>
+<p><strong>Config 6</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Local Hourly 2012&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;datetime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">column_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">dtype</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp_ntz&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">time_column</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-12-31 23:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_zone_format</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">format_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;aligned_in_std_clock_time&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="c1">// All unique IANA fixed-offset time zones that appear in the data table&#39;s time_zone column</span>
+<span class="w">    </span><span class="nx">time_zones</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Etc/GMT+5&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Etc/GMT+8&quot;</span><span class="p">],</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 6 after registration</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span> <span class="o">|</span> <span class="n">time_zone</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">---------------------------|-----------|-----------|-----</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span> <span class="o">|</span> <span class="n">g_east</span> <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">8</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">3.1</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">08</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">8</span> <span class="o">|</span> <span class="n">g_west</span> <span class="o">|</span> <span class="mf">2.7</span>
+</pre></div>
+</div>
+<p>Each row’s tz-naive timestamp is localized to the IANA zone in its <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column during registration, resulting in timezone-aware timestamps with the appropriate offsets. To store timezone-naive timestamps <strong>without localization</strong>, use <code class="docutils literal notranslate"><span class="pre">aligned_in_absolute_time</span></code> with <code class="docutils literal notranslate"><span class="pre">time_zone:</span> <span class="pre">null</span></code>.</p>
+</section>
+<section id="id3">
+<h4>With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, no offset)<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> column format is supported for locally aligned time, similar to globally aligned time. See Examples 3 for configuration options.</p>
+</section>
+<section id="id4">
+<h4>With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, with offset)<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> column format is also supported for locally aligned time, similar to globally aligned time. See Examples 4 for configuration options.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="key-fields-for-datetime">
+<h3>Key fields for <code class="docutils literal notranslate"><span class="pre">datetime</span></code><a class="headerlink" href="#key-fields-for-datetime" title="Link to this heading">¶</a></h3>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ranges[].start</span></code> / <code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p>First and last timestamps in the data (inclusive), parsed by <code class="docutils literal notranslate"><span class="pre">str_format</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ranges[].str_format</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">strftime</span></code> format string for parsing <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> (default: <code class="docutils literal notranslate"><span class="pre">&quot;%Y-%m-%d</span> <span class="pre">%H:%M:%S&quot;</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ranges[].frequency</span></code></p></td>
+<td><p>Time step size as a <code class="docutils literal notranslate"><span class="pre">timedelta</span></code> string (<code class="docutils literal notranslate"><span class="pre">&quot;01:00:00&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;00:15:00&quot;</span></code>) or ISO 8601 duration (<code class="docutils literal notranslate"><span class="pre">&quot;P1D&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;PT1H&quot;</span></code>)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_zone_format.format_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;aligned_in_absolute_time&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;aligned_in_std_clock_time&quot;</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">time_interval_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;period_beginning&quot;</span></code> – timestamp labels the start of the interval; <code class="docutils literal notranslate"><span class="pre">&quot;period_ending&quot;</span></code> – labels the end; <code class="docutils literal notranslate"><span class="pre">&quot;instantaneous&quot;</span></code> – a point measurement</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;total&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;mean&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;min&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;max&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;measured&quot;</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="index-time">
+<h2>2. Index Time<a class="headerlink" href="#index-time" title="Link to this heading">¶</a></h2>
+<p>Index time uses sequential <strong>integer indices</strong> instead of explicit timestamps. The config maps these indices to a real time range using <code class="docutils literal notranslate"><span class="pre">starting_timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">frequency</span></code>, and the range of start/end indices. This is useful when source data is indexed (e.g., 1-8760 or 0-8783) rather than timestamped directly.</p>
+<p><strong>How it works</strong>: Index <code class="docutils literal notranslate"><span class="pre">start</span></code> corresponds to <code class="docutils literal notranslate"><span class="pre">starting_timestamp</span></code>, and each subsequent index shifts forward by one <code class="docutils literal notranslate"><span class="pre">frequency</span></code> increment.</p>
+<p><strong>Requirements</strong>:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column required</strong>: Must exist in both the geography dimension records and the data table. Used when converting indices to datetimes during dataset-to-project mapping.</p></li>
+<li><p><strong>All time zones allowed</strong>: Including DST-observing zones like <code class="docutils literal notranslate"><span class="pre">&quot;America/New_York&quot;</span></code> and fixed-offset zones like <code class="docutils literal notranslate"><span class="pre">&quot;Etc/GMT+5&quot;</span></code>.</p></li>
+</ul>
+<p><strong>Conversion behavior</strong>: Index-to-datetime conversion happens only when the dataset (with index time) maps to a project (with datetime time), not during dataset registration. The conversion respects time adjustments specified in the project config, such as <code class="docutils literal notranslate"><span class="pre">daylight_saving_adjustment</span></code>, <code class="docutils literal notranslate"><span class="pre">leap_day_adjustment</span></code>, and <code class="docutils literal notranslate"><span class="pre">wrap_time_allowed</span></code>.</p>
+<hr class="docutils" />
+<section id="common-use-cases">
+<h3>Common use cases<a class="headerlink" href="#common-use-cases" title="Link to this heading">¶</a></h3>
+<p><strong>Example 1: Electricity data with standard 8760 indexing</strong></p>
+<p>Electricity datasets commonly index hourly values from 0-8759 (or 1-8760). The config records the starting point to preserve time specificity (day of week, season, etc.).</p>
+<p><strong>Example 1 data table</strong> (indexed, before mapping to project):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">time_index</span> <span class="o">|</span> <span class="n">time_zone</span>  <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-----------|------------|-----------|-------</span>
+         <span class="mi">0</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">1.2</span>
+         <span class="mi">1</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">0.9</span>
+         <span class="mi">2</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">2.1</span>
+       <span class="o">...</span> <span class="o">|</span> <span class="o">...</span>        <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+      <span class="mi">8783</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">1.8</span>
+</pre></div>
+</div>
+<p><strong>Config 1</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Hourly 2012 Index&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;index&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span><span class="w">                                     </span><span class="c1">// first index value (inclusive)</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="mf">8783</span><span class="p">,</span><span class="w">                                    </span><span class="c1">// last index value (inclusive); 8784 hours in 2012</span>
+<span class="w">      </span><span class="nx">starting_timestamp</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2012-01-01 00:00:00&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1">// real datetime that index 0 corresponds to</span>
+<span class="w">      </span><span class="nx">str_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;%Y-%m-%d %H:%M:%S&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 1 after mapping to project</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span>           <span class="o">|</span> <span class="n">time_zone</span>  <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">--------------------|------------|-----------|-------</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">1.2</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">0.9</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">01</span><span class="o">-</span><span class="mi">01</span> <span class="mi">02</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">2.1</span>
+<span class="o">...</span>                 <span class="o">|</span> <span class="o">...</span>        <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+<span class="mi">2012</span><span class="o">-</span><span class="mi">12</span><span class="o">-</span><span class="mi">31</span> <span class="mi">23</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="o">|</span> <span class="n">Etc</span><span class="o">/</span><span class="n">GMT</span><span class="o">+</span><span class="mi">5</span>  <span class="o">|</span> <span class="n">g_east</span>    <span class="o">|</span> <span class="mf">1.8</span>
+</pre></div>
+</div>
+<p>During registration, dsgrid converts the integer <code class="docutils literal notranslate"><span class="pre">time_index</span></code> column to a proper <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> column by combining the starting timestamp with the index and frequency. The resulting timestamps are timezone-naive, paired with the <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column to fully specify each point in time.</p>
+<p><strong>Example 2: Industrial data with DST adjustment</strong></p>
+<p>Some datasets (e.g., IEF industrial profiles) are stitched together from representative diurnal profiles in local standard time. When mapping to a project, both the timestamps and data values must be adjusted for DST transitions. Geographies observing DST will have dropped (spring-forward) or duplicated (fall-back) hours. Interpolation is available for the fall-back hour adjustment.</p>
+<p><strong>Example 2 data table</strong> (before mapping to project, showing hours around spring-forward DST transition):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">time_index</span> <span class="o">|</span> <span class="n">time_zone</span>        <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-----------|------------------|-----------|-------</span>
+      <span class="mi">1560</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.5</span>
+      <span class="mi">1561</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.4</span>
+      <span class="mi">1562</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.3</span>
+      <span class="mi">1563</span> <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.2</span>
+       <span class="o">...</span> <span class="o">|</span> <span class="o">...</span>              <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p><strong>Config 2 (dataset)</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;index&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;ind_time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">description</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Industrial 8760-indexed time with 2018-01-01 00:00:00 start, stitched from representative diurnal profiles in local standard time. Requires DST adjustment during mapping to account for DST transitions.&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="mf">0</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="mf">8759</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">starting_timestamp</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2018-01-01 00:00:00&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">str_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;%Y-%m-%d %H:%M:%S&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">frequency</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;01:00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Config 2 (project)</strong> to apply daylight saving adjustment:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">dataset_id</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;ief_2025_industry&#39;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">wrap_time_allowed</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_based_data_adjustment</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">daylight_saving_adjustment</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">spring_forward_hour</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;drop&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">fall_back_hour</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;duplicate&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 2 after mapping to project</strong> (showing hours around spring-forward DST transition where 2:00 AM is dropped):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span>                    <span class="o">|</span> <span class="n">time_zone</span>        <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-----------------------------|------------------|-----------|-------</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">06</span><span class="p">:</span><span class="mi">00</span>    <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.5</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>    <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.3</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">04</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>    <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">Chicago</span>   <span class="o">|</span> <span class="n">g_midwest</span> <span class="o">|</span> <span class="mf">1.2</span>
+       <span class="o">...</span>                   <span class="o">|</span> <span class="o">...</span>              <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>When the dataset maps to a project with geographies observing DST, the index time is first converted to standard time datetimes. Then, for each geography’s time zone, data rows are adjusted according to the <code class="docutils literal notranslate"><span class="pre">daylight_saving_adjustment</span></code> setting. Hours during spring-forward (2:00–2:59 AM when clocks jump to 3:00 AM) are dropped as configured. Hours during fall-back (1:00–1:59 AM when clocks repeat) are duplicated, affecting both timestamps and their associated data values.</p>
+</section>
+</section>
+<section id="representative-time">
+<h2>3. Representative Time<a class="headerlink" href="#representative-time" title="Link to this heading">¶</a></h2>
+<p>Representative time is used when data covers a <strong>typical period</strong> rather than actual calendar dates – for example, a typical week for each month – in local clock time. Representative periods are useful for modeling based on synthetic or averaged time patterns rather than actual historical dates.</p>
+<p>Two formats are currently supported, selected by the <code class="docutils literal notranslate"><span class="pre">format</span></code> field.</p>
+<p><strong>How it works</strong>: Data is structured using integer columns (month, day_of_week/is_weekday, hour) that define typical periods independent of actual calendar dates. When the dataset maps to a project, these typical periods are repeated across a selected calendar year, matching the day-of-week or weekday/weekend patterns.</p>
+<p><strong>Requirements</strong>:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column required</strong>: Must exist in both the geography dimension records and the data table. Used when localizing the representative periods to a specific project year.</p></li>
+<li><p><strong>All time zones allowed</strong>: Including DST-observing zones like <code class="docutils literal notranslate"><span class="pre">&quot;America/New_York&quot;</span></code> and fixed-offset zones like <code class="docutils literal notranslate"><span class="pre">&quot;Etc/GMT+5&quot;</span></code>.</p></li>
+<li><p><strong>Two formats supported</strong>: <code class="docutils literal notranslate"><span class="pre">one_week_per_month_by_hour</span></code> or <code class="docutils literal notranslate"><span class="pre">one_weekday_day_and_one_weekend_day_per_month_by_hour</span></code>.</p></li>
+</ul>
+<p><strong>Conversion behavior</strong>: Representative-to-datetime conversion happens only when the dataset (with representative time) maps to a project (with datetime time), not during dataset registration. Each hour in the typical period is assumed to represent local clock time. When the represented calendar date experiences a DST spring-forward transition, the hour 2:00–2:59 AM does not exist and is not mapped; consequently, any data value associated with 2 AM in the input is not used.</p>
+<section id="a-one-week-per-month-by-hour">
+<h3>3a. <code class="docutils literal notranslate"><span class="pre">one_week_per_month_by_hour</span></code><a class="headerlink" href="#a-one-week-per-month-by-hour" title="Link to this heading">¶</a></h3>
+<p>Data has one representative week per month (168 hours = 7 days × 24 hours per month). The data table must have three columns: <code class="docutils literal notranslate"><span class="pre">month</span></code>, <code class="docutils literal notranslate"><span class="pre">day_of_week</span></code>, and <code class="docutils literal notranslate"><span class="pre">hour</span></code>.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">month</span></code>: 1–12 (one-based, January=1)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">day_of_week</span></code>: 0 (Monday) – 6 (Sunday), following Python’s <code class="docutils literal notranslate"><span class="pre">datetime.weekday()</span></code> convention</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hour</span></code>: 0–23</p></li>
+</ul>
+<p><strong>Example 3a data table</strong> (before mapping to project, showing March data around spring-forward DST transition):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">month</span> <span class="o">|</span> <span class="n">day_of_week</span> <span class="o">|</span> <span class="n">hour</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">------|-------------|------|-----------|-------</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">0</span> <span class="o">|</span>    <span class="mi">0</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.0</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">0</span> <span class="o">|</span>    <span class="mi">1</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.1</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">0</span> <span class="o">|</span>    <span class="mi">2</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.2</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">0</span> <span class="o">|</span>    <span class="mi">3</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.3</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">1</span> <span class="o">|</span>    <span class="mi">0</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.0</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">1</span> <span class="o">|</span>    <span class="mi">1</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.1</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">1</span> <span class="o">|</span>    <span class="mi">2</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.2</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">1</span> <span class="o">|</span>    <span class="mi">3</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.3</span>
+<span class="o">...</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">6</span> <span class="o">|</span>    <span class="mi">0</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.0</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">6</span> <span class="o">|</span>    <span class="mi">1</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.1</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">6</span> <span class="o">|</span>    <span class="mi">2</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.2</span>
+    <span class="mi">3</span> <span class="o">|</span>           <span class="mi">6</span> <span class="o">|</span>    <span class="mi">3</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.3</span>
+</pre></div>
+</div>
+<p><strong>Config 3a</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Representative Week per Month&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;representative_period&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_week_per_month_by_hour&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w">    </span><span class="c1">// first month (January)</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="mf">12</span><span class="p">,</span><span class="w">     </span><span class="c1">// last month (December)</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 3a after mapping to project</strong> (showing March 5-11, 2018 with spring-forward transition on March 11):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">timestamp</span>                     <span class="o">|</span> <span class="n">time_zone</span>        <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">-------------------------------|------------------|-----------|-------</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">05</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.0</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">05</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.1</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">05</span> <span class="mi">02</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.2</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">05</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">30.3</span>
+<span class="o">...</span>                           <span class="o">|</span> <span class="o">...</span>              <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">10</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.0</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">10</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.1</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">10</span> <span class="mi">02</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.2</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">10</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">31.3</span>
+<span class="o">...</span>                           <span class="o">|</span> <span class="o">...</span>              <span class="o">|</span> <span class="o">...</span>       <span class="o">|</span> <span class="o">...</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.0</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">01</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">05</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.1</span>
+<span class="mi">2018</span><span class="o">-</span><span class="mi">03</span><span class="o">-</span><span class="mi">11</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span><span class="o">-</span><span class="mi">04</span><span class="p">:</span><span class="mi">00</span>      <span class="o">|</span> <span class="n">America</span><span class="o">/</span><span class="n">New_York</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">36.3</span>
+</pre></div>
+</div>
+<p>The March representative week (day_of_week 0-6, where 0=Monday through 6=Sunday) maps to actual calendar dates. Note that on March 11, 2018, the spring-forward transition occurs at 2:00 AM: the 2:00-2:59 AM hour is skipped and the clock jumps directly to 3:00 AM. Consequently, the 2 AM data row (36.2) is not mapped, and the 3 AM value (36.3) is used instead.</p>
+</section>
+<section id="b-one-weekday-day-and-one-weekend-day-per-month-by-hour">
+<h3>3b. <code class="docutils literal notranslate"><span class="pre">one_weekday_day_and_one_weekend_day_per_month_by_hour</span></code><a class="headerlink" href="#b-one-weekday-day-and-one-weekend-day-per-month-by-hour" title="Link to this heading">¶</a></h3>
+<p>Data has one representative weekday and one representative weekend day per month (48 hours = 2 days × 24 hours per month). The data table must have three columns: <code class="docutils literal notranslate"><span class="pre">month</span></code>, <code class="docutils literal notranslate"><span class="pre">is_weekday</span></code>, and <code class="docutils literal notranslate"><span class="pre">hour</span></code>.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">month</span></code>: 1–12 (one-based, January=1)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">is_weekday</span></code>: <code class="docutils literal notranslate"><span class="pre">true</span></code> (weekday profile) or <code class="docutils literal notranslate"><span class="pre">false</span></code> (weekend profile)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hour</span></code>: 0–23</p></li>
+</ul>
+<p><strong>Example 3b data table</strong> (before mapping to project, showing March weekday and weekend profiles around spring-forward DST transition):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">month</span> <span class="o">|</span> <span class="n">is_weekday</span> <span class="o">|</span> <span class="n">hour</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">------|------------|------|-----------|-------</span>
+    <span class="mi">3</span> <span class="o">|</span>       <span class="n">true</span> <span class="o">|</span>    <span class="mi">0</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">31.00</span>
+    <span class="mi">3</span> <span class="o">|</span>       <span class="n">true</span> <span class="o">|</span>    <span class="mi">1</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">31.01</span>
+    <span class="mi">3</span> <span class="o">|</span>       <span class="n">true</span> <span class="o">|</span>    <span class="mi">2</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">31.02</span>
+    <span class="mi">3</span> <span class="o">|</span>       <span class="n">true</span> <span class="o">|</span>    <span class="mi">3</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">31.03</span>
+<span class="o">...</span>
+    <span class="mi">3</span> <span class="o">|</span>      <span class="n">false</span> <span class="o">|</span>    <span class="mi">0</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">30.00</span>
+    <span class="mi">3</span> <span class="o">|</span>      <span class="n">false</span> <span class="o">|</span>    <span class="mi">1</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">30.01</span>
+    <span class="mi">3</span> <span class="o">|</span>      <span class="n">false</span> <span class="o">|</span>    <span class="mi">2</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">30.02</span>
+    <span class="mi">3</span> <span class="o">|</span>      <span class="n">false</span> <span class="o">|</span>    <span class="mi">3</span> <span class="o">|</span> <span class="mi">06037</span>     <span class="o">|</span> <span class="mf">30.03</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p><strong>Config 3b</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Representative Weekday/Weekend per Month&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;representative_period&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_weekday_day_and_one_weekend_day_per_month_by_hour&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="mf">12</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">time_interval_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;period_beginning&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Data table 3b after mapping to project</strong> (showing March 8-11, 2018 with spring-forward transition affecting the weekend day):</p>
+<p>Weekday profiles (is_weekday=true) repeat on all weekdays throughout the year; in this example, March 8 and 10 use the weekday profile. The weekend profile (is_weekday=false) repeats on all weekend days; March 11 (Sunday) uses the weekend profile. During the spring-forward transition on March 11, the 2 AM data row (30.02) is not mapped due to the missing hour.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="annual-time">
+<h2>4. Annual Time<a class="headerlink" href="#annual-time" title="Link to this heading">¶</a></h2>
+<p>Use annual time when each value represents an <strong>aggregate for an entire year</strong> (e.g., annual energy consumption in MWh). The data table has a single <code class="docutils literal notranslate"><span class="pre">time_year</span></code> integer column.</p>
+<p><strong>Example data table</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">time_year</span> <span class="o">|</span> <span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">----------|-----------|------</span>
+     <span class="mi">2020</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">105.3</span>
+     <span class="mi">2021</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">108.7</span>
+     <span class="mi">2022</span> <span class="o">|</span> <span class="n">g1</span>        <span class="o">|</span> <span class="mf">112.0</span>
+</pre></div>
+</div>
+<p><strong>Config</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;Annual 2020-2050&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;AnnualTime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;annual&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ranges</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">start</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2020&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">end</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;2050&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">include_leap_day</span><span class="o">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">    </span><span class="c1">// set true if annual totals include Feb 29 data in leap years</span>
+<span class="w">  </span><span class="nx">measurement_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;total&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// annual time only supports &quot;total&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">include_leap_day</span></code> indicates whether values in leap years account for February 29. This matters when dsgrid disaggregates annual totals to sub-annual (e.g., hourly) resolution.</p>
+<p>Annual time does not require a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column in the geography dimension.</p>
+</section>
+<hr class="docutils" />
+<section id="noop-time">
+<h2>5. NoOp Time<a class="headerlink" href="#noop-time" title="Link to this heading">¶</a></h2>
+<p>Use NoOp when the dataset has <strong>no time dimension at all</strong> – for example, a static lookup table or a single-year snapshot where time is not a relevant axis.</p>
+<p><strong>Example data table</strong>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">geography</span> <span class="o">|</span> <span class="n">value</span>
+<span class="o">----------|------</span>
+<span class="n">g1</span>        <span class="o">|</span> <span class="mf">42.0</span>
+<span class="n">g2</span>        <span class="o">|</span> <span class="mf">17.5</span>
+</pre></div>
+</div>
+<p><strong>Config</strong>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nx">type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;No Time&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="s2">&quot;class&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;NoOpTime&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">time_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;noop&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>NoOp time does not require a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column in the geography dimension.</p>
+</section>
+<hr class="docutils" />
+<section id="related-references">
+<h2>Related References<a class="headerlink" href="#related-references" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../dataset_registration/dimension_concepts.html#time-dimensions"><span class="std std-ref">Dimension Concepts – Time Dimensions</span></a> – conceptual overview and <code class="docutils literal notranslate"><span class="pre">column_format</span></code> details</p></li>
+<li><p><a class="reference internal" href="../../software_reference/data_models/dimension_model.html"><span class="std std-doc">Dimension Data Models</span></a> – complete config schema reference</p></li>
+<li><p><a class="reference internal" href="how_to_dimensions.html"><span class="std std-doc">How to Define Dimensions</span></a> – general dimension workflow</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="how_to_filter.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">How to Filter a Query</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="how_to_supplemental_dimensions.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">How to Create Project Supplemental Dimensions</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">How to Define a Time Dimension</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#datetime">1. Datetime</a><ul>
+<li><a class="reference internal" href="#key-concepts">Key concepts</a></li>
+<li><a class="reference internal" href="#a-column-format-distinctions">1a. Column Format Distinctions</a></li>
+<li><a class="reference internal" href="#b-globally-aligned-single-time-zone">1b. Globally Aligned — Single Time Zone</a><ul>
+<li><a class="reference internal" href="#with-timestamp-tz-timezone-aware-single-column">With <code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> (timezone-aware single column)</a></li>
+<li><a class="reference internal" href="#with-timestamp-ntz-timezone-naive-single-column">With <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> (timezone-naive single column)</a></li>
+<li><a class="reference internal" href="#with-time-format-in-parts-separate-columns-no-offset">With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, no offset)</a></li>
+<li><a class="reference internal" href="#with-time-format-in-parts-separate-columns-with-offset">With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, with offset)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#c-locally-aligned-multiple-time-zones">1c. Locally Aligned — Multiple Time Zones</a><ul>
+<li><a class="reference internal" href="#id1">With <code class="docutils literal notranslate"><span class="pre">timestamp_tz</span></code> (timezone-aware single column)</a></li>
+<li><a class="reference internal" href="#id2">With <code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> (timezone-naive single column)</a></li>
+<li><a class="reference internal" href="#id3">With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, no offset)</a></li>
+<li><a class="reference internal" href="#id4">With <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> (separate columns, with offset)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#key-fields-for-datetime">Key fields for <code class="docutils literal notranslate"><span class="pre">datetime</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#index-time">2. Index Time</a><ul>
+<li><a class="reference internal" href="#common-use-cases">Common use cases</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#representative-time">3. Representative Time</a><ul>
+<li><a class="reference internal" href="#a-one-week-per-month-by-hour">3a. <code class="docutils literal notranslate"><span class="pre">one_week_per_month_by_hour</span></code></a></li>
+<li><a class="reference internal" href="#b-one-weekday-day-and-one-weekend-day-per-month-by-hour">3b. <code class="docutils literal notranslate"><span class="pre">one_weekday_day_and_one_weekend_day_per_month_by_hour</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#annual-time">4. Annual Time</a></li>
+<li><a class="reference internal" href="#noop-time">5. NoOp Time</a></li>
+<li><a class="reference internal" href="#related-references">Related References</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=1437fa6d"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

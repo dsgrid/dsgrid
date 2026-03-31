@@ -1,0 +1,1273 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Registration Checks" href="registration_checks.html"><link rel="prev" title="Dataset Concepts" href="dataset_concepts.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Data File Formats - dsgrid 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=04b6322e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.4.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.4.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_time_dimension.html">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" checked="" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_types.html">Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_workflows.html">Mapping Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_submittal/index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_process.html">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/project_concepts.html">Project Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/base_dimensions.html">Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/supplemental_dimensions.html">Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/dataset_requirements.html">Dataset Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_queries/index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/query_concepts.html">Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/aggregations.html">Aggregations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/output_formats.html">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/derived_concepts.html">Derived Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/growth_rates.html">Growth Rates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/residuals.html">Residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/workflows.html">Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../apache_spark/index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/overview.html">Apache Spark Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/when_to_use_spark.html">When to Use Spark</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/kestrel_setup.html">Kestrel Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/spark_cluster.html">Spark Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../software_reference/index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../software_reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_model.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Citation and Data Attribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/user_guide/dataset_registration/data_file_formats.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="data-file-formats">
+<h1>Data File Formats<a class="headerlink" href="#data-file-formats" title="Link to this heading">¶</a></h1>
+<p>dsgrid aims to support all data file formats that users need for efficient queries and analysis. If you need a new format, please <a class="reference internal" href="../../contact.html#contact-us"><span class="std std-ref">contact the dsgrid team</span></a> to discuss it.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Metric data should usually be stored in Parquet files. <a class="reference internal" href="#csv-files">CSV files</a> are also supported. If you need or want another optimized columnar file format, please contact the dsgrid team.</p></li>
+<li><p>If the data tables contain time-series data, each unique time array must contain an identical range of timestamps.</p></li>
+<li><p>Values of dimension columns except <code class="docutils literal notranslate"><span class="pre">model_year</span></code> and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> must be strings. <code class="docutils literal notranslate"><span class="pre">model_year</span></code> and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> can be integers.</p></li>
+<li><p>Each dimension column name except time must match dsgrid dimension types (geography, sector, subsector, etc.) either directly or by specifying a <a class="reference internal" href="#custom-column-names">column mapping</a>.</p></li>
+<li><p>The values in each dimension column must match the dataset’s dimension records.</p></li>
+</ol>
+</section>
+<section id="recommendations">
+<h2>Recommendations<a class="headerlink" href="#recommendations" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Enable compression in all Parquet files. <code class="docutils literal notranslate"><span class="pre">Snappy</span></code> is preferred.</p></li>
+<li><p>The recommended size of individual Parquet files is 128 MiB. Making the files too big can cause memory issues. Making them too small adds overhead and hurts performance.</p></li>
+<li><p><a class="reference internal" href="dimension_concepts.html#id2"><span class="std std-ref">Trivial dimensions</span></a> (one-element records) should not be stored in the data files. They should instead be defined in the dataset config. dsgrid will add them dynamically at runtime.</p></li>
+<li><p>Floating point data can be 64-bit or 32-bit. 64-bit floats provide more precision but require twice as much storage space as 32-bit floats.</p></li>
+</ol>
+</section>
+<section id="table-formats">
+<h2>Table Formats<a class="headerlink" href="#table-formats" title="Link to this heading">¶</a></h2>
+<p>Input datasets can use a <strong>one-table</strong> or <strong>two-table</strong> format.</p>
+<section id="one-table-format">
+<span id="id1"></span><h3>One Table Format<a class="headerlink" href="#one-table-format" title="Link to this heading">¶</a></h3>
+<p>All metric data and dimension records are stored in one Parquet file (or set of Parquet files in a directory).</p>
+<p>The following example shows a stacked one-table format. The <code class="docutils literal notranslate"><span class="pre">metric</span></code> column contains dimension record IDs and the <code class="docutils literal notranslate"><span class="pre">value</span></code> column contains the data:</p>
+<div class="table-wrapper colwidths-given docutils container" id="id9">
+<table class="docutils align-default" id="id9">
+<caption><span class="caption-text">load_data.parquet</span><a class="headerlink" href="#id9" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 10.0%" />
+<col style="width: 12.0%" />
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 10.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>timestamp</p></th>
+<th class="head"><p>geography</p></th>
+<th class="head"><p>scenario</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>metric</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>heating</p></td>
+<td><p>1.234</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>cooling</p></td>
+<td><p>0.002</p></td>
+</tr>
+<tr class="row-even"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>interior_equipment</p></td>
+<td><p>0.051</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>primary_school</p></td>
+<td><p>heating</p></td>
+<td><p>2.345</p></td>
+</tr>
+<tr class="row-even"><td><p>2012-01-01T01:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>heating</p></td>
+<td><p>1.456</p></td>
+</tr>
+<tr class="row-odd"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This example omits the <code class="docutils literal notranslate"><span class="pre">sector</span></code>, <code class="docutils literal notranslate"><span class="pre">model_year</span></code>, and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> columns because they are <a class="reference internal" href="dimension_concepts.html#id2"><span class="std std-ref">trivial dimensions</span></a> — each has only a single record (e.g., <code class="docutils literal notranslate"><span class="pre">sector</span> <span class="pre">=</span> <span class="pre">&quot;com&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">model_year</span> <span class="pre">=</span> <span class="pre">2020</span></code>, <code class="docutils literal notranslate"><span class="pre">weather_year</span> <span class="pre">=</span> <span class="pre">2012</span></code>). Trivial dimensions are declared in the dataset config and added by dsgrid at runtime, so they do not need to appear in the data files.</p>
+</div>
+</section>
+<section id="two-table-format">
+<span id="id2"></span><h3>Two Table Format<a class="headerlink" href="#two-table-format" title="Link to this heading">¶</a></h3>
+<p>Two Parquet files comprise the dataset: a <strong>data table</strong> with time-series metric values and a <strong>lookup table</strong> that maps an integer ID to combinations of dimension records.</p>
+<p><strong>Data table</strong> (<code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code>) — required columns and content:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">id</span></code> (integer) — links each row to a dimension-record combination in the lookup table.</p></li>
+<li><p>Time columns — one or more columns representing time (e.g., <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>). See <a class="reference internal" href="#time-formats">Time Formats</a> below.</p></li>
+<li><p>Value data — either a single <code class="docutils literal notranslate"><span class="pre">value</span></code> column (stacked) or one column per metric record ID (pivoted). See <a class="reference internal" href="#value-formats">Value Formats</a> below.</p></li>
+<li><p>Dimension columns are optional. Any non-time, non-trivial dimension not present here must appear in the lookup table. In practice, most dimensions go in the lookup table.</p></li>
+</ul>
+<p><strong>Lookup table</strong> (<code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code>) — required columns and content:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">id</span></code> (integer) — matches the IDs in the data table.</p></li>
+<li><p>Every non-time, non-trivial dimension that is <em>not</em> already a column in the data table. This typically includes all non-time dimensions (geography, sector, subsector, metric, scenario, model_year, weather_year, etc.).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> (float, optional) — see <a class="reference internal" href="#lookup-table-with-scaling-factor">Lookup Table with Scaling Factor</a> below.</p></li>
+</ul>
+<section id="pivoted-no-scaling-factor">
+<h4>Pivoted, No Scaling Factor<a class="headerlink" href="#pivoted-no-scaling-factor" title="Link to this heading">¶</a></h4>
+<p><strong><code class="docutils literal notranslate"><span class="pre">load_data.parquet</span></code></strong> — Time-series values for all metric data. This example pivots the metric dimension, so the metric record IDs (<code class="docutils literal notranslate"><span class="pre">heating</span></code>, <code class="docutils literal notranslate"><span class="pre">cooling</span></code>, <code class="docutils literal notranslate"><span class="pre">interior_equipment</span></code>) appear as column names. The <code class="docutils literal notranslate"><span class="pre">id</span></code> column links each row to a dimension record combination in the lookup table:</p>
+<div class="table-wrapper colwidths-given docutils container" id="id10">
+<table class="docutils align-default" id="id10">
+<caption><span class="caption-text">load_data.parquet (time-series metric values; example shows a pivoted metric dimension)</span><a class="headerlink" href="#id10" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 33.7%" />
+<col style="width: 6.0%" />
+<col style="width: 18.1%" />
+<col style="width: 18.1%" />
+<col style="width: 24.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>timestamp</p></th>
+<th class="head"><p>id</p></th>
+<th class="head"><p>heating</p></th>
+<th class="head"><p>cooling</p></th>
+<th class="head"><p>interior_equipment</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>1</p></td>
+<td><p>0.214</p></td>
+<td><p>0.002</p></td>
+<td><p>0.051</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01T01:00:00+00:00</p></td>
+<td><p>1</p></td>
+<td><p>0.329</p></td>
+<td><p>0.000</p></td>
+<td><p>0.051</p></td>
+</tr>
+<tr class="row-even"><td><p>2012-01-01T02:00:00+00:00</p></td>
+<td><p>1</p></td>
+<td><p>0.369</p></td>
+<td><p>0.000</p></td>
+<td><p>0.066</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>2</p></td>
+<td><p>1.023</p></td>
+<td><p>0.015</p></td>
+<td><p>0.102</p></td>
+</tr>
+<tr class="row-even"><td><p>2012-01-01T01:00:00+00:00</p></td>
+<td><p>2</p></td>
+<td><p>1.156</p></td>
+<td><p>0.012</p></td>
+<td><p>0.102</p></td>
+</tr>
+<tr class="row-odd"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong><code class="docutils literal notranslate"><span class="pre">load_data_lookup.parquet</span></code></strong> — Maps each <code class="docutils literal notranslate"><span class="pre">id</span></code> to a combination of dimension records:</p>
+<div class="table-wrapper colwidths-given docutils container" id="id11">
+<table class="docutils align-default" id="id11">
+<caption><span class="caption-text">load_data_lookup.parquet</span><a class="headerlink" href="#id11" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 6.0%" />
+<col style="width: 11.9%" />
+<col style="width: 9.5%" />
+<col style="width: 29.8%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+<col style="width: 14.3%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>id</p></th>
+<th class="head"><p>geography</p></th>
+<th class="head"><p>sector</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>scenario</p></th>
+<th class="head"><p>model_year</p></th>
+<th class="head"><p>weather_year</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>01001</p></td>
+<td><p>com</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>reference</p></td>
+<td><p>2020</p></td>
+<td><p>2012</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>01001</p></td>
+<td><p>com</p></td>
+<td><p>primary_school</p></td>
+<td><p>reference</p></td>
+<td><p>2020</p></td>
+<td><p>2012</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>01003</p></td>
+<td><p>com</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>reference</p></td>
+<td><p>2020</p></td>
+<td><p>2012</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>01003</p></td>
+<td><p>com</p></td>
+<td><p>primary_school</p></td>
+<td><p>reference</p></td>
+<td><p>2020</p></td>
+<td><p>2012</p></td>
+</tr>
+<tr class="row-even"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All non-time, non-trivial dimensions should appear in the lookup table. Trivial dimensions can still be omitted and declared in the dataset config. In this example, if <code class="docutils literal notranslate"><span class="pre">sector</span></code>, <code class="docutils literal notranslate"><span class="pre">model_year</span></code>, and <code class="docutils literal notranslate"><span class="pre">weather_year</span></code> were all trivial, the lookup table would only need <code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">geography</span></code>, <code class="docutils literal notranslate"><span class="pre">subsector</span></code>, and <code class="docutils literal notranslate"><span class="pre">scenario</span></code> columns.</p>
+</div>
+<p>Each unique time array in <code class="docutils literal notranslate"><span class="pre">load_data</span></code> must be denoted with an integer ID that corresponds to a record in <code class="docutils literal notranslate"><span class="pre">load_data_lookup</span></code>. The ID is user-defined. Users may want to use a sequentially-increasing integer or encode other information into specific bytes/digits of each integer.</p>
+</section>
+<section id="lookup-table-with-scaling-factor">
+<h4>Lookup Table with Scaling Factor<a class="headerlink" href="#lookup-table-with-scaling-factor" title="Link to this heading">¶</a></h4>
+<p>The lookup table may optionally include a <code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> column. When present, dsgrid multiplies each value column by the row’s scaling factor at query time and then drops the <code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> column from the result.</p>
+<p>This is useful when the data table stores normalized profiles and the actual magnitude varies by dimension combination. For example, a distributed generation dataset might store a single set of hourly capacity-factor profiles in the data table, while the lookup table records the installed capacity (in kW) for each geography. At query time, dsgrid multiplies the normalized profile by the installed capacity to produce absolute generation values. This format avoids duplicating 8,760 hourly rows for every geography.</p>
+<div class="table-wrapper colwidths-given docutils container" id="id12">
+<table class="docutils align-default" id="id12">
+<caption><span class="caption-text">load_data_lookup.parquet with scaling_factor</span><a class="headerlink" href="#id12" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 6.9%" />
+<col style="width: 16.7%" />
+<col style="width: 11.1%" />
+<col style="width: 27.8%" />
+<col style="width: 16.7%" />
+<col style="width: 20.8%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>id</p></th>
+<th class="head"><p>geography</p></th>
+<th class="head"><p>sector</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>model_year</p></th>
+<th class="head"><p>scaling_factor</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>01001</p></td>
+<td><p>com</p></td>
+<td><p>rooftop_pv</p></td>
+<td><p>2020</p></td>
+<td><p>10.5</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>01001</p></td>
+<td><p>com</p></td>
+<td><p>rooftop_pv</p></td>
+<td><p>2025</p></td>
+<td><p>102.3</p></td>
+</tr>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>01001</p></td>
+<td><p>com</p></td>
+<td><p>rooftop_pv</p></td>
+<td><p>2030</p></td>
+<td><p>245.7</p></td>
+</tr>
+<tr class="row-odd"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Multiple rows can share the same hourly profile shape in <code class="docutils literal notranslate"><span class="pre">load_data</span></code> by referencing the same ID, but produce different absolute values because their scaling factors differ.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">scaling_factor</span></code> is <code class="docutils literal notranslate"><span class="pre">null</span></code> for a given row, the value passes through unchanged (i.e., no multiplication is applied). A scaling factor of <code class="docutils literal notranslate"><span class="pre">1.0</span></code> explicitly multiplies by one, which also leaves the value unchanged. Either is acceptable for rows that do not need scaling.</p>
+</div>
+<p>This format minimizes file storage because:</p>
+<ol class="arabic simple">
+<li><p>Time arrays can be shared across combinations of dimension records, each with its own scaling factor.</p></li>
+<li><p>Dimension information is not repeated for every timestamp. (This could be minimal because of compression inside the Parquet files.)</p></li>
+</ol>
+</section>
+</section>
+</section>
+<section id="value-formats">
+<span id="id3"></span><h2>Value Formats<a class="headerlink" href="#value-formats" title="Link to this heading">¶</a></h2>
+<p>Both table formats support two value layouts:</p>
+<section id="stacked">
+<h3>Stacked<a class="headerlink" href="#stacked" title="Link to this heading">¶</a></h3>
+<p>Each non-time dimension has its own column, plus a single <code class="docutils literal notranslate"><span class="pre">value</span></code> column containing the data. A <code class="docutils literal notranslate"><span class="pre">metric</span></code> column identifies which metric each row represents. This format is a good default choice.</p>
+<p>The <a class="reference internal" href="#one-table-format">one-table example</a> above uses stacked format. The same layout works with two-table format: the <code class="docutils literal notranslate"><span class="pre">value</span></code>, <code class="docutils literal notranslate"><span class="pre">metric</span></code>, and any time columns appear in the data table, and other dimensions go in the lookup table.</p>
+</section>
+<section id="pivoted">
+<h3>Pivoted<a class="headerlink" href="#pivoted" title="Link to this heading">¶</a></h3>
+<p>The record IDs of one dimension become column names in the data table, and each row contains all values for that combination of other (non-pivoted) dimensions at once. In practice, the pivoted dimension is almost always <code class="docutils literal notranslate"><span class="pre">metric</span></code>. The code allows pivoting on other dimensions, but this is uncommon.</p>
+<p>The <a class="reference internal" href="#two-table-format">two-table example</a> above uses pivoted format. Here is a one-table pivoted equivalent in which the <code class="docutils literal notranslate"><span class="pre">metric</span></code> and <code class="docutils literal notranslate"><span class="pre">value</span></code> columns are replaced by one column per metric record ID:</p>
+<div class="table-wrapper colwidths-given docutils container" id="id13">
+<table class="docutils align-default" id="id13">
+<caption><span class="caption-text">One-table pivoted example</span><a class="headerlink" href="#id13" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 22.4%" />
+<col style="width: 8.0%" />
+<col style="width: 9.6%" />
+<col style="width: 20.0%" />
+<col style="width: 12.0%" />
+<col style="width: 12.0%" />
+<col style="width: 16.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>timestamp</p></th>
+<th class="head"><p>geography</p></th>
+<th class="head"><p>scenario</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>heating</p></th>
+<th class="head"><p>cooling</p></th>
+<th class="head"><p>interior_equipment</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>1.234</p></td>
+<td><p>0.002</p></td>
+<td><p>0.051</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01T00:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>primary_school</p></td>
+<td><p>2.345</p></td>
+<td><p>0.008</p></td>
+<td><p>0.073</p></td>
+</tr>
+<tr class="row-even"><td><p>2012-01-01T01:00:00+00:00</p></td>
+<td><p>01001</p></td>
+<td><p>reference</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>1.456</p></td>
+<td><p>0.003</p></td>
+<td><p>0.049</p></td>
+</tr>
+<tr class="row-odd"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Pivoted format saves storage space by avoiding repeated dimension values across rows, but can make inspection and data operations more complex because the column names carry semantic meaning. dsgrid converts pivoted data to stacked format during registration, so all downstream processing and queries operate on stacked data.</p>
+</section>
+</section>
+<section id="data-layout">
+<h2>Data Layout<a class="headerlink" href="#data-layout" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">data_layout</span></code> section of a dataset configuration defines the data file locations, table format, and value format. It has the following structure:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;two_table&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// or &quot;one_table&quot;</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;pivoted&quot;</span><span class="p">,</span><span class="w">         </span><span class="c1">// or &quot;stacked&quot;</span>
+<span class="w">  </span><span class="nx">pivoted_dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;metric&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// required if value_format is &quot;pivoted&quot;</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w">                     </span><span class="c1">// optional</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;column_name&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// actual name in the file</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span><span class="w">       </span><span class="c1">// optional, for type override</span>
+<span class="w">        </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// optional, for column renaming</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;col1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;col2&quot;</span><span class="p">],</span><span class="w">  </span><span class="c1">// optional, columns to drop</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">lookup_data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c1">// required for &quot;two_table&quot; format</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data_lookup.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w">                   </span><span class="c1">// optional, same structure as data_file</span>
+<span class="w">    </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[],</span><span class="w">            </span><span class="c1">// optional, same as data_file</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nx">expected_associations</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w">         </span><span class="c1">// optional</span>
+<span class="w">    </span><span class="s2">&quot;expected_combos.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">missing_associations</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w">          </span><span class="c1">// optional</span>
+<span class="w">    </span><span class="s2">&quot;missing_associations.parquet&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;additional_missing&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Fields:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">table_format</span></code>: Defines the table structure: <code class="docutils literal notranslate"><span class="pre">&quot;two_table&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;one_table&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">value_format</span></code>: Defines whether values are <code class="docutils literal notranslate"><span class="pre">&quot;pivoted&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;stacked&quot;</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pivoted_dimension_type</span></code>: The dimension type whose records are columns (required when <code class="docutils literal notranslate"><span class="pre">value_format</span></code> is <code class="docutils literal notranslate"><span class="pre">&quot;pivoted&quot;</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_file</span></code>: Main data file configuration (required).</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">path</span></code>: Path to the data file. Can be absolute or relative to the config file. You can also use the <code class="docutils literal notranslate"><span class="pre">--data-base-dir</span></code> CLI option to specify a different base directory for resolving relative paths.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">columns</span></code>: Optional list of column definitions for type overrides and renaming.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: The actual column name in the file (required).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">data_type</span></code>: Data type override (optional). See <a class="reference internal" href="#specifying-column-data-types">Specifying Column Data Types</a> for supported types.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code>: The dsgrid dimension type this column represents (optional, but required if this column is not a time column and <code class="docutils literal notranslate"><span class="pre">name</span></code> is not already a <a class="reference internal" href="../../software_reference/data_models/enums.html#dimensiontype"><span class="std std-ref">dimension type</span></a>). When specified, the column will be renamed to match the dimension type.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code>: Optional list of column names to drop when reading the file. Cannot overlap with columns defined in <code class="docutils literal notranslate"><span class="pre">columns</span></code>.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>: Lookup file configuration (required for <code class="docutils literal notranslate"><span class="pre">two_table</span></code> format). Has the same structure as <code class="docutils literal notranslate"><span class="pre">data_file</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">expected_associations</span></code>: Paths to files or directories defining the exact dimension combinations expected in the data (optional). When provided, these replace the full cross-join as the required set. See <a class="reference internal" href="../how_tos/how_to_dimension_associations.html"><span class="doc std std-doc">How to Handle Dimension Associations</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">missing_associations</span></code>: Paths to files or directories of missing dimension combinations (optional). See <a class="reference internal" href="../how_tos/how_to_dimension_associations.html"><span class="doc std std-doc">How to Handle Dimension Associations</span></a>.</p></li>
+</ul>
+<p>Both <code class="docutils literal notranslate"><span class="pre">expected_associations</span></code> and <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code> accept absolute or relative paths. Relative paths resolve against the config file’s directory, or against <code class="docutils literal notranslate"><span class="pre">--associations-base-dir</span></code> (<code class="docutils literal notranslate"><span class="pre">-A</span></code>) if provided. The two fields can be used together: <code class="docutils literal notranslate"><span class="pre">expected_associations</span></code> defines the baseline of required combinations, and <code class="docutils literal notranslate"><span class="pre">missing_associations</span></code> subtracts corner-case exceptions from it.</p>
+</section>
+<section id="column-configuration">
+<h2>Column Configuration<a class="headerlink" href="#column-configuration" title="Link to this heading">¶</a></h2>
+<section id="csv-files">
+<span id="id4"></span><h3>CSV Files<a class="headerlink" href="#csv-files" title="Link to this heading">¶</a></h3>
+<p>While not generally recommended, dsgrid does support CSV data files. By default, dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time zones, dsgrid provides a mechanism for defining column data types directly in the dataset configuration.</p>
+<p>Consider this example that uses county FIPS codes to identify the geography of each data point:</p>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 31.8%" />
+<col style="width: 11.4%" />
+<col style="width: 17.0%" />
+<col style="width: 28.4%" />
+<col style="width: 11.4%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>timestamp</p></th>
+<th class="head"><p>geography</p></th>
+<th class="head"><p>scenario</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2011-12-31T22:00:00-07:00</p></td>
+<td><p>01001</p></td>
+<td><p>efs_high_ldv</p></td>
+<td><p>full_service_restaurant</p></td>
+<td><p>1.234</p></td>
+</tr>
+<tr class="row-odd"><td><p>2011-12-31T22:00:00-07:00</p></td>
+<td><p>01001</p></td>
+<td><p>efs_high_ldv</p></td>
+<td><p>primary_school</p></td>
+<td><p>2.345</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The default behavior of IO libraries like Pandas, Spark, and DuckDB is to infer data types by inspecting the data. They will all decide that the geography column contains integers and drop the leading zeros. This will result in an invalid geography column, which is required to be a string data type, and will not match the project’s geography dimension (assuming that the project is also defined over county FIPS codes).</p>
+<p>Secondly, you may want to specify the minimum required size for each number. For example, if you don’t need the precision that comes with 8-byte floats, choose <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code> and Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.</p>
+<section id="specifying-column-data-types">
+<span id="id5"></span><h4>Specifying Column Data Types<a class="headerlink" href="#specifying-column-data-types" title="Link to this heading">¶</a></h4>
+<p>To specify column data types, add a <code class="docutils literal notranslate"><span class="pre">columns</span></code> field to the <code class="docutils literal notranslate"><span class="pre">data_file</span></code> (or <code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>) section in your dataset configuration. You can specify types for all columns or just a subset — columns without explicit types will have their types inferred.</p>
+<p>The supported data types are (case-insensitive):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">BOOLEAN</span></code>: boolean</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">INT</span></code>: 4-byte integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">INTEGER</span></code>: 4-byte integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TINYINT</span></code>: 1-byte integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SMALLINT</span></code>: 2-byte integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BIGINT</span></code>: 8-byte integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>: 4-byte float</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>: 8-byte float</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">STRING</span></code>: string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TEXT</span></code>: string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code>: string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code>: timestamp with time zone</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>: timestamp without time zone</p></li>
+</ul>
+<p>Example dataset configuration with column data types:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_layout</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">table_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;one_table&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">value_format</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;stacked&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;TIMESTAMP_TZ&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;scenario&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;subsector&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;FLOAT&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can also specify types for only the columns that need explicit typing:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Prevent FIPS codes from being read as integers</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="custom-column-names">
+<span id="id6"></span><h3>Custom Column Names<a class="headerlink" href="#custom-column-names" title="Link to this heading">¶</a></h3>
+<p>By default, dsgrid expects data files to have columns named after the standard dimension types (<code class="docutils literal notranslate"><span class="pre">geography</span></code>, <code class="docutils literal notranslate"><span class="pre">sector</span></code>, <code class="docutils literal notranslate"><span class="pre">subsector</span></code>, <code class="docutils literal notranslate"><span class="pre">metric</span></code>, etc.). Data files with value format “stacked” are also expected to have a <code class="docutils literal notranslate"><span class="pre">value</span></code> column. However, your data files may use different column names. dsgrid provides a mechanism to map custom column names to the expected dimension types.</p>
+<p>To rename columns, add the <code class="docutils literal notranslate"><span class="pre">dimension_type</span></code> field to the column definition. This tells dsgrid what dimension the column represents, and dsgrid will automatically rename it at runtime.</p>
+<p>This feature works for all file formats (Parquet, CSV), not just CSV files.</p>
+<p>Example with custom column names:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;county&quot;</span><span class="p">,</span><span class="w">           </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Will be renamed to &quot;geography&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;end_use&quot;</span><span class="p">,</span><span class="w">          </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;metric&quot;</span><span class="p">,</span><span class="w">     </span><span class="c1">// Will be renamed to &quot;metric&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;building_type&quot;</span><span class="p">,</span><span class="w">    </span><span class="c1">// Actual column name in the file</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;subsector&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Will be renamed to &quot;subsector&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can combine <code class="docutils literal notranslate"><span class="pre">dimension_type</span></code> with <code class="docutils literal notranslate"><span class="pre">data_type</span></code> when using CSV files:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;fips_code&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;DOUBLE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="ignoring-columns">
+<h3>Ignoring Columns<a class="headerlink" href="#ignoring-columns" title="Link to this heading">¶</a></h3>
+<p>Data files may contain columns that are not needed for dsgrid processing. Rather than modifying your source files, you can tell dsgrid to ignore (drop) specific columns when reading the data.</p>
+<p>To ignore columns, add an <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> field to the <code class="docutils literal notranslate"><span class="pre">data_file</span></code> (or <code class="docutils literal notranslate"><span class="pre">lookup_data_file</span></code>) section in your dataset configuration. This field accepts a list of column names to drop.</p>
+<p>This feature works for all file formats (Parquet, CSV).</p>
+<p>Example with ignored columns:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.parquet&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;internal_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;notes&quot;</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can combine <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> with <code class="docutils literal notranslate"><span class="pre">columns</span></code> for type overrides and renaming:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">data_file</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;load_data.csv&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nx">columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;county&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;STRING&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">dimension_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;value&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">data_type</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;DOUBLE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nx">ignore_columns</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;internal_id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;notes&quot;</span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A column cannot appear in both <code class="docutils literal notranslate"><span class="pre">columns</span></code> and <code class="docutils literal notranslate"><span class="pre">ignore_columns</span></code> — dsgrid will raise an error if there is any overlap.</p>
+</div>
+</section>
+</section>
+<section id="time">
+<h2>Time<a class="headerlink" href="#time" title="Link to this heading">¶</a></h2>
+<p>dsgrid supports three timestamp storage formats in data files: timezone-aware (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code>), timezone-naive (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>), and time-in-parts. The format you choose affects how dsgrid interprets and processes timestamps during dataset registration.</p>
+<p>For detailed information on time zone concepts, localization, and configuration requirements, see <a class="reference internal" href="dimension_concepts.html#time-dimensions"><span class="std std-ref">Dimension Concepts — Time Dimensions</span></a>.</p>
+<section id="storage-and-implementation-considerations">
+<h3>Storage and Implementation Considerations<a class="headerlink" href="#storage-and-implementation-considerations" title="Link to this heading">¶</a></h3>
+<p>When writing timezone-aware timestamps to Parquet files, they must be stored in UTC. Do not use Pandas’ Parquet metadata feature for time zone information — provide time zone details through dsgrid configuration instead.</p>
+<p><strong>If using Spark to create Parquet files:</strong></p>
+<ul class="simple">
+<li><p>Spark automatically interprets timestamps in the current SQL session’s time zone and converts them to UTC when writing</p></li>
+<li><p>Configure the session time zone with the <code class="docutils literal notranslate"><span class="pre">spark.sql.session.timeZone</span></code> setting if needed</p></li>
+</ul>
+</section>
+<section id="time-formats">
+<span id="id7"></span><h3>Time Formats<a class="headerlink" href="#time-formats" title="Link to this heading">¶</a></h3>
+<p>Datetime time dimensions support three timestamp storage formats. This section shows how each format appears in Parquet files. For detailed configuration requirements, conceptual explanations, and practical examples, see:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="dimension_concepts.html#time-dimensions"><span class="std std-ref">Dimension Concepts — Time Dimensions</span></a> — configuration options, requirements, and when to use each format</p></li>
+<li><p><a class="reference internal" href="../how_tos/how_to_time_dimension.html"><span class="std std-doc">How to Define a Time Dimension</span></a> — step-by-step examples for all time dimension types</p></li>
+</ul>
+<section id="timezone-aware-timestamps-timestamp-tz">
+<h4>Timezone-aware timestamps (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code>)<a class="headerlink" href="#timezone-aware-timestamps-timestamp-tz" title="Link to this heading">¶</a></h4>
+<p><strong>Parquet storage:</strong></p>
+<ul class="simple">
+<li><p>Logical type: <code class="docutils literal notranslate"><span class="pre">TIMESTAMP</span></code> (integer, not string)</p></li>
+<li><p>Spark type: <code class="docutils literal notranslate"><span class="pre">TimestampType</span></code></p></li>
+<li><p>Example: <code class="docutils literal notranslate"><span class="pre">2012-01-01T00:00:00+00:00</span></code></p></li>
+</ul>
+<p>The <a class="reference internal" href="#one-table-format">one-table</a> and <a class="reference internal" href="#two-table-format">two-table</a> examples above both use this format.</p>
+</section>
+<section id="timezone-naive-timestamps-timestamp-ntz">
+<span id="timestamp-ntz"></span><h4>Timezone-naive timestamps (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>)<a class="headerlink" href="#timezone-naive-timestamps-timestamp-ntz" title="Link to this heading">¶</a></h4>
+<p><strong>Parquet storage:</strong></p>
+<ul class="simple">
+<li><p>Logical type: <code class="docutils literal notranslate"><span class="pre">TimestampNTZ</span></code> (no time zone info)</p></li>
+<li><p>Spark type: <code class="docutils literal notranslate"><span class="pre">TimestampNTZType</span></code></p></li>
+<li><p>Example: <code class="docutils literal notranslate"><span class="pre">2012-01-01</span> <span class="pre">00:00:00</span></code></p></li>
+</ul>
+<p>Timezone-naive data requires a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column (see <a class="reference internal" href="#time-zone-column-sourcing">Time Zone Column Sourcing</a> below) and specific localization handling. For requirements and restrictions, see <a class="reference internal" href="dimension_concepts.html#id1"><span class="std std-ref">Dimension Concepts — Time Zone Localization</span></a>.</p>
+<p><strong>Data example (two-table, pivoted):</strong></p>
+<div class="table-wrapper colwidths-given docutils container" id="id14">
+<table class="docutils align-default" id="id14">
+<caption><span class="caption-text">TIMESTAMP_NTZ example</span><a class="headerlink" href="#id14" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 39.7%" />
+<col style="width: 12.7%" />
+<col style="width: 23.8%" />
+<col style="width: 23.8%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>timestamp</p></th>
+<th class="head"><p>id</p></th>
+<th class="head"><p>heating</p></th>
+<th class="head"><p>cooling</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2012-01-01 00:00:00</p></td>
+<td><p>1</p></td>
+<td><p>0.214</p></td>
+<td><p>0.002</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012-01-01 01:00:00</p></td>
+<td><p>1</p></td>
+<td><p>0.329</p></td>
+<td><p>0.000</p></td>
+</tr>
+<tr class="row-even"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="time-zone-column-sourcing">
+<span id="id8"></span><h4>Time Zone Column Sourcing<a class="headerlink" href="#time-zone-column-sourcing" title="Link to this heading">¶</a></h4>
+<p>When using timezone-naive timestamps (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>) or time-in-parts formats, a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column is required in the data table (one value per row). This column provides the IANA time zone for each row, allowing dsgrid to interpret local times correctly.</p>
+<p>There are two ways to source the <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column:</p>
+<ul class="simple">
+<li><p><strong>Dataset geography records</strong> (default) — include a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column with IANA time zone strings (e.g., <code class="docutils literal notranslate"><span class="pre">America/New_York</span></code>) in the dataset’s geography dimension records file. dsgrid automatically joins this column to the data during registration.</p></li>
+<li><p><strong>Project geography records</strong> — set <code class="docutils literal notranslate"><span class="pre">use_project_geography_time_zone:</span> <span class="pre">true</span></code> in the dataset config. dsgrid will read time zones from the project’s geography dimension instead. This is useful when the dataset’s geography records do not include time zone information.</p></li>
+</ul>
+<p>In both cases, the resulting data table has a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column containing IANA time zone strings, with one value per row. The <code class="docutils literal notranslate"><span class="pre">time_zones</span></code> list in your time dimension config must include all unique values that appear in this column.</p>
+<p>For configuration requirements, see <a class="reference internal" href="dimension_concepts.html#time-dimensions"><span class="std std-ref">Dimension Concepts — Time Dimensions</span></a>.</p>
+</section>
+<section id="time-in-parts">
+<h4>Time-in-parts<a class="headerlink" href="#time-in-parts" title="Link to this heading">¶</a></h4>
+<p>Time components (year, month, day, hour) are stored in separate integer columns. dsgrid automatically combines these into a single timestamp column during registration. For configuration options and examples, see <a class="reference internal" href="dimension_concepts.html#time-dimensions"><span class="std std-ref">Dimension Concepts — Time Dimensions</span></a>.</p>
+<p><strong>Data example (two-table, stacked):</strong></p>
+<div class="table-wrapper colwidths-given docutils container" id="id15">
+<table class="docutils align-default" id="id15">
+<caption><span class="caption-text">Time-in-parts example</span><a class="headerlink" href="#id15" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 12.9%" />
+<col style="width: 12.9%" />
+<col style="width: 12.9%" />
+<col style="width: 12.9%" />
+<col style="width: 12.9%" />
+<col style="width: 19.4%" />
+<col style="width: 16.1%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>year</p></th>
+<th class="head"><p>month</p></th>
+<th class="head"><p>day</p></th>
+<th class="head"><p>hour</p></th>
+<th class="head"><p>id</p></th>
+<th class="head"><p>metric</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>2012</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>1</p></td>
+<td><p>heating</p></td>
+<td><p>0.214</p></td>
+</tr>
+<tr class="row-odd"><td><p>2012</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>1</p></td>
+<td><p>cooling</p></td>
+<td><p>0.002</p></td>
+</tr>
+<tr class="row-even"><td><p>2012</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>heating</p></td>
+<td><p>0.329</p></td>
+</tr>
+<tr class="row-odd"><td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+<td><p>…</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The time-in-parts columns are removed and replaced with a single <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> column during registration. Original data files are not modified.</p>
+</div>
+</section>
+<section id="annual">
+<h4>Annual<a class="headerlink" href="#annual" title="Link to this heading">¶</a></h4>
+<p>Annual time dimensions contain one value per year per dimension combination. The data file includes a <code class="docutils literal notranslate"><span class="pre">model_year</span></code> column with integer year values. For configuration details and examples, see <a class="reference internal" href="../how_tos/how_to_time_dimension.html#annual-time"><span class="std std-ref">How to Define a Time Dimension — Annual Time</span></a>.</p>
+<p>See <a class="reference internal" href="../../software_reference/data_models/dimension_model.html#annualtimedimensionmodel"><span class="std std-ref">AnnualTimeDimensionModel</span></a> for all config fields.</p>
+</section>
+<section id="index">
+<h4>Index<a class="headerlink" href="#index" title="Link to this heading">¶</a></h4>
+<p>Index time dimensions use integer time steps rather than timestamp values. Data files include an integer time column (typically <code class="docutils literal notranslate"><span class="pre">time_index</span></code>) that dsgrid converts to proper timestamps during registration using the config’s starting timestamp and frequency. For detailed examples, configurations, and use cases, see <a class="reference internal" href="../how_tos/how_to_time_dimension.html#index-time"><span class="std std-ref">How to Define a Time Dimension — Index Time</span></a>.</p>
+<p>See <a class="reference internal" href="../../software_reference/data_models/dimension_model.html#indextimedimensionmodel"><span class="std std-ref">IndexTimeDimensionModel</span></a> for all config fields.</p>
+</section>
+<section id="representative-period">
+<h4>Representative Period<a class="headerlink" href="#representative-period" title="Link to this heading">¶</a></h4>
+<p>Representative period time dimensions represent typical patterns (e.g., a typical week per month) rather than actual calendar dates, specified using integer columns (month, day_of_week or is_weekday, hour). Two formats are supported: <code class="docutils literal notranslate"><span class="pre">one_week_per_month_by_hour</span></code> and <code class="docutils literal notranslate"><span class="pre">one_weekday_day_and_one_weekend_day_per_month_by_hour</span></code>. During dataset-to-project mapping, representative periods are expanded to actual calendar dates with DST transition handling. For detailed examples, column requirements, and conversion behavior, see <a class="reference internal" href="../how_tos/how_to_time_dimension.html#representative-time"><span class="std std-ref">How to Define a Time Dimension — Representative Time</span></a>.</p>
+<p>See <a class="reference internal" href="../../software_reference/data_models/dimension_model.html#representativeperiodtimedimensionmodel"><span class="std std-ref">RepresentativePeriodTimeDimensionModel</span></a> and <a class="reference internal" href="../../software_reference/data_models/enums.html#representativeperiodformat"><span class="std std-ref">RepresentativePeriodFormat</span></a> for all config fields and supported formats.</p>
+</section>
+<section id="noop-no-time-dimension">
+<h4>NoOp (No Time Dimension)<a class="headerlink" href="#noop-no-time-dimension" title="Link to this heading">¶</a></h4>
+<p>Use NoOp time for datasets with no time component — for example, static lookup tables or single-year snapshots where time is not a relevant data axis. Data files contain no time columns. For examples and configuration details, see <a class="reference internal" href="../how_tos/how_to_time_dimension.html#noop-time"><span class="std std-ref">How to Define a Time Dimension — NoOp Time</span></a>.</p>
+<p>See <a class="reference internal" href="../../software_reference/data_models/dimension_model.html#nooptimedimensionmodel"><span class="std std-ref">NoOpTimeDimensionModel</span></a> for all config fields.</p>
+</section>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="registration_checks.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Registration Checks</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="dataset_concepts.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Dataset Concepts</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Data File Formats</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements</a></li>
+<li><a class="reference internal" href="#recommendations">Recommendations</a></li>
+<li><a class="reference internal" href="#table-formats">Table Formats</a><ul>
+<li><a class="reference internal" href="#one-table-format">One Table Format</a></li>
+<li><a class="reference internal" href="#two-table-format">Two Table Format</a><ul>
+<li><a class="reference internal" href="#pivoted-no-scaling-factor">Pivoted, No Scaling Factor</a></li>
+<li><a class="reference internal" href="#lookup-table-with-scaling-factor">Lookup Table with Scaling Factor</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#value-formats">Value Formats</a><ul>
+<li><a class="reference internal" href="#stacked">Stacked</a></li>
+<li><a class="reference internal" href="#pivoted">Pivoted</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#data-layout">Data Layout</a></li>
+<li><a class="reference internal" href="#column-configuration">Column Configuration</a><ul>
+<li><a class="reference internal" href="#csv-files">CSV Files</a><ul>
+<li><a class="reference internal" href="#specifying-column-data-types">Specifying Column Data Types</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#custom-column-names">Custom Column Names</a></li>
+<li><a class="reference internal" href="#ignoring-columns">Ignoring Columns</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#time">Time</a><ul>
+<li><a class="reference internal" href="#storage-and-implementation-considerations">Storage and Implementation Considerations</a></li>
+<li><a class="reference internal" href="#time-formats">Time Formats</a><ul>
+<li><a class="reference internal" href="#timezone-aware-timestamps-timestamp-tz">Timezone-aware timestamps (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code>)</a></li>
+<li><a class="reference internal" href="#timezone-naive-timestamps-timestamp-ntz">Timezone-naive timestamps (<code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code>)</a></li>
+<li><a class="reference internal" href="#time-zone-column-sourcing">Time Zone Column Sourcing</a></li>
+<li><a class="reference internal" href="#time-in-parts">Time-in-parts</a></li>
+<li><a class="reference internal" href="#annual">Annual</a></li>
+<li><a class="reference internal" href="#index">Index</a></li>
+<li><a class="reference internal" href="#representative-period">Representative Period</a></li>
+<li><a class="reference internal" href="#noop-no-time-dimension">NoOp (No Time Dimension)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=1437fa6d"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

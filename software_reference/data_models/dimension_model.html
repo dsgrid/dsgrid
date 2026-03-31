@@ -1,0 +1,1776 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Dimension Record Classes" href="dimension_classes.html"><link rel="prev" title="Data Models" href="index.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Dimensions - dsgrid 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=04b6322e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.4.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.4.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../user_guide/index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_time_dimension.html">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/dataset_registration/index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_registration/dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_registration/dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_registration/data_file_formats.html">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_registration/registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_mapping/concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_mapping/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_mapping/mapping_types.html">Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_mapping/mapping_workflows.html">Mapping Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/dataset_submittal/index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_submittal/submission_process.html">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/dataset_submittal/submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_creation/project_concepts.html">Project Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_creation/base_dimensions.html">Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_creation/supplemental_dimensions.html">Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_creation/dataset_requirements.html">Dataset Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/project_queries/index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_queries/query_concepts.html">Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_queries/aggregations.html">Aggregations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_queries/filters.html">Filters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_queries/output_formats.html">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_derived_datasets/derived_concepts.html">Derived Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_derived_datasets/growth_rates.html">Growth Rates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_derived_datasets/residuals.html">Residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/project_derived_datasets/workflows.html">Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../user_guide/apache_spark/index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/apache_spark/overview.html">Apache Spark Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/apache_spark/when_to_use_spark.html">When to Use Spark</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/apache_spark/kestrel_setup.html">Kestrel Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/apache_spark/spark_cluster.html">Spark Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" checked="" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Citation and Data Attribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/software_reference/data_models/dimension_model.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="dimensions">
+<h1>Dimensions<a class="headerlink" href="#dimensions" title="Link to this heading">¶</a></h1>
+<section id="dimensionmodel">
+<h2>DimensionModel<a class="headerlink" href="#dimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.DimensionModel</em></p>
+<p>Defines a non-time dimension</p>
+<section id="fields">
+<h3>Fields<a class="headerlink" href="#fields" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">filename</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Filename containing dimension records. Only assigned for user input and output purposes. The registry database stores records in the dimension JSON document.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">file_hash</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Hash of the contents of the file</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">records</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[]</span></code></p></td>
+<td><p>Dimension records that can either be loaded from filename at runtime or provided directly. Example of records provided directly: records: [ {id: ‘scenario_1’, name: ‘Scenario 1’}, {id: ‘scenario_2’, name: ‘Scenario 2’}, ],</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="validators">
+<h3>Validators<a class="headerlink" href="#validators" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_file</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_file</span></code></p></td>
+<td><p>Validate that dimension file exists and has no errors</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">compute_file_hash</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">compute_file_hash</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">add_records</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">add_records</span></code></p></td>
+<td><p>Add records from the file.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="datetimedimensionmodel">
+<h2>DateTimeDimensionModel<a class="headerlink" href="#datetimedimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.DateTimeDimensionModel</em></p>
+<p>Defines a time dimension where timestamps translate to datetime objects.</p>
+<section id="id1">
+<h3>Fields<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timedimensiontype"><span class="std std-ref">TimeDimensionType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TimeDimensionType.DATETIME</span></code></p></td>
+<td><p>Type of time dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">column_format</span></code></p></td>
+<td><p><a class="reference internal" href="#timeformatdatetimetzmodel"><span class="std std-ref">TimeFormatDateTimeTZModel</span></a> | <a class="reference internal" href="#timeformatdatetimentzmodel"><span class="std std-ref">TimeFormatDateTimeNTZModel</span></a> | <a class="reference internal" href="#timeformatinpartsmodel"><span class="std std-ref">TimeFormatInPartsModel</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">dtype='timestamp_tz'</span> <span class="pre">time_column='timestamp'</span></code></p></td>
+<td><p>Specifies the format of the timestamps in the dataset.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_zone_format</span></code></p></td>
+<td><p><a class="reference internal" href="#alignedtimesingletimezone"><span class="std std-ref">AlignedTimeSingleTimeZone</span></a> | <a class="reference internal" href="#localtimemultipletimezones"><span class="std std-ref">LocalTimeMultipleTimeZones</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Specifies whether timestamps are aligned in absolute time or in local standard time when adjusted for time zone.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#measurementtype"><span class="std std-ref">MeasurementType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MeasurementType.TOTAL</span></code></p></td>
+<td><p>The type of measurement represented by a value associated with a timestamp: mean, min, max, measured, total</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ranges</span></code></p></td>
+<td><p>list[<a class="reference internal" href="#timerangemodel"><span class="std std-ref">TimeRangeModel</span></a>]</p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Defines the continuous ranges of datetime in the data, inclusive of start and end time.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">time_interval_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timeintervaltype"><span class="std std-ref">TimeIntervalType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>The range of time that the value associated with a timestamp represents, e.g., period-beginning</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id2">
+<h3>Validators<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_times</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_times</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_standard_time_zones_for_localization</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>Validate that only fixed-offset time zones are used when localizing tz-naive timestamps.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="alignedtimesingletimezone">
+<h2>AlignedTimeSingleTimeZone<a class="headerlink" href="#alignedtimesingletimezone" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.AlignedTimeSingleTimeZone</em></p>
+<p>All geographies have data with the same set of timestamps in absolute time.</p>
+<p>E.g., data in CA and NY both start in 2018-01-01 00:00 Etc/GMT+5 (EST).</p>
+<p>For time zone, only an IANA time zone name or None is accepted. The types of time zones
+supported (fixed offset or DST-observing) depend on column_format, which in part defines
+whether the timestamps are tz-naive after parsing:</p>
+<ol class="arabic simple">
+<li><p>When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+(“America/New_York”) are accepted.</p></li>
+<li><p>When the input timestamps are tz-naive (i.e., ‘timestamp_ntz’ or TimeFormatInParts without
+offset column), only IANA time zones with constant UTC offsets (e.g., “Etc/GMT+5”) are allowed
+because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+definition, the timestamps in the data table must also be in standard time without skips and
+duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+missing timestamps at DST transitions when localizing tz-naive timestamps.</p></li>
+</ol>
+<p>Note: IANA time zone names (e.g., “America/New_York”, “Etc/GMT+5”) are distinct
+from UTC offsets (e.g., UTC-5). Fixed-offset zones like “Etc/GMT+5” observe
+a single UTC offset (UTC-5) year-round, while DST-observing zones like “America/New_York”
+have multiple offsets depending on the calendar date (UTC-5 during standard time,
+UTC-4 during daylight saving time).</p>
+<section id="id3">
+<h3>Fields<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">format_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Literal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME&quot;</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_zone</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>IANA time zone of data. Accepts <code class="docutils literal notranslate"><span class="pre">None</span></code> for no time zone. The types of time zones supported (fixed offset or DST-observing) depend on <code class="docutils literal notranslate"><span class="pre">column_format.dtype</span></code>. When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive (<code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> without <code class="docutils literal notranslate"><span class="pre">offset_column</span></code>), only fixed UTC offset zones are allowed.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id4">
+<h3>Validators<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="localtimemultipletimezones">
+<h2>LocalTimeMultipleTimeZones<a class="headerlink" href="#localtimemultipletimezones" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.LocalTimeMultipleTimeZones</em></p>
+<p>Timestamps cover the same interval of local clock time across geographies.</p>
+<p>All data represents the same interval of standard clock time as experienced locally
+in each geography’s time zone, but the intervals represent different absolute UTC instants.</p>
+<p>Example: California data starts at 2018-01-01 00:00-08:00, while
+New York data starts at 2018-01-01 00:00-05:00. Both rows have the
+same local clock time but represent different absolute UTC instants.</p>
+<p>The data table must contain a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column with IANA time zone names
+(one per row) that match the entries in the <code class="docutils literal notranslate"><span class="pre">time_zones</span></code> list below. The types of of time
+zones supported (fixed offset or DST-observing) depend on column_format, which in part defines
+whether the timestamps are tz-naive after parsing:</p>
+<ol class="arabic simple">
+<li><p>When the input timestamps are tz-aware, both fixed offset or DST-observing time zones
+(“America/New_York”) are accepted.</p></li>
+<li><p>When the input timestamps are tz-naive (i.e., ‘timestamp_ntz’ or TimeFormatInParts without
+offset column), only IANA time zones with constant UTC offsets (e.g., “Etc/GMT+5”) are allowed
+because dsgrid will localize the tz-naive timestamps to the time zone specified here. By
+definition, the timestamps in the data table must also be in standard time without skips and
+duplicates for daylight saving time (DST). This restriction is necessary to avoid ambiguous or
+missing timestamps at DST transitions when localizing tz-naive timestamps.</p></li>
+</ol>
+<p>Note: IANA time zone names (e.g., “America/New_York”, “Etc/GMT+5”) are distinct
+from UTC offsets (e.g., UTC-5). Fixed-offset zones like “Etc/GMT+5” observe
+a single UTC offset (UTC-5) year-round, while DST-observing zones like “America/New_York”
+have multiple offsets depending on the calendar date (UTC-5 during standard time,
+UTC-4 during daylight saving time).</p>
+<section id="id5">
+<h3>Fields<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">format_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Literal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME&quot;</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_zones</span></code></p></td>
+<td><p>list[<code class="docutils literal notranslate"><span class="pre">str</span></code>]</p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>List of unique IANA time zones in the dataset. Does not allow <code class="docutils literal notranslate"><span class="pre">None</span></code> as a time zone. The types of time zones supported (fixed offset or DST-observing) depend on <code class="docutils literal notranslate"><span class="pre">column_format.dtype</span></code>. When timestamps are tz-aware, both fixed offset and DST-observing zones are accepted. When timestamps are tz-naive (<code class="docutils literal notranslate"><span class="pre">timestamp_ntz</span></code> or <code class="docutils literal notranslate"><span class="pre">time_format_in_parts</span></code> without <code class="docutils literal notranslate"><span class="pre">offset_column</span></code>), only fixed UTC offset zones are allowed.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="timeformatdatetimentzmodel">
+<h2>TimeFormatDateTimeNTZModel<a class="headerlink" href="#timeformatdatetimentzmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.TimeFormatDateTimeNTZModel</em></p>
+<p>Format of timestamps in a dataset is timezone-naive datetime</p>
+<section id="id6">
+<h3>Fields<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dtype</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Literal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;timestamp_ntz&quot;</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;timestamp&quot;</span></code></p></td>
+<td><p>Name of the timestamp column in the dataset.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id7">
+<h3>Validators<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="timeformatdatetimetzmodel">
+<h2>TimeFormatDateTimeTZModel<a class="headerlink" href="#timeformatdatetimetzmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.TimeFormatDateTimeTZModel</em></p>
+<p>Format of timestamps in a dataset is timezone-aware datetime.</p>
+<section id="id8">
+<h3>Fields<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dtype</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Literal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;timestamp_tz&quot;</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;timestamp&quot;</span></code></p></td>
+<td><p>Name of the timestamp column in the dataset.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id9">
+<h3>Validators<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="timeformatinpartsmodel">
+<h2>TimeFormatInPartsModel<a class="headerlink" href="#timeformatinpartsmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.TimeFormatInPartsModel</em></p>
+<p>Format of timestamps in a dataset is in parts, e.g., month-day-hour format,
+requiring conversion to datetime.</p>
+<section id="id10">
+<h3>Fields<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dtype</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Literal</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;time_format_in_parts&quot;</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">year_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Name of the year column in the dataset.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">month_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Name of the month column in the dataset. Value is the month in a year (1 - 12)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">day_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Name of the day column in the dataset. Value is the day in a month (1 - 31).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hour_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Name of the hour column in the dataset. Value is the hour in a day (0 - 23). If None, the hour will be set to 0 for all rows.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">offset_column</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Name of the offset column in the dataset. Value is the UTC offset, either as a numeric offset in hours (e.g., -8) or as a string in ±HH:MM format (e.g., -08:00). If None, no offset is applied and the resulting timestamp will be timezone-naive. Example: ‘2024-01-01 00:00:00-05:00’ is the start of 2024 in New York; the offset column records ‘-05:00’ for that row. For America/New_York, the offset is -05:00 during standard time and -04:00 during daylight saving time.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="timerangemodel">
+<h2>TimeRangeModel<a class="headerlink" href="#timerangemodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.TimeRangeModel</em></p>
+<p>Defines a continuous range of time.</p>
+<section id="id11">
+<h3>Fields<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>First timestamp in the data</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Last timestamp in the data (inclusive)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">str_format</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;%Y-%m-%d</span> <span class="pre">%H:%M:%S&quot;</span></code></p></td>
+<td><p>Timestamp string format (for parsing the time ranges). The string format is used to parse the timestamps provided in the time ranges.Cheatsheet reference: <code class="docutils literal notranslate"><span class="pre">&lt;https://strftime.org/&gt;</span></code>_.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">timedelta</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1:00:00</span></code></p></td>
+<td><p>Resolution of the timestamps</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="annualtimedimensionmodel">
+<h2>AnnualTimeDimensionModel<a class="headerlink" href="#annualtimedimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.AnnualTimeDimensionModel</em></p>
+<p>Defines an annual time dimension where timestamps are years.
+Each value associated with a year represents the MEASUREMENT_TYPE over the entire year.
+i.e., MEASUREMENT_TYPE = total means the value is the total over the year, not over the range frequency.</p>
+<section id="id12">
+<h3>Fields<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timedimensiontype"><span class="std std-ref">TimeDimensionType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TimeDimensionType.ANNUAL</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#measurementtype"><span class="std std-ref">MeasurementType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MeasurementType.TOTAL</span></code></p></td>
+<td><p>The type of measurement represented by a value associated with an annual time: e.g., total</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ranges</span></code></p></td>
+<td><p>list[<a class="reference internal" href="#annualrangemodel"><span class="std std-ref">AnnualRangeModel</span></a>]</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[]</span></code></p></td>
+<td><p>Defines the contiguous ranges of annual time in the data, inclusive of start and end time.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">include_leap_day</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>Whether annual time includes leap day.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id13">
+<h3>Validators<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_times</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_times</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_measurement_type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_measurement_type</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="annualrangemodel">
+<h2>AnnualRangeModel<a class="headerlink" href="#annualrangemodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.AnnualRangeModel</em></p>
+<p>Defines a continuous range of annual time.</p>
+<section id="id14">
+<h3>Fields<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>First year in the data</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Last year in the data (inclusive)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">str_format</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;%Y&quot;</span></code></p></td>
+<td><p>Timestamp string format. The string format is used to parse the timestamps provided in the time ranges. Cheatsheet reference: <code class="docutils literal notranslate"><span class="pre">&lt;https://strftime.org/&gt;</span></code>_.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Resolution of the annual time in number of years</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="representativeperiodtimedimensionmodel">
+<h2>RepresentativePeriodTimeDimensionModel<a class="headerlink" href="#representativeperiodtimedimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel</em></p>
+<p>Defines a representative time dimension.</p>
+<section id="id15">
+<h3>Fields<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timedimensiontype"><span class="std std-ref">TimeDimensionType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TimeDimensionType.REPRESENTATIVE_PERIOD</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#measurementtype"><span class="std std-ref">MeasurementType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MeasurementType.TOTAL</span></code></p></td>
+<td><p>The type of measurement represented by a value associated with a timestamp: e.g., mean, total</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">format</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#representativeperiodformat"><span class="std std-ref">RepresentativePeriodFormat</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Format of the timestamps in the load data</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ranges</span></code></p></td>
+<td><p>list[<a class="reference internal" href="#monthrangemodel"><span class="std std-ref">MonthRangeModel</span></a>]</p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Defines the continuous ranges of datetime in the data, inclusive of start and end time.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_interval_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timeintervaltype"><span class="std std-ref">TimeIntervalType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>The range of time that the value associated with a timestamp represents</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id16">
+<h3>Validators<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="monthrangemodel">
+<h2>MonthRangeModel<a class="headerlink" href="#monthrangemodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.MonthRangeModel</em></p>
+<p>Defines a continuous range of time.</p>
+<section id="id17">
+<h3>Fields<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>First month in the data (January is 1, December is 12)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Last month in the data (inclusive)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="indextimedimensionmodel">
+<h2>IndexTimeDimensionModel<a class="headerlink" href="#indextimedimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.IndexTimeDimensionModel</em></p>
+<p>Defines a time dimension where timestamps are indices and requires converting to datetime.</p>
+<section id="id18">
+<h3>Fields<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timedimensiontype"><span class="std std-ref">TimeDimensionType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TimeDimensionType.INDEX</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#measurementtype"><span class="std std-ref">MeasurementType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MeasurementType.TOTAL</span></code></p></td>
+<td><p>The type of measurement represented by a value associated with a timestamp: e.g., mean, total</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ranges</span></code></p></td>
+<td><p>list[<a class="reference internal" href="#indexrangemodel"><span class="std std-ref">IndexRangeModel</span></a>]</p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Defines the continuous ranges of indices of the data, inclusive of start and end index.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">time_interval_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timeintervaltype"><span class="std std-ref">TimeIntervalType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>The range of time that the value associated with a timestamp represents, e.g., period-beginning</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id19">
+<h3>Validators<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_indices</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_indices</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">handle_legacy_fields</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">*(model)*</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="indexrangemodel">
+<h2>IndexRangeModel<a class="headerlink" href="#indexrangemodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.IndexRangeModel</em></p>
+<p>Defines a continuous range of indices.</p>
+<section id="id20">
+<h3>Fields<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">start</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>First of indices</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">end</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Last of indices (inclusive)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">starting_timestamp</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Timestamp the start index corresponds to.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">str_format</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;%Y-%m-%d</span> <span class="pre">%H:%M:%S&quot;</span></code></p></td>
+<td><p>Timestamp string format. The string format is used to parse the starting timestamp provided. Cheatsheet reference: <code class="docutils literal notranslate"><span class="pre">&lt;https://strftime.org/&gt;</span></code>_.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">timedelta</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1:00:00</span></code></p></td>
+<td><p>Resolution of the timestamps for which the index range represents.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="nooptimedimensionmodel">
+<h2>NoOpTimeDimensionModel<a class="headerlink" href="#nooptimedimensionmodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.NoOpTimeDimensionModel</em></p>
+<p>Defines a NoOp time dimension.</p>
+<section id="id21">
+<h3>Fields<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Registry database ID</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Version, generated by dsgrid</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Unique identifier, generated by dsgrid</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;dsgrid.dimension.standard&quot;</span></code></p></td>
+<td><p>Python module with the dimension class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Dimension record model class name. The dimension class defines the expected and allowable fields (and their data types) for the dimension records file.All dimension records must have a ‘id’ and ‘name’ field.Some dimension classes support additional fields that can be used for mapping, querying, display, etc.dsgrid in online-mode only supports dimension classes defined in the :mod:<code class="docutils literal notranslate"><span class="pre">dsgrid.dimension.standard</span></code> module. If dsgrid does not currently support a dimension class that you require, please contact the dsgrid-coordination team to request a new class feature</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">cls</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">Any</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>Dimension record model class</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">description</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code> | None</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+<td><p>A description of the dimension records that is helpful, memorable, and identifiable</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">time_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#timedimensiontype"><span class="std std-ref">TimeDimensionType</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TimeDimensionType.NOOP</span></code></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="id22">
+<h3>Validators<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<div class="model-validators-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Applies To</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_name</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">check_module</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class_name</span></code></p></td>
+<td><p>Set class_name based on inputs.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">get_dimension_class</span></code></p></td>
+<td><p>No description</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="dimensionreferencemodel">
+<h2>DimensionReferenceModel<a class="headerlink" href="#dimensionreferencemodel" title="Link to this heading">¶</a></h2>
+<p><em>dsgrid.config.dimensions.DimensionReferenceModel</em></p>
+<p>Reference to a dimension stored in the registry</p>
+<section id="id23">
+<h3>Fields<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
+<div class="model-fields-table">
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></p></td>
+<td><p><a class="reference internal" href="enums.html#dimensiontype"><span class="std std-ref">DimensionType</span></a></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Type of the dimension</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dimension_id</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Unique ID of the dimension in the registry. The dimension ID is generated by dsgrid when a dimension is registered. Only alphanumerics and dashes are supported.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">version</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><em>(required)</em></p></td>
+<td><p>Version of the dimension. The version string must be in semver format (e.g., ‘1.0.0’) and it must be a valid/existing version in the registry.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="dimension_classes.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Dimension Record Classes</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Data Models</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dimensions</a><ul>
+<li><a class="reference internal" href="#dimensionmodel">DimensionModel</a><ul>
+<li><a class="reference internal" href="#fields">Fields</a></li>
+<li><a class="reference internal" href="#validators">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#datetimedimensionmodel">DateTimeDimensionModel</a><ul>
+<li><a class="reference internal" href="#id1">Fields</a></li>
+<li><a class="reference internal" href="#id2">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#alignedtimesingletimezone">AlignedTimeSingleTimeZone</a><ul>
+<li><a class="reference internal" href="#id3">Fields</a></li>
+<li><a class="reference internal" href="#id4">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#localtimemultipletimezones">LocalTimeMultipleTimeZones</a><ul>
+<li><a class="reference internal" href="#id5">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#timeformatdatetimentzmodel">TimeFormatDateTimeNTZModel</a><ul>
+<li><a class="reference internal" href="#id6">Fields</a></li>
+<li><a class="reference internal" href="#id7">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#timeformatdatetimetzmodel">TimeFormatDateTimeTZModel</a><ul>
+<li><a class="reference internal" href="#id8">Fields</a></li>
+<li><a class="reference internal" href="#id9">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#timeformatinpartsmodel">TimeFormatInPartsModel</a><ul>
+<li><a class="reference internal" href="#id10">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#timerangemodel">TimeRangeModel</a><ul>
+<li><a class="reference internal" href="#id11">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#annualtimedimensionmodel">AnnualTimeDimensionModel</a><ul>
+<li><a class="reference internal" href="#id12">Fields</a></li>
+<li><a class="reference internal" href="#id13">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#annualrangemodel">AnnualRangeModel</a><ul>
+<li><a class="reference internal" href="#id14">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#representativeperiodtimedimensionmodel">RepresentativePeriodTimeDimensionModel</a><ul>
+<li><a class="reference internal" href="#id15">Fields</a></li>
+<li><a class="reference internal" href="#id16">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#monthrangemodel">MonthRangeModel</a><ul>
+<li><a class="reference internal" href="#id17">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indextimedimensionmodel">IndexTimeDimensionModel</a><ul>
+<li><a class="reference internal" href="#id18">Fields</a></li>
+<li><a class="reference internal" href="#id19">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indexrangemodel">IndexRangeModel</a><ul>
+<li><a class="reference internal" href="#id20">Fields</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#nooptimedimensionmodel">NoOpTimeDimensionModel</a><ul>
+<li><a class="reference internal" href="#id21">Fields</a></li>
+<li><a class="reference internal" href="#id22">Validators</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dimensionreferencemodel">DimensionReferenceModel</a><ul>
+<li><a class="reference internal" href="#id23">Fields</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=1437fa6d"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

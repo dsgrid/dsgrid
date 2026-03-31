@@ -1,0 +1,810 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Project Derived Datasets" href="../project_derived_datasets/index.html"><link rel="prev" title="Filters" href="filters.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Output Formats - dsgrid 0.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=04b6322e" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.4.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.4.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_time_dimension.html">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_registration/index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/data_file_formats.html">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_types.html">Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/mapping_workflows.html">Mapping Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_submittal/index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_process.html">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_submittal/submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/project_concepts.html">Project Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/base_dimensions.html">Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/supplemental_dimensions.html">Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/dataset_requirements.html">Dataset Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" checked="" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="query_concepts.html">Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="aggregations.html">Aggregations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/derived_concepts.html">Derived Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/growth_rates.html">Growth Rates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/residuals.html">Residuals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/workflows.html">Workflows</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../apache_spark/index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/overview.html">Apache Spark Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/when_to_use_spark.html">When to Use Spark</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/kestrel_setup.html">Kestrel Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/spark_cluster.html">Spark Cluster</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../software_reference/index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../software_reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_model.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Citation and Data Attribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/user_guide/project_queries/output_formats.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="output-formats">
+<h1>Output Formats<a class="headerlink" href="#output-formats" title="Link to this heading">¶</a></h1>
+<p>Query results can be customized through parameters in <code class="docutils literal notranslate"><span class="pre">QueryResultParamsModel</span></code>, which controls table structure, file format, data organization, and post-processing. This guide explains how each parameter influences the output.</p>
+<section id="overview-of-queryresultparamsmodel">
+<h2>Overview of QueryResultParamsModel<a class="headerlink" href="#overview-of-queryresultparamsmodel" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">QueryResultParamsModel</span></code> class provides fine-grained control over how query results are formatted and stored. Parameters are passed when executing a query and determine:</p>
+<ul class="simple">
+<li><p><strong>Table structure</strong> — how rows and columns are organized (stacked vs. pivoted)</p></li>
+<li><p><strong>File format</strong> — CSV or Parquet output</p></li>
+<li><p><strong>Column naming</strong> — dimension names vs. dimension types</p></li>
+<li><p><strong>Data filtering and sorting</strong> — which rows appear and in what order</p></li>
+<li><p><strong>Time zone conversion</strong> — localization to specific time zones</p></li>
+<li><p><strong>Aggregation behavior</strong> — how dimensions are rolled up</p></li>
+<li><p><strong>Additional reports</strong> — pre-defined analysis outputs</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="table-format-stacked-vs-pivoted">
+<h2>Table Format: Stacked vs. Pivoted<a class="headerlink" href="#table-format-stacked-vs-pivoted" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">table_format</span></code> parameter controls the overall structure of your result table.</p>
+<section id="stacked-format-default">
+<h3>Stacked Format (Default)<a class="headerlink" href="#stacked-format-default" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">table_format</span><span class="p">:</span> <span class="n">StackedTableFormatModel</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Structure</strong>: Long, narrow table with all dimensions as columns (plus one <code class="docutils literal notranslate"><span class="pre">value</span></code> column).</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>geography</p></th>
+<th class="head"><p>subsector</p></th>
+<th class="head"><p>time</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CA</p></td>
+<td><p>Industrial</p></td>
+<td><p>2020-01-01</p></td>
+<td><p>1200.5</p></td>
+</tr>
+<tr class="row-odd"><td><p>CA</p></td>
+<td><p>Industrial</p></td>
+<td><p>2020-01-02</p></td>
+<td><p>1195.3</p></td>
+</tr>
+<tr class="row-even"><td><p>CA</p></td>
+<td><p>Residential</p></td>
+<td><p>2020-01-01</p></td>
+<td><p>450.2</p></td>
+</tr>
+<tr class="row-odd"><td><p>TX</p></td>
+<td><p>Industrial</p></td>
+<td><p>2020-01-01</p></td>
+<td><p>2100.8</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Use when</strong>: Working with time series analysis, filtering by multiple dimensions, or performing statistical calculations. This format is most practical for most analyses.</p>
+</section>
+<section id="pivoted-format">
+<h3>Pivoted Format<a class="headerlink" href="#pivoted-format" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">table_format</span><span class="p">:</span> <span class="n">PivotedTableFormatModel</span><span class="p">(</span>
+    <span class="n">dimension_to_pivot</span><span class="p">:</span> <span class="s2">&quot;subsector&quot;</span>  <span class="c1"># column to spread across as column headers</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Structure</strong>: Wider table where one dimension’s records become column headers, with values spread across columns.</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>geography</p></th>
+<th class="head"><p>time</p></th>
+<th class="head"><p>Industrial</p></th>
+<th class="head"><p>Residential</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CA</p></td>
+<td><p>2020-01-01</p></td>
+<td><p>1200.5</p></td>
+<td><p>450.2</p></td>
+</tr>
+<tr class="row-odd"><td><p>CA</p></td>
+<td><p>2020-01-02</p></td>
+<td><p>1195.3</p></td>
+<td><p>448.7</p></td>
+</tr>
+<tr class="row-even"><td><p>TX</p></td>
+<td><p>2020-01-01</p></td>
+<td><p>2100.8</p></td>
+<td><p>620.5</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Use when</strong>: Comparing values across a dimension (e.g., subsector-to-subsector comparison), creating wide comparison matrices, or preparing data for spreadsheet analysis.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="column-naming-dimension-names-vs-types">
+<h2>Column Naming: Dimension Names vs. Types<a class="headerlink" href="#column-naming-dimension-names-vs-types" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">column_type</span></code> parameter controls whether columns use actual dimension names or generic type labels.</p>
+<section id="dimension-names-default">
+<h3>Dimension Names (Default)<a class="headerlink" href="#dimension-names-default" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">column_type</span><span class="p">:</span> <span class="n">ColumnType</span><span class="o">.</span><span class="n">DIMENSION_NAMES</span>
+</pre></div>
+</div>
+<p>Columns use actual dimension names from your project: <code class="docutils literal notranslate"><span class="pre">geography</span></code>, <code class="docutils literal notranslate"><span class="pre">subsector</span></code>, <code class="docutils literal notranslate"><span class="pre">time</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>.</p>
+<p><strong>Use when</strong>: Reading results directly or performing ad-hoc analysis where dimension names provide context.</p>
+</section>
+<section id="dimension-types">
+<h3>Dimension Types<a class="headerlink" href="#dimension-types" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">column_type</span><span class="p">:</span> <span class="n">ColumnType</span><span class="o">.</span><span class="n">DIMENSION_TYPES</span>
+</pre></div>
+</div>
+<p>Columns use generic type names: <code class="docutils literal notranslate"><span class="pre">geography_type</span></code>, <code class="docutils literal notranslate"><span class="pre">subsector_type</span></code>, <code class="docutils literal notranslate"><span class="pre">time_type</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code>.</p>
+<p><strong>Use when</strong>: Registering query results as a derived dataset (required). This naming convention ensures compatibility with the dsgrid data registration system.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="file-format">
+<h2>File Format<a class="headerlink" href="#file-format" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">output_format</span></code> parameter controls the output file format.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">output_format</span><span class="p">:</span> <span class="s2">&quot;parquet&quot;</span>  <span class="c1"># or &quot;csv&quot;</span>
+</pre></div>
+</div>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Format</p></th>
+<th class="head"><p>Advantages</p></th>
+<th class="head"><p>Disadvantages</p></th>
+<th class="head"><p>Use When</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>parquet</strong> (default)</p></td>
+<td><p>Efficient compression, preserves data types, scalable to large files</p></td>
+<td><p>Requires specialized tools to read</p></td>
+<td><p>Results are large or will be processed further</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>csv</strong></p></td>
+<td><p>Universal, human-readable, opens in spreadsheet applications</p></td>
+<td><p>Large file sizes, loses data type information</p></td>
+<td><p>Results are small or for sharing with others</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<hr class="docutils" />
+<section id="replace-ids-with-names">
+<h2>Replace IDs with Names<a class="headerlink" href="#replace-ids-with-names" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">replace_ids_with_names</span></code> parameter controls whether dimension record IDs or names appear in results.</p>
+<section id="default-behavior-false">
+<h3>Default Behavior (False)<a class="headerlink" href="#default-behavior-false" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">replace_ids_with_names</span><span class="p">:</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<p>Results contain dimension record IDs:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>geography_id</p></th>
+<th class="head"><p>subsector_id</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>06001</p></td>
+<td><p>110</p></td>
+<td><p>1200.5</p></td>
+</tr>
+<tr class="row-odd"><td><p>06002</p></td>
+<td><p>110</p></td>
+<td><p>950.3</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="with-names-replacement-true">
+<h3>With Names Replacement (True)<a class="headerlink" href="#with-names-replacement-true" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">replace_ids_with_names</span><span class="p">:</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>Results contain human-readable names:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>geography_name</p></th>
+<th class="head"><p>subsector_name</p></th>
+<th class="head"><p>value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Alameda County</p></td>
+<td><p>Oil and gas extraction</p></td>
+<td><p>1200.5</p></td>
+</tr>
+<tr class="row-odd"><td><p>Alpine County</p></td>
+<td><p>Oil and gas extraction</p></td>
+<td><p>950.3</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>Note</strong>: This is purely cosmetic and doesn’t affect data values. Choose based on whether you need human-readable output or IDs for downstream processing.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="aggregation-control">
+<h2>Aggregation Control<a class="headerlink" href="#aggregation-control" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">aggregations</span></code> parameter and <code class="docutils literal notranslate"><span class="pre">aggregate_each_dataset</span></code> flag control how dimensions are rolled up in your results.</p>
+<section id="aggregating-dimensions">
+<h3>Aggregating Dimensions<a class="headerlink" href="#aggregating-dimensions" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">aggregations</span></code> to roll up (group) dimensions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">aggregations</span><span class="p">:</span> <span class="p">[</span>
+    <span class="n">AggregationModel</span><span class="p">(</span>
+        <span class="n">dimension</span><span class="p">:</span> <span class="s2">&quot;subsector&quot;</span><span class="p">,</span>
+        <span class="n">aggregation_function</span><span class="p">:</span> <span class="s2">&quot;sum&quot;</span>
+    <span class="p">),</span>
+    <span class="n">AggregationModel</span><span class="p">(</span>
+        <span class="n">dimension</span><span class="p">:</span> <span class="s2">&quot;time&quot;</span><span class="p">,</span>
+        <span class="n">aggregation_function</span><span class="p">:</span> <span class="s2">&quot;mean&quot;</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>This removes <code class="docutils literal notranslate"><span class="pre">subsector</span></code> and <code class="docutils literal notranslate"><span class="pre">time</span></code> as columns and instead aggregates values across all subsectors (summing) and all times (averaging).</p>
+<p><strong>Result</strong>: Output has fewer columns (<code class="docutils literal notranslate"><span class="pre">geography</span></code> only, plus <code class="docutils literal notranslate"><span class="pre">value</span></code>), with rolled-up values.</p>
+</section>
+<section id="aggregating-individual-datasets-vs-combined-result">
+<h3>Aggregating Individual Datasets vs. Combined Result<a class="headerlink" href="#aggregating-individual-datasets-vs-combined-result" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">aggregate_each_dataset</span></code> parameter determines when aggregation happens:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">aggregate_each_dataset</span><span class="p">:</span> <span class="kc">False</span>  <span class="c1"># Default: aggregate after combining datasets</span>
+<span class="n">aggregate_each_dataset</span><span class="p">:</span> <span class="kc">True</span>   <span class="c1"># Aggregate each dataset separately first</span>
+</pre></div>
+</div>
+<p><strong>When combining datasets with different dimensionality</strong> (union followed by aggregation), set <code class="docutils literal notranslate"><span class="pre">aggregate_each_dataset:</span> <span class="pre">True</span></code> to avoid duplicate rows.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="sorting-results">
+<h2>Sorting Results<a class="headerlink" href="#sorting-results" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">sort_columns</span></code> parameter controls the row order in your output:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">sort_columns</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;geography&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Results are sorted first by <code class="docutils literal notranslate"><span class="pre">geography</span></code>, then by <code class="docutils literal notranslate"><span class="pre">time</span></code>. This makes output easier to scan and analyze.</p>
+<p><strong>Note</strong>: Column order in the output follows dimension order, while sorting affects row order.</p>
+</section>
+<hr class="docutils" />
+<section id="time-zone-conversion">
+<h2>Time Zone Conversion<a class="headerlink" href="#time-zone-conversion" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> parameter converts timestamps to a specific time zone:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">time_zone</span><span class="p">:</span> <span class="s2">&quot;America/New_York&quot;</span>      <span class="c1"># Convert to specific IANA timezone</span>
+<span class="n">time_zone</span><span class="p">:</span> <span class="s2">&quot;geography&quot;</span>              <span class="c1"># Convert to each geography&#39;s time zone</span>
+<span class="n">time_zone</span><span class="p">:</span> <span class="kc">None</span>                     <span class="c1"># Keep original (no conversion)</span>
+</pre></div>
+</div>
+<p>When time zone conversion is applied:</p>
+<ul class="simple">
+<li><p>Timestamps are converted to the specified zone</p></li>
+<li><p>The time column becomes timezone-naive (no UTC offset embedded)</p></li>
+<li><p>A separate <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column records the timezone for each row</p></li>
+</ul>
+<p><strong>Example</strong>: If your data is in UTC and you set <code class="docutils literal notranslate"><span class="pre">time_zone:</span> <span class="pre">&quot;America/Los_Angeles&quot;</span></code>, timestamps shift 7-8 hours earlier (depending on DST).</p>
+</section>
+<hr class="docutils" />
+<section id="filtering-results">
+<h2>Filtering Results<a class="headerlink" href="#filtering-results" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">dimension_filters</span></code> parameter applies post-processing filters to the query result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">dimension_filters</span><span class="p">:</span> <span class="p">[</span>
+    <span class="n">DimensionFilters</span><span class="p">(</span>
+        <span class="n">dimension</span><span class="p">:</span> <span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+        <span class="n">records</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;06001&quot;</span><span class="p">,</span> <span class="s2">&quot;06003&quot;</span><span class="p">,</span> <span class="s2">&quot;06005&quot;</span><span class="p">]</span>  <span class="c1"># Only these counties</span>
+    <span class="p">),</span>
+    <span class="n">DimensionFilters</span><span class="p">(</span>
+        <span class="n">dimension</span><span class="p">:</span> <span class="s2">&quot;subsector&quot;</span><span class="p">,</span>
+        <span class="n">records</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;110&quot;</span><span class="p">,</span> <span class="s2">&quot;120&quot;</span><span class="p">]</span>  <span class="c1"># Only these subsectors</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>Filters are applied <strong>after</strong> the query executes, removing rows that don’t match. This is different from query-level filters (which reduce computation) but useful for extracting subsets from results.</p>
+</section>
+<hr class="docutils" />
+<section id="reports">
+<h2>Reports<a class="headerlink" href="#reports" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">reports</span></code> parameter generates pre-defined analysis reports on the query result:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">reports</span><span class="p">:</span> <span class="p">[</span>
+    <span class="n">ReportInputModel</span><span class="p">(</span><span class="n">report_name</span><span class="p">:</span> <span class="s2">&quot;peak_load&quot;</span><span class="p">),</span>
+    <span class="n">ReportInputModel</span><span class="p">(</span><span class="n">report_name</span><span class="p">:</span> <span class="s2">&quot;seasonal_pattern&quot;</span><span class="p">)</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>Each report generates additional output files with specific analyses (e.g., peak load analysis, seasonal breakdowns). Available reports depend on your dsgrid installation.</p>
+</section>
+<hr class="docutils" />
+<section id="complete-example">
+<h2>Complete Example<a class="headerlink" href="#complete-example" title="Link to this heading">¶</a></h2>
+<p>Here’s a complete <code class="docutils literal notranslate"><span class="pre">QueryResultParamsModel</span></code> configuration:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dsgrid.query.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">QueryResultParamsModel</span><span class="p">,</span>
+    <span class="n">AggregationModel</span><span class="p">,</span>
+    <span class="n">DimensionFilters</span><span class="p">,</span>
+    <span class="n">ColumnType</span><span class="p">,</span>
+    <span class="n">StackedTableFormatModel</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">result_params</span> <span class="o">=</span> <span class="n">QueryResultParamsModel</span><span class="p">(</span>
+    <span class="c1"># Table structure</span>
+    <span class="n">table_format</span><span class="o">=</span><span class="n">StackedTableFormatModel</span><span class="p">(),</span>
+    <span class="n">column_type</span><span class="o">=</span><span class="n">ColumnType</span><span class="o">.</span><span class="n">DIMENSION_NAMES</span><span class="p">,</span>
+
+    <span class="c1"># Output format</span>
+    <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;parquet&quot;</span><span class="p">,</span>
+
+    <span class="c1"># Data presentation</span>
+    <span class="n">replace_ids_with_names</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">sort_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;geography&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">],</span>
+
+    <span class="c1"># Filtering and aggregation</span>
+    <span class="n">aggregations</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">AggregationModel</span><span class="p">(</span>
+            <span class="n">dimension</span><span class="o">=</span><span class="s2">&quot;subsector&quot;</span><span class="p">,</span>
+            <span class="n">aggregation_function</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span>
+        <span class="p">)</span>
+    <span class="p">],</span>
+    <span class="n">aggregate_each_dataset</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">dimension_filters</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">DimensionFilters</span><span class="p">(</span>
+            <span class="n">dimension</span><span class="o">=</span><span class="s2">&quot;geography&quot;</span><span class="p">,</span>
+            <span class="n">records</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;06001&quot;</span><span class="p">,</span> <span class="s2">&quot;06003&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+    <span class="p">],</span>
+
+    <span class="c1"># Time zone conversion</span>
+    <span class="n">time_zone</span><span class="o">=</span><span class="s2">&quot;America/Los_Angeles&quot;</span><span class="p">,</span>
+
+    <span class="c1"># Additional analysis</span>
+    <span class="n">reports</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">ReportInputModel</span><span class="p">(</span><span class="n">report_name</span><span class="o">=</span><span class="s2">&quot;peak_load&quot;</span><span class="p">)</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This configuration produces a Parquet file with:</p>
+<ul class="simple">
+<li><p>Stacked rows (long format)</p></li>
+<li><p>Subsectors aggregated (summed)</p></li>
+<li><p>Only California counties 06001 and 06003</p></li>
+<li><p>Timestamps converted to America/Los_Angeles</p></li>
+<li><p>A peak load report generated</p></li>
+<li><p>Columns sorted by geography then time</p></li>
+<li><p>Human-readable dimension names</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="../project_derived_datasets/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Project Derived Datasets</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="filters.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Filters</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Output Formats</a><ul>
+<li><a class="reference internal" href="#overview-of-queryresultparamsmodel">Overview of QueryResultParamsModel</a></li>
+<li><a class="reference internal" href="#table-format-stacked-vs-pivoted">Table Format: Stacked vs. Pivoted</a><ul>
+<li><a class="reference internal" href="#stacked-format-default">Stacked Format (Default)</a></li>
+<li><a class="reference internal" href="#pivoted-format">Pivoted Format</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#column-naming-dimension-names-vs-types">Column Naming: Dimension Names vs. Types</a><ul>
+<li><a class="reference internal" href="#dimension-names-default">Dimension Names (Default)</a></li>
+<li><a class="reference internal" href="#dimension-types">Dimension Types</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#file-format">File Format</a></li>
+<li><a class="reference internal" href="#replace-ids-with-names">Replace IDs with Names</a><ul>
+<li><a class="reference internal" href="#default-behavior-false">Default Behavior (False)</a></li>
+<li><a class="reference internal" href="#with-names-replacement-true">With Names Replacement (True)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#aggregation-control">Aggregation Control</a><ul>
+<li><a class="reference internal" href="#aggregating-dimensions">Aggregating Dimensions</a></li>
+<li><a class="reference internal" href="#aggregating-individual-datasets-vs-combined-result">Aggregating Individual Datasets vs. Combined Result</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sorting-results">Sorting Results</a></li>
+<li><a class="reference internal" href="#time-zone-conversion">Time Zone Conversion</a></li>
+<li><a class="reference internal" href="#filtering-results">Filtering Results</a></li>
+<li><a class="reference internal" href="#reports">Reports</a></li>
+<li><a class="reference internal" href="#complete-example">Complete Example</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=1437fa6d"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

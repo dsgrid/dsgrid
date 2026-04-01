@@ -113,6 +113,27 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _get_load_data_table(self) -> DataFrame:
         return self._load_data.join(self._load_data_lookup, on="id")
 
+    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
+        """Override base implementation to avoid joining all time-series rows.
+
+        The base class joins the full load_data (potentially billions of time-step rows)
+        with the lookup table and then calls .distinct(). For the two-table schema the
+        same result can be obtained far more cheaply:
+          1. Select only the columns from load_data that are dimension columns (typically
+             just "metric"), plus "id", and take distinct — eliminating all time steps.
+          2. Join that small table with the lookup's dimension columns.
+        This reduces the data scanned from O(ids × metrics × time_steps) to
+        O(ids × metrics).
+        """
+        ld_dim_cols = self._list_dimension_columns(self._load_data)
+        distinct_ld = self._load_data.select("id", *ld_dim_cols).distinct()
+
+        lkp_dim_cols = self._list_dimension_columns(self._load_data_lookup)
+        distinct_lkp = self._load_data_lookup.select("id", *lkp_dim_cols).distinct()
+
+        joined = distinct_ld.join(distinct_lkp, on="id")
+        return joined.select(*ld_dim_cols, *lkp_dim_cols).distinct()
+
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
     ) -> DataFrame:

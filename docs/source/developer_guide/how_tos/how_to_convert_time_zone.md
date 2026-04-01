@@ -2,7 +2,7 @@
 
 Time zone conversion shifts a timestamp from one time zone to another, changing its local time representation. The underlying UTC instant—the actual moment in time—remains unchanged.
 
-dsgrid provides time zone conversion through [Chronify](https://github.com/NatLabRockies/chronify), a time series mapping library. The relevant functions live in `dsgrid/utils/dataset.py`. This guide covers when and how to use them, what the input and output time columns look like, and how the query backend affects the output.
+dsgrid provides time zone conversion through [Chronify](https://github.com/NREL/chronify), a time series mapping library. The relevant functions live in `dsgrid/utils/dataset.py`. This guide covers when and how to use them, what the input and output time columns look like, and how the query backend affects the output.
 
 ## Why the output is always timezone-naive
 

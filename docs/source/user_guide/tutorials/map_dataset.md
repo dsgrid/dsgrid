@@ -99,6 +99,6 @@ $ cat /kfs3/scratch/dthom/ief-registry-y2-3/__dsgrid_scratch__/tmpgn_6xbst.json
 
 ## Next Steps
 
-- Learn about [dimension mapping concepts](../dataset_mapping/concepts)
+- Learn about [dimension mapping concepts](../dataset_mapping/dimension_mapping_concepts)
 - Explore [querying project data](query_project)
 - Understand [Apache Spark performance tuning](../apache_spark/overview.md#troubleshooting-configuration-problems)

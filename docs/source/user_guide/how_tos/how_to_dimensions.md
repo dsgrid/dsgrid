@@ -42,6 +42,6 @@ For any dimensions that differ from the project, create mappings. See the [datas
 
 ## Next Steps
 
-- Learn about [dimension mapping](../dataset_mapping/concepts)
+- Learn about [dimension mapping](../dataset_mapping/dimension_mapping_concepts)
 - Follow the complete [dataset registration tutorial](../tutorials/create_and_submit_dataset)
 - Understand [data file formats](../dataset_registration/data_file_formats)

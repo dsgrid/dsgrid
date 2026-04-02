@@ -5,18 +5,9 @@ a project. This is useful when you want to map a dataset to alternate
 dimensions (e.g., aggregate county-level data to state-level) as a standalone
 operation.
 
-## When to Use a Dataset Query
-
-Use `dsgrid query dataset` when you want to:
-
-- Map a dataset to coarser dimensions (e.g., counties → states) before further
-  analysis
-- Transform a dataset's dimensions without needing a project
-- Cache a remapped dataset for reuse in multiple downstream analyses
-
 If you need to combine multiple datasets, apply result-level aggregations,
 filters, or reports, use a **project query** instead. See
-[Query Concepts](../project_queries/query_concepts).
+[Project Query Concepts](../project_queries/project_query_concepts).
 
 ## How It Works
 
@@ -46,7 +37,7 @@ A dataset query is defined by a JSON5 file with these fields:
   to_dimension_references: [
     {
       type: "geography",
-      dimension_id: "us-states-l48",
+      dimension_id: "<target-dimension-uuid>",
       version: "1.0.0",
     },
   ],
@@ -207,5 +198,5 @@ Options:
 
 - Follow the [Query a Dataset tutorial](../tutorials/query_dataset)
 - Learn [Dimension Mapping Concepts](dimension_mapping_concepts) for config structure
-- See the [DatasetQueryModel API reference](../../software_reference/python_api) for
-  the full Python model
+- See the [DatasetQueryModel reference](../../software_reference/data_models/dataset_query_model) for
+  the full data model

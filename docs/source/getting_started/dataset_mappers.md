@@ -23,7 +23,7 @@ Dimension mappings are also central to other dsgrid workflows, particularly when
 
 Mapping can be computationally intensive for datasets with many records or fine-grained dimensions. If you are working with large datasets on NLR HPC:
 
-- Install the Spark extras: `pip install "dsgrid-toolkit[spark]"`
+- Install the Spark extras: `pip install dsgrid-toolkit[spark]`
 - See [How to Run dsgrid on Kestrel](../user_guide/how_tos/run_on_kestrel)
 
 ## Key Resources
@@ -48,3 +48,5 @@ Mapping can be computationally intensive for datasets with many records or fine-
 
 - [Dimension Mapping Data Model](../software_reference/data_models/dimension_mapping_model)
 - [DimensionMappingType Enum](../software_reference/data_models/enums.md#dimensionmappingtype)
+- [Dataset Query Data Models](../software_reference/data_models/dataset_query_model)
+- [CLI Reference](../software_reference/cli_reference)

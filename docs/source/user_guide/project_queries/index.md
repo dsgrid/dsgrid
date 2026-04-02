@@ -7,7 +7,7 @@ Learn how to query dsgrid projects and analyze energy demand data.
 ```{toctree}
 :maxdepth: 1
 
-query_concepts
+project_query_concepts
 aggregations
 filters
 output_formats

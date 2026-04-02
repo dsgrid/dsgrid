@@ -1,6 +1,6 @@
 # How to Filter a Query
 
-dsgrid offers several ways to filter the result of a query. It is important to understand some dsgrid behaviors to get an optimal result. Please refer to [query concepts](../project_queries/query_concepts) for details.
+dsgrid offers several ways to filter the result of a query. It is important to understand some dsgrid behaviors to get an optimal result. Please refer to [project query concepts](../project_queries/project_query_concepts) for details.
 
 The examples below show how to define the filters in JSON5 or Python as well as the equivalent implementation if you were to filter the dataframe with Spark in Python (pyspark).
 
@@ -349,6 +349,6 @@ dimension_filters: [
 
 ## Next Steps
 
-- Learn about [query concepts](../project_queries/query_concepts) for understanding query processing
+- Learn about [project query concepts](../project_queries/project_query_concepts) for understanding query processing
 - Follow the [query project tutorial](../tutorials/query_project)
 - Explore the [CLI reference](../../software_reference/cli_reference) for command-line query options

@@ -15,7 +15,7 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 3. **Create supplemental dimensions** — Define alternative dimensions, typically aggregations, that can be used for querying (e.g., counties → states). Follow [How to Create Supplemental Dimensions](../user_guide/how_tos/how_to_supplemental_dimensions).
 4. **Register the project** — Create the project config and register it. See the [Create a Project](../user_guide/tutorials/create_project) tutorial.
 5. **Coordinate dataset submissions** — Work with [dataset submitters](dataset_submitters) to register and validate their contributions.
-6. **Define and run queries** — Assemble the data using queries. See [Query Concepts](../user_guide/project_queries/query_concepts) and [How to Filter Query Results](../user_guide/how_tos/how_to_filter).
+6. **Define and run queries** — Assemble the data using queries. See [Project Query Concepts](../user_guide/project_queries/project_query_concepts) and [How to Filter Query Results](../user_guide/how_tos/how_to_filter).
 7. **Create derived datasets** — Build derived datasets from query results for publication. See [Derived Dataset Concepts](../user_guide/project_derived_datasets/concepts).
 
 ## Key Resources
@@ -25,7 +25,7 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 - [Dimension Concepts](../user_guide/dataset_registration/dimension_concepts)
 - [Project Concepts](../user_guide/project_creation/project_concepts)
 - [Dataset Concepts](../user_guide/dataset_registration/dataset_concepts)
-- [Query Concepts](../user_guide/project_queries/query_concepts)
+- [Project Query Concepts](../user_guide/project_queries/project_query_concepts)
 - [Derived Dataset Concepts](../user_guide/project_derived_datasets/concepts)
 
 ### How-Tos

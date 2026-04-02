@@ -26,7 +26,7 @@ Registers the dataset as a standalone entity in the registry. Validates internal
 4. **Register your dataset** — Run `dsgrid registry datasets register`. This validates internal integrity: schema, dimensions, and data completeness. If you defined `expected_associations` in the previous step, dsgrid validates against those combinations rather than the full cross-join.
 5. **Refine with missing associations** — If registration fails due to missing dimension combinations, dsgrid writes a Parquet file of all missing combinations and runs pattern analysis (`find_minimal_patterns`) to identify the simplest column subsets that characterize the gaps — for example, specific geography–subsector pairs. It records these minimal patterns as CSV files in a `missing_associations/` directory. Review the output, fix any data bugs, and then reference the legitimate gaps as `missing_associations` in your config file alongside the `expected_associations`. Re-run registration (iterate as needed). See [How to Handle Dimension Associations](../user_guide/how_tos/how_to_dimension_associations) for a concise description of the full workflow.
 
-### Phase 2 — Project Submittal
+### Phase 2 — Submit to Project
 
 Submits the registered dataset to a specific project. Dimension mappings are usually required to align dataset dimensions with project base dimensions. Validates that dimension mappings are consistent and that the dataset provides all expected data points.
 

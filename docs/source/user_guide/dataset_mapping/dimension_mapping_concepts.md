@@ -1,35 +1,39 @@
 # Dimension Mapping Concepts
 
 A dimension mapping is a data structure that describes how to transform data
-from one dimensional representation to another. This enables datasets with
-different dimensional schemes to be integrated into a unified dsgrid project,
-or to be remapped to alternate dimensions as a standalone operation.
+from one representation for a given
+[DimensionType](../../software_reference/data_models/enums.md#dimensiontype) to
+another. Each mapping handles exactly one dimension type (e.g., geography or
+model year); to remap multiple dimension types you define a separate mapping for
+each. By defining such mappings, datasets can be remapped to a different
+resolution for use by another team or tool or can be integrated into a unified
+dsgrid project.
 
 ## Where Mappings Are Used
 
 Dimension mappings appear in three dsgrid workflows:
 
-1. **Dataset submittal** — When submitting a dataset to a project, mappings
-   align dataset dimensions to the project's base dimensions. See
-   [Submission Checks](../dataset_submittal/submission_checks).
-2. **Project queries** — The `dsgrid query project map-dataset` and
-   `dsgrid query project run` commands apply mappings to transform data during
-   query execution. See [Query Concepts](../project_queries/query_concepts).
-3. **Dataset queries** — The `dsgrid query dataset` commands map a registered
+1. **Dataset queries** — The `dsgrid query dataset` commands map a registered
    dataset to arbitrary target dimensions without involving a project. See
    [Dataset Query Concepts](dataset_query_concepts).
+2. **Dataset submittal** — When submitting a dataset to a project, mappings
+   align dataset dimensions to the project's base dimensions. See
+   [Submission Checks](../dataset_submittal/submission_checks).
+3. **Project queries** — The `dsgrid query project map-dataset` and
+   `dsgrid query project run` commands apply mappings to transform data during
+   query execution. See [Project Query Concepts](../project_queries/project_query_concepts).
 
 The mapping structure is identical regardless of which workflow consumes it.
 
 ## How Mappings Work
 
 A mapping can simply map one value to another or perform aggregations and
-disaggregations. It can optionally apply multipliers. The behavior is dictated
-by the `mapping_type` field.
+disaggregations. It can optionally apply multipliers. Specific behavior is
+determined by the `mapping_type` field.
 
 Common mapping types include:
 - **Many-to-one aggregation** — Multiple source values map to one target (e.g., counties → states)
-- **One-to-many disaggregation** — One source value splits to multiple targets
+- **One-to-many disaggregation** — One source value splits to multiple targets (e.g., states → counties)
 - **Many-to-many with multipliers** — Complex transformations with explicit fractions
 
 See [Dimension Mapping Types](dimension_mapping_types) for a complete guide to
@@ -38,6 +42,14 @@ all mapping types, their `from_fraction` requirements, and when to use each one.
 ## Examples
 
 The [dsgrid-project-StandardScenarios repository](https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/dsgrid_project) contains datasets that you can use as examples.
+
+:::{note}
+The examples below are taken from project and dataset config files, which use a
+pre-registration format that references dimensions by `name` or
+`dimension_type` instead of `dimension_id`. When registering mappings
+standalone with `dsgrid registry dimension-mappings register`, you must use
+`dimension_id` (a UUID) as shown in [Mapping Config Structure](#mapping-config-structure) below.
+:::
 
 ### Many-To-One Aggregation
 
@@ -114,12 +126,14 @@ The top-level structure is a `mappings` list:
       file: "dimension_mappings/lookup_county_to_state.csv",
       mapping_type: "many_to_one_aggregation",
       from_dimension: {
-        name: "US Counties 2020 L48",
         type: "geography",
+        dimension_id: "<from-dimension-uuid>",
+        version: "1.0.0",
       },
       to_dimension: {
-        name: "US States L48",
         type: "geography",
+        dimension_id: "<to-dimension-uuid>",
+        version: "1.0.0",
       },
     },
     // additional mappings ...
@@ -127,14 +141,20 @@ The top-level structure is a `mappings` list:
 }
 ```
 
+:::{note}
+`dimension_id` is a UUID assigned by dsgrid when a dimension is registered.
+Use `dsgrid registry dimensions list` to find IDs.
+:::
+
 Each mapping entry has these fields:
 
 - **`mapping_type`** — The operation dsgrid applies during the mapping (e.g.,
   `many_to_one_aggregation`). See [Dimension Mapping Types](dimension_mapping_types)
   for all options.
 - **`from_dimension`** / **`to_dimension`** — Identify the source and target
-  dimensions by `name` and `type` (for unregistered mappings) or by
-  `dimension_id` and `version` (for registered dimensions).
+  dimensions by `type`, `dimension_id`, and `version`. Both must share
+  the same
+  [DimensionType](../../software_reference/data_models/enums.md#dimensiontype).
 - **`file`** — Path to a CSV file containing the mapping records.
 - **`description`** — Human-readable description of the mapping.
 

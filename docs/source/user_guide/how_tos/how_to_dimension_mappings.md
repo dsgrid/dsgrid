@@ -7,7 +7,7 @@ dataset submittal, a project query, or a standalone dataset query.
 ## Prerequisites
 
 - [Install dsgrid](../../getting_started/installation) on your system
-- Access to the dsgrid registry
+- Access a dsgrid registry
 - Familiarity with [Dimension Mapping Concepts](../dataset_mapping/dimension_mapping_concepts)
 
 ## Steps
@@ -116,35 +116,14 @@ value (leave the field blank after the comma).
 
 ### 6. Write the Mapping Config
 
-Create a JSON5 config file referencing the CSV records. Dimension references
-can use `name` + `type` (for unregistered dimensions that will be registered
-alongside the mapping) or `dimension_id` + `version` (for already-registered
-dimensions).
+Create a JSON5 config file referencing the CSV records. Each `from_dimension`
+and `to_dimension` identifies a registered dimension by `type`, `dimension_id`,
+and `version`. Use `dsgrid registry dimensions list` to find the IDs.
 
-**Using names** (common when registering mappings alongside a project or
-dataset):
-
-```json5
-{
-  mappings: [
-    {
-      description: "County to state aggregation",
-      file: "dimension_mappings/county_to_state.csv",
-      mapping_type: "many_to_one_aggregation",
-      from_dimension: {
-        name: "US Counties 2020 L48",
-        type: "geography",
-      },
-      to_dimension: {
-        name: "US States L48",
-        type: "geography",
-      },
-    },
-  ],
-}
-```
-
-**Using registered IDs** (when both dimensions are already registered):
+:::{note}
+`dimension_id` is a UUID assigned automatically when a dimension is registered
+(e.g., `c5e76cb6-4537-4f17-9db9-1e7eeda55eb9`). It is not user-specified.
+:::
 
 ```json5
 {
@@ -155,12 +134,12 @@ dataset):
       mapping_type: "many_to_one_aggregation",
       from_dimension: {
         type: "geography",
-        dimension_id: "us-counties-2020-l48",
+        dimension_id: "<from-dimension-uuid>",
         version: "1.0.0",
       },
       to_dimension: {
         type: "geography",
-        dimension_id: "us-states-l48",
+        dimension_id: "<to-dimension-uuid>",
         version: "1.0.0",
       },
     },

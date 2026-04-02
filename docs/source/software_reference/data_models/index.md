@@ -10,5 +10,7 @@ dimension_classes
 dataset_model
 dimension_mapping_model
 project_model
+dataset_query_model
+project_query_model
 enums
 ```

@@ -1,8 +1,11 @@
 # Dimension Mapping Types
 
-dsgrid supports 15 dimension mapping types that control how data values are
-transformed when mapping between dimensions. Each type has specific rules about
-the `from_fraction` column and how fractions are validated.
+dsgrid supports 14 dimension mapping types that control how data values are
+transformed when mapping between dimensions. Each mapping operates on a single
+[DimensionType](../../software_reference/data_models/enums.md#dimensiontype)
+(e.g., geography); to remap multiple dimension types, define a separate mapping
+for each. Each type has specific rules about the `from_fraction` column and how
+fractions are validated.
 
 This page is the conceptual guide. For formal enum definitions and archetype
 constraint flags, see:
@@ -38,7 +41,7 @@ that dsgrid assigns automatically based on the `mapping_type`.
   - sum by `from_id` = 1
   - Reclassifying categories
 * - `duplication`
-  - No (defaults to 1.0)
+  - No (defaults to 1.0; must be 1.0 if provided)
   - None
   - Copying a value to multiple targets
 * - `one_to_many_disaggregation`
@@ -137,7 +140,8 @@ different categories rather than performing a hierarchical aggregation.
 ### `duplication`
 
 One source record is copied to multiple target records. The same value is
-duplicated for each target. No fraction sum validation is performed.
+duplicated for each target. No fraction sum validation is performed, but if
+`from_fraction` is present it must be exactly `1.0` for every record.
 
 - Duplicate `from_id` values allowed
 - No duplicate `to_id` values allowed

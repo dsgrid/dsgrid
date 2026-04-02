@@ -30,8 +30,7 @@ dimensions are available:
 dsgrid registry dimensions list -f "dimension_type == geography"
 ```
 
-Note the `dimension_id` and `version` of your target dimension (e.g.,
-`us-states-l48` version `1.0.0`).
+Note the `dimension_id` (a UUID) and `version` of your target dimension.
 
 ## Step 2: Verify Mapping Exists
 
@@ -91,7 +90,7 @@ entry identifies a target dimension by its `type`, `dimension_id`, and
   to_dimension_references: [
     {
       type: "geography",
-      dimension_id: "us-states-l48",
+      dimension_id: "<target-geography-uuid>",
       version: "1.0.0",
     },
   ],
@@ -106,12 +105,12 @@ example, to also map model years:
   to_dimension_references: [
     {
       type: "geography",
-      dimension_id: "us-states-l48",
+      dimension_id: "<target-geography-uuid>",
       version: "1.0.0",
     },
     {
       type: "model_year",
-      dimension_id: "standard-model-years",
+      dimension_id: "<target-model-year-uuid>",
       version: "1.0.0",
     },
   ],

@@ -87,6 +87,13 @@ Common choices:
 Create a CSV file with the mapping records. All mapping files have `from_id`
 and `to_id` columns. Some mapping types also require a `from_fraction` column.
 
+:::{note}
+Every `from_id` and `to_id` value must be a valid record in the corresponding
+registered dimension, but you do not need to list every record from those
+dimensions. Source records omitted from `from_id` are excluded from the mapping.
+Target records omitted from `to_id` are not populated by the mapping.
+:::
+
 **Example: County to state aggregation** (`many_to_one_aggregation`)
 
 ```text

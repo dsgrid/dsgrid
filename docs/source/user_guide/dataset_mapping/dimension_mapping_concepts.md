@@ -175,6 +175,13 @@ Whether `from_fraction` is required and how its sums are validated depends on
 the `mapping_type`. See [Dimension Mapping Types](dimension_mapping_types) for
 the rules.
 
+:::{note}
+Every `from_id` value must exist in the registered `from_dimension` and every
+`to_id` value must exist in the registered `to_dimension`. However, not all
+records in those dimensions need to appear — omitting a `from_id` effectively
+excludes that source record from the mapping.
+:::
+
 ## Registering Mappings
 
 Dimension mappings must be registered in the dsgrid registry before they can be

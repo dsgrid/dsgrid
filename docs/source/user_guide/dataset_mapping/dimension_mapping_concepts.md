@@ -178,8 +178,9 @@ the rules.
 :::{note}
 Every `from_id` value must exist in the registered `from_dimension` and every
 `to_id` value must exist in the registered `to_dimension`. However, not all
-records in those dimensions need to appear — omitting a `from_id` effectively
-excludes that source record from the mapping.
+records in those dimensions need to appear in a given mapping file. Omitting a
+`from_id` effectively excludes that source record from the mapping and ommitting
+a `to_id` indicates that the mapping does not provide data for that target.
 :::
 
 ## Registering Mappings

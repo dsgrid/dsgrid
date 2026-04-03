@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Iterable
 
 from prettytable import PrettyTable
+from pydantic import ValidationError
 
 try:
     from IPython.display import display, HTML
@@ -139,7 +140,11 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
         elif len(row) != length:
             msg = f"Rows have inconsistent length: first_row_length={length} {row=}"
             raise ValueError(msg)
-        record = cls(**row)
+        try:
+            record = cls(**row)
+        except ValidationError as e:
+            msg = f"Validation error in row {len(records) + 1}: {row}\n{e}"
+            raise ValueError(msg) from e
         for name in check_duplicates:
             val = getattr(record, name)
             if val in values[name]:

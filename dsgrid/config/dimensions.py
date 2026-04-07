@@ -628,6 +628,20 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if "localize_to_time_zone" in values:
+            logger.warning(
+                "Dropping deprecated localize_to_time_zone field from the datetime config."
+            )
+            values.pop("localize_to_time_zone")
+
+        # Normalize column_format.dtype to lowercase before the discriminated union
+        # resolves, because Pydantic v2 reads the discriminator tag before running
+        # per-model validators.
+        if isinstance(values.get("column_format"), dict) and isinstance(
+            values["column_format"].get("dtype"), str
+        ):
+            values["column_format"]["dtype"] = values["column_format"]["dtype"].lower()
+
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
                 msg = f"Unknown data_schema format: {values=}"

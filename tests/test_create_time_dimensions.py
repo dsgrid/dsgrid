@@ -93,7 +93,15 @@ def index_time_dimension_model():
     config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
     config_as_dict["dimensions"] = [config_as_dict["dimensions"][6]]
     model = DimensionsConfigModel(**config_as_dict).dimensions[0]
-    yield model  # IndexTimeDimensionModel (industrial time)
+    yield model  # IndexTimeDimensionModel (industrial time, multi-tz)
+
+
+@pytest.fixture
+def index_time_dimension_model_single_tz():
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][8]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # IndexTimeDimensionModel (single time zone)
 
 
 @pytest.fixture
@@ -340,6 +348,15 @@ def test_annual_time_dimension_model(annual_time_dimension_model):
         start, end = int(time_range.start), int(time_range.end)
         assert st == datetime.datetime(year=start, month=1, day=1)
         assert length == len(range(start, end + 1))
+
+
+def test_index_time_single_tz_model(index_time_dimension_model_single_tz):
+    from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+
+    config = IndexTimeDimensionConfig(index_time_dimension_model_single_tz)
+    assert config.get_time_zone() == "Etc/GMT+5"
+    assert not index_time_dimension_model_single_tz.is_time_zone_required_in_geography()
+    assert config.get_lengths() == [8784]
 
 
 def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):

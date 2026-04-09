@@ -454,3 +454,144 @@ def test_submit_dataset_utc_to_utc_no_tz_passes(tmp_path):
     project_config = _make_mock_project_config(_make_time_dimension_utc())
 
     ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
+
+
+# ===========================================================================
+# Index time time_zone_format tests
+# ===========================================================================
+
+
+def _make_index_time_single_tz():
+    """Build an IndexTimeDimensionModel with aligned_in_absolute_time (single tz)."""
+    from dsgrid.config.dimensions import IndexTimeDimensionModel
+
+    return IndexTimeDimensionModel(
+        name="time",
+        type=DimensionType.TIME,
+        module="dsgrid.dimension.standard",
+        **{"class": "Time"},
+        time_zone_format=AlignedTimeSingleTimeZone(
+            format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
+            time_zone="Etc/GMT+5",
+        ),
+        measurement_type=MeasurementType.TOTAL,
+        ranges=[{"start": 0, "end": 8783, "starting_timestamp": "2012-01-01 00:00:00", "frequency": "01:00:00"}],
+        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+    )
+
+
+def _make_index_time_multi_tz():
+    """Build an IndexTimeDimensionModel with aligned_in_std_clock_time (per-geography tz)."""
+    from dsgrid.config.dimensions import IndexTimeDimensionModel
+
+    return IndexTimeDimensionModel(
+        name="time",
+        type=DimensionType.TIME,
+        module="dsgrid.dimension.standard",
+        **{"class": "Time"},
+        time_zone_format=LocalTimeMultipleTimeZones(
+            format_type=TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME,
+            time_zones=["Etc/GMT+5", "Etc/GMT+6"],
+        ),
+        measurement_type=MeasurementType.TOTAL,
+        ranges=[{"start": 0, "end": 8783, "starting_timestamp": "2012-01-01 00:00:00", "frequency": "01:00:00"}],
+        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+    )
+
+
+def test_index_time_single_tz_does_not_require_geography_tz():
+    """IndexTime with aligned_in_absolute_time should not require time_zone in geography."""
+    model = _make_index_time_single_tz()
+    assert not model.is_time_zone_required_in_geography()
+
+
+def test_index_time_multi_tz_requires_geography_tz():
+    """IndexTime with aligned_in_std_clock_time should require time_zone in geography."""
+    model = _make_index_time_multi_tz()
+    assert model.is_time_zone_required_in_geography()
+
+
+def test_index_time_single_tz_config_accessors():
+    """IndexTimeDimensionConfig with single tz should return tz from config."""
+    from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+
+    model = _make_index_time_single_tz()
+    config = IndexTimeDimensionConfig.load_from_model(model)
+    assert config.get_time_zone() == "Etc/GMT+5"
+    assert config.get_time_zones() == ["Etc/GMT+5"]
+    assert config.get_tzinfo() is not None
+
+
+def test_index_time_multi_tz_config_accessors():
+    """IndexTimeDimensionConfig with multi tz should return None for get_time_zone."""
+    from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+
+    model = _make_index_time_multi_tz()
+    config = IndexTimeDimensionConfig.load_from_model(model)
+    assert config.get_time_zone() is None
+    assert config.get_time_zones() == ["Etc/GMT+5", "Etc/GMT+6"]
+    assert config.get_tzinfo() is None
+
+
+def test_index_time_single_tz_chronify_type():
+    """IndexTimeDimensionConfig with single tz should produce IndexTimeRange."""
+    import chronify
+    from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+
+    model = _make_index_time_single_tz()
+    config = IndexTimeDimensionConfig.load_from_model(model)
+    result = config.to_chronify()
+    assert isinstance(result, chronify.IndexTimeRange)
+
+
+def test_index_time_multi_tz_chronify_type():
+    """IndexTimeDimensionConfig with multi tz should produce IndexTimeRangeWithTZColumn."""
+    import chronify
+    from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+
+    model = _make_index_time_multi_tz()
+    config = IndexTimeDimensionConfig.load_from_model(model)
+    result = config.to_chronify()
+    assert isinstance(result, chronify.IndexTimeRangeWithTZColumn)
+
+
+def test_index_time_legacy_config_defaults_to_multi_tz():
+    """An index time config without time_zone_format should default to aligned_in_std_clock_time."""
+    from dsgrid.config.dimensions import IndexTimeDimensionModel
+
+    model = IndexTimeDimensionModel(
+        name="time",
+        type=DimensionType.TIME,
+        module="dsgrid.dimension.standard",
+        **{"class": "Time"},
+        # No time_zone_format — legacy config
+        measurement_type=MeasurementType.TOTAL,
+        ranges=[{"start": 0, "end": 8783, "starting_timestamp": "2012-01-01 00:00:00", "frequency": "01:00:00"}],
+        time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+    )
+    assert model.is_time_zone_required_in_geography()
+    assert model.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
+
+
+def test_index_time_single_tz_dataset_config_no_geo_tz_passes(tmp_path):
+    """Dataset with single-tz IndexTime should not require time_zone in geography."""
+    model = _make_index_time_single_tz()
+    config = _build_dataset_config_model(
+        tmp_path,
+        use_project_geography_time_zone=False,
+        geo_has_tz=False,
+        time_dim_model=model,
+    )
+    assert config is not None
+
+
+def test_index_time_multi_tz_dataset_config_no_geo_tz_raises(tmp_path):
+    """Dataset with multi-tz IndexTime should require time_zone in geography."""
+    model = _make_index_time_multi_tz()
+    with pytest.raises((ValueError, DSGInvalidDimension)):
+        _build_dataset_config_model(
+            tmp_path,
+            use_project_geography_time_zone=False,
+            geo_has_tz=False,
+            time_dim_model=model,
+        )

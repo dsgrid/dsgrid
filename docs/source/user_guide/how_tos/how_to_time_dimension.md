@@ -312,7 +312,7 @@ Timestamps cover the **same interval of local standard time** across geographies
 dsgrid automatically adds a `time_zone` column to the data table by joining it with geography records. The source of the time zone information is configurable:
 
 - **Dataset geography records** (default) — dsgrid reads time zones from a `time_zone` column in the dataset's geography dimension records file. This is the common case.
-- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config to read time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config to read time zones from the project's geography dimension during query-time mapping instead of from the dataset's geography dimension. Note: the dataset's geography records must still include a `time_zone` column with valid IANA time zone values when using timezone-naive data (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), because dsgrid localizes timestamps during registration before any project mapping occurs.
 
 The `time_zones` list in the config must include all unique IANA time zone strings that appear in the geography records.
 

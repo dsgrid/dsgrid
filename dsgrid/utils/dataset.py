@@ -11,7 +11,7 @@ import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -88,7 +88,7 @@ def map_stacked_dimension(
 
 def add_time_zone(
     load_data_df: DataFrame,
-    geography_dim: DimensionConfig,
+    geography_dim: DimensionBaseConfigWithFiles,
     df_key: str = "geography",
     dim_key: str = "id",
 ):
@@ -97,7 +97,7 @@ def add_time_zone(
     Parameters
     ----------
     load_data_df : DataFrame
-    geography_dim: DimensionConfig
+    geography_dim: DimensionBaseConfigWithFiles
 
     Returns
     -------
@@ -1215,6 +1215,17 @@ def localize_timestamps_if_necessary(
             if TIME_ZONE_COLUMN not in df.columns:
                 geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
                 df = add_time_zone(df, geo_dim)
+
+            if df.filter(f"{TIME_ZONE_COLUMN} IS NOT NULL").count() == 0:
+                raise DSGInvalidOperation(
+                    f"The '{TIME_ZONE_COLUMN}' column is all null after joining "
+                    f"with geography dimension records. The geography dimension "
+                    f"records file must include a 'time_zone' column with valid "
+                    f"IANA time zone values (e.g., 'Etc/GMT+5') for "
+                    f"'aligned_in_std_clock_time' localization during registration. "
+                    f"Note: 'use_project_geography_time_zone' only applies during "
+                    f"query-time mapping, not during registration."
+                )
 
             match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):

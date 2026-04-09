@@ -628,6 +628,10 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated Pydantic model
+            return values
+
         if "localize_to_time_zone" in values:
             logger.warning(
                 "Dropping deprecated localize_to_time_zone field from the datetime config."

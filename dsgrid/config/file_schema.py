@@ -10,7 +10,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.operations import drop_columns, rename_columns
-from dsgrid.ibis.types import DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
+from dsgrid.ibis.types import DUCKDB_COLUMN_TYPES, SPARK_COLUMN_TYPES, SUPPORTED_TYPES, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
@@ -111,7 +111,8 @@ def read_data_file(
         case ".parquet":
             df = read_parquet(path)
         case ".csv":
-            column_schema = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
+            backend_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
+            column_schema = _get_column_schema(schema, backend_types)
             df = read_csv(path, schema=column_schema)
         case ".json":
             df = read_json(path)

@@ -567,157 +567,6 @@ def localize_time_zone_by_column_with_chronify_duckdb(
         _drop_chronify_source(store, src_schema, src_kind)
 
 
-def map_time_dimension_with_chronify_runtime_hive(
-    df: ibis.Table,
-    table_name: str,
-    from_time_dim: TimeDimensionBaseConfig,
-    to_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
-    wrap_time_allowed: bool = False,
-) -> ibis.Table:
-    """Create a time-mapped table with chronify and the runtime backend with a metastore.
-    The source data must already be stored in the metastore.
-    Chronify will store the mapped table in the metastore.
-    """
-    src_schema, dst_schema = _get_mapping_schemas(
-        df, from_time_dim, to_time_dim, src_name=table_name, value_column=value_column
-    )
-    store = _create_shared_chronify_store()
-    # This bypasses checks because the table should already be valid.
-    store.schema_manager.add_schema(src_schema)
-    try:
-        store.map_table_time_config(
-            src_schema.name,
-            dst_schema,
-            check_mapped_timestamps=False,
-            wrap_time_allowed=wrap_time_allowed,
-            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
-        )
-    finally:
-        store.schema_manager.remove_schema(src_schema.name)
-
-    if _is_ibis_table(df):
-        return make_runtime_backend().sql(f"SELECT * FROM {dst_schema.name}")
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
-
-
-def convert_time_zone_with_chronify_runtime_hive(
-    df: ibis.Table,
-    from_time_dim: TimeDimensionBaseConfig,
-    time_zone: tzinfo | None,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-) -> ibis.Table:
-    """Create a single time zone-converted table with chronify and the runtime backend with a metastore.
-    Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps with the specified time zone as a new column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = _create_shared_chronify_store()
-    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.convert_time_zone(
-            src_schema.name,
-            time_zone,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return _read_chronify_output(df, output_file)
-
-
-def convert_time_zone_by_column_with_chronify_runtime_hive(
-    df: ibis.Table,
-    from_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_zone_column: str = TIME_ZONE_COLUMN,
-    wrap_time_allowed: bool = False,
-) -> ibis.Table:
-    """Create a multiple time zone-converted table (based on a time_zone_column)
-    using chronify and the runtime backend with a metastore.
-    Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps with time zones specified in the time_zone_column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = _create_shared_chronify_store()
-    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone_by_column hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.convert_time_zone_by_column(
-            src_schema.name,
-            time_zone_column,
-            wrap_time_allowed=wrap_time_allowed,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return _read_chronify_output(df, output_file)
-
-
-def localize_time_zone_with_chronify_runtime_hive(
-    df: ibis.Table,
-    from_time_dim: TimeDimensionBaseConfig,
-    time_zone: tzinfo | None,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-) -> ibis.Table:
-    """Create a single time zone-localized table with chronify and the runtime backend with a metastore.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = _create_shared_chronify_store()
-    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.localize_time_zone(
-            src_schema.name,
-            time_zone,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return _read_chronify_output(df, output_file)
-
-
-def localize_time_zone_by_column_with_chronify_runtime_hive(
-    df: ibis.Table,
-    from_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_zone_column: str = TIME_ZONE_COLUMN,
-) -> ibis.Table:
-    """Create a multiple time zone-localized table (based on a time_zone_column)
-    using chronify and the runtime backend with a metastore.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
-    the time zones specified in the time_zone_column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = _create_shared_chronify_store()
-    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone_by_column hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.localize_time_zone_by_column(
-            src_schema.name,
-            time_zone_column=time_zone_column,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return _read_chronify_output(df, output_file)
-
-
 def map_time_dimension_with_chronify_runtime_path(
     df: ibis.Table,
     filename: Path,
@@ -1291,20 +1140,11 @@ def localize_timestamps_if_necessary(
     assert len(value_columns) > 0, value_columns
     value_column = next(iter(value_columns))
 
-    runtime_config = dsgrid.runtime_config
     match localization_plan:
         case "localize_to_single_tz":
             to_time_zone = time_dim.get_chronify_time_zone()
-            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = localize_time_zone_with_chronify_runtime_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        time_zone=to_time_zone,
-                        scratch_dir_context=scratch_dir_context,
-                        value_column=value_column,
-                    )
-                case (BackendEngine.SPARK, False):
+            match dsgrid.runtime_config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
@@ -1318,7 +1158,7 @@ def localize_timestamps_if_necessary(
                         scratch_dir_context=scratch_dir_context,
                         value_column=value_column,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = localize_time_zone_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,
@@ -1332,15 +1172,8 @@ def localize_timestamps_if_necessary(
                 geo_dim = cast(DimensionBaseConfigWithFiles, geo_dim)
                 df = add_time_zone(df, geo_dim)
 
-            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = localize_time_zone_by_column_with_chronify_runtime_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        scratch_dir_context=scratch_dir_context,
-                        value_column=value_column,
-                    )
-                case (BackendEngine.SPARK, False):
+            match dsgrid.runtime_config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
@@ -1353,7 +1186,7 @@ def localize_timestamps_if_necessary(
                         scratch_dir_context=scratch_dir_context,
                         value_column=value_column,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = localize_time_zone_by_column_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,

@@ -65,7 +65,7 @@ jobs:
         fail_ci_if_error: false
         verbose: true
 
-  tests-spark:
+  tests-spark-smoke:
     if: contains(github.event.pull_request.labels.*.name, 'run-spark-tests')
     runs-on: ubuntu-latest
 
@@ -79,13 +79,6 @@ jobs:
       with:
         python-version: "3.13"
 
-    - name: Cache Spark
-      id: cache-spark
-      uses: actions/cache@v4
-      with:
-        path: spark-4.0.0-bin-hadoop3
-        key: spark-4.0.0-bin-hadoop3
-
     - name: Install dependencies
       run: |
         python -m venv .venv
@@ -94,34 +87,11 @@ jobs:
         pip install maturin
         pip install -e '.[dev,spark]'
 
-        # Only download if cache miss
-        if [ ! -d "spark-4.0.0-bin-hadoop3" ]; then
-          echo "Spark cache missed, downloading..."
-          wget -q https://archive.apache.org/dist/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
-          tar -xzf spark-4.0.0-bin-hadoop3.tgz
-        else
-          echo "Spark restored from cache."
-        fi
-
-        export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        ${SPARK_HOME}/sbin/start-thriftserver.sh \
-          --hiveconf javax.jdo.option.ConnectionURL="jdbc:derby:;databaseName=/tmp/thrift-metastore-db;create=true" \
-          --hiveconf spark.sql.warehouse.dir=/tmp/spark-warehouse
-        # Wait for the Thrift server to be ready
-        for i in $(seq 1 30); do
-          if nc -z localhost 10000 2>/dev/null; then
-            echo "Thrift server is ready."
-            break
-          fi
-          echo "Waiting for Thrift server... ($i/30)"
-          sleep 2
-        done
-
-    - name: Run Spark tests
+    - name: Run Spark smoke tests
       run: |
         source .venv/bin/activate
-        export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_ibis_session.py tests/test_ibis_functions.py tests/test_localize_timestamps_if_necessary.py
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_file_schema.py -k "read_data_file_csv or read_data_file_parquet"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0

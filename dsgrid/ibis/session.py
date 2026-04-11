@@ -15,7 +15,6 @@ from typing import Any, Generator, Iterable, Type, Union, cast, get_args, get_or
 import pandas as pd
 import ibis
 
-import dsgrid
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.exceptions import (
     DSGInvalidField,
@@ -132,9 +131,6 @@ else:
         def config(self, *args, **kwargs):
             return self
 
-        def enableHiveSupport(self):
-            return self
-
         def getOrCreate(self):
             return get_runtime_session()
 
@@ -228,6 +224,10 @@ class _SparkReader:
         self._session = session
 
     def csv(self, path: str, **kwargs) -> ibis.Table:
+        schema = kwargs.get("schema")
+        if isinstance(schema, dict):
+            kwargs = dict(kwargs)
+            kwargs["schema"] = _merge_spark_csv_schema(self._session, path, schema, kwargs)
         return _spark_dataframe_to_ibis_table(self._session.read.csv(path, **kwargs))
 
     def json(self, path: str, **kwargs) -> ibis.Table:
@@ -380,10 +380,7 @@ def _create_pyspark_session(name="dsgrid", check_env=True, spark_conf=None) -> A
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
 
-    config = SparkSession.builder.config(conf=conf)
-    if dsgrid.runtime_config.use_hive_metastore:
-        config = config.enableHiveSupport()
-    spark = config.getOrCreate()
+    spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
     with disable_console_logging():
         log_runtime_conf(spark)
@@ -1008,20 +1005,6 @@ def persist_table(df: ibis.Table, context: ScratchDirContext, tag=None) -> Path:
     return path
 
 
-@track_timing(timer_stats_collector)
-def save_to_warehouse(df: ibis.Table, table_name: str) -> ibis.Table:
-    """Save an Ibis table to the Spark warehouse. Not supported when using DuckDB."""
-    if use_duckdb():
-        msg = "save_to_warehouse is not supported when using DuckDB"
-        raise DSGInvalidOperation(msg)
-
-    logger.info("Start saveAsTable to warehouse %s", table_name)
-    view = create_temp_view(df)
-    get_pyspark_session().table(view).write.saveAsTable(table_name)
-    logger.info("Completed saveAsTable %s", table_name)
-    return make_runtime_backend().table(table_name)
-
-
 def sql(query: str) -> ibis.Table:
     """Run a SQL query with the active Ibis backend."""
     logger.debug("Run SQL query [%s]", query)
@@ -1254,6 +1237,66 @@ def _duckdb_type_from_spark_type(data_type: Any) -> str:
         case _:
             msg = f"Unsupported schema data type: {data_type}"
             raise NotImplementedError(msg)
+
+
+def _merge_spark_csv_schema(
+    session: Any, path: str, schema: dict[str, str], kwargs: dict[str, Any]
+):
+    from pyspark.sql.types import (
+        BooleanType,
+        ByteType,
+        DoubleType,
+        FloatType,
+        IntegerType,
+        LongType,
+        ShortType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampNTZType,
+        TimestampType,
+    )
+
+    def make_type(dtype: str):
+        match dtype.upper():
+            case "BOOLEAN":
+                return BooleanType()
+            case "TINYINT":
+                return ByteType()
+            case "SMALLINT":
+                return ShortType()
+            case "INT" | "INTEGER":
+                return IntegerType()
+            case "BIGINT":
+                return LongType()
+            case "FLOAT":
+                return FloatType()
+            case "DOUBLE":
+                return DoubleType()
+            case "STRING" | "TEXT" | "VARCHAR":
+                return StringType()
+            case "TIMESTAMP":
+                return TimestampType()
+            case "TIMESTAMP_NTZ":
+                return TimestampNTZType()
+            case _:
+                msg = f"Unsupported Spark CSV schema data type: {dtype}"
+                raise NotImplementedError(msg)
+
+    inference_kwargs = dict(kwargs)
+    inference_kwargs.pop("schema", None)
+    inference_kwargs["inferSchema"] = True
+    inferred = session.read.csv(path, **inference_kwargs).schema
+    fields = [
+        StructField(
+            field.name,
+            make_type(schema[field.name]) if field.name in schema else field.dataType,
+            field.nullable,
+            field.metadata,
+        )
+        for field in inferred
+    ]
+    return StructType(fields)
 
 
 def _ibis_type_from_spark_type(data_type: Any) -> str:

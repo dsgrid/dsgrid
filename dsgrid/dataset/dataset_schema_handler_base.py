@@ -70,7 +70,6 @@ from dsgrid.utils.dataset import (
     merge_expected_associations_tables,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_runtime_hive,
     map_time_dimension_with_chronify_runtime_path,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
@@ -83,7 +82,6 @@ from dsgrid.ibis.session import (
     get_runtime_session,
     persist_table,
     read_dataframe,
-    save_to_warehouse,
     write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -969,21 +967,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
             return load_data_df
-        match (config.backend_engine, config.use_hive_metastore):
-            case (BackendEngine.SPARK, True):
-                table_name = make_temp_view_name()
-                load_data_df = map_time_dimension_with_chronify_runtime_hive(
-                    df=save_to_warehouse(load_data_df, table_name),
-                    table_name=table_name,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    value_column=value_column,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
-
-            case (BackendEngine.SPARK, False):
+        match config.backend_engine:
+            case BackendEngine.SPARK:
                 filename = persist_table(
                     load_data_df,
                     mapping_manager.scratch_dir_context,
@@ -999,7 +984,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
-            case (BackendEngine.DUCKDB, _):
+            case BackendEngine.DUCKDB:
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     from_time_dim=time_dim,

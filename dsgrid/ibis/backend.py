@@ -53,7 +53,7 @@ def read_csv_expr(path: Path | str, schema: dict[str, str] | None = None) -> ibi
 
         kwargs: dict[str, Any] = {"header": True}
         if schema:
-            kwargs["schema"] = ", ".join(f"{name} {dtype}" for name, dtype in schema.items())
+            kwargs["schema"] = schema
         return get_runtime_session().read.csv(path_str, **kwargs)
     if schema:
         return make_runtime_backend().connection.read_csv(path_str, header=True, types=schema)

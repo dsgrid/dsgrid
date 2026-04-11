@@ -5,7 +5,6 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
-from warnings import warn
 
 import json5
 from pydantic import model_validator
@@ -15,7 +14,6 @@ from dsgrid.data_models import DSGBaseModel
 
 RC_FILENAME = ".dsgrid.json5"
 DEFAULT_BACKEND = BackendEngine.DUCKDB
-DEFAULT_THRIFT_SERVER_URL = "hive://localhost:10000/default"
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +21,13 @@ logger = logging.getLogger(__name__)
 class DsgridRuntimeConfig(DSGBaseModel):
     """Defines the runtime config that can be stored in users' home directories."""
 
+    model_config = DSGBaseModel.model_config | {"extra": "ignore"}
+
     database_url: str | None = None
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = True
     backend_engine: BackendEngine = DEFAULT_BACKEND
-    thrift_server_url: str = DEFAULT_THRIFT_SERVER_URL
-    use_hive_metastore: bool = False
     console_level: str = "info"
     file_level: str = "info"
     timings: bool = False
@@ -39,25 +37,10 @@ class DsgridRuntimeConfig(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def environment_overrides(cls, values: dict[str, Any]) -> dict[str, Any]:
-        for env, field in (
-            ("DSGRID_BACKEND_ENGINE", "backend_engine"),
-            ("THRIFT_SERVER_URL", "thrift_server_url"),
-        ):
+        for env, field in (("DSGRID_BACKEND_ENGINE", "backend_engine"),):
             if env in os.environ:
                 values[field] = os.environ[env]
         return values
-
-    @model_validator(mode="before")
-    @classmethod
-    def remove_legacy_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
-        for field in ("database_name",):
-            res = data.pop(field, None)
-            if res is not None:
-                warn(
-                    f"The dsgrid runtime config field {field} is deprecated. Please remove it. "
-                    "This will cause an error in a future release.",
-                )
-        return data
 
     @classmethod
     def load(cls, filename=None) -> "DsgridRuntimeConfig":

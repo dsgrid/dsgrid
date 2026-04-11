@@ -9,7 +9,6 @@ from dsgrid.common import BackendEngine
 from dsgrid.cli.common import handle_scratch_dir
 from dsgrid.dsgrid_rc import (
     DsgridRuntimeConfig,
-    DEFAULT_THRIFT_SERVER_URL,
     DEFAULT_BACKEND,
 )
 from dsgrid.exceptions import DSGInvalidParameter
@@ -42,22 +41,6 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
     type=click.Choice([x.value for x in BackendEngine]),
     default=DEFAULT_BACKEND.value,
     help="Backend engine for SQL processing",
-)
-@click.option(
-    "-t",
-    "--thrift-server-url",
-    type=str,
-    default=DEFAULT_THRIFT_SERVER_URL,
-    help="URL for the Apache Thrift Server to be used by chronify. "
-    "Only applies if Spark is the backend engine.",
-)
-@click.option(
-    "-m",
-    "--use-hive-metastore",
-    is_flag=True,
-    default=False,
-    help="Set this flag to use a Hive metastore when sharing data with chronify. "
-    "Only applies if Spark is the backend engine.",
 )
 @click.option(
     "--timings/--no-timings",
@@ -129,8 +112,6 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 def create(
     url,
     backend_engine,
-    thrift_server_url,
-    use_hive_metastore,
     timings,
     use_absolute_db_path,
     # username,
@@ -158,8 +139,6 @@ def create(
 
     dsgrid_config = DsgridRuntimeConfig(
         backend_engine=backend_engine,
-        thrift_server_url=thrift_server_url,
-        use_hive_metastore=use_hive_metastore,
         timings=timings,
         database_url=conn.url,
         # database_user=username,

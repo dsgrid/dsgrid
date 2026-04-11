@@ -62,10 +62,8 @@ from dsgrid.query.models import (
 )
 from dsgrid.utils.dataset import (
     add_time_zone,
-    convert_time_zone_with_chronify_runtime_hive,
     convert_time_zone_with_chronify_runtime_path,
     convert_time_zone_with_chronify_duckdb,
-    convert_time_zone_by_column_with_chronify_runtime_hive,
     convert_time_zone_by_column_with_chronify_runtime_path,
     convert_time_zone_by_column_with_chronify_duckdb,
 )
@@ -361,16 +359,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             if time_dim.supports_chronify():
                 tz_name = model.result.time_zone
                 to_time_zone = ZoneInfo(tz_name) if tz_name not in [None, "None", "none"] else None
-                match (config.backend_engine, config.use_hive_metastore):
-                    case (BackendEngine.SPARK, True):
-                        df = convert_time_zone_with_chronify_runtime_hive(
-                            df=df,
-                            from_time_dim=time_dim,
-                            time_zone=to_time_zone,
-                            scratch_dir_context=scratch_dir_context,
-                        )
-
-                    case (BackendEngine.SPARK, False):
+                match config.backend_engine:
+                    case BackendEngine.SPARK:
                         filename = persist_table(
                             df,
                             scratch_dir_context,
@@ -383,7 +373,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             time_zone=to_time_zone,
                             scratch_dir_context=scratch_dir_context,
                         )
-                    case (BackendEngine.DUCKDB, _):
+                    case BackendEngine.DUCKDB:
                         df = convert_time_zone_with_chronify_duckdb(
                             df=df,
                             from_time_dim=time_dim,
@@ -408,15 +398,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
                 # use chronify
-            match (config.backend_engine, config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = convert_time_zone_by_column_with_chronify_runtime_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        scratch_dir_context=scratch_dir_context,
-                        wrap_time_allowed=False,
-                    )
-                case (BackendEngine.SPARK, False):
+            match config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
@@ -429,7 +412,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         scratch_dir_context=scratch_dir_context,
                         wrap_time_allowed=False,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = convert_time_zone_by_column_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,

@@ -69,7 +69,7 @@ offline_mode = True
 no_prompts = True
 # There could be collisions on the shared runtime session between the main process and
 # subprocesses that run queries.
-# If both processes try to use the Hive metastore, a crash will occur.
+# Keep API worker initialization isolated from query execution state.
 runtime_session = init_runtime_session("dsgrid_api", check_env=False)
 dsgrid_config = DsgridRuntimeConfig.load()
 conn = DatabaseConnection(

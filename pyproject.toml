@@ -32,7 +32,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
-    "chronify ~= 0.7.0", # "chronify@git+https://github.com/NatLabRockies/chronify.git@main"
+    "chronify@git+https://github.com/NatLabRockies/chronify.git@feat/replace-sqlalchemy-with-ibis",
     "click>=8.2, < 9",
     "dash",
     "dash_bootstrap_components",
@@ -52,9 +52,6 @@ dependencies = [
     "uvicorn",
     "tzdata",  # time zone stuff
 ]
-
-[tool.uv.sources]
-chronify = { path = "../chronify2", editable = true }
 
 [project.urls]
 GitHub = "https://github.com/dsgrid/dsgrid"
@@ -89,10 +86,7 @@ allow-direct-references = true
 [project.optional-dependencies]
 spark = [
     "chronify[spark]",
-    # "pyhive",
     "pyspark==4.0.0",  # Keep this synced with the spark version in Dockerfile.
-    "thrift",
-    "thrift_sasl",
 ]
 
 dev = [

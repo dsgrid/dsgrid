@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Type, Union
 
 import chronify
 import pandas as pd
@@ -18,7 +18,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to a IndexTimeDimensionModel."""
 
     @staticmethod
-    def model_class() -> IndexTimeDimensionModel:
+    def model_class() -> Type[IndexTimeDimensionModel]:
         return IndexTimeDimensionModel
 
     def supports_chronify(self) -> bool:

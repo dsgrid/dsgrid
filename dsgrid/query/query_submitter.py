@@ -4,6 +4,7 @@ import logging
 import shutil
 from pathlib import Path
 import copy
+from typing import cast
 from zipfile import ZipFile
 from zoneinfo import ZoneInfo
 
@@ -12,9 +13,10 @@ from semver import VersionInfo
 from sqlalchemy import Connection
 
 import dsgrid
+import ibis
 from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimension_config import DimensionBaseConfig
+from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
@@ -34,10 +36,11 @@ from dsgrid.query.dataset_mapping_plan import MapOperationCheckpoint
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import pivot
-from dsgrid.spark.types import DataFrame
+from dsgrid.ibis.functions import write_csv
+from dsgrid.ibis.operations import drop_columns, join, pivot
+
 from dsgrid.project import Project
-from dsgrid.utils.spark import (
+from dsgrid.ibis.session import (
     custom_time_zone,
     read_dataframe,
     try_read_dataframe,
@@ -59,11 +62,11 @@ from dsgrid.query.models import (
 )
 from dsgrid.utils.dataset import (
     add_time_zone,
-    convert_time_zone_with_chronify_spark_hive,
-    convert_time_zone_with_chronify_spark_path,
+    convert_time_zone_with_chronify_runtime_hive,
+    convert_time_zone_with_chronify_runtime_path,
     convert_time_zone_with_chronify_duckdb,
-    convert_time_zone_by_column_with_chronify_spark_hive,
-    convert_time_zone_by_column_with_chronify_spark_path,
+    convert_time_zone_by_column_with_chronify_runtime_hive,
+    convert_time_zone_by_column_with_chronify_runtime_path,
     convert_time_zone_by_column_with_chronify_duckdb,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
@@ -89,7 +92,7 @@ class QuerySubmitterBase:
         self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
     @abc.abstractmethod
-    def submit(self, *args, **kwargs) -> DataFrame:
+    def submit(self, *args, **kwargs) -> ibis.Table:
         """Submit a query for execution"""
 
     def _composite_datasets_dir(self):
@@ -171,7 +174,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
-    def _run_checks(self, model: ProjectQueryModel) -> DatasetBaseDimensionNamesModel:
+    def _run_checks(
+        self, model: ProjectQueryModel | CreateCompositeDatasetQueryModel
+    ) -> DatasetBaseDimensionNamesModel:
         subsets = set(self.project.config.list_dimension_names(DimensionCategory.SUBSET))
         for agg in model.result.aggregations:
             for _, column in agg.iter_dimensions_to_keep():
@@ -188,20 +193,20 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ]
                     msg = (
                         f"Subset dimensions cannot be used in aggregations: "
-                        f"{dimension_name=}. Only base and supplemental dimensions are "
+                        f"{dimension_name =}. Only base and supplemental dimensions are "
                         f"allowed. base={base_names} supplemental={supp_names}"
                     )
                     raise DSGInvalidQuery(msg)
 
         for report_inputs in model.result.reports:
             report = make_report(report_inputs.report_type)
-            report.check_query(model)
+            report.check_query(cast(ProjectQueryModel, model))
 
         with self._project.dimension_mapping_manager.db.engine.connect() as conn:
             return self._check_datasets(model, conn)
 
     def _check_datasets(
-        self, query_model: ProjectQueryModel, conn: Connection
+        self, query_model: ProjectQueryModel | CreateCompositeDatasetQueryModel, conn: Connection
     ) -> DatasetBaseDimensionNamesModel:
         base_dimension_names: DatasetBaseDimensionNamesModel | None = None
         dataset_ids: list[str] = []
@@ -223,7 +228,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ),
                 ]
             else:
-                msg = f"Unhandled dataset type: {dataset=}"
+                msg = f"Unhandled dataset type: {dataset =}"
                 raise NotImplementedError(msg)
 
             for dataset_id in src_dataset_ids:
@@ -242,7 +247,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 elif base_dimension_names != names:
                     msg = (
                         "Datasets in a query must have the same base dimension query names: "
-                        f"{dataset=} {base_dimension_names} {names}"
+                        f"{dataset =} {base_dimension_names} {names}"
                     )
                     raise DSGInvalidQuery(msg)
 
@@ -262,7 +267,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     msg = (
                         "The dataset's base_dimension_names value is not set and "
                         f"there are multiple base dimensions of type {dim_type} in the project. "
-                        f"Please re-register the dataset with {dataset_id=}."
+                        f"Please re-register the dataset with {dataset_id =}."
                     )
                     raise DSGInvalidDataset(msg)
                 setattr(names, dim_type.value, dims[0].model.name)
@@ -270,7 +275,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _run_query(
         self,
         scratch_dir_context: ScratchDirContext,
-        model: ProjectQueryModel,
+        model: ProjectQueryModel | CreateCompositeDatasetQueryModel,
         load_cached_table: bool,
         checkpoint_file: Path | None,
         persist_intermediate_table: bool,
@@ -336,7 +341,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _convert_time_zone(
         self,
         scratch_dir_context: ScratchDirContext,
-        model: ProjectQueryModel,
+        model: ProjectQueryModel | CreateCompositeDatasetQueryModel,
         df,
         context,
         persist_intermediate_table: bool,
@@ -358,7 +363,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 to_time_zone = ZoneInfo(tz_name) if tz_name not in [None, "None", "none"] else None
                 match (config.backend_engine, config.use_hive_metastore):
                     case (BackendEngine.SPARK, True):
-                        df = convert_time_zone_with_chronify_spark_hive(
+                        df = convert_time_zone_with_chronify_runtime_hive(
                             df=df,
                             from_time_dim=time_dim,
                             time_zone=to_time_zone,
@@ -371,7 +376,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             scratch_dir_context,
                             tag="project query before time zone conversion",
                         )
-                        df = convert_time_zone_with_chronify_spark_path(
+                        df = convert_time_zone_with_chronify_runtime_path(
                             df=df,
                             filename=filename,
                             from_time_dim=time_dim,
@@ -399,12 +404,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     dim_key = "name"
                 else:
                     dim_key = "id"
+                geo_dim = cast(DimensionBaseConfigWithFiles, geo_dim)
                 df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
-            # use chronify
+                # use chronify
             match (config.backend_engine, config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):
-                    df = convert_time_zone_by_column_with_chronify_spark_hive(
+                    df = convert_time_zone_by_column_with_chronify_runtime_hive(
                         df=df,
                         from_time_dim=time_dim,
                         scratch_dir_context=scratch_dir_context,
@@ -416,7 +422,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         scratch_dir_context,
                         tag="project query before time mapping",
                     )
-                    df = convert_time_zone_by_column_with_chronify_spark_path(
+                    df = convert_time_zone_by_column_with_chronify_runtime_path(
                         df=df,
                         filename=filename,
                         from_time_dim=time_dim,
@@ -431,7 +437,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         wrap_time_allowed=False,
                     )
         else:
-            msg = f"Unknown input {model.result.time_zone=}"
+            msg = f"Unknown input {model.result.time_zone =}"
             raise DSGInvalidParameter(msg)
 
         repartition = not persist_intermediate_table
@@ -445,7 +451,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return df, context
 
     def _check_checkpoint_file(
-        self, checkpoint_file: Path | None, model: ProjectQueryModel
+        self,
+        checkpoint_file: Path | None,
+        model: ProjectQueryModel | CreateCompositeDatasetQueryModel,
     ) -> MapOperationCheckpoint | None:
         if checkpoint_file is None:
             return None
@@ -492,7 +500,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         context: QueryContext,
         scratch_dir_context: ScratchDirContext,
         df_filenames: dict[str, Path],
-    ) -> DataFrame:
+    ) -> ibis.Table:
         if context.model.result.aggregate_each_dataset:
             for dataset_id, path in df_filenames.items():
                 df = read_dataframe(path)
@@ -503,7 +511,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 write_dataframe(df, path)
                 df_filenames[dataset_id] = path
 
-        # All dataset columns need to be in the same order.
+                # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         datasets = self._convert_datasets(context, df_filenames)
         assert isinstance(context.model, ProjectQueryModel) or isinstance(
@@ -522,7 +530,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = read_dataframe(path)
             unexpected = sorted(set(df.columns).difference(expected_columns))
             if unexpected:
-                msg = f"Unexpected columns are present in {dataset_id=} {unexpected=}"
+                msg = f"Unexpected columns are present in {dataset_id =} {unexpected =}"
                 raise Exception(msg)
             datasets[dataset_id] = DatasetExpressionHandler(
                 df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
@@ -538,14 +546,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
-                msg = f"BUG: unhandled {context.model.result.column_type=}"
+                msg = f"BUG: unhandled {context.model.result.column_type =}"
                 raise NotImplementedError(msg)
 
         return sorted(dim_columns), sorted(time_columns)
 
     def _process_aggregations(
-        self, df: DataFrame, context: QueryContext, dataset_id: str | None = None
-    ) -> DataFrame:
+        self, df: ibis.Table, context: QueryContext, dataset_id: str | None = None
+    ) -> ibis.Table:
         handler = make_table_format_handler(
             ValueFormat.STACKED, self._project.config, dataset_id=dataset_id
         )
@@ -555,7 +563,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = handler.replace_ids_with_names(df)
 
         if context.model.result.sort_columns:
-            df = df.sort(*context.model.result.sort_columns)
+            if isinstance(df, ibis.Table):
+                df = df.order_by(*context.model.result.sort_columns)
+            else:
+                df = df.sort(*context.model.result.sort_columns)
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
@@ -564,11 +575,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _process_aggregations_and_save(
         self,
-        df: DataFrame,
+        df: ibis.Table,
         context: QueryContext,
         repartition: bool,
         zip_file: bool = False,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         df = self._process_aggregations(df, context)
 
         self._save_query_results(context, df, repartition, zip_file=zip_file)
@@ -578,17 +589,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         for dim_filter in context.model.result.dimension_filters:
             column_names = context.get_dimension_column_names(dim_filter.dimension_type)
             if len(column_names) > 1:
-                msg = f"Cannot filter {dim_filter} when there are multiple {column_names=}"
+                msg = f"Cannot filter {dim_filter} when there are multiple {column_names =}"
                 raise NotImplementedError(msg)
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 records = dim_filter.get_filtered_records_dataframe(
                     self.project.config.get_dimension
                 )
                 column = next(iter(column_names))
-                df = df.join(
-                    records.select("id"),
-                    on=getattr(df, column) == getattr(records, "id"),
-                ).drop("id")
+                df = drop_columns(join(df, records.select("id"), column, "id"), "id")
             else:
                 query_name = dim_filter.dimension_name
                 if query_name not in df.columns:
@@ -626,7 +634,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            df.toPandas().to_csv(filename, header=True, index=False)
+            write_csv(df, filename, header=True, overwrite=True)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
@@ -647,14 +655,14 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
     @track_timing(timer_stats_collector)
     def submit(
         self,
-        model: ProjectQueryModel,
+        model: ProjectQueryModel | CreateCompositeDatasetQueryModel,
         scratch_dir: Path | None = None,
         checkpoint_file: Path | None = None,
         persist_intermediate_table: bool = True,
         load_cached_table: bool = True,
         zip_file: bool = False,
         overwrite: bool = False,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Submits a project query to consolidate datasets and produce result tables.
 
         Parameters
@@ -673,7 +681,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
 
         Raises
         ------
@@ -689,7 +697,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
             # of the local computer.
-            # If any other settings get customized here, handle them in restart_spark()
+            # If any other settings get customized here, handle them in restart_runtime_session()
             # as well. This change won't persist Spark session restarts.
             with custom_time_zone(tz):
                 df, context = self._run_query(
@@ -741,13 +749,14 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
         """
         tz = self._project.config.get_base_time_dimension().get_time_zone()
+        assert tz is not None
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
             # of the local computer.
-            # If any other settings get customized here, handle them in restart_spark()
+            # If any other settings get customized here, handle them in restart_runtime_session()
             # as well. This change won't persist Spark session restarts.
-            with custom_time_zone(tz):  # type: ignore
+            with custom_time_zone(tz):
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -764,7 +773,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         self,
         query: CompositeDatasetQueryModel,
         scratch_dir: Path | None = None,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Submit a query to an composite dataset and produce result tables.
 
         Parameters
@@ -793,7 +802,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             context.metadata = metadata
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.
-            with custom_time_zone(tz):  # type: ignore
+            with custom_time_zone(tz):
                 df = self._process_aggregations_and_save(df, context, repartition=False)
             context.finalize()
             return df
@@ -802,7 +811,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"
         return CreateCompositeDatasetQueryModel.from_file(filename)
 
-    def _read_dataset(self, dataset_id) -> tuple[DataFrame, DatasetMetadataModel]:
+    def _read_dataset(self, dataset_id) -> tuple[ibis.Table, DatasetMetadataModel]:
         filename = self._composite_datasets_dir() / dataset_id / "table.parquet"
         if not filename.exists():
             msg = f"There is no composite dataset with dataset_id={dataset_id}"
@@ -815,7 +824,8 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
     @track_timing(timer_stats_collector)
     def _save_composite_dataset(self, context: QueryContext, df, repartition):
-        output_dir = self._composite_datasets_dir() / context.model.dataset_id
+        model = cast(CreateCompositeDatasetQueryModel, context.model)
+        output_dir = self._composite_datasets_dir() / model.dataset_id
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / "table.parquet"
         self._save_result(context, df, filename, repartition)
@@ -833,7 +843,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         scratch_dir: Path | None = None,
         checkpoint_file: Path | None = None,
         overwrite: bool = False,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Submits a dataset query to produce a result table."""
         if not query.to_dimension_references:
             msg = "A dataset query must specify at least one dimension to map."
@@ -852,7 +862,10 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
 
         base_dim_names = DatasetBaseDimensionNamesModel()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
-        time_dim = dims.get(DimensionType.TIME) or dataset_config.get_time_dimension()
+        time_dim = cast(
+            TimeDimensionBaseConfig | None,
+            dims.get(DimensionType.TIME) or dataset_config.get_time_dimension(),
+        )
         time_zone = None if time_dim is None else time_dim.get_time_zone()
         checkpoint = self._check_checkpoint_file(checkpoint_file, query)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
@@ -862,7 +875,11 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
             output_dir = self._query_output_dir(context)
             check_overwrite(output_dir, overwrite)
             args = (context, handler)
-            kwargs = {"time_dimension": dims.get(DimensionType.TIME)}
+            kwargs = {
+                "time_dimension": cast(
+                    TimeDimensionBaseConfig | None, dims.get(DimensionType.TIME)
+                )
+            }
             if time_dim is not None and time_zone is not None:
                 with custom_time_zone(time_zone):
                     df = self._run_query(*args, **kwargs)
@@ -896,7 +913,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                             f"dimension version = {to_dim.model.version}"
                         )
                         raise DSGInvalidQuery(msg)
-                    # No mapping is required.
+                        # No mapping is required.
                     continue
                 if to_dim.model.dimension_type != DimensionType.TIME:
                     refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(
@@ -941,15 +958,18 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         context: QueryContext,
         handler: DatasetSchemaHandlerBase,
         time_dimension: TimeDimensionBaseConfig | None,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         df = handler.make_mapped_dataframe(context, time_dimension=time_dimension)
         df = self._postprocess(context, df)
         self._save_results(context, df)
         return df
 
-    def _postprocess(self, context: QueryContext, df: DataFrame) -> DataFrame:
+    def _postprocess(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
         if context.model.result.sort_columns:
-            df = df.sort(*context.model.result.sort_columns)
+            if isinstance(df, ibis.Table):
+                df = df.order_by(*context.model.result.sort_columns)
+            else:
+                df = df.sort(*context.model.result.sort_columns)
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
@@ -966,7 +986,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         filename = output_dir / f"table.{context.model.result.output_format}"
         suffix = filename.suffix
         if suffix == ".csv":
-            df.toPandas().to_csv(filename, header=True, index=False)
+            write_csv(df, filename, header=True, overwrite=True)
         elif suffix == ".parquet":
             df = write_dataframe_and_auto_partition(df, filename)
         else:
@@ -977,6 +997,6 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         return filename
 
 
-def _pivot_table(df: DataFrame, context: QueryContext):
+def _pivot_table(df: ibis.Table, context: QueryContext):
     pivoted_column = context.convert_to_pivoted()
     return pivot(df, pivoted_column, VALUE_COLUMN)

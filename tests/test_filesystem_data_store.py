@@ -3,7 +3,7 @@
 import pytest
 
 from dsgrid.registry.filesystem_data_store import FilesystemDataStore
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.ibis.session import create_dataframe_from_dicts
 
 
 def _make_df():

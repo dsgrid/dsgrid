@@ -1,3 +1,4 @@
+import ibis
 import itertools
 import logging
 from collections import defaultdict
@@ -37,11 +38,9 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
-from dsgrid.spark.types import (
-    DataFrame,
-)
+
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
+from dsgrid.ibis.session import (
     cross_join_dfs,
     create_dataframe_from_product,
 )
@@ -147,7 +146,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             for selector in selectors[1:]:
                 columns = sorted(selector.column_values.keys())
                 if columns != first:
-                    msg = f"All selectors must define the same columns: {first=} {columns=}"
+                    msg = f"All selectors must define the same columns: {first =} {columns =}"
                     raise ValueError(msg)
 
         return selectors
@@ -364,7 +363,7 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
     @model_validator(mode="after")
     def check_base(self) -> "RequiredDimensionRecordsByTypeModel":
         if self.base.record_ids and self.base_missing.record_ids:
-            msg = f"base and base_missing cannot both contain record_ids: {self.base=} {self.base_missing=}"
+            msg = f"base and base_missing cannot both contain record_ids: {self.base =} {self.base_missing =}"
             raise ValueError(msg)
         return self
 
@@ -601,10 +600,10 @@ class InputDatasetModel(DSGBaseModel):
             return time_based_data_adjustment
         if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
             return time_based_data_adjustment
-        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment=}."
+        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment =}."
         raise ValueError(msg)
 
-    #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
+        #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
 
 
 class DimensionMappingsModel(DSGBaseModel):
@@ -775,7 +774,7 @@ class ProjectConfig(ConfigBase):
         for dim in self._iter_base_dimensions():
             if dim.model.dimension_type == dimension_type and dim.model.name == dimension_name:
                 return dim
-        msg = f"Did not find a dimension of {dimension_type=} with {dimension_name=}"
+        msg = f"Did not find a dimension of {dimension_type =} with {dimension_name =}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_time_dimension(self) -> TimeDimensionBaseConfig:
@@ -790,13 +789,13 @@ class ProjectConfig(ConfigBase):
             x for x in self._iter_base_dimensions() if x.model.dimension_type == dimension_type
         ]
         if not dims:
-            msg = f"base dimension {dimension_type=} not found"
+            msg = f"base dimension {dimension_type =} not found"
             raise DSGValueNotRegistered(msg)
 
         if len(dims) > 1:
             qnames = " ".join([x.model.name for x in dims])
             msg = (
-                f"Found multiple base dimensions for {dimension_type=}: {qnames}. "
+                f"Found multiple base dimensions for {dimension_type =}: {qnames}. "
                 "Call get_base_dimension() with a specific name."
             )
             raise DSGInvalidDimension(msg)
@@ -812,14 +811,14 @@ class ProjectConfig(ConfigBase):
                 if dimension_name is None or dim.model.name == dimension_name:
                     if res is not None:
                         msg = (
-                            f"Found multiple base dimensions for {dimension_type=}. "
+                            f"Found multiple base dimensions for {dimension_type =}. "
                             "You must specify a dimension query name to remove ambiguity."
                         )
                         raise DSGInvalidOperation(msg)
                     res = dim, key.version
 
         if res is None:
-            msg = f"Did not find a dimension with {dimension_type=} {dimension_name=}"
+            msg = f"Did not find a dimension with {dimension_type =} {dimension_name =}"
             raise DSGValueNotRegistered(msg)
         return res
 
@@ -845,22 +844,22 @@ class ProjectConfig(ConfigBase):
             if dim.model.name == name:
                 return dim
 
-        msg = f"No base dimension with {name=} is stored."
+        msg = f"No base dimension with {name =} is stored."
         raise DSGValueNotRegistered(msg)
 
     def get_dimension_with_records(self, name: str) -> DimensionBaseConfigWithFiles:
         """Return a dimension config matching name that has records."""
         dim = self._dimensions_by_name.get(name)
         if dim is None:
-            msg = f"{name=} is not stored"
+            msg = f"{name =} is not stored"
             raise DSGInvalidDimension(msg)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
             msg = f"{dim.model.label} does not have records"
             raise DSGInvalidParameter(msg)
         return dim
 
-    def get_dimension_records(self, name: str) -> DataFrame:
-        """Return a DataFrame containing the records for a dimension."""
+    def get_dimension_records(self, name: str) -> ibis.Table:
+        """Return an Ibis table containing the records for a dimension."""
         return self.get_dimension_with_records(name).get_records_dataframe()
 
     def get_dimension_record_ids(self, name: str) -> set[str]:
@@ -976,12 +975,14 @@ class ProjectConfig(ConfigBase):
 
     def get_base_to_supplemental_mapping_records(
         self, base_dim: DimensionBaseConfigWithFiles, supp_dim: DimensionBaseConfigWithFiles
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Return the project's base-to-supplemental dimension mapping records.
         Excludes rows with NULL to_id values.
         """
         config = self.get_base_to_supplemental_config(base_dim, supp_dim)
-        return config.get_records_dataframe().filter("to_id is not NULL")
+        from dsgrid.ibis.operations import filter_sql
+
+        return filter_sql(config.get_records_dataframe(), "to_id is not NULL")
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type) -> bool:
         """Return True if the config has these base-to-supplemental mappings."""
@@ -996,10 +997,10 @@ class ProjectConfig(ConfigBase):
         for dim in self._iter_base_dimensions():
             if dim.model.dimension_id == dimension_id:
                 return dim
-        msg = f"Did not find a base dimension with {dimension_id=}"
+        msg = f"Did not find a base dimension with {dimension_id =}"
         raise DSGValueNotRegistered(msg)
 
-    def get_base_dimension_records_by_id(self, dimension_id: str) -> DataFrame:
+    def get_base_dimension_records_by_id(self, dimension_id: str) -> ibis.Table:
         """Return the records for the base dimension with dimension_id."""
         dim = self.get_base_dimension_by_id(dimension_id)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
@@ -1045,7 +1046,7 @@ class ProjectConfig(ConfigBase):
             case DimensionCategory.SUPPLEMENTAL:
                 method = self._iter_supplemental_dimensions
             case _:
-                msg = f"{category=}"
+                msg = f"{category =}"
                 raise NotImplementedError(msg)
 
         return sorted((x.model.name for x in method()))
@@ -1271,8 +1272,8 @@ class ProjectConfig(ConfigBase):
 
     def _build_multi_dim_requirement_associations(
         self, multi_dim_reqs: list[RequiredDimensionRecordsModel], context: ScratchDirContext
-    ) -> list[DataFrame]:
-        dfs_by_dim_combo: dict[tuple[str, ...], DataFrame] = {}
+    ) -> list[ibis.Table]:
+        dfs_by_dim_combo: dict[tuple[str, ...], ibis.Table] = {}
 
         # Example: Partial sector and subsector combinations are required.
         # [
@@ -1283,7 +1284,7 @@ class ProjectConfig(ConfigBase):
         #     {"sector": {"base": ["res"]}, "subsector": {"base": ["MidriseApartment"]}},
         # ]
         # This code will replace supplemental records with base records and return a list of
-        # dataframes of those combinations - one per unique combination of dimensions.
+        # tables of those combinations - one per unique combination of dimensions.
 
         for multi_req in multi_dim_reqs:
             dim_combo = []
@@ -1340,7 +1341,7 @@ class ProjectConfig(ConfigBase):
                 msg = (
                     "The project config requires these these record IDs in the dataset's 'base' "
                     "field, but they are not in the base dimension records: "
-                    f"name={base_dim_query_name}: {diff=}"
+                    f"name={base_dim_query_name}: {diff =}"
                 )
                 raise DSGInvalidDataset(msg)
         elif reqs.base_missing.record_ids:
@@ -1350,7 +1351,7 @@ class ProjectConfig(ConfigBase):
                 msg = (
                     "The project config requires these these record IDs in the dataset's "
                     "'base_missing' field, but they are not in the base dimension "
-                    f"name={base_dim_query_name}: {diff=}"
+                    f"name={base_dim_query_name}: {diff =}"
                 )
                 raise DSGInvalidDataset(msg)
             record_ids = all_base_record_ids - missing_ids
@@ -1367,7 +1368,7 @@ class ProjectConfig(ConfigBase):
                         assert isinstance(dim, DimensionBaseConfigWithFiles)
                         return dim.get_unique_ids()
 
-        msg = f"subset dimension selector not found: {name=} {selector_name=}"
+        msg = f"subset dimension selector not found: {name =} {selector_name =}"
         raise DSGInvalidDimension(msg)
 
     def _get_required_record_ids_from_subsets(
@@ -1382,7 +1383,7 @@ class ProjectConfig(ConfigBase):
     @track_timing(timer_stats_collector)
     def make_dimension_association_table(
         self, dataset_id: str, context: ScratchDirContext
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Build a table that includes all combinations of dimension records that must be provided
         by the dataset.
         """

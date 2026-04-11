@@ -6,7 +6,7 @@ from dsgrid.utils.timing import timed_info
 logger = logging.getLogger(__name__)
 
 
-class SparkPartition:
+class TablePartition:
     def __init__(self):
         return
 
@@ -15,11 +15,11 @@ class SparkPartition:
 
         Parameters
         ----------
-        df : DataFrame
+        df : Ibis table
         bytes_per_cell : [float, int]
             Estimated number of bytes per cell in a dataframe.
-            * 4-bytes = 32-bit = Single-precision Float = pyspark.sql.types.FloatType,
-            * 8-bytes = 64-bit = Double-precision float = pyspark.sql.types.DoubleType,
+            * 4-bytes = 32-bit = single-precision float.
+            * 8-bytes = 64-bit = double-precision float.
 
         Returns
         -------
@@ -31,7 +31,7 @@ class SparkPartition:
             Estimated size of df in memory in MB
 
         """
-        n_rows = df.count()
+        n_rows = _count_rows(df)
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
         return n_rows, n_cols, data_MB
@@ -41,7 +41,7 @@ class SparkPartition:
         """calculate *optimal* number of files
         Parameters
         ----------
-        df : DataFrame
+        df : Ibis table
         MB_per_cmp_file : float
             Desired size of compressed file on disk in MB
         cmp_ratio : float
@@ -67,11 +67,11 @@ class SparkPartition:
     def file_size_if_partition_by(self, df, key):
         """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
-        n_partitions = df.select(key).distinct().count()
+        counts = df.group_by(key).aggregate(count=df.count())
+        n_partitions = counts.count().execute()
+        n_rows_largest_part = counts["count"].max().execute()
+        n_rows_smallest_part = counts["count"].min().execute()
         avg_MB = round(data_MB / n_partitions, 2)
-
-        n_rows_largest_part = df.groupBy(key).count().orderBy("count", ascending=False).first()[1]
-        n_rows_smallest_part = df.groupBy(key).count().orderBy("count", ascending=True).first()[1]
 
         largest_MB = round(data_MB / n_rows * n_rows_largest_part, 2)
         smallest_MB = round(data_MB / n_rows * n_rows_smallest_part, 2)
@@ -96,3 +96,7 @@ class SparkPartition:
         }
 
         return output
+
+
+def _count_rows(df) -> int:
+    return df.count().execute()

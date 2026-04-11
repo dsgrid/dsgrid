@@ -25,8 +25,8 @@ In summary:
 
 Use this when you want to convert all rows to the **same** target time zone.
 
-- **Input**: a DataFrame with a `timestamp_tz` column.
-- **Output**: a DataFrame with a `timestamp_ntz` column (local time in the target zone) and a `time_zone` column containing the target zone name.
+- **Input**: an Ibis table with a `timestamp_tz` column.
+- **Output**: an Ibis table with a `timestamp_ntz` column (local time in the target zone) and a `time_zone` column containing the target zone name.
 
 **Example** — convert an `aligned_in_absolute_time` hourly dataset to US Eastern Standard Time (`Etc/GMT+5`):
 
@@ -37,7 +37,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 est = ZoneInfo("Etc/GMT+5")
 result_df = convert_time_zone_with_chronify_duckdb(
-    df=load_data_df,           # DataFrame with timestamp_tz column
+    df=load_data_df,           # Ibis table with timestamp_tz column
     from_time_dim=time_dim,    # DateTimeDimensionConfig describing the input
     time_zone=est,
     scratch_dir_context=ScratchDirContext(scratch_dir),
@@ -73,10 +73,10 @@ timestamp            | time_zone  | geography | value
 
 ### 2. `convert_time_zone_by_column` — per-row target time zone
 
-Use this when different rows should be converted to **different** target time zones, driven by a `time_zone` column already in the DataFrame (typically added by `add_time_zone` from a geography dimension).
+Use this when different rows should be converted to **different** target time zones, driven by a `time_zone` column already in the Ibis table (typically added by `add_time_zone` from a geography dimension).
 
-- **Input**: a DataFrame with a `timestamp_tz` column **and** a `time_zone` column that contains the target IANA zone name for each row.
-- **Output**: a DataFrame with a `timestamp_ntz` column (local clock time in each row's target zone); the `time_zone` column is preserved as-is.
+- **Input**: an Ibis table with a `timestamp_tz` column **and** a `time_zone` column that contains the target IANA zone name for each row.
+- **Output**: an Ibis table with a `timestamp_ntz` column (local clock time in each row's target zone); the `time_zone` column is preserved as-is.
 
 **Example** — convert an `aligned_in_absolute_time` dataset so each geography's timestamps reflect its local standard time:
 
@@ -201,10 +201,10 @@ Each conversion function has three variants that differ only in how they interac
 | Backend | Function suffix |
 |---|---|
 | DuckDB (default, in-memory) | `_with_chronify_duckdb` |
-| Spark + Hive Metastore | `_with_chronify_spark_hive` |
-| Spark + local filesystem | `_with_chronify_spark_path` |
+| Runtime backend + metastore | `_with_chronify_runtime_hive` |
+| Runtime backend + local filesystem | `_with_chronify_runtime_path` |
 
-The DuckDB variants hold everything in memory and are the fastest for moderate-sized datasets. The Spark variants write intermediate Parquet files and suit large distributed workloads.
+The DuckDB variants hold everything in memory and are the fastest for moderate-sized datasets. The runtime variants write intermediate Parquet files and suit larger workloads.
 
 ---
 

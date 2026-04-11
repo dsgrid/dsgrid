@@ -289,7 +289,7 @@ def test_invalid_load_data_null_id(register_dataset):
     lines.append(",".join(new_line_fields))
     data_file.write_text("\n".join(lines))
     expected_errors["exception"] = DSGInvalidField
-    expected_errors["match_msg"] = r"DataFrame contains NULL value.*id"
+    expected_errors["match_msg"] = r"Ibis table contains NULL value.*id"
 
 
 def test_invalid_load_data_lookup_mismatched_ids(register_dataset):
@@ -313,7 +313,7 @@ def test_invalid_load_data_lookup_null_id(register_dataset):
     data.append(item)
     dump_line_delimited_json(data, lookup_file)
     expected_errors["exception"] = DSGInvalidField
-    expected_errors["match_msg"] = r"DataFrame contains NULL value.*geography"
+    expected_errors["match_msg"] = r"Ibis table contains NULL value.*geography"
 
 
 def test_invalid_load_data_extra_column(register_dataset):

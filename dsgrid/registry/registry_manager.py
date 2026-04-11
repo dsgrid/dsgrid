@@ -19,7 +19,7 @@ from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidOperation, DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
-from dsgrid.utils.spark import init_spark, get_active_session
+from dsgrid.ibis.session import init_runtime_session, get_active_session
 from .common import (
     DataStoreType,
     RegistryManagerParams,
@@ -49,7 +49,7 @@ class RegistryManager:
         self._data_store = db.data_store
         self._check_environment_variables(params)
         if get_active_session() is None:
-            init_spark("dsgrid")
+            init_runtime_session("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path,

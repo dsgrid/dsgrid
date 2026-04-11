@@ -4,6 +4,7 @@ import functools
 import logging
 import time
 from pathlib import Path
+from typing import cast
 
 from dsgrid.utils.files import dump_line_delimited_json
 
@@ -117,7 +118,7 @@ class Timer:
 
     def __exit__(self, exc, value, tb):
         if self._timer_stat is not None:
-            self._timer_stat.update(time.perf_counter() - self._start)
+            self._timer_stat.update(time.perf_counter() - cast(float, self._start))
 
 
 def track_timing(collector):

@@ -1,5 +1,7 @@
+import ibis
 import logging
 from datetime import timedelta
+from typing import Type
 from dateutil.relativedelta import relativedelta
 
 import pandas as pd
@@ -11,23 +13,12 @@ from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
-from dsgrid.spark.functions import (
-    cross_join,
-    handle_column_spaces,
-    select_expr,
-)
-from dsgrid.spark.types import (
-    DataFrame,
-    StructType,
-    StructField,
-    IntegerType,
-    StringType,
-    TimestampType,
-    F,
-)
+from dsgrid.ibis.operations import create_temp_view, filter_sql
+from dsgrid.ibis.table_utils import table_column_to_list
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.spark import (
-    get_spark_session,
+from dsgrid.ibis.session import (
+    get_runtime_session,
     set_session_time_zone,
 )
 from .dimensions import AnnualTimeDimensionModel
@@ -45,7 +36,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     """
 
     @staticmethod
-    def model_class() -> AnnualTimeDimensionModel:
+    def model_class() -> Type[AnnualTimeDimensionModel]:
         return AnnualTimeDimensionModel
 
     @track_timing(timer_stats_collector)
@@ -64,13 +55,12 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
         expected_timestamps = time_range.list_time_range()
+        actual_timestamps_df = filter_sql(
+            load_data_df.select(time_col).distinct(), f"{time_col} IS NOT NULL"
+        ).order_by(time_col)
         actual_timestamps = [
-            pd.Timestamp(str(x[time_col]), tz=self.get_tzinfo()).to_pydatetime()
-            for x in load_data_df.select(time_col)
-            .distinct()
-            .filter(f"{time_col} IS NOT NULL")
-            .sort(time_col)
-            .collect()
+            pd.Timestamp(str(value), tz=self.get_tzinfo()).to_pydatetime()
+            for value in table_column_to_list(actual_timestamps_df, time_col)
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
@@ -79,14 +69,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             msg = f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             raise DSGInvalidDataset(msg)
 
-    def build_time_dataframe(self) -> DataFrame:
+    def build_time_dataframe(self) -> ibis.Table:
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        schema = StructType([StructField(time_col, IntegerType(), False)])
 
         model_time = self.list_expected_dataset_timestamps()
-        df_time = get_spark_session().createDataFrame(model_time, schema=schema)
+        df_time = get_runtime_session().createDataFrame(model_time, schema=[time_col])
         return df_time
 
     def get_frequency(self) -> relativedelta:
@@ -139,7 +128,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> None:
         return None
 
-    def list_expected_dataset_timestamps(self) -> list[AnnualTimestampType]:
+    def list_expected_dataset_timestamps(
+        self, time_based_data_adjustment=None
+    ) -> list[AnnualTimestampType]:
         timestamps = []
         for start, end, freq in build_annual_ranges(self.model.ranges, tz=self.get_tzinfo()):
             year = start.year
@@ -150,45 +141,74 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
 
 def map_annual_time_to_date_time(
-    df: DataFrame,
+    df: ibis.Table,
     annual_dim: AnnualTimeDimensionConfig,
     dt_dim: DateTimeDimensionConfig,
     value_columns: set[str],
-) -> DataFrame:
-    """Map a DataFrame with an annual time dimension to a DateTime time dimension."""
+) -> ibis.Table:
+    """Map an Ibis table with an annual time dimension to a DateTime time dimension."""
     annual_col = annual_dim.get_load_data_time_columns()[0]
     myear_column = DimensionType.MODEL_YEAR.value
     timestamps = make_time_range_generator(dt_dim.to_chronify()).list_timestamps()
     time_cols = dt_dim.get_load_data_time_columns()
     assert len(time_cols) == 1, time_cols
     time_col = time_cols[0]
-    schema = StructType([StructField(time_col, TimestampType(), False)])
-    dt_df = get_spark_session().createDataFrame(
-        [(x.to_pydatetime(),) for x in timestamps], schema=schema
+    dt_df = get_runtime_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=[time_col]
     )
 
     # Note that MeasurementType.TOTAL has already been verified, i.e.,
     # each value associated with an annual time represents the total over that year.
     with set_session_time_zone(dt_dim.model.time_zone_format.time_zone):
-        years = (
-            select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"])
-            .distinct()
-            .collect()
+        years = table_column_to_list(
+            select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"]).distinct(),
+            "year",
         )
         if len(years) != 1:
             msg = "DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)
-        if annual_dim.model.include_leap_day and is_leap_year(years[0].year):
+        if annual_dim.model.include_leap_day and is_leap_year(years[0]):
             measured_duration = timedelta(days=366)
         else:
             measured_duration = timedelta(days=365)
 
-    df2 = (
-        cross_join(df, dt_df)
-        .withColumn(myear_column, F.col(annual_col).cast(StringType()))
-        .drop(annual_col)
-    )
+    df2 = cross_join(df, dt_df)
     frequency: timedelta = dt_dim.get_frequency()
-    for column in value_columns:
-        df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
-    return df2
+    value_divisor = measured_duration / frequency
+    select_columns = []
+    for column in df2.columns:
+        if column == annual_col:
+            continue
+        if column in value_columns:
+            select_columns.append(
+                f"{handle_column_spaces(column)} / {value_divisor} AS {handle_column_spaces(column)}"
+            )
+        else:
+            select_columns.append(handle_column_spaces(column))
+    if myear_column not in df.columns:
+        select_columns.append(
+            f"CAST({handle_column_spaces(annual_col)} AS VARCHAR) AS {handle_column_spaces(myear_column)}"
+        )
+    return select_expr(df2, select_columns)
+
+
+def cross_join(df1: ibis.Table, df2: ibis.Table) -> ibis.Table:
+    view1 = _create_temp_view(df1)
+    view2 = _create_temp_view(df2)
+    return get_runtime_session().sql(f"SELECT * from {view1} CROSS JOIN {view2}")
+
+
+def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
+    view = _create_temp_view(df)
+    cols = ",".join(exprs)
+    return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
+
+
+def handle_column_spaces(column: str) -> str:
+    if use_duckdb():
+        return f'"{column}"'
+    return f"`{column}`"
+
+
+def _create_temp_view(df: ibis.Table) -> str:
+    return create_temp_view(df)

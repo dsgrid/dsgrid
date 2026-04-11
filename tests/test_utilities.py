@@ -1,6 +1,5 @@
 """Tests for dsgrid.utils.utilities module."""
 
-
 from dsgrid.utils.utilities import make_unique_key
 
 

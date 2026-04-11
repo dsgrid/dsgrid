@@ -1,7 +1,11 @@
 import logging
 
+import ibis
+
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.query.models import (
     AggregationModel,
     ColumnModel,
@@ -9,9 +13,10 @@ from dsgrid.query.models import (
     DatasetDimensionsMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
-from dsgrid.spark.types import DataFrame
+
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.dataset.table_format_handler_base import TableFormatHandlerBase
+from dsgrid.ibis.session import get_runtime_session
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +26,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
     """Implements behavior for tables stored in unpivoted format."""
 
     def process_aggregations(
-        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
+        self, df: ibis.Table, aggregations: list[AggregationModel], context: QueryContext
     ):
         orig_id = id(df)
         df = self.process_stacked_aggregations(df, aggregations, context)
@@ -35,13 +40,13 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.Table
         aggregations : AggregationModel
         context : QueryContext
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
 
         """
         if not aggregations:
@@ -72,7 +77,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             df = self.add_columns(df, columns, context, [VALUE_COLUMN])
             group_by_cols = self._build_group_by_columns(columns, context, final_metadata)
             op = agg.aggregation_function
-            df = df.groupBy(*group_by_cols).agg(op(VALUE_COLUMN).alias(VALUE_COLUMN))
+            df = _aggregate_value(df, group_by_cols, op.name)
 
             if metric_query_name not in dim_type_to_base_query_name[DimensionType.METRIC]:
                 to_dim = self.project_config.get_dimension_with_records(metric_query_name)
@@ -119,3 +124,36 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
             msg = f"Bug: unhandled: {context.model.result.column_type}"
             raise NotImplementedError(msg)
     return metric_column
+
+
+def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
+    view = create_temp_view(df)
+    select_cols = ", ".join(_select_expr(x) for x in group_by_cols)
+    group_cols = ", ".join(_group_by_expr(x) for x in group_by_cols)
+    agg_func = "AVG" if op_name == "mean" else op_name.upper()
+    query = (
+        f"SELECT {select_cols}, {agg_func}({handle_column_spaces(VALUE_COLUMN)}) "
+        f"AS {handle_column_spaces(VALUE_COLUMN)} FROM {view}"
+    )
+    if group_cols:
+        query += f" GROUP BY {group_cols}"
+    if isinstance(df, ibis.Table):
+        return make_runtime_backend().sql(query)
+    return get_runtime_session().sql(query)
+
+
+def _group_by_expr(select_expr: str) -> str:
+    marker = " AS "
+    if marker in select_expr:
+        return select_expr.rsplit(marker, 1)[1]
+    return _select_expr(select_expr)
+
+
+def _select_expr(expr: str) -> str:
+    if "(" in expr or " AS " in expr:
+        return expr
+    if (expr.startswith('"') and expr.endswith('"')) or (
+        expr.startswith("`") and expr.endswith("`")
+    ):
+        return expr
+    return handle_column_spaces(expr)

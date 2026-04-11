@@ -13,9 +13,7 @@ __version__ = "0.4.0"
 __author__ = "National Laboratory of the Rockies (formerly NREL)"
 __maintainer_email__ = "elaine.hale@nlr.gov"
 __license__ = "BSD-3"
-__copyright__ = "Copyright {}, Alliance for Energy Innovation, LLC".format(
-    dt.date.today().year
-)
+__copyright__ = "Copyright {}, Alliance for Energy Innovation, LLC".format(dt.date.today().year)
 
 warnings.filterwarnings("ignore", module="duckdb_engine")
 

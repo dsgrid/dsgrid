@@ -1,12 +1,13 @@
 import math
 
+import ibis
 import pytest
 
 import dsgrid.units.energy as energy
 import dsgrid.units.power as power
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.spark.functions import cache, unpersist
-from dsgrid.spark.types import F
+from dsgrid.ibis.operations import create_temp_view, drop_columns, filter_sql, join, rename_columns
+from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.units.constants import (
     GIGA_TO_KILO,
     GIGA_TO_MEGA,
@@ -42,7 +43,8 @@ from dsgrid.units.constants import (
     TWH,
     TWH_TO_THERM,
 )
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.ibis.session import create_dataframe_from_dicts
+from dsgrid.ibis.session import get_runtime_session
 
 
 KWH_VAL = 1234.5
@@ -92,7 +94,7 @@ def records_dataframe_power():
 
 
 @pytest.fixture(scope="module")
-def pivoted_dataframes(records_dataframe_energy):
+def pivoted_tables(records_dataframe_energy):
     data = [
         {
             "fans": KWH_VAL,
@@ -111,7 +113,7 @@ def pivoted_dataframes(records_dataframe_energy):
 
 
 @pytest.fixture(scope="module")
-def unpivoted_dataframes_energy(records_dataframe_energy):
+def unpivoted_tables_energy(records_dataframe_energy):
     data = [
         {
             "timestamp": 1,
@@ -156,7 +158,7 @@ def unpivoted_dataframes_energy(records_dataframe_energy):
 
 
 @pytest.fixture(scope="module")
-def unpivoted_dataframes_power(records_dataframe_power):
+def unpivoted_tables_power(records_dataframe_power):
     data = [
         {
             "timestamp": 1,
@@ -216,8 +218,8 @@ def test_constants():
 
 def check_column_values(row, expected_val, unit_columns):
     for col in unit_columns:
-        assert math.isclose(row[col], expected_val)
-    assert row["unitless"] == KWH_VAL
+        assert math.isclose(_row_value(row, col), expected_val)
+    assert _row_value(row, "unitless") == KWH_VAL
 
 
 @pytest.mark.parametrize(
@@ -231,27 +233,25 @@ def check_column_values(row, expected_val, unit_columns):
         (energy.to_mbtu, MBTU_VAL),
     ),
 )
-def test_to_units(pivoted_dataframes, inputs):
-    df, records = pivoted_dataframes
+def test_to_units(pivoted_tables, inputs):
+    df, records = pivoted_tables
     func, expected_val = inputs
     row = _convert_units(df, records, func)
     check_column_values(row, expected_val, UNIT_COLUMNS_ENERGY)
 
 
 @pytest.mark.parametrize("to_unit", [KWH, MWH, GWH, TWH, THERM, MBTU])
-def test_from_any_to_any_energy(unpivoted_dataframes_energy, to_unit):
-    df, records = unpivoted_dataframes_energy
-    df_with_units = (
-        df.join(records, on=df.metric == records.id)
-        .withColumnRenamed("unit", "from_unit")
-        .withColumn("to_unit", F.lit(to_unit))
-        .select("metric", "timestamp", "from_unit", "to_unit", VALUE_COLUMN)
-    )
-    res = df_with_units.withColumn(
-        VALUE_COLUMN, energy.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
+def test_from_any_to_any_energy(unpivoted_tables_energy, to_unit):
+    df, records = unpivoted_tables_energy
+    df_with_units = rename_columns(
+        join(df, records, "metric", "id"), {"unit": "from_unit"}
+    ).select("metric", "timestamp", "from_unit", VALUE_COLUMN)
+    df_with_units = _with_sql_column(df_with_units, "to_unit", f"'{to_unit}'")
+    res = _with_sql_column(
+        df_with_units, VALUE_COLUMN, energy.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
     )
 
-    unitless = res.filter("metric == 'unitless'").collect()[0][VALUE_COLUMN]
+    unitless = _first_value(filter_sql(res, "metric == 'unitless'"), VALUE_COLUMN)
     assert unitless == KWH_VAL
 
     match to_unit:
@@ -271,24 +271,22 @@ def test_from_any_to_any_energy(unpivoted_dataframes_energy, to_unit):
             assert False, to_unit
 
     for col in UNIT_COLUMNS_ENERGY:
-        val = res.filter(f"metric == '{col}'").collect()[0][VALUE_COLUMN]
+        val = _first_value(filter_sql(res, f"metric == '{col}'"), VALUE_COLUMN)
         assert math.isclose(val, expected_val)
 
 
 @pytest.mark.parametrize("to_unit", [KW, MW, GW, TW])
-def test_from_any_to_any_power(unpivoted_dataframes_power, to_unit):
-    df, records = unpivoted_dataframes_power
-    df_with_units = (
-        df.join(records, on=df.metric == records.id)
-        .withColumnRenamed("unit", "from_unit")
-        .withColumn("to_unit", F.lit(to_unit))
-        .select("metric", "timestamp", "from_unit", "to_unit", VALUE_COLUMN)
-    )
-    res = df_with_units.withColumn(
-        VALUE_COLUMN, power.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
+def test_from_any_to_any_power(unpivoted_tables_power, to_unit):
+    df, records = unpivoted_tables_power
+    df_with_units = rename_columns(
+        join(df, records, "metric", "id"), {"unit": "from_unit"}
+    ).select("metric", "timestamp", "from_unit", VALUE_COLUMN)
+    df_with_units = _with_sql_column(df_with_units, "to_unit", f"'{to_unit}'")
+    res = _with_sql_column(
+        df_with_units, VALUE_COLUMN, power.from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
     )
 
-    unitless = res.filter("metric == 'unitless'").collect()[0][VALUE_COLUMN]
+    unitless = _first_value(filter_sql(res, "metric == 'unitless'"), VALUE_COLUMN)
     assert unitless == KWH_VAL
 
     match to_unit:
@@ -304,14 +302,39 @@ def test_from_any_to_any_power(unpivoted_dataframes_power, to_unit):
             assert False, to_unit
 
     for col in UNIT_COLUMNS_POWER:
-        val = res.filter(f"metric == '{col}'").collect()[0][VALUE_COLUMN]
+        val = _first_value(filter_sql(res, f"metric == '{col}'"), VALUE_COLUMN)
         assert math.isclose(val, expected_val)
 
 
 def _convert_units(df, records, conversion_func):
     unit_col = "unit"
     for column in df.columns:
-        unit_val = records.filter(f"id='{column}'").select(unit_col).collect()[0][unit_col]
-        tdf = df.withColumn(unit_col, F.lit(unit_val))
-        df = tdf.withColumn(column, conversion_func(unit_col, column)).drop(unit_col)
-    return df.collect()[0]
+        unit_val = _first_value(filter_sql(records, f"id='{column}'").select(unit_col), unit_col)
+        tdf = _with_sql_column(df, unit_col, f"'{unit_val}'")
+        df = drop_columns(
+            _with_sql_column(tdf, column, conversion_func(unit_col, column)), unit_col
+        )
+    return _collect(df)[0]
+
+
+def _with_sql_column(df, column, expr):
+    view = create_temp_view(df)
+    cols = ", ".join(x for x in df.columns if x != column)
+    return get_runtime_session().sql(f"SELECT {cols}, {expr} AS {column} FROM {view}")
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _first_value(df, column):
+    return getattr(_collect(df.limit(1))[0], column)
+
+
+def _row_value(row, column):
+    try:
+        return row[column]
+    except TypeError:
+        return getattr(row, column)

@@ -4,6 +4,7 @@ from collections import namedtuple
 from pathlib import Path
 
 import pytest
+import ibis
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
@@ -26,7 +27,7 @@ from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.ibis.session import read_dataframe
 
 
 REGISTRY_PATH = (
@@ -110,8 +111,8 @@ def test_create_derived_dataset_config(tmp_path):
     orig_df = read_dataframe(REGISTRY_PATH / "data" / dataset_id / "1.0.0" / "table.parquet")
     new_df = read_dataframe(query_output / "table.parquet")
     assert sorted(new_df.columns) == sorted(orig_df.columns)
-    orig_data = orig_df.sort(*orig_df.columns).collect()
-    new_data = new_df.select(*orig_df.columns).sort(*orig_df.columns).collect()
+    orig_data = _collect(_order_by(orig_df, *orig_df.columns))
+    new_data = _collect(_order_by(new_df.select(*orig_df.columns), *orig_df.columns))
     assert new_data == orig_data
 
     # Create the config in the CLI and Python API to get test coverage in both places.
@@ -141,3 +142,15 @@ def test_create_derived_dataset_config(tmp_path):
     assert result.exit_code == 0
     assert dataset_config_file.exists()
     shutil.rmtree(dataset_dir)
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _order_by(df, *columns):
+    if isinstance(df, ibis.Table):
+        return df.order_by(*columns)
+    return df.sort(*columns)

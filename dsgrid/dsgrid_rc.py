@@ -60,9 +60,9 @@ class DsgridRuntimeConfig(DSGBaseModel):
         return data
 
     @classmethod
-    def load(cls) -> "DsgridRuntimeConfig":
+    def load(cls, filename=None) -> "DsgridRuntimeConfig":
         """Load the dsgrid runtime config if it exists or one with default values."""
-        rc_file = cls.path()
+        rc_file = cls.path() if filename is None else Path(filename)
         if rc_file.exists():
             data = json5.loads(rc_file.read_text(encoding="utf-8-sig"))
             return cls(**data)

@@ -1,7 +1,7 @@
 import abc
 import itertools
 import logging
-from typing import Any, Generator
+from typing import Any, Generator, cast
 
 import pandas as pd
 from sqlalchemy import Connection, Engine
@@ -92,6 +92,7 @@ class RegistryInterfaceBase(abc.ABC):
         self, conn: Connection | None, model: DSGBaseDatabaseModel
     ) -> RegistrationModel:
         """Return the registration information for the model."""
+        assert model.id is not None
         if conn is None:
             with self._db.engine.connect() as conn:
                 return self._db.get_registration(conn, model.id)
@@ -206,6 +207,7 @@ class RegistryInterfaceBase(abc.ABC):
         version of model. Only looks at the latest version of each parent model.
         """
         version_ = version or model.version
+        assert version_ is not None
         if isinstance(model, ProjectConfigModel):
             model_type = RegistryType.PROJECT
         elif isinstance(model, DatasetConfigModel):
@@ -218,6 +220,8 @@ class RegistryInterfaceBase(abc.ABC):
             msg = str(type(model))
             raise NotImplementedError(msg)
         model_id = getattr(model, MODEL_TYPE_TO_ID_FIELD_MAPPING[model_type])
+        assert model_id is not None
+        model_id = cast(str, model_id)
         if conn is None:
             with self._db.engine.connect() as conn:
                 return self._get_containing_models(
@@ -344,8 +348,10 @@ class DatasetRegistryInterface(RegistryInterfaceBase):
 
     def _insert_contains_edges(self, conn: Connection, model):
         dim_intf = DimensionRegistryInterface(self._db)
+        assert model.id is not None
         for ref in model.dimension_references:
             dim = dim_intf.get_by_version(conn, ref.dimension_id, ref.version)
+            assert dim.id is not None
             self._db.insert_contains_edge(conn, model.id, dim.id)
 
 
@@ -386,8 +392,10 @@ class DimensionMappingRegistryInterface(RegistryInterfaceBase):
 
     def _insert_contains_edges(self, conn, model):
         dim_intf = DimensionRegistryInterface(self._db)
+        assert model.id is not None
         for ref in (model.from_dimension, model.to_dimension):
             dim = dim_intf.get_by_version(conn, ref.dimension_id, ref.version)
+            assert dim.id is not None
             self._db.insert_contains_edge(conn, model.id, dim.id)
 
 
@@ -412,21 +420,25 @@ class ProjectRegistryInterface(RegistryInterfaceBase):
         dim_intf = DimensionRegistryInterface(self._db)
         dim_mapping_intf = DimensionMappingRegistryInterface(self._db)
         dataset_intf = DatasetRegistryInterface(self._db)
+        assert model.id is not None
 
         for ref in itertools.chain(
             model.dimensions.base_dimension_references,
             model.dimensions.supplemental_dimension_references,
         ):
             dim = dim_intf.get_by_version(conn, ref.dimension_id, ref.version)
+            assert dim.id is not None
             self._db.insert_contains_edge(conn, model.id, dim.id)
 
         for ref in model.dimension_mappings.base_to_supplemental_references:
             mapping = dim_mapping_intf.get_by_version(conn, ref.mapping_id, ref.version)
+            assert mapping.id is not None
             self._db.insert_contains_edge(conn, model.id, mapping.id)
 
         for dataset in model.datasets:
             if dataset.status == DatasetRegistryStatus.REGISTERED.value:
                 dset = dataset_intf.get_by_version(conn, dataset.dataset_id, dataset.version)
+                assert dset.id is not None
                 self._db.insert_contains_edge(conn, model.id, dset.id)
 
     def add_contains_dataset(

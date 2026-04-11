@@ -1,6 +1,6 @@
 # Apache Spark
 
-Guide for working with large-scale datasets using Apache Spark.
+Guide for using Apache Spark as dsgrid's distributed Ibis backend.
 
 ## Core Concepts
 

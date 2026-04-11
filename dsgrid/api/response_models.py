@@ -98,7 +98,7 @@ class ListValueFormatsResponse(DSGBaseModel):
     formats: list[ValueFormat]
 
 
-class SparkSubmitProjectQueryResponse(DSGBaseModel):
+class SubmitProjectQueryResponse(DSGBaseModel):
     """Defines the response to the submit_project_query command."""
 
     async_task_id: int

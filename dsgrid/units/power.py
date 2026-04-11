@@ -2,7 +2,6 @@
 
 import logging
 
-from dsgrid.spark.types import DataFrame, F
 from dsgrid.units.constants import (
     GIGA_TO_KILO,
     GIGA_TO_MEGA,
@@ -26,62 +25,69 @@ from dsgrid.units.constants import (
 logger = logging.getLogger(__name__)
 
 
-def to_kw(unit_col: str, value_col: str) -> DataFrame:
-    """Convert a column to kW."""
-    return (
-        F.when(F.col(unit_col) == KW, F.col(value_col))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_KILO))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_KILO))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_KILO))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+def to_kw(unit_col: str, value_col: str) -> str:
+    """Return a SQL expression that converts a column to kW."""
+    return _to_unit(
+        unit_col, value_col, {KW: 1.0, MW: MEGA_TO_KILO, GW: GIGA_TO_KILO, TW: TERA_TO_KILO}
     )
 
 
-def to_mw(unit_col: str, value_col: str) -> DataFrame:
-    """Convert a column to MW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_MEGA))
-        .when(F.col(unit_col) == MW, F.col(value_col))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_MEGA))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_MEGA))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+def to_mw(unit_col: str, value_col: str) -> str:
+    """Return a SQL expression that converts a column to MW."""
+    return _to_unit(
+        unit_col, value_col, {KW: KILO_TO_MEGA, MW: 1.0, GW: GIGA_TO_MEGA, TW: TERA_TO_MEGA}
     )
 
 
-def to_gw(unit_col: str, value_col: str) -> DataFrame:
-    """Convert a column to GW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_GIGA))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_GIGA))
-        .when(F.col(unit_col) == GW, F.col(value_col))
-        .when(F.col(unit_col) == TW, (F.col(value_col) * TERA_TO_GIGA))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+def to_gw(unit_col: str, value_col: str) -> str:
+    """Return a SQL expression that converts a column to GW."""
+    return _to_unit(
+        unit_col, value_col, {KW: KILO_TO_GIGA, MW: MEGA_TO_GIGA, GW: 1.0, TW: TERA_TO_GIGA}
     )
 
 
-def to_tw(unit_col: str, value_col: str) -> DataFrame:
-    """Convert a column to TW."""
-    return (
-        F.when(F.col(unit_col) == KW, (F.col(value_col) * KILO_TO_TERA))
-        .when(F.col(unit_col) == MW, (F.col(value_col) * MEGA_TO_TERA))
-        .when(F.col(unit_col) == GW, (F.col(value_col) * GIGA_TO_TERA))
-        .when(F.col(unit_col) == TW, F.col(value_col))
-        .when(F.col(unit_col) == "", F.col(value_col))
-        .otherwise(None)
+def to_tw(unit_col: str, value_col: str) -> str:
+    """Return a SQL expression that converts a column to TW."""
+    return _to_unit(
+        unit_col, value_col, {KW: KILO_TO_TERA, MW: MEGA_TO_TERA, GW: GIGA_TO_TERA, TW: 1.0}
     )
 
 
-def from_any_to_any(from_unit_col: str, to_unit_col: str, value_col: str) -> DataFrame:
-    """Convert a column of power based on from/to columns."""
-    return (
-        F.when(F.col(from_unit_col) == F.col(to_unit_col), F.col(value_col))
-        .when(F.col(from_unit_col) == "", F.col(value_col))
-        .when(F.col(to_unit_col) == KW, to_kw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == MW, to_mw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == GW, to_gw(from_unit_col, value_col))
-        .when(F.col(to_unit_col) == TW, to_tw(from_unit_col, value_col))
-        .otherwise(None)
+def from_any_to_any(from_unit_col: str, to_unit_col: str, value_col: str) -> str:
+    """Return a SQL expression that converts a column of power based on from/to columns."""
+    return _from_any_to_any(
+        from_unit_col,
+        to_unit_col,
+        value_col,
+        {KW: 1.0, MW: MEGA_TO_KILO, GW: GIGA_TO_KILO, TW: TERA_TO_KILO},
     )
+
+
+def _to_unit(unit_col: str, value_col: str, factors: dict[str, float]) -> str:
+    cases = [
+        f"WHEN {unit_col} = '{unit}' THEN {value_col} * {factor}"
+        for unit, factor in factors.items()
+    ]
+    cases.append(f"WHEN {unit_col} = '' THEN {value_col}")
+    return "CASE " + " ".join(cases) + " ELSE NULL END"
+
+
+def _from_any_to_any(
+    from_unit_col: str,
+    to_unit_col: str,
+    value_col: str,
+    unit_to_base: dict[str, float],
+) -> str:
+    cases = [
+        f"WHEN {from_unit_col} = {to_unit_col} THEN {value_col}",
+        f"WHEN {from_unit_col} = '' THEN {value_col}",
+    ]
+    for to_unit, to_factor in unit_to_base.items():
+        for from_unit, from_factor in unit_to_base.items():
+            if from_unit == to_unit:
+                continue
+            cases.append(
+                f"WHEN {to_unit_col} = '{to_unit}' AND {from_unit_col} = '{from_unit}' "
+                f"THEN {value_col} * {from_factor / to_factor}"
+            )
+    return "CASE " + " ".join(cases) + " ELSE NULL END"

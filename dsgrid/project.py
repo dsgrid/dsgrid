@@ -1,14 +1,17 @@
 """Interface to a dsgrid project."""
 
+import ibis
 import json
 import logging
 
 from pathlib import Path
+from typing import cast
 from semver import VersionInfo
 from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
@@ -17,27 +20,25 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
 )
 from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
+from dsgrid.ibis.operations import join, join_multiple_columns, rename_columns
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
     StandaloneDatasetModel,
     ProjectionDatasetModel,
     DatasetConstructionMethod,
     ColumnType,
+    ProjectQueryModel,
 )
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
-from dsgrid.spark.functions import (
-    is_dataframe_empty,
-)
-from dsgrid.spark.types import DataFrame
-from dsgrid.utils.spark import (
+from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.session import (
     read_dataframe,
     try_read_dataframe,
-    restart_spark_with_custom_conf,
+    restart_runtime_session_with_custom_conf,
     write_dataframe_and_auto_partition,
-    get_active_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
@@ -57,7 +58,6 @@ class Project:
         dimension_mapping_mgr: DimensionMappingRegistryManager,
         dataset_mgr: DatasetRegistryManager,
     ):
-        self._spark = get_active_session()
         self._config = config
         self._version = version
         self._dataset_configs = dataset_configs
@@ -181,13 +181,14 @@ class Project:
     @track_timing(timer_stats_collector)
     def process_query(self, context: QueryContext, cached_datasets_dir: Path) -> dict[str, Path]:
         """Return a dictionary of dataset_id to dataframe path for all datasets in the query."""
+        model = cast(ProjectQueryModel, context.model)
         self._build_filtered_record_ids_by_dimension_type(context)
 
-        # Note: Store DataFrame filenames instead of objects because the SparkSession will get
-        # restarted for each dataset. The Spark DataFrame keeps a reference to the session that
-        # created it, and so that reference will be invalid.
+        # Note: Store table filenames instead of objects because the runtime session will get
+        # restarted for each dataset. Tables can keep references to the session that created
+        # them, and so that reference will be invalid.
         df_filenames = {}
-        for dataset in context.model.project.dataset.source_datasets:
+        for dataset in model.project.dataset.source_datasets:
             if isinstance(dataset, StandaloneDatasetModel):
                 path = self._process_dataset(context, cached_datasets_dir, dataset.dataset_id)
             elif isinstance(dataset, ProjectionDatasetModel):
@@ -203,8 +204,9 @@ class Project:
         return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
-        record_ids: dict[DimensionType, DataFrame] = {}
-        for dim_filter in context.model.project.dataset.params.dimension_filters:
+        model = cast(ProjectQueryModel, context.model)
+        record_ids: dict[DimensionType, ibis.Table] = {}
+        for dim_filter in model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
             if dim_type == DimensionType.TIME:
                 # TODO #196
@@ -229,19 +231,17 @@ class Project:
                     )
                     base_dim = self._config.get_dimension(base_query_name)
                     supp_dim = self._config.get_dimension(query_name)
+                    base_dim = cast(DimensionBaseConfigWithFiles, base_dim)
+                    supp_dim = cast(DimensionBaseConfigWithFiles, supp_dim)
                     mapping_records = self._config.get_base_to_supplemental_mapping_records(
                         base_dim, supp_dim
                     )
-                    df = (
-                        mapping_records.join(df, on=mapping_records.to_id == df.id)
-                        .select("from_id")
-                        .withColumnRenamed("from_id", "id")
-                        .distinct()
-                    )
+                    df = join(mapping_records, df, "to_id", "id").select("from_id")
+                    df = rename_columns(df, {"from_id": "id"}).distinct()
 
             if dim_type in record_ids:
-                df = record_ids[dim_type].join(df, "id")
-            if is_dataframe_empty(df):
+                df = join_multiple_columns(record_ids[dim_type], df, ["id"])
+            if is_table_empty(df):
                 msg = f"Query filter produced empty records: {dim_filter}"
                 raise DSGInvalidQuery(msg)
             record_ids[dim_type] = df
@@ -255,7 +255,7 @@ class Project:
         cached_datasets_dir: Path,
         dataset_id: str,
     ) -> Path:
-        """Return a Path to the created DataFrame. Does not return a DataFrame object because
+        """Return a Path to the created Ibis table. Does not return an Ibis table object because
         the SparkSession will be restarted.
 
         """
@@ -266,7 +266,7 @@ class Project:
         cached_dataset_path = hash_dir / (dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
-            # An alternative solution is to call custom_spark_conf instead.
+            # An alternative solution is to call custom_runtime_conf instead.
             # That changes some settings without restarting the SparkSession.
             # Results were not as good with that solution.
             # Observations on queries with comstock and resstock showed that Spark
@@ -276,8 +276,8 @@ class Project:
             # the cluster manager on AWS.
             # Queries on standalone clusters will be easier to debug if we restart the session
             # for each big job.
-            with restart_spark_with_custom_conf(
-                conf=context.model.project.get_spark_conf(dataset_id),
+            with restart_runtime_session_with_custom_conf(
+                conf=cast(ProjectQueryModel, context.model).project.get_runtime_conf(dataset_id),
                 force=True,
             ):
                 logger.info("Build project-mapped dataset %s", dataset_id)
@@ -346,12 +346,12 @@ class Project:
                 case ColumnType.DIMENSION_NAMES:
                     pass
                 case _:
-                    msg = f"BUG: unhandled {context.model.result.column_type=}"
+                    msg = f"BUG: unhandled {context.model.result.column_type =}"
                     raise NotImplementedError(msg)
             names = list(
                 context.get_dimension_column_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
             )
-            assert len(names) == 1, f"{dataset_id=} {names=}"
+            assert len(names) == 1, f"{dataset_id =} {names =}"
             return names[0]
 
         iv_path = self._process_dataset(
@@ -369,7 +369,7 @@ class Project:
         if model_year_column != model_year_column_gr:
             msg = (
                 "BUG: initial_value and growth rate datasets have different model_year columns: "
-                f"{model_year_column=} {model_year_column_gr=}"
+                f"{model_year_column =} {model_year_column_gr =}"
             )
             raise Exception(msg)
         match context.model.result.column_type:
@@ -383,10 +383,12 @@ class Project:
                 assert time_dim is not None
                 time_columns = set(time_dim.get_load_data_time_columns())
             case _:
-                msg = f"BUG: unhandled {context.model.result.column_type=}"
+                msg = f"BUG: unhandled {context.model.result.column_type =}"
                 raise NotImplementedError(msg)
-        with restart_spark_with_custom_conf(
-            conf=context.model.project.get_spark_conf(dataset.dataset_id),
+        with restart_runtime_session_with_custom_conf(
+            conf=cast(ProjectQueryModel, context.model).project.get_runtime_conf(
+                dataset.dataset_id
+            ),
             force=True,
         ):
             logger.info("Build projection dataset %s", dataset.dataset_id)
@@ -401,7 +403,7 @@ class Project:
                 case DatasetConstructionMethod.ANNUAL_MULTIPLIER:
                     df = apply_annual_multiplier(iv_df, gr_df, time_columns, value_columns)
                 case _:
-                    msg = f"BUG: Unsupported {dataset.construction_method=}"
+                    msg = f"BUG: Unsupported {dataset.construction_method =}"
                     raise NotImplementedError(msg)
             df = write_dataframe_and_auto_partition(df, dataset_path)
 
@@ -439,7 +441,9 @@ class Project:
             "project_id": self._config.model.project_id,
             "project_major_version": VersionInfo.parse(self._config.model.version).major,
             "dataset": self._config.get_dataset(dataset_id).model_dump(mode="json"),
-            "dataset_query_params": context.model.project.dataset.params.model_dump(mode="json"),
+            "dataset_query_params": cast(
+                ProjectQueryModel, context.model
+            ).project.dataset.params.model_dump(mode="json"),
         }
         text = json.dumps(dataset_query_info, indent=2)
         hash_dir_name = compute_hash(text.encode())

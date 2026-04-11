@@ -25,16 +25,14 @@ from dsgrid.dimension.time_utils import (
     get_time_ranges,
 )
 
-from dsgrid.spark.types import (
+from dsgrid.ibis.session import (
     DoubleType,
     F,
+    get_runtime_session,
     IntegerType,
     StringType,
     StructField,
     StructType,
-)
-from dsgrid.utils.spark import (
-    get_spark_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -133,7 +131,7 @@ def create_index_time_dataframe(interval="1h"):
             StructField("time_zone", StringType(), False),
         ]
     )
-    df = get_spark_session().createDataFrame([], schema=schema)
+    df = get_runtime_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     if interval == "1h":
@@ -145,7 +143,7 @@ def create_index_time_dataframe(interval="1h"):
     else:
         msg = f"Unsupported {interval=}"
         raise ValueError(msg)
-    df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
+    df_tz = get_runtime_session().createDataFrame(zip(indices, values), ["time_index", "value"])
     for geo, tz in zip(geography, time_zones):
         df = df.union(
             df_tz.withColumn("geography", F.lit(geo))
@@ -176,7 +174,7 @@ def df_date_time():
             StructField("time_zone", StringType(), False),
         ]
     )
-    df = get_spark_session().createDataFrame([], schema=schema)
+    df = get_runtime_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     ts_pt = pd.date_range(
@@ -196,7 +194,7 @@ def df_date_time():
         ]
     )
     for geo, tz, ts in zip(geography, time_zones, timestamps):
-        df_tz = get_spark_session().createDataFrame(zip(ts, values), schema=sch)
+        df_tz = get_runtime_session().createDataFrame(zip(ts, values), schema=sch)
         df = df.union(
             df_tz.withColumn("geography", F.lit(geo))
             .withColumn("time_zone", F.lit(tz))

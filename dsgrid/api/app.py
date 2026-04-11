@@ -19,14 +19,15 @@ from dsgrid.loggers import setup_logging
 from dsgrid.query.models import ReportType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.run_command import run_command
-from dsgrid.utils.spark import init_spark, read_parquet
+from dsgrid.ibis.session import init_runtime_session, read_parquet
 from .api_manager import ApiManager
 from .models import (
     AsyncTaskStatus,
     AsyncTaskType,
     ProjectQueryAsyncResultModel,
-    SparkSubmitProjectQueryRequest,
+    SubmitProjectQueryRequest,
 )
 from .response_models import (
     GetAsyncTaskResponse,
@@ -45,11 +46,12 @@ from .response_models import (
     ListProjectsResponse,
     ListReportTypesResponse,
     ListValueFormatsResponse,
-    SparkSubmitProjectQueryResponse,
+    SubmitProjectQueryResponse,
 )
 
 
 logger = setup_logging(__name__, "dsgrid_api.log")
+MAX_INLINE_QUERY_DATA_ROWS = 10_000
 DSGRID_REGISTRY_DATABASE_URL = os.environ.get("DSGRID_REGISTRY_DATABASE_URL")
 if DSGRID_REGISTRY_DATABASE_URL is None:
     msg = "The environment variable DSGRID_REGISTRY_DATABASE_URL must be set."
@@ -65,10 +67,10 @@ if API_SERVER_STORE_DIR is None:
 
 offline_mode = True
 no_prompts = True
-# There could be collisions on the only-allowed SparkSession between the main process and
+# There could be collisions on the shared runtime session between the main process and
 # subprocesses that run queries.
 # If both processes try to use the Hive metastore, a crash will occur.
-spark = init_spark("dsgrid_api", check_env=False)
+runtime_session = init_runtime_session("dsgrid_api", check_env=False)
 dsgrid_config = DsgridRuntimeConfig.load()
 conn = DatabaseConnection(
     url=DSGRID_REGISTRY_DATABASE_URL,
@@ -286,9 +288,9 @@ async def list_value_formats():
     return ListValueFormatsResponse(formats=_list_enums(ValueFormat))
 
 
-@app.post("/queries/projects", response_model=SparkSubmitProjectQueryResponse)
+@app.post("/queries/projects", response_model=SubmitProjectQueryResponse)
 async def submit_project_query(
-    query: SparkSubmitProjectQueryRequest, background_tasks: BackgroundTasks
+    query: SubmitProjectQueryRequest, background_tasks: BackgroundTasks
 ):
     """Submit a project query for execution."""
     if not api_mgr.can_start_new_async_task():
@@ -299,7 +301,7 @@ async def submit_project_query(
     # TODO: force should not be True
     # TODO: how do we manage the number of background tasks?
     background_tasks.add_task(_submit_project_query, query, async_task_id)
-    return SparkSubmitProjectQueryResponse(async_task_id=async_task_id)
+    return SubmitProjectQueryResponse(async_task_id=async_task_id)
 
 
 @app.get("/async_tasks/status", response_model=ListAsyncTasksResponse)
@@ -337,11 +339,16 @@ def get_async_task_data(async_task_id: int):
         # TODO: Sending data this way has major limitations. We lose all the benefits of Parquet and
         # compression.
         # We should also check how much data we can read through the Spark driver.
-        text = (
-            read_parquet(str(task.result.data_file))
-            .toPandas()
-            .to_json(orient="split", index=False)
-        )
+        table = read_parquet(str(task.result.data_file))
+        count = table.count()
+        num_rows = count.execute() if hasattr(count, "execute") else count
+        if num_rows > MAX_INLINE_QUERY_DATA_ROWS:
+            msg = (
+                f"Query result has {num_rows} rows. Inline JSON responses are limited to "
+                f"{MAX_INLINE_QUERY_DATA_ROWS} rows. Download the archive file instead."
+            )
+            raise HTTPException(413, detail=msg)
+        text = table_to_pandas(table).to_json(orient="split", index=False)
     else:
         msg = f"task type {task.task_type} is not implemented"
         raise NotImplementedError(msg)
@@ -359,10 +366,10 @@ def download_async_task_archive_file(async_task_id: int):
     return FileResponse(task.result.archive_file)
 
 
-def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_task_id):
+def _submit_project_query(request: SubmitProjectQueryRequest, async_task_id):
     fp = NamedTemporaryFile(mode="w", suffix=".json", delete=False)
     try:
-        query = spark_query.query
+        query = request.query
         fp.write(query.model_dump_json())
         fp.write("\n")
         fp.flush()
@@ -374,13 +381,13 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
             f"query project run "
             f"--output={output_dir} --zip-file --overwrite {fp.name}"
         )
-        if spark_query.use_spark_submit:
+        if request.use_spark_submit:
             # Need to find the full path to pass to spark-submit.
             dsgrid_exec = _find_exec(dsgrid_exec)
             spark_cmd = "spark-submit"
-            if spark_query.spark_submit_options:
+            if request.spark_submit_options:
                 spark_cmd += " " + " ".join(
-                    (f"{k} {v}" for k, v in spark_query.spark_submit_options.items())
+                    (f"{k} {v}" for k, v in request.spark_submit_options.items())
                 )
             cmd = f"{spark_cmd} {dsgrid_exec} {base_cmd}"
         else:

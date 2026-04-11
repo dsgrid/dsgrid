@@ -1,3 +1,4 @@
+import ibis
 import logging
 from pathlib import Path
 from typing import Self
@@ -7,10 +8,11 @@ from pydantic import Field, field_validator, model_validator
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
-from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
-from dsgrid.spark.types import DataFrame, DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
+from dsgrid.ibis.io import read_csv, read_json, read_parquet
+from dsgrid.ibis.operations import drop_columns, rename_columns
+from dsgrid.ibis.types import DUCKDB_COLUMN_TYPES, SUPPORTED_TYPES
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import write_dataframe
+from dsgrid.ibis.session import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 
 
@@ -40,7 +42,7 @@ class Column(DSGBaseModel):
         type_upper = data_type.upper()
         if type_upper not in SUPPORTED_TYPES:
             supported_data_types = sorted(SUPPORTED_TYPES)
-            msg = f"{data_type=} is not one of {supported_data_types=}"
+            msg = f"{data_type =} is not one of {supported_data_types =}"
             raise ValueError(msg)
         return type_upper
 
@@ -62,7 +64,7 @@ class FileSchema(DSGBaseModel):
         if len(self.columns) > 1:
             check_uniqueness((x.name for x in self.columns), "column names")
 
-        # Check that ignore_columns don't overlap with columns
+            # Check that ignore_columns don't overlap with columns
         column_names = {x.name for x in self.columns}
         ignore_set = set(self.ignore_columns)
         overlap = column_names & ignore_set
@@ -79,7 +81,7 @@ class FileSchema(DSGBaseModel):
 
 def read_data_file(
     schema: FileSchema, scratch_dir_context: ScratchDirContext | None = None
-) -> DataFrame:
+) -> ibis.Table:
     """Read a data file from a schema.
 
     Parameters
@@ -91,8 +93,8 @@ def read_data_file(
 
     Returns
     -------
-    DataFrame
-        A Spark DataFrame containing the file data.
+    Ibis table
+        An Ibis table containing the file data.
     """
     if schema.path is None:
         msg = "File path is not assigned"
@@ -110,7 +112,7 @@ def read_data_file(
             df = read_parquet(path)
         case ".csv":
             column_schema = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
-            df = read_csv_duckdb(path, schema=column_schema)
+            df = read_csv(path, schema=column_schema)
         case ".json":
             df = read_json(path)
         case _:
@@ -120,7 +122,7 @@ def read_data_file(
     actual_columns = set(df.columns)
     diff = expected_columns.difference(actual_columns)
     if diff:
-        msg = f"Expected columns {diff} are not in {actual_columns=}"
+        msg = f"Expected columns {diff} are not in {actual_columns =}"
         raise DSGInvalidDataset(msg)
 
     df = _drop_ignored_columns(df, schema.ignore_columns)
@@ -153,21 +155,21 @@ def _get_column_renames(schema: FileSchema) -> dict[str, str]:
     return mapping
 
 
-def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
+def _rename_columns(df: ibis.Table, mapping: dict[str, str]) -> ibis.Table:
+    df = rename_columns(df, mapping)
     for old_name, new_name in mapping.items():
-        df = df.withColumnRenamed(old_name, new_name)
         logger.info("Renamed column %s to %s", old_name, new_name)
     return df
 
 
-def _drop_ignored_columns(df: DataFrame, ignore_columns: list[str]) -> DataFrame:
+def _drop_ignored_columns(df: ibis.Table, ignore_columns: list[str]) -> ibis.Table:
     if not ignore_columns:
         return df
 
     existing_columns = set(df.columns)
     for col in ignore_columns:
         if col in existing_columns:
-            df = df.drop(col)
+            df = drop_columns(df, col)
             logger.info("Dropped ignored column: %s", col)
         else:
             logger.warning("Ignored column '%s' not found in file", col)
@@ -184,7 +186,7 @@ def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, s
         col_type = val.upper()
         if col_type not in backend_mapping:
             options = " ".join(sorted(backend_mapping.keys()))
-            msg = f"column type = {val} is not supported. {options=}"
+            msg = f"column type = {val} is not supported. {options =}"
             raise DSGInvalidField(msg)
         mapped_schema[key] = backend_mapping[col_type]
     return mapped_schema

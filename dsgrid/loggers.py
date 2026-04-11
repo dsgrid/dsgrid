@@ -4,6 +4,7 @@ import logging
 import logging.config
 import os
 from contextlib import contextmanager
+from typing import cast
 
 import chronify.loggers
 
@@ -77,7 +78,7 @@ def setup_logging(
             "propagate": True,
         }
         if filename is not None:
-            log_config["loggers"][package]["handlers"].append("file")
+            cast(list[str], log_config["loggers"][package]["handlers"]).append("file")
 
     # ETH@20210325 - This logic should be applied to packages as well? This makes
     # me think that this should really be two functions--one for setting up a

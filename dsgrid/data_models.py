@@ -78,7 +78,7 @@ class DSGBaseModel(BaseModel):
         return self.model_dump(*args, mode="json", **kwargs)
 
     @classmethod
-    def from_file(cls, filename: Path) -> Self:
+    def from_file(cls, filename: Path | str) -> Self:
         """Deserialize the model from a file. Unlike the load method,
         this does not change directories.
         """
@@ -151,5 +151,5 @@ class DSGEnum(Enum):
         """Returns formatted dict of enum values and descriptions for docs."""
         desc = {}
         for e in cls:
-            desc[f"``{e.value}``"] = f"{e.description}"
+            desc[f"``{e.value}``"] = f"{getattr(e, 'description')}"
         return desc

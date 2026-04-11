@@ -1,3 +1,4 @@
+import ibis
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
@@ -18,8 +19,36 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
-from dsgrid.spark.types import F, use_duckdb
-from dsgrid.utils.spark import create_dataframe_from_dicts
+from dsgrid.ibis.session import F, create_dataframe_from_dicts, use_duckdb
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _count(df) -> int:
+    if isinstance(df, ibis.Table):
+        return df.count().execute()
+    return df.count()
+
+
+def _count_timestamps_per_model_year(df, time_col: str):
+    if isinstance(df, ibis.Table):
+        return _collect(
+            df.group_by("model_year")
+            .aggregate(count_timestamps=df[time_col].count())
+            .select("count_timestamps")
+            .distinct()
+        )
+    return (
+        df.groupBy("model_year")
+        .agg(F.count(time_col).alias("count_timestamps"))
+        .select("count_timestamps")
+        .distinct()
+        .collect()
+    )
 
 
 @pytest.fixture(scope="module")
@@ -50,7 +79,7 @@ def annual_dataframe():
     df = create_dataframe_from_dicts(data)
     if not use_duckdb():
         df.cache()
-        df.count()
+        _count(df)
     yield df
 
 
@@ -167,12 +196,12 @@ def test_map_annual_time_total_to_datetime(
         value_columns,
     )
     expected_by_year = {
-        x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
+        x.time_year: x.electricity_sales / (366 * 24) for x in _collect(annual_dataframe)
     }
-    num_rows = annual_dataframe.count()
+    num_rows = _count(annual_dataframe)
     num_timestamps = 24 * 7
-    assert df.count() == num_rows * num_timestamps
-    values = df.select("model_year", "electricity_sales").distinct().collect()
+    assert _count(df) == num_rows * num_timestamps
+    values = _collect(df.select("model_year", "electricity_sales").distinct())
     assert len(values) == num_rows
     by_year = {x.model_year: x.electricity_sales for x in values}
     assert len(by_year) == len(expected_by_year)
@@ -180,15 +209,9 @@ def test_map_annual_time_total_to_datetime(
         assert by_year[year] == expected_by_year[int(year)]
 
     time_col = date_time_dimension.get_load_data_time_columns()[0]
-    count_timestamps_per_model_year = (
-        df.groupBy("model_year")
-        .agg(F.count(time_col).alias("count_timestamps"))
-        .select("count_timestamps")
-        .distinct()
-        .collect()
-    )
+    count_timestamps_per_model_year = _count_timestamps_per_model_year(df, time_col)
     assert len(count_timestamps_per_model_year) == 1
-    assert count_timestamps_per_model_year[0]["count_timestamps"] == num_timestamps
+    assert count_timestamps_per_model_year[0].count_timestamps == num_timestamps
 
 
 def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):

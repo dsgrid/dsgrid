@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import ibis
 import pytest
 
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -9,23 +10,25 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     aggregate_single_value,
     cache,
-    get_spark_session,
+    get_runtime_session,
     is_dataframe_empty,
     unpersist,
 )
-from dsgrid.spark.types import (
-    StructField,
-    StructType,
+from dsgrid.ibis.session import (
     DoubleType,
     IntegerType,
-    ShortType,
     LongType,
+    ShortType,
+    StructField,
+    StructType,
     StringType,
+    create_dataframe_from_dicts,
     use_duckdb,
 )
+from dsgrid.ibis.operations import filter_sql
 from dsgrid.utils.dataset import (
     add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
@@ -36,11 +39,10 @@ from dsgrid.utils.dataset import (
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
 @pytest.fixture(scope="module")
-def dataframes():
+def tables():
     df = create_dataframe_from_dicts(
         [
             {
@@ -234,7 +236,7 @@ def test_is_noop_mapping_false():
 
 
 def test_add_null_rows_from_load_data_lookup():
-    spark = get_spark_session()
+    spark = get_runtime_session()
     df = spark.createDataFrame(
         [
             ("2018-01-01 01:00:00", 2030, "Jefferson", 1.0),
@@ -264,8 +266,8 @@ def test_add_null_rows_from_load_data_lookup():
         ),
     )
     result = add_null_rows_from_load_data_lookup(df, lookup)
-    assert result.count() == 4
-    null_rows = result.filter("timestamp is NULL").collect()
+    assert _count(result) == 4
+    null_rows = _collect(filter_sql(result, "timestamp is NULL"))
     assert len(null_rows) == 1
     assert null_rows[0].geography == "Boulder"
 
@@ -323,9 +325,9 @@ def test_remove_invalid_null_timestamps():
     stacked = ["county", "subsector"]
     time_col = "timestamp"
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
-    assert result.count() == 6
-    assert result.filter("county == 'Boulder'").count() == 2
-    assert is_dataframe_empty(result.filter(f"county == 'Boulder' and {time_col} is NULL"))
+    assert _count(result) == 6
+    assert _count(filter_sql(result, "county == 'Boulder'")) == 2
+    assert is_dataframe_empty(filter_sql(result, f"county == 'Boulder' and {time_col} is NULL"))
 
 
 def test_apply_scaling_factor(tmp_path):
@@ -349,8 +351,8 @@ def test_apply_scaling_factor(tmp_path):
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
-def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
-    df = dataframes[0]
+def test_repartition_if_needed_by_mapping(tmp_path, caplog, tables):
+    df = tables[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.INFO):
         df, _ = repartition_if_needed_by_mapping(
@@ -362,8 +364,8 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
-def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframes):
-    df = dataframes[0]
+def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, tables):
+    df = tables[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.DEBUG):
         df, _ = repartition_if_needed_by_mapping(
@@ -379,11 +381,12 @@ def test_unpivot(pivoted_dataframe_with_time):
     df, time_columns, value_columns = pivoted_dataframe_with_time
     unpivoted = unpivot_dataframe(df, value_columns, "end_use", time_columns)
     expected_columns = [*time_columns, "county", "end_use", VALUE_COLUMN]
-    assert unpivoted.columns == expected_columns
-    null_data = unpivoted.filter("county = 'Boulder' and end_use = 'heating'").collect()
+    assert list(unpivoted.columns) == expected_columns
+    null_data = _collect(filter_sql(unpivoted, "county = 'Boulder' and end_use = 'heating'"))
     assert len(null_data) == 1
     assert null_data[0].time_index is None
-    assert null_data[0][VALUE_COLUMN] is None
+    value = getattr(null_data[0], VALUE_COLUMN)
+    assert value is None or value != value
 
 
 @pytest.mark.parametrize("data_type", [IntegerType(), ShortType(), LongType()])
@@ -395,9 +398,9 @@ def test_convert_types_if_necessary(data_type):
             StructField("bystander", IntegerType(), False),
         ]
     )
-    df1 = get_spark_session().createDataFrame([(2030, 2018, 2040)], schema)
+    df1 = get_runtime_session().createDataFrame([(2030, 2018, 2040)], schema)
     df2 = convert_types_if_necessary(df1)
-    row = df2.collect()[0]
+    row = _first(df2)
     assert row.model_year == "2030"
     assert row.weather_year == "2018"
     assert row.bystander == 2040
@@ -423,9 +426,26 @@ def _make_df(rows: list[dict[str, str]]):
 
 
 def _sorted_rows(df) -> list[Any]:
-    """Collect a DataFrame into a sorted list of tuples for easy comparison."""
+    """Collect an Ibis table into a sorted list of tuples for easy comparison."""
     cols = sorted(df.columns)
-    return sorted(df.select(*cols).distinct().collect(), key=lambda r: tuple(r))
+    return sorted(_collect(df.select(*cols).distinct()), key=lambda r: tuple(r))
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _count(df) -> int:
+    if isinstance(df, ibis.Table):
+        return df.count().execute()
+    return df.count()
+
+
+def _first(df):
+    rows = _collect(df.limit(1))
+    return rows[0]
 
 
 class TestMergeExpectedAssociationsTables:

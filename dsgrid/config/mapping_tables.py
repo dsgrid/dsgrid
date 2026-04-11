@@ -155,15 +155,17 @@ class MappingTableModel(DimensionMappingBaseModel):
         from_dimension: DimensionReferenceModel,
         to_dimension: DimensionReferenceModel,
     ):
-        return MappingTableModel(
-            mapping_type=model.mapping_type,
-            archetype=model.archetype,
-            from_dimension=from_dimension,
-            to_dimension=to_dimension,
-            description=model.description,
-            file=model.filename,
-            from_fraction_tolerance=model.from_fraction_tolerance,
-            to_fraction_tolerance=model.to_fraction_tolerance,
+        return MappingTableModel.model_validate(
+            {
+                "mapping_type": model.mapping_type,
+                "archetype": model.archetype,
+                "from_dimension": from_dimension,
+                "to_dimension": to_dimension,
+                "description": model.description,
+                "file": model.filename,
+                "from_fraction_tolerance": model.from_fraction_tolerance,
+                "to_fraction_tolerance": model.to_fraction_tolerance,
+            }
         )
 
 

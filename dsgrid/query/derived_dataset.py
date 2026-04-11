@@ -1,5 +1,7 @@
+import ibis
 import logging
 from pathlib import Path
+from typing import Any, cast
 
 import chronify
 import json5
@@ -15,18 +17,20 @@ from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, Dimensi
 from dsgrid.config.dimensions import DimensionModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import TableFormat, ValueFormat
+from dsgrid.dataset.models import PivotedTableFormatModel, TableFormat, ValueFormat
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import make_temp_view_name
-from dsgrid.spark.types import DataFrame
+from dsgrid.ibis.functions import write_csv
+from dsgrid.ibis.table_utils import get_unique_values
+
+from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import read_dataframe, get_unique_values
+from dsgrid.ibis.session import read_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -65,9 +69,8 @@ def create_derived_dataset_config_from_query(
     value_format = metadata.get_value_format()
     value_format_dict = {"value_format": value_format.value}
     if value_format == ValueFormat.PIVOTED:
-        value_format_dict[
-            "pivoted_dimension_type"
-        ] = metadata.table_format.pivoted_dimension_type.value
+        table_format = cast(PivotedTableFormatModel, metadata.table_format)
+        value_format_dict["pivoted_dimension_type"] = table_format.pivoted_dimension_type.value
 
     project = registry_manager.project_manager.load_project(
         query.project.project_id, version=query.project.version
@@ -106,7 +109,8 @@ def create_derived_dataset_config_from_query(
         dim = project.config.get_dimension_with_records(dim_query_name)
         if (
             value_format == ValueFormat.PIVOTED
-            and metadata.table_format.pivoted_dimension_type == dim_type
+            and cast(PivotedTableFormatModel, metadata.table_format).pivoted_dimension_type
+            == dim_type
         ):
             unique_data_records = metadata.dimensions.get_column_names(dim_type)
         else:
@@ -179,7 +183,7 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
-def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path):
+def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: ibis.Table, df_path: Path):
     try:
         if dim_config.supports_chronify():
             _check_time_dimension_with_chronify(dim_config, df, df_path)
@@ -191,7 +195,7 @@ def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFram
 
 
 def _check_time_dimension_with_chronify(
-    dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path
+    dim_config: TimeDimensionBaseConfig, df: ibis.Table, df_path: Path
 ):
     scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
     with ScratchDirContext(scratch_dir) as scratch_dir_context:
@@ -208,7 +212,7 @@ def _check_time_dimension_with_chronify(
         ]
         schema = chronify.TableSchema(
             name=make_temp_view_name(),
-            time_config=dim_config.to_chronify(),
+            time_config=cast(Any, dim_config.to_chronify()),
             time_array_id_columns=time_array_id_columns,
             value_column=VALUE_COLUMN,
         )
@@ -220,7 +224,7 @@ def _check_time_dimension_with_chronify(
 
 
 def _is_dimension_valid_for_dataset(
-    dim_config: DimensionBaseConfigWithFiles, unique_data_records: DataFrame
+    dim_config: DimensionBaseConfigWithFiles, unique_data_records: set[str]
 ):
     records = dim_config.get_records_dataframe()
     dim_values = get_unique_values(records, "id")
@@ -234,7 +238,7 @@ def _is_dimension_valid_for_dataset(
 def _get_matching_supplemental_dimension(
     project_config: ProjectConfig,
     dimension_type: DimensionType,
-    unique_data_records: DataFrame,
+    unique_data_records: set[str],
 ) -> DimensionBaseConfigWithFiles | None:
     for dim_config in project_config.list_supplemental_dimensions(dimension_type):
         if _is_dimension_valid_for_dataset(dim_config, unique_data_records):
@@ -302,14 +306,14 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
         if diff:
             msg = (
                 f"The derived dataset records do not include some project base dimension "
-                f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
+                f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff =}"
             )
             raise DSGInvalidDataset(msg)
         assert unique_data_records.issuperset(project_record_ids)
         diff = unique_data_records.difference(project_record_ids)
         msg = (
             f"The derived dataset records is a superset of the project base dimension "
-            f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
+            f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff =}"
         )
         raise DSGInvalidDataset(msg)
 
@@ -319,8 +323,7 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
     records = orig_records.filter(orig_records.id.isin(unique_data_records))
     # TODO: AWS #186 - not an issue if registry is in a database instead of files
     filename = new_dim_path / "records.csv"
-    # Use pandas because spark creates a directory.
-    records.toPandas().to_csv(filename, index=False)
+    write_csv(records, filename, overwrite=True)
     # Use dictionaries instead of DimensionModel to avoid running the Pydantic validators.
     # Some won't work, like loading the records. Others, like file_hash, shouldn't get set yet.
     new_dim = {
@@ -360,7 +363,7 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
         case ColumnType.DIMENSION_TYPES:
             column = dim_model.dimension_type.value
         case _:
-            msg = f"BUG: unhandled: {column_type=}"
+            msg = f"BUG: unhandled: {column_type =}"
             raise NotImplementedError(msg)
 
     return get_unique_values(df, column)

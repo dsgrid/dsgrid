@@ -1,3 +1,4 @@
+import ibis
 import logging
 from pathlib import Path
 from typing import Self
@@ -7,9 +8,9 @@ from dsgrid.query.dataset_mapping_plan import (
     MapOperation,
     MapOperationCheckpoint,
 )
-from dsgrid.spark.types import DataFrame
+
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.utils.spark import read_dataframe, write_dataframe
+from dsgrid.ibis.session import read_dataframe, write_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ class DatasetMappingManager:
         """Return the scratch_dir_context."""
         return self._scratch_dir_context
 
-    def try_read_checkpointed_table(self) -> DataFrame | None:
+    def try_read_checkpointed_table(self) -> ibis.Table | None:
         """Read the checkpointed table for the dataset, if it exists."""
         if self._checkpoint is None:
             return None
@@ -64,8 +65,8 @@ class DatasetMappingManager:
         """Return True if the mapping operation has been completed."""
         return op.name in self.get_completed_mapping_operations()
 
-    def persist_table(self, df: DataFrame, op: MapOperation) -> DataFrame:
-        """Persist the intermediate table to the filesystem and return the persisted DataFrame."""
+    def persist_table(self, df: ibis.Table, op: MapOperation) -> ibis.Table:
+        """Persist the intermediate table to the filesystem and return the persisted Ibis table."""
         persisted_file = self._scratch_dir_context.get_temp_filename(
             suffix=".parquet", add_tracked_path=False
         )

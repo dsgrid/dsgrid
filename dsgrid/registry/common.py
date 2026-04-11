@@ -66,12 +66,12 @@ class DatabaseConnection(DSGBaseModel):
     # password: str = DEFAULT_DB_PASSWORD
 
     @classmethod
-    def from_file(cls, path: Path | str) -> "DatabaseConnection":
+    def from_file(cls, filename: Path | str) -> "DatabaseConnection":
         """Create a connection from a SQLite file path.
 
         Uses forward slashes in the URL for cross-platform compatibility.
         """
-        return cls(url=make_sqlite_url(path))
+        return cls(url=make_sqlite_url(filename))
 
     # @classmethod
     # def from_url(cls, url, **kwargs):

@@ -13,11 +13,14 @@ Covers:
 
 All tests run real chronify localization processes end-to-end without patching helpers.
 """
+
+import ibis
 import pytest
 import pandas as pd
 
 import dsgrid
 from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN
+from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     TimeIntervalType,
@@ -34,23 +37,22 @@ from dsgrid.config.dimensions import (
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.spark.types import (
-    DataFrame,
+from dsgrid.ibis.session import (
     DoubleType,
+    get_runtime_session,
     StringType,
     StructField,
     StructType,
     TimestampNTZType,
     use_duckdb,
 )
-from dsgrid.spark.functions import get_spark_session
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
 @pytest.fixture(scope="module")
 def spark():
-    return get_spark_session()
+    return get_runtime_session()
 
 
 skip_unless_spark = pytest.mark.skipif(
@@ -187,8 +189,8 @@ class DummyGeoDim:
         return self._spark.createDataFrame(pdf)
 
 
-def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> DataFrame:
-    """Create a minimal real DataFrame for routing tests."""
+def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> ibis.Table:
+    """Create a minimal real Ibis table for routing tests."""
     pdf = pd.DataFrame(
         {
             TIME_COLUMN: [
@@ -215,8 +217,8 @@ def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> DataFram
 def _make_multi_tz_dataframe(
     spark,
     time_zones: tuple[str, ...] = ("Etc/GMT+5", "Etc/GMT+8"),
-) -> DataFrame:
-    """Create a DataFrame with TIME_ZONE_COLUMN for multi-timezone localization tests."""
+) -> ibis.Table:
+    """Create an Ibis table with TIME_ZONE_COLUMN for multi-timezone localization tests."""
     timestamps = [pd.Timestamp("2018-01-01 00:00:00"), pd.Timestamp("2018-01-01 01:00:00")]
     rows = [
         {TIME_COLUMN: ts, "geography": "g1", VALUE_COLUMN: 1.0, TIME_ZONE_COLUMN: tz}
@@ -259,9 +261,9 @@ def test_single_tz_duckdb(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = sdf.toPandas()
+    sdf2 = _to_pandas(sdf)
     tz = time_dim.model.time_zone_format.time_zone
-    res_df2 = res_df.toPandas()
+    res_df2 = _to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -282,11 +284,11 @@ def test_single_tz_spark_hive(spark, tmp_path):
         dsgrid.runtime_config.use_hive_metastore = original
 
     assert changed is True
-    session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
-    res_df2 = res_df.toPandas()
+    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    res_df2 = _to_pandas(res_df)
 
     tz = time_dim.model.time_zone_format.time_zone
-    sdf2 = sdf.toPandas()
+    sdf2 = _to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
@@ -303,11 +305,11 @@ def test_single_tz_spark_path(spark, tmp_path):
     )
 
     assert changed is True
-    session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
-    res_df2 = res_df.toPandas()
+    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    res_df2 = _to_pandas(res_df)
 
     tz = time_dim.model.time_zone_format.time_zone
-    sdf2 = sdf.toPandas()
+    sdf2 = _to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
@@ -328,7 +330,7 @@ def test_value_column_first_used(spark, tmp_path):
 
     assert changed is True
     assert set(res_df.columns) >= {"val_a", "val_b", "val_c"}
-    assert res_df.toPandas()[TIME_COLUMN].dt.tz is not None
+    assert _to_pandas(res_df)[TIME_COLUMN].dt.tz is not None
 
 
 @skip_unless_duckdb
@@ -347,8 +349,8 @@ def test_multi_tz_duckdb_adds_tz_column(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = sdf.toPandas()
-    res_df2 = res_df.toPandas()
+    sdf2 = _to_pandas(sdf)
+    res_df2 = _to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -371,8 +373,8 @@ def test_multi_tz_duckdb_existing_tz_column(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = sdf.toPandas()
-    res_df2 = res_df.toPandas()
+    sdf2 = _to_pandas(sdf)
+    res_df2 = _to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -400,10 +402,10 @@ def test_multi_tz_spark_hive_existing_tz_column(spark, tmp_path):
         dsgrid.runtime_config.use_hive_metastore = original
 
     assert changed is True
-    session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
-    res_df2 = res_df.toPandas()
+    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    res_df2 = _to_pandas(res_df)
 
-    sdf2 = sdf.toPandas()
+    sdf2 = _to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
@@ -424,11 +426,11 @@ def test_multi_tz_spark_path(spark, tmp_path):
     )
 
     assert changed is True
-    session_tz = res_df.sparkSession.conf.get("spark.sql.session.timeZone")
-    res_df2 = res_df.toPandas()
+    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    res_df2 = _to_pandas(res_df)
 
     tz = "Etc/GMT+5"
-    sdf2 = sdf.toPandas()
+    sdf2 = _to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
@@ -470,3 +472,7 @@ def test_ntz_no_time_zone_is_noop(spark, tmp_path):
     )
     assert changed is False
     assert res_df is sdf
+
+
+def _to_pandas(df):
+    return table_to_pandas(df)

@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Generator, Sequence, Union
+from typing import Any, Generator, Sequence, Union, cast
 from uuid import uuid4
 
 from prettytable import PrettyTable
@@ -273,7 +273,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             filter_config = {"dimension_type": dimension_type}
             for model in self.db.iter_models(filter_config=filter_config, conn=conn):
                 assert isinstance(model, DimensionBaseModel)
+                assert model.dimension_id is not None
                 config = self.get_by_id(model.dimension_id, conn=conn)
+                assert isinstance(config, DimensionBaseConfigWithFiles)
                 if sorted_record_ids == sorted(config.get_unique_ids()):
                     yield config
 
@@ -334,6 +336,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for model in self.db.iter_models(conn):
+            model = cast(Any, model)
             registration = self.db.get_registration(conn, model)
             if dimension_ids and model.dimension_id not in dimension_ids:
                 continue
@@ -405,9 +408,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             for key in [x for x in self._dimensions if x.id in config_ids]:
                 self._dimensions.pop(key)
 
-    def remove(self, dimension_id, conn: Connection | None = None):
-        self.db.delete_all(conn, dimension_id)
-        for key in [x for x in self._dimensions if x.id == dimension_id]:
+    def remove(self, config_id: str, conn: Connection | None = None):
+        self.db.delete_all(conn, config_id)
+        for key in [x for x in self._dimensions if x.id == config_id]:
             self._dimensions.pop(key)
 
-        logger.info("Removed %s from the registry.", dimension_id)
+        logger.info("Removed %s from the registry.", config_id)

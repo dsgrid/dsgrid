@@ -69,8 +69,8 @@ def build_time_ranges(
 
 def get_time_ranges(
     time_dimension_config,  #: DateTimeDimensionConfig,
-    time_zone: str = None,
-    time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
+    time_zone: str | None = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
 ):
     dim_model = time_dimension_config.model
     if time_zone is None:

@@ -4,7 +4,7 @@ import importlib
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Union, Literal
+from typing import Any, Union, Literal, cast
 import copy
 from zoneinfo import ZoneInfo
 
@@ -757,7 +757,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         """
         is_tz_naive = self.column_format.dtype == "timestamp_ntz" or (
             self.column_format.dtype == "time_format_in_parts"
-            and self.column_format.offset_column is None
+            and cast(Any, self.column_format).offset_column is None
         )
         if not is_tz_naive:
             return self

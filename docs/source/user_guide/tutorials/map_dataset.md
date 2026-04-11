@@ -1,10 +1,10 @@
 # Map a Dataset to a Project's Dimensions
 
-It is often beneficial to map a dataset to a project's dimensions before running queries with other datasets that perform aggregations or filters. Mapping a dataset with Spark can be an expensive operation that takes several iterations to figure out with Spark. It is easier to debug in isolation. Once complete, the cached result can be used for subsequent queries.
+It is often beneficial to map a dataset to a project's dimensions before running queries with other datasets that perform aggregations or filters. dsgrid runs the mapping through Ibis on the configured backend. With large datasets, the Spark backend can take several iterations to tune, so it is easier to debug the mapping in isolation. Once complete, the cached result can be used for subsequent queries.
 
 This page assumes that you have already registered a dataset and submitted it to a project. It also assumes that you have populated your `~/.dsgrid.json5` file with the location of your dsgrid registry.
 
-Spark runtime details are not covered here. Refer to [Apache Spark Overview](../apache_spark/overview).
+Backend runtime details are not covered here. DuckDB is the default local backend; refer to [Apache Spark Overview](../apache_spark/overview) when you choose Spark for distributed execution.
 
 ## Basic Operation
 
@@ -14,13 +14,13 @@ dsgrid offers a CLI command to perform the mapping operation. This is its simple
 dsgrid query project map-dataset my-project-id my-dataset-id
 ```
 
-By default, this will attempt to map all dimensions by performing three Spark queries:
+By default, this will attempt to map all dimensions in three Ibis query phases:
 
 1. Map all dimensions other than time that do not already match the project. Apply scaling factors if assigned and automatically convert units if applicable. Persist the result to the filesystem.
 2. Map the time dimension. Persist the result to the filesystem.
 3. Finalize the table: convert user-defined options, such as column names. Add null rows as necessary.
 
-If the dataset is less than 10 GB, this process should run smoothly with Spark. If the dataset grows to hundreds of GBs or more, you may experience problems. Our recommendation is to use the dsgrid mapping plan features described below to work in an iterative manner.
+If the dataset is less than 10 GB, this process should run smoothly with the default DuckDB backend. If the dataset grows to hundreds of GBs or more, use the Spark backend and expect to tune the run. Our recommendation is to use the dsgrid mapping plan features described below to work in an iterative manner.
 
 ## Mapping Plan
 
@@ -31,12 +31,12 @@ If you set `persist=true` for an operation, dsgrid will persist the query to the
 **Points to consider when creating a mapping plan:**
 
 - If a dimension mapping operation will reduce the size of data, perhaps because it is aggregating data, list that operation first and persist it.
-- If a dimension mapping operation will increase the size of data, such as a disaggregation or duplication, list that operation last and persist the query just before it. We have experienced the most problems with Spark with this type of operation.
+- If a dimension mapping operation will increase the size of data, such as a disaggregation or duplication, list that operation last and persist the query just before it. We have experienced the most problems with the Spark backend for this type of operation.
 - Some disaggregation operations can cause data skew. dsgrid will automatically enable techniques to handle this condition with certain mapping types. If you experience this problem, you may need to set `handle_data_skew: true` in the mapping plan for that operation. Refer to [Executors Spilling to Disk](../apache_spark/overview.md#executors-spilling-to-disk) for information on how to identify this condition.
 
 ### Example Mapping Plan
 
-Below is an example mapping plan in JSON formation. The dataset in this example has a one-to-one mapping for the scenario dimension, a many-to-many mapping for the model_year dimension, and a disaggregation from state to county for the geography dimension. The Spark query for the geography disaggregation is failing. Here is our rationale for the plan:
+Below is an example mapping plan in JSON formation. The dataset in this example has a one-to-one mapping for the scenario dimension, a many-to-many mapping for the model_year dimension, and a disaggregation from state to county for the geography dimension. The geography disaggregation query is failing on the selected backend. Here is our rationale for the plan:
 
 1. Persist the result after mapping the scenario and model_year dimensions. This part is working, but takes some time. We may have to run the geography disaggregation several times, and so we want to avoid repeating this work.
 2. Persist the result after mapping the geography dimension so that we don't have to repeat the work once we figure out the solution.

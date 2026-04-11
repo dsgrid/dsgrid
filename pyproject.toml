@@ -38,6 +38,7 @@ dependencies = [
     "dash_bootstrap_components",
     "duckdb >= 1, < 2",
     "fastapi",
+    "ibis-framework[duckdb] >= 9.0",
     "json5",
     "networkx",
     "pandas",
@@ -51,6 +52,9 @@ dependencies = [
     "uvicorn",
     "tzdata",  # time zone stuff
 ]
+
+[tool.uv.sources]
+chronify = { path = "../chronify2", editable = true }
 
 [project.urls]
 GitHub = "https://github.com/dsgrid/dsgrid"
@@ -99,6 +103,7 @@ dev = [
     "devtools",
     "flake8",
     "mypy",
+    "ty",
     "pyarrow",
     "maturin",
 ]
@@ -140,6 +145,15 @@ omit = ["dsgrid/tests/*", "tests/*", "tests_aws/*", "build_backend.py"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+[tool.ty.src]
+include = ["dsgrid"]
+exclude = [
+    "dsgrid/.ipynb_checkpoints/",
+    "dsgrid/__pycache__/",
+    "dsgrid/notebooks/",
+    "dsgrid/utils/py_expression_eval/",
+]
 
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.

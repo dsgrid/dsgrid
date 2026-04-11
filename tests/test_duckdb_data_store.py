@@ -1,16 +1,20 @@
 """Tests for DuckDbDataStore."""
 
 import pytest
+import pandas as pd
 
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.registry.duckdb_data_store import DuckDbDataStore
-from dsgrid.spark.types import use_duckdb
-from dsgrid.utils.spark import create_dataframe_from_dicts
 
 pytestmark = pytest.mark.skipif(not use_duckdb(), reason="DuckDbDataStore requires DuckDB backend")
 
 
 def _make_df():
-    return create_dataframe_from_dicts([{"id": "a", "value": 1}])
+    return pd.DataFrame([{"id": "a", "value": 1}])
+
+
+def _count_rows(table):
+    return table.count().execute()
 
 
 def test_remove_tables(tmp_path):
@@ -22,8 +26,8 @@ def test_remove_tables(tmp_path):
     store.write_missing_associations_tables({"geo": df}, "ds1", "1.0.0")
 
     # Verify tables exist by reading them.
-    assert store.read_table("ds1", "1.0.0").count() == 1
-    assert store.read_lookup_table("ds1", "1.0.0").count() == 1
+    assert _count_rows(store.read_table("ds1", "1.0.0")) == 1
+    assert _count_rows(store.read_lookup_table("ds1", "1.0.0")) == 1
     assert len(store.read_expected_associations_tables("ds1", "1.0.0")) == 1
     assert len(store.read_missing_associations_tables("ds1", "1.0.0")) == 1
 
@@ -31,8 +35,8 @@ def test_remove_tables(tmp_path):
 
     # After removal, reads should fail or return empty.
     with pytest.raises(Exception):
-        store.read_table("ds1", "1.0.0")
+        store.read_table("ds1", "1.0.0").execute()
     with pytest.raises(Exception):
-        store.read_lookup_table("ds1", "1.0.0")
+        store.read_lookup_table("ds1", "1.0.0").execute()
     assert store.read_expected_associations_tables("ds1", "1.0.0") == {}
     assert store.read_missing_associations_tables("ds1", "1.0.0") == {}

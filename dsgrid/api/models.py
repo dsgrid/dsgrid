@@ -47,7 +47,7 @@ class StoreModel(DSGBaseModel):
     outstanding_async_tasks: set[int] = set()
 
 
-class SparkSubmitProjectQueryRequest(DSGBaseModel):
+class SubmitProjectQueryRequest(DSGBaseModel):
     use_spark_submit: bool = Field(
         default=True,
         description="If True, run the query command through spark-submit. If False, run the "

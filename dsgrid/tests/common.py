@@ -1,6 +1,7 @@
 import getpass
 import os
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from semver import VersionInfo
@@ -9,7 +10,12 @@ from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidOperation
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.registry.common import DataStoreType, DatabaseConnection, VersionUpdateType, make_sqlite_url
+from dsgrid.registry.common import (
+    DataStoreType,
+    DatabaseConnection,
+    VersionUpdateType,
+    make_sqlite_url,
+)
 from dsgrid.utils.files import dump_data, load_data
 
 TEST_PROJECT_PATH = Path(__file__).absolute().parents[2] / "dsgrid-test-data"
@@ -93,7 +99,7 @@ def check_config_update(base_dir, mgr: ProjectRegistryManager, config_id, user, 
     version : str
 
     """
-    config_file = Path(base_dir) / mgr.config_class().config_filename()
+    config_file = Path(base_dir) / cast(Any, mgr.config_class()).config_filename()
     assert not config_file.exists()
     try:
         mgr.dump(config_id, base_dir, force=True)

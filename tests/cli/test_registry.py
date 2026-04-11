@@ -5,7 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.spark.types import use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.query.models import ColumnType
 from dsgrid.registry.common import DatabaseConnection

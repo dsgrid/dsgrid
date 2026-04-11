@@ -8,20 +8,23 @@ Focus:
 Localization call-order tests have been moved to
 `tests/test_localize_timestamps_if_necessary.py`.
 """
+
 import pytest
 from unittest.mock import MagicMock
 from pathlib import Path
+
+import ibis
 
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.config.dimensions import (
     TimeFormatInPartsModel,
 )
 from dsgrid.common import TIME_COLUMN
-from dsgrid.spark.functions import (
-    get_spark_session,
+from dsgrid.ibis.functions import (
+    get_runtime_session,
     select_expr,
 )
-from dsgrid.spark.types import use_duckdb
+from dsgrid.ibis.types import use_duckdb
 import pandas as pd
 
 
@@ -59,7 +62,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     )
 
     # Build a small dataframe of test cases
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020] * 6,
@@ -87,7 +90,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     # session time zone (default UTC).
     # These are the UTC instants corresponding to local times + offsets above.
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     got = [row.ts_str for row in rows]
     expected = [
         "2019-12-31 18:30:00",  # +05:30
@@ -110,7 +113,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
         offset_column="utc_offset_str",
     )
 
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020] * 3,
@@ -129,7 +132,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
 
     assert new_col_format.dtype == "timestamp_tz"
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     got = [row.ts_str for row in rows]
     # UTC instants corresponding to local time + string offsets
     expected = [
@@ -142,7 +145,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
 
 def test_invalid_numeric_offset_raises():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -160,7 +163,7 @@ def test_invalid_numeric_offset_raises():
 
 def test_invalid_string_offset_raises():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -177,7 +180,7 @@ def test_invalid_string_offset_raises():
 
 def test_invalid_string_offset_minutes_out_of_range():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -194,7 +197,7 @@ def test_invalid_string_offset_minutes_out_of_range():
 
 def test_invalid_string_offset_24_with_nonzero_minutes():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -211,7 +214,7 @@ def test_invalid_string_offset_24_with_nonzero_minutes():
 
 def test_invalid_string_offset_bad_format():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -228,7 +231,7 @@ def test_invalid_string_offset_bad_format():
 
 def test_invalid_string_offset_missing_leading_zero_hours():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -245,7 +248,7 @@ def test_invalid_string_offset_missing_leading_zero_hours():
 
 def test_invalid_string_offset_missing_leading_zero_minutes():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -262,7 +265,7 @@ def test_invalid_string_offset_missing_leading_zero_minutes():
 
 def test_valid_string_offset_24_allowed():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -284,7 +287,7 @@ def test_cast_with_offset_24_numeric_previous_behavior():
     both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -309,7 +312,7 @@ def test_cast_with_offset_24_numeric_previous_behavior():
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
 
 
@@ -320,7 +323,7 @@ def test_cast_with_offset_24_string_previous_behavior():
     both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -345,5 +348,11 @@ def test_cast_with_offset_24_string_previous_behavior():
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()

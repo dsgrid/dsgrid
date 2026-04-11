@@ -5,8 +5,8 @@ from pathlib import Path
 import rich_click as click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.query.models import ProjectQueryModel
-from dsgrid.registry.dataset_registry import DatasetRegistry
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.timing import timer_stats_collector
 
@@ -76,7 +76,7 @@ def _run_registration(
         query = ProjectQueryModel.from_file(query_file)
         dataset_id = query.project.dataset.dataset_id
         dataset_config_dir = derived_dataset_config_dir / dataset_id
-        dataset_config_file = dataset_config_dir / DatasetRegistry.config_filename()
+        dataset_config_file = dataset_config_dir / DatasetConfig.config_filename()
 
         create_cmd = (
             f"dsgrid query project run --registry-path={registry_path} "

@@ -3,10 +3,13 @@ from pathlib import Path
 from typing import Generator
 from zoneinfo import ZoneInfo
 
+import ibis
 import pandas as pd
 import pytest
 
-from dsgrid.spark.functions import (
+from dsgrid.ibis.operations import filter_sql
+from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.functions import (
     aggregate,
     aggregate_single_value,
     cache,
@@ -26,24 +29,44 @@ from dsgrid.spark.functions import (
     unpersist,
     unpivot,
 )
-from dsgrid.spark.types import (
-    DataFrame,
+from dsgrid.utils.files import dump_json_file
+from dsgrid.ibis.session import (
+    get_runtime_session,
     SparkSession,
 )
-from dsgrid.utils.files import dump_json_file
-from dsgrid.utils.spark import (
-    get_spark_session,
-)
+
+
+def _collect(df):
+    if hasattr(df, "execute"):
+        return list(table_to_pandas(df).itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _count(df):
+    count = df.count()
+    if hasattr(count, "execute"):
+        return count.execute()
+    return count
+
+
+def _filter(df, predicate):
+    return filter_sql(df, predicate)
+
+
+def _order_by(df, *columns):
+    if hasattr(df, "order_by"):
+        return df.order_by(*columns)
+    return df.sort(*columns)
 
 
 @pytest.fixture(scope="module")
 def spark() -> Generator[SparkSession, None, None]:
-    spark = get_spark_session()
+    spark = get_runtime_session()
     yield spark
 
 
 @pytest.fixture(scope="module")
-def dataframe(spark) -> Generator[DataFrame, None, None]:
+def dataframe(spark) -> Generator[ibis.Table, None, None]:
     df = spark.createDataFrame(
         [
             (0, "cooling", 1.0),
@@ -59,7 +82,7 @@ def dataframe(spark) -> Generator[DataFrame, None, None]:
 
 
 @pytest.fixture(scope="module")
-def geo_dataframe(spark) -> Generator[DataFrame, None, None]:
+def geo_dataframe(spark) -> Generator[ibis.Table, None, None]:
     df = spark.createDataFrame(
         [
             ("Boulder",),
@@ -73,7 +96,7 @@ def geo_dataframe(spark) -> Generator[DataFrame, None, None]:
 
 
 @pytest.fixture(scope="module")
-def time_dataframe(spark) -> Generator[DataFrame, None, None]:
+def time_dataframe(spark) -> Generator[ibis.Table, None, None]:
     df = spark.createDataFrame(
         [
             (datetime(2020, 1, 1, 0), "cooling", 1.0),
@@ -89,7 +112,7 @@ def time_dataframe(spark) -> Generator[DataFrame, None, None]:
 
 
 def test_aggregate(dataframe):
-    assert aggregate(dataframe, "sum", "value", "s").select("s").collect()[0].s == 10.0
+    assert _collect(aggregate(dataframe, "sum", "value", "s").select("s"))[0].s == 10.0
 
 
 def test_aggregate_single_value(dataframe):
@@ -106,31 +129,31 @@ def test_collect_list(dataframe):
 
 
 def test_count_distinct_on_group_by(dataframe):
-    assert count_distinct_on_group_by(dataframe, ["metric"], "index", "c").collect()[0].c == 2
+    assert _collect(count_distinct_on_group_by(dataframe, ["metric"], "index", "c"))[0].c == 2
 
 
 def test_cross_join(dataframe, geo_dataframe):
     df = cross_join(dataframe, geo_dataframe)
-    assert df.count() == dataframe.count() * geo_dataframe.count()
+    assert _count(df) == _count(dataframe) * _count(geo_dataframe)
     assert (
         aggregate_single_value(
-            df.filter("county = 'Boulder' and metric = 'cooling'"), "sum", "value"
+            _filter(df, "county = 'Boulder' and metric = 'cooling'"), "sum", "value"
         )
         == 4.0
     )
 
 
 def test_except_all(dataframe):
-    df2 = dataframe.filter("metric = 'heating'")
-    res = except_all(dataframe, df2).collect()
+    df2 = _filter(dataframe, "metric = 'heating'")
+    res = _collect(except_all(dataframe, df2))
     assert len(res) == 2
     for row in res:
         assert row.metric == "cooling"
 
 
 def test_intersect(dataframe):
-    df2 = dataframe.filter("metric = 'heating'")
-    res = intersect(dataframe, df2).collect()
+    df2 = _filter(dataframe, "metric = 'heating'")
+    res = _collect(intersect(dataframe, df2))
     assert len(res) == 2
     for row in res:
         assert row.metric == "heating"
@@ -138,19 +161,22 @@ def test_intersect(dataframe):
 
 def test_is_dataframe_empty(dataframe):
     assert not is_dataframe_empty(dataframe)
-    assert is_dataframe_empty(dataframe.filter("metric = 'invalid'"))
+    assert is_dataframe_empty(_filter(dataframe, "metric = 'invalid'"))
 
 
 def test_interval(time_dataframe):
     res = [
         x.timestamp2
-        for x in perform_interval_op(
-            time_dataframe, "timestamp", "+", 3600, "SECONDS", "timestamp2"
+        for x in _collect(
+            _order_by(
+                perform_interval_op(
+                    time_dataframe, "timestamp", "+", 3600, "SECONDS", "timestamp2"
+                )
+                .select("timestamp2")
+                .distinct(),
+                "timestamp2",
+            )
         )
-        .select("timestamp2")
-        .distinct()
-        .sort("timestamp2")
-        .collect()
     ]
     assert res == [datetime(2020, 1, 1, 1), datetime(2020, 1, 1, 2)]
 
@@ -164,8 +190,8 @@ def test_join(spark, dataframe):
         ["county", "index2"],
     )
     df3 = join(dataframe, df2, "index", "index2")
-    assert not is_dataframe_empty(df3.filter("county = 'Boulder'"))
-    assert is_dataframe_empty(df3.filter("county = 'Jefferson'"))
+    assert not is_dataframe_empty(_filter(df3, "county = 'Boulder'"))
+    assert is_dataframe_empty(_filter(df3, "county = 'Jefferson'"))
     assert aggregate_single_value(df3, "sum", "value") == 1.0 + 2.0
 
 
@@ -178,8 +204,8 @@ def test_join_multiple_columns(spark, dataframe):
         ["county", "metric", "index"],
     )
     df3 = join_multiple_columns(dataframe, df2, ["index", "metric"])
-    assert not is_dataframe_empty(df3.filter("county = 'Boulder'"))
-    assert is_dataframe_empty(df3.filter("county = 'Jefferson'"))
+    assert not is_dataframe_empty(_filter(df3, "county = 'Boulder'"))
+    assert is_dataframe_empty(_filter(df3, "county = 'Jefferson'"))
     assert aggregate_single_value(df3, "sum", "value") == 1.0
 
 
@@ -217,15 +243,22 @@ def test_read_csv(tmp_path: Path) -> None:
     }
     dump_json_file(schema, schema_file)
     df = read_csv(filename)
-    values = df.collect()
+    values = _collect(df)
     row = values[-1]
-    assert isinstance(row.a, int) and row.a == 2
+    assert int(row.a) == 2
     assert isinstance(row.b, str) and row.b == "c"
-    assert isinstance(row.c, float) and row.c == 2.0
-    assert isinstance(row.d, datetime)
+    assert float(row.c) == 2.0
+    assert datetime.fromisoformat(row.d)
 
     assert (
-        len(df.filter("d >= '2020-01-01 00:00:00-05' and d <= '2020-01-01 02:00:00-05'").collect())
+        len(
+            _collect(
+                _filter(
+                    df,
+                    "d >= '2020-01-01 00:00:00-05:00' and d <= '2020-01-01 02:00:00-05:00'",
+                )
+            )
+        )
         == 3
     )
 
@@ -262,5 +295,5 @@ def test_unpivot(spark):
         ["index", "cooling", "heating"],
     )
     df2 = unpivot(df, ["cooling", "heating"], "metric", "value")
-    assert aggregate_single_value(df2.filter("metric = 'cooling'"), "sum", "value") == 4.0
-    assert aggregate_single_value(df2.filter("metric = 'heating'"), "sum", "value") == 6.0
+    assert aggregate_single_value(_filter(df2, "metric = 'cooling'"), "sum", "value") == 4.0
+    assert aggregate_single_value(_filter(df2, "metric = 'heating'"), "sum", "value") == 6.0

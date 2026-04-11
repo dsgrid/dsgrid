@@ -1,20 +1,23 @@
 import copy
 import getpass
+import importlib
 import logging
 import os
 import sys
 from pathlib import Path
-
-from IPython.display import display, HTML
-import ipywidgets as widgets
+from typing import Any, cast
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGBaseException
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.loggers import setup_logging
-from dsgrid.spark.types import SparkSession
-from dsgrid.utils.spark import init_spark
+from dsgrid.ibis.session import init_runtime_session, is_runtime_session_active
+
+_ipython_display = cast(Any, importlib.import_module("IPython.display"))
+display = _ipython_display.display
+HTML = _ipython_display.HTML
+widgets = cast(Any, importlib.import_module("ipywidgets"))
 
 SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.json5"
 RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.json5"
@@ -49,24 +52,25 @@ class RegistrationGui:
         self._tables_out = widgets.Output()
 
     @property
-    def manager(self):
+    def manager(self) -> RegistryManager:
+        assert self._manager is not None
         return self._manager
 
     @property
     def dimension_manager(self):
-        return self._manager.dimension_manager
+        return self.manager.dimension_manager
 
     @property
     def dimension_mapping_manager(self):
-        return self._manager.dimension_mapping_manager
+        return self.manager.dimension_mapping_manager
 
     @property
     def dataset_manager(self):
-        return self._manager.dataset_manager
+        return self.manager.dataset_manager
 
     @property
     def project_manager(self):
-        return self._manager.project_manager
+        return self.manager.project_manager
 
     def _make_widgets(self):
         self._main_label = widgets.HTML("<b>dsgrid Registration Tool</b>")
@@ -286,17 +290,17 @@ class RegistrationGui:
         logger = setup_logging(__name__, self._log_file_text.value, mode="a")
         if (
             self._spark_cluster_text.value not in ("local mode", "")
-            and SparkSession.getActiveSession() is None
+            and not is_runtime_session_active()
         ):
             os.environ["SPARK_CLUSTER"] = self._spark_cluster_text.value
             out = widgets.Output()
             with out:
-                init_spark()
+                init_runtime_session()
             out.clear_output()
 
         sync = self._sync_cbox.value
         online = self._online_mode_cbox.value
-        conn = DatabaseConnection()
+        conn = DatabaseConnection.from_file(self._local_path_text.value)
         try:
             if sync and not online:
                 # This exists only to sync data locally.
@@ -319,7 +323,7 @@ class RegistrationGui:
         self._enable_manager_actions()
 
     def _update_project_ids(self):
-        self._project_ids[1:] = self._manager.project_manager.list_ids()
+        self._project_ids[1:] = self.manager.project_manager.list_ids()
         self._project_dimensions_filter_dd.options = self._project_ids
         self._project_dimensions_filter_dd.value = self._project_ids[0]
         self._dataset_project_id_dd.options = self._project_ids
@@ -333,7 +337,7 @@ class RegistrationGui:
         if not self._registration_pre_check():
             return
         try:
-            self._manager.project_manager.register(
+            self.manager.project_manager.register(
                 project_file, submitter=getpass.getuser(), log_message=self._log_message_text.value
             )
         except DSGBaseException:
@@ -362,7 +366,7 @@ class RegistrationGui:
         if not self._registration_pre_check():
             return
         try:
-            self._manager.project_manager.register_and_submit_dataset(
+            self.manager.project_manager.register_and_submit_dataset(
                 dataset_file,
                 dataset_path,
                 project_id,
@@ -388,12 +392,12 @@ class RegistrationGui:
         self._log_message_text.value = ""
 
     def _on_show_projects_click(self, _):
-        table = self._manager.project_manager.show(return_table=True)
+        table = self.manager.project_manager.show(return_table=True)
         # self._project_table.value = table.get_html_string()
         self._display_table("Projects", table)
 
     def _on_show_datasets_click(self, _):
-        table = self._manager.dataset_manager.show(return_table=True)
+        table = self.manager.dataset_manager.show(return_table=True)
         # self._dataset_table.value = table.get_html_string()
         self._display_table("Datasets", table)
 
@@ -405,12 +409,12 @@ class RegistrationGui:
         if project_id == "":
             dimension_ids = None
         else:
-            project_config = self._manager.project_manager.get_by_id(project_id)
+            project_config = self.manager.project_manager.get_by_id(project_id)
             dimension_ids = {x.id for x in project_config.base_dimensions}
             for key in project_config.supplemental_dimensions:
                 dimension_ids.add(key.id)
 
-        table = self._manager.dimension_manager.show(
+        table = self.manager.dimension_manager.show(
             filters=filters, dimension_ids=dimension_ids, return_table=True
         )
         self._display_table("Dimensions", table)
@@ -424,7 +428,7 @@ class RegistrationGui:
         display(self._tables_out)
 
     def _on_show_dimension_mappings_click(self, _):
-        table = self._manager.dimension_mapping_manager.show(return_table=True)
+        table = self.manager.dimension_mapping_manager.show(return_table=True)
         # self._dimension_mapping_table.value = table.get_html_string()
         self._display_table("Dimension Mappings", table)
 

@@ -1,3 +1,4 @@
+import ibis
 import logging
 from enum import Enum
 from pathlib import Path
@@ -23,11 +24,10 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
-)
-from dsgrid.utils.spark import get_unique_values, read_dataframe
+from dsgrid.ibis.operations import create_temp_view, drop_columns, join_multiple_columns
+from dsgrid.ibis.table_utils import get_unique_values
+from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.session import get_runtime_session, read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -89,7 +89,7 @@ def check_load_data_filename(path: str | Path) -> Path:
         if filename.exists():
             return filename
 
-    # Use ValueError because this gets called in Pydantic model validation.
+            # Use ValueError because this gets called in Pydantic model validation.
     msg = f"no load_data file exists in {path_}"
     raise ValueError(msg)
 
@@ -121,7 +121,7 @@ def check_load_data_lookup_filename(path: str | Path) -> Path:
         if filename.exists():
             return filename
 
-    # Use ValueError because this gets called in Pydantic model validation.
+            # Use ValueError because this gets called in Pydantic model validation.
     msg = f"no load_data_lookup file exists in {path_}"
     raise ValueError(msg)
 
@@ -736,7 +736,7 @@ class DatasetConfig(ConfigBase):
             msg = "load_from_user_path requires data_file.path to be set"
             raise DSGInvalidParameter(msg)
 
-        # Resolve data file path
+            # Resolve data file path
         data_path = cls._resolve_path(
             user_layout.data_file.path, data_base_dir, config_file.parent
         )
@@ -762,7 +762,7 @@ class DatasetConfig(ConfigBase):
                 raise DSGInvalidParameter(msg)
             user_layout.lookup_data_file.path = str(lookup_path)
 
-        # Resolve expected associations paths
+            # Resolve expected associations paths
         user_layout.expected_associations = [
             str(cls._resolve_path(p, associations_base_dir, config_file.parent))
             for p in user_layout.expected_associations
@@ -892,14 +892,21 @@ class DatasetConfig(ConfigBase):
         msg = "Neither data_layout nor registry_data_layout is set"
         raise DSGInvalidDataset(msg)
 
-    def add_trivial_dimensions(self, df: DataFrame):
+    def add_trivial_dimensions(self, df: ibis.Table):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                df = df.withColumn(col, F.lit(val))
+                escaped = val.replace("'", "''")
+                if use_duckdb():
+                    view = create_temp_view(df)
+                    df = get_runtime_session().sql(
+                        f"SELECT *, '{escaped}' AS \"{col}\" FROM {view}"
+                    )
+                else:
+                    df = df.selectExpr("*", f"'{escaped}' AS {col}")
         return df
 
     def remove_trivial_dimensions(self, df):
@@ -924,7 +931,7 @@ def get_unique_dimension_record_ids(
     if table_format == TableFormat.TWO_TABLE:
         ld = read_dataframe(check_load_data_filename(path))
         lk = read_dataframe(check_load_data_lookup_filename(path))
-        df = ld.join(lk, on="id").drop("id")
+        df = drop_columns(join_multiple_columns(ld, lk, ["id"]), "id")
     elif table_format == TableFormat.ONE_TABLE:
         ld_path = check_load_data_filename(path)
         df = read_dataframe(ld_path)
@@ -940,7 +947,7 @@ def get_unique_dimension_record_ids(
             )
     if pivoted_dimension_type is not None:
         if pivoted_dimension_type.value in df.columns:
-            msg = f"{pivoted_dimension_type=} cannot be in the dataframe columns."
+            msg = f"{pivoted_dimension_type =} cannot be in the dataframe columns."
             raise DSGInvalidParameter(msg)
         dimension_type_columns = {x.value for x in DimensionType}
         dimension_type_columns.update(time_columns)

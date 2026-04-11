@@ -103,16 +103,16 @@ def test_expected_cardinalities_prevents_false_single_column_patterns(tmp_path):
     output_no_card = tmp_path / "output_no_card"
     find_minimal_patterns_from_file(parquet_path, output_dir=output_no_card)
     geography_file = output_no_card / "geography.csv"
-    assert geography_file.exists(), (
-        "Without expected_cardinalities, geo3 should be a single-column closed pattern"
-    )
+    assert (
+        geography_file.exists()
+    ), "Without expected_cardinalities, geo3 should be a single-column closed pattern"
 
     # With expected_cardinalities: geo3 should NOT be a single-column pattern
     output_with_card = tmp_path / "output_with_card"
     expected_cardinalities = {
-        "geography": 3,   # geo1, geo2, geo3
-        "subsector": 4,   # A, B, C, D (C and D have no missing data)
-        "metric": 2,      # m1, m2
+        "geography": 3,  # geo1, geo2, geo3
+        "subsector": 4,  # A, B, C, D (C and D have no missing data)
+        "metric": 2,  # m1, m2
     }
     find_minimal_patterns_from_file(
         parquet_path,
@@ -128,9 +128,7 @@ def test_expected_cardinalities_prevents_false_single_column_patterns(tmp_path):
 
     # Instead, geo3's missing data should be captured as (geography, subsector) pairs
     geo_sub_file = output_with_card / "geography__subsector.csv"
-    assert geo_sub_file.exists(), (
-        f"Expected geography__subsector.csv but got: {output_files}"
-    )
+    assert geo_sub_file.exists(), f"Expected geography__subsector.csv but got: {output_files}"
     geo_sub_df = pd.read_csv(geo_sub_file, dtype=str)
     geo_sub_rows = sorted([tuple(row) for row in geo_sub_df.values])
     assert geo_sub_rows == [("geo3", "A"), ("geo3", "B")]

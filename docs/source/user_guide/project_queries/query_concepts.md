@@ -13,17 +13,17 @@ dsgrid performs the following steps:
    - Pre-filter dataset according to the `dimension_filters` in the dataset data model of the query.
    - Map dataset dimensions to the project.
    - Convert units.
-   - Evaluate the Spark job by writing the dataframe to the filesystem in the directory `query_output/cached_project_mapped_datasets`.
-     - dsgrid restarts the `SparkSession` for this query. If custom Spark configuration parameters are defined in the `spark_conf_per_dataset` data model of the query for this dataset, dsgrid will apply them in the new session.
-     - The value `spark.sql.shuffle.partitions` may need to be increased for very large datasets.
+   - Evaluate the Ibis query by writing the table to the filesystem in the directory `query_output/cached_project_mapped_datasets`.
+     - dsgrid restarts the runtime session for this query. If custom runtime configuration parameters are defined in the `runtime_conf_per_dataset` data model of the query for this dataset, dsgrid will apply them in the new session.
+     - If the backend is Spark, the value `spark.sql.shuffle.partitions` may need to be increased for very large datasets.
 
 :::{note}
-Currently, there is no way to skip caching of the dataset. If it is not performed, the Spark job can grow too large and take too long to complete in normal compute node allocations.
+Currently, there is no way to skip caching of the dataset. If it is not performed, the backend query can grow too large and take too long to complete in normal compute node allocations.
 :::
 
 3. **Combine datasets** - Combine the datasets as specified by the `expression` in the dataset data model of the query. The default is to take a union of all datasets.
 
-4. **Persist intermediate table** - If the option `--persist-intermediate-table` is `true` (which is the default) then dsgrid will evaluate the Spark query from the previous step by writing the dataframe to the filesystem in the directory `query_output/cached_tables`. This can be disabled by setting `--no-persist-intermediate-table`.
+4. **Persist intermediate table** - If the option `--persist-intermediate-table` is `true` (which is the default) then dsgrid will evaluate the Ibis query from the previous step by writing the table to the filesystem in the directory `query_output/cached_tables`. This can be disabled by setting `--no-persist-intermediate-table`.
 
 5. **Apply result filters** - Apply any dimension_filters defined in the `result` data model of the query.
 
@@ -31,9 +31,9 @@ Currently, there is no way to skip caching of the dataset. If it is not performe
 
 7. **Replace IDs with names** - If the field `replace_ids_with_names` in the `result` data model is `true`, replace all dimension record IDs with names.
 
-8. **Sort columns** - If the field `sort_columns` in the `result` data model is `true`, sort the dataframe by those columns.
+8. **Sort columns** - If the field `sort_columns` in the `result` data model is `true`, sort the table by those columns.
 
-9. **Write output** - Evaluate the Spark job for the previous steps by writing the dataframe to the filesystem in the directory `query_output/<query-name>`.
+9. **Write output** - Evaluate the Ibis query for the previous steps by writing the table to the filesystem in the directory `query_output/<query-name>`.
 
 10. **Run reports** - Run any `reports` defined in the `result` data model of the query.
 
@@ -45,7 +45,7 @@ The project-mapping step is by far the most time consuming. There are some trade
 
 - **If you will only use one query result**, you may want to disable this behavior because it will use less filesystem space and may take less time.
 - **However, persisting is always safer**:
-  - Persisting makes it easier for Spark to complete its jobs.
+  - Persisting makes it easier for the active backend to complete its jobs.
   - If your compute nodes are revoked because of a timeout and you persisted the tables, you can resume from that point.
 
 ### Pre-filtering vs Post-filtering

@@ -29,7 +29,7 @@ class RegistryManagerBase(abc.ABC):
     def __init__(self, path, params: RegistryManagerParams):
         self._path = path
         self._params = params
-        self._db = None
+        self._db: Any = None
 
         if not path.exists():
             logger.warning(

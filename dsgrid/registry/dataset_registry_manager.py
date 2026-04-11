@@ -1,10 +1,11 @@
 """Manages the registry for dimension datasets"""
 
+import ibis
 import logging
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Self, Type, Union
+from typing import Any, Self, Type, Union, cast
 
 import pandas as pd
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
@@ -41,20 +42,23 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
-from dsgrid.spark.functions import (
-    get_spark_session,
-    is_dataframe_empty,
-    select_expr,
+from dsgrid.ibis.operations import create_temp_view, drop_columns, filter_sql
+from dsgrid.ibis.types import (
+    DUCKDB_COLUMN_TYPES,
+    SPARK_COLUMN_TYPES,
+    get_str_type,
+    is_table_empty,
+    use_duckdb,
 )
-from dsgrid.spark.types import get_str_type, DUCKDB_COLUMN_TYPES, SPARK_COLUMN_TYPES, use_duckdb
-from dsgrid.spark.types import DataFrame, F, StringType
+
 from dsgrid.utils.dataset import (
     split_expected_missing_rows,
     unpivot_dataframe,
     localize_timestamps_if_necessary,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
+from dsgrid.ibis.session import (
+    get_runtime_session,
     read_dataframe,
     write_dataframe,
 )
@@ -131,8 +135,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -155,8 +159,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -423,6 +427,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if isinstance(time_dim.model, DateTimeDimensionModel) and isinstance(
             time_dim.model.column_format, TimeFormatInPartsModel
         ):
+            time_dim = cast(DateTimeDimensionConfig, time_dim)
             df = self._convert_time_format_in_parts_to_datetime(
                 df,
                 time_dim,
@@ -430,6 +435,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 scratch_dir_context,
             )
         if isinstance(time_dim.model, DateTimeDimensionModel):
+            time_dim = cast(DateTimeDimensionConfig, time_dim)
             df = self._localize_timestamps_if_necessary(
                 df,
                 time_dim,
@@ -439,11 +445,11 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _convert_time_format_in_parts_to_datetime(
         self,
-        df: DataFrame,
+        df: ibis.Table,
         time_dim: DateTimeDimensionConfig,
         config: DatasetConfig,
         scratch_dir_context: ScratchDirContext,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Convert time-in-parts format to timestamp format."""
         col_format = time_dim.model.column_format
 
@@ -468,11 +474,11 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _localize_timestamps_if_necessary(
         self,
-        df: DataFrame,
+        df: ibis.Table,
         time_dim: DateTimeDimensionConfig,
         config: DatasetConfig,
         scratch_dir_context: ScratchDirContext,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Localize tz-naive timestamps to time zone(s) if necessary."""
         df, localized = localize_timestamps_if_necessary(df, config, scratch_dir_context)
 
@@ -521,7 +527,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         return offset_expr
 
-    def _validate_offset_bounds(self, df: DataFrame, offset_col: str) -> None:
+    def _validate_offset_bounds(self, df: ibis.Table, offset_col: str) -> None:
         """Ensure UTC offsets are within valid bounds and valid string format.
 
         Rules:
@@ -545,8 +551,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             f"     ELSE FALSE END "
             f"ELSE ABS(CAST({offset_col} AS DOUBLE)) > 24 END AS invalid_offset"
         )
-        check_df = select_expr(df, [invalid_expr])
-        if not is_dataframe_empty(check_df.filter("invalid_offset")):
+        check_df = _select_expr(df, [invalid_expr])
+        if not is_table_empty(filter_sql(check_df, "invalid_offset")):
             msg = (
                 "Invalid UTC offset detected. Offsets must be 24 hours or less "
                 f"in absolute value: column={offset_col}"
@@ -665,16 +671,16 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _apply_timestamp_transformation(
-        df: DataFrame, cols_to_drop: set[str], timestamp_sql: str
-    ) -> DataFrame:
+        df: ibis.Table, cols_to_drop: set[str], timestamp_sql: str
+    ) -> ibis.Table:
         """Apply the timestamp transformation to the dataframe."""
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
-        return select_expr(df, existing_cols + [timestamp_sql])
+        return _select_expr(df, existing_cols + [timestamp_sql])
 
     def _update_config_for_timestamp(
         self,
         config: DatasetConfig,
-        df: DataFrame,
+        df: ibis.Table,
         scratch_dir_context: ScratchDirContext,
         cols_to_drop: set[str],
         new_col_format: TimeFormatDateTimeTZModel | TimeFormatDateTimeNTZModel,
@@ -710,7 +716,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _write_data_and_update_config_after_localization(
         time_dim: DateTimeDimensionConfig,
         config: DatasetConfig,
-        df: DataFrame,
+        df: ibis.Table,
         scratch_dir_context: ScratchDirContext,
     ) -> None:
         """Write localized dataframe and update config paths and columns."""
@@ -738,7 +744,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _read_lookup_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
-    ) -> tuple[DataFrame, DataFrame | None]:
+    ) -> tuple[ibis.Table, ibis.Table | None]:
         if config.lookup_file_schema is None:
             msg = "Cannot read lookup table without lookup file schema"
             raise DSGInvalidDataset(msg)
@@ -747,18 +753,18 @@ class DatasetRegistryManager(RegistryManagerBase):
         if "id" not in df.columns:
             msg = "load_data_lookup does not include an 'id' column"
             raise DSGInvalidDataset(msg)
-        missing = df.filter("id IS NULL").drop("id")
-        if is_dataframe_empty(missing):
+        missing = drop_columns(filter_sql(df, "id IS NULL"), "id")
+        if is_table_empty(missing):
             missing_df = None
         else:
             missing_df = missing
             if SCALING_FACTOR_COLUMN in missing_df.columns:
-                missing_df = missing_df.drop(SCALING_FACTOR_COLUMN)
+                missing_df = drop_columns(missing_df, SCALING_FACTOR_COLUMN)
         return df, missing_df
 
     def _read_expected_associations_tables_from_user_path(
         self, config: DatasetConfig
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ibis.Table]:
         """Return all expected association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
@@ -766,17 +772,17 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _read_missing_associations_tables_from_user_path(
         self, config: DatasetConfig
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ibis.Table]:
         """Return all missing association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
         return self._read_associations_tables_from_user_path(config.missing_associations_paths)
 
-    def _read_associations_tables_from_user_path(self, paths: list[Path]) -> dict[str, DataFrame]:
+    def _read_associations_tables_from_user_path(self, paths: list[Path]) -> dict[str, ibis.Table]:
         """Return all missing association tables keyed by the file path stem.
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
-        dfs: dict[str, DataFrame] = {}
+        dfs: dict[str, ibis.Table] = {}
         if not paths:
             return dfs
 
@@ -795,21 +801,21 @@ class DatasetRegistryManager(RegistryManagerBase):
         return dfs
 
     @staticmethod
-    def _read_associations_file(path: Path) -> DataFrame:
+    def _read_associations_file(path: Path) -> ibis.Table:
         if path.suffix.lower() == ".csv":
-            df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
+            df = get_runtime_session().createDataFrame(pd.read_csv(path, dtype="string"))
         else:
             df = read_dataframe(path)
-            for field in df.schema.fields:
-                if field.dataType != StringType():
-                    df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
+            view = create_temp_view(df)
+            cols = ", ".join(f"CAST({col} AS VARCHAR) AS {col}" for col in df.columns)
+            df = get_runtime_session().sql(f"SELECT {cols} FROM {view}")
         return df
 
     def _read_table_from_user_path(
         self, config: DatasetConfig, scratch_dir_context: ScratchDirContext | None = None
-    ) -> tuple[DataFrame, DataFrame | None]:
+    ) -> tuple[ibis.Table, ibis.Table | None]:
         """Read a table from a user-provided path. Split expected-missing rows into a separate
-        DataFrame.
+        Ibis table.
 
         Parameters
         ----------
@@ -820,8 +826,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         Returns
         -------
-        tuple[DataFrame, DataFrame | None]
-            The first DataFrame contains the expected rows, and the second DataFrame contains the
+        tuple[Ibis table, Ibis table | None]
+            The first Ibis table contains the expected rows, and the second Ibis table contains the
             missing rows or will be None if there are no missing rows.
         """
         if config.data_file_schema is None:
@@ -853,10 +859,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             assert pivoted_dimension_type is not None
             existing_columns = set(df.columns)
             if diff := set(time_columns) - existing_columns:
-                msg = f"Expected time columns are not present in the table: {diff=}"
+                msg = f"Expected time columns are not present in the table: {diff =}"
                 raise DSGInvalidDataset(msg)
             if diff := set(pivoted_columns) - existing_columns:
-                msg = f"Expected pivoted_columns are not present in the table: {diff=}"
+                msg = f"Expected pivoted_columns are not present in the table: {diff =}"
                 raise DSGInvalidDataset(msg)
             df = unpivot_dataframe(df, pivoted_columns, pivoted_dimension_type.value, time_columns)
 
@@ -868,9 +874,9 @@ class DatasetRegistryManager(RegistryManagerBase):
         orig_version: str | None = None,
         scratch_dir_context: ScratchDirContext | None = None,
     ) -> None:
-        lk_df: DataFrame | None = None
-        expected_dfs: dict[str, DataFrame] = {}
-        missing_dfs: dict[str, DataFrame] = {}
+        lk_df: ibis.Table | None = None
+        expected_dfs: dict[str, ibis.Table] = {}
+        missing_dfs: dict[str, ibis.Table] = {}
         match config.get_table_format():
             case TableFormat.ONE_TABLE:
                 if not config.has_user_layout:
@@ -953,21 +959,21 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     @staticmethod
     def _merge_missing_associations(
-        df1: DataFrame | None,
-        expected_dfs: dict[str, DataFrame],
-        missing_dfs: dict[str, DataFrame],
-    ) -> dict[str, DataFrame]:
+        df1: ibis.Table | None,
+        expected_dfs: dict[str, ibis.Table],
+        missing_dfs: dict[str, ibis.Table],
+    ) -> dict[str, ibis.Table]:
         """Merge missing associations from NULL rows in the data with missing
         associations from files. Both sources are allowed.
 
         Parameters
         ----------
-        df1 : DataFrame | None
+        df1 : Ibis table | None
             Missing associations derived from NULL rows in the data.
-        expected_dfs : dict[str, DataFrame]
+        expected_dfs : dict[str, Ibis table]
             Expected associations from user-provided files (used only for
             the mutual-exclusivity check below).
-        missing_dfs : dict[str, DataFrame]
+        missing_dfs : dict[str, Ibis table]
             Missing associations from user-provided files.
         """
         # Uncomment the check below to disallow combining inline NULL rows
@@ -984,7 +990,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         #     )
         #     raise DSGInvalidDataset(msg)
 
-        result: dict[str, DataFrame] = {}
+        result: dict[str, ibis.Table] = {}
         if df1 is not None:
             result["missing_associations_from_nulls"] = df1
         if missing_dfs:
@@ -1211,3 +1217,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                 "Please report this error to the dsgrid team. The registry may need recovery."
             )
             raise
+
+
+def _select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
+    if use_duckdb():
+        view = create_temp_view(df)
+        cols = ",".join(exprs)
+        return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
+    return df.selectExpr(*exprs)

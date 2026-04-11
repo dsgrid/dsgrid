@@ -15,8 +15,8 @@ dsgrid is built on a distributed architecture designed to handle large-scale ene
 - **Store dataset time-series data in Parquet files** - On shared filesystem (e.g., Lustre, S3)
 - **Store dependencies between registry components in SQLite** - Version tracking and relationships
 - **Store version history of registry components in SQLite** - Full audit trail
-- **Load all data tables in Apache Spark** - Use DataFrame API for queries
-- **Convert to Pandas DataFrames** - For post-processing and visualizations
+- **Load all data tables as Ibis tables** - Execute queries on DuckDB or Apache Spark backends
+- **Convert selected small results to Pandas DataFrames** - For API payloads, post-processing, and visualizations
 
 ## APIs
 
@@ -77,7 +77,7 @@ The Project Viewer consumes the HTTP API. See [Browse Registry](../user_guide/ho
 
 ## Current Workflow
 
-Future workflows may change significantly. We may have a persistent database and dsgrid API server running in the cloud with on-demand Spark clusters. For the foreseeable future, this is what we anticipate the user workflow to be:
+Future workflows may change significantly. We may have a persistent database and dsgrid API server running in the cloud with on-demand runtime backends. For the foreseeable future, this is what we anticipate the user workflow to be:
 
 ### Typical HPC Workflow
 
@@ -105,13 +105,15 @@ Future workflows may change significantly. We may have a persistent database and
 
 3. **Run operations** directly from your local machine
    - Suitable for small datasets and testing
-   - Limited by local computational resources
+   - Uses the DuckDB backend by default and is limited by local computational resources
 
 ## Technology Stack
 
 ### Core Technologies
 
-- **Apache Spark** - Distributed data processing
+- **Ibis** - Table API used by dsgrid and chronify
+- **DuckDB** - Default local query backend
+- **Apache Spark** - Distributed query backend
 - **SQLite** - Registry metadata storage
 - **Parquet** - Columnar data format for time-series
 - **Pydantic** - Data validation and configuration models
@@ -119,8 +121,8 @@ Future workflows may change significantly. We may have a persistent database and
 
 ### Data Processing
 
-- **PySpark** - Python interface to Spark
-- **Pandas** - Post-processing and analysis
+- **PySpark** - Python interface to Spark backend
+- **Pandas** - Post-processing and analysis for selected small results
 - **PyArrow** - Efficient data interchange
 
 ### Web Technologies
@@ -141,7 +143,7 @@ User → CLI → Python API → Registry DB
 
 ```
 User → CLI → Python API → Registry DB (metadata)
-                        → Spark Cluster → Parquet Files (data)
+                        → Ibis backend (DuckDB or Spark) → Parquet Files (data)
                         → Result Files (Parquet)
 ```
 

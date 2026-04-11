@@ -4,17 +4,22 @@ Helpful utility functions for dsgrid
 
 import logging
 import inspect
+import importlib
 import json
 import os
 from enum import Enum
-from typing import Iterable
+from typing import Any, Iterable, Type, cast
 
 from prettytable import PrettyTable
 
 try:
-    from IPython.display import display, HTML
-    from IPython import get_ipython
-    from ipykernel.zmqshell import ZMQInteractiveShell
+    _ipython_display = cast(Any, importlib.import_module("IPython.display"))
+    display = _ipython_display.display
+    HTML = _ipython_display.HTML
+    get_ipython = cast(Any, importlib.import_module("IPython")).get_ipython
+    ZMQInteractiveShell = cast(
+        Any, importlib.import_module("ipykernel.zmqshell")
+    ).ZMQInteractiveShell
 
     _IPYTHON_INSTALLED = True
 except ImportError:
@@ -151,7 +156,7 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     return records
 
 
-def list_enum_values(enum: Enum):
+def list_enum_values(enum: Type[Enum]):
     """Returns list enum values."""
     return [e.value for e in enum]
 

@@ -13,16 +13,16 @@ from click.testing import CliRunner
 from dsgrid.cli.dsgrid import cli
 from dsgrid.registry.common import DataStoreType, DatabaseConnection, make_sqlite_url
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     drop_temp_tables_and_views,
     get_current_time_zone,
     set_current_time_zone,
 )
-from dsgrid.spark.types import use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import init_spark
+from dsgrid.ibis.session import init_runtime_session
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
@@ -200,7 +200,7 @@ def _get_latest_commit():
 
 
 def spark_session():
-    spark = init_spark("dsgrid_test")
+    spark = init_runtime_session("dsgrid_test")
     yield spark
     if not use_duckdb():
         spark.stop()

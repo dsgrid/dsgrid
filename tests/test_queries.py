@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import ibis
 import pytest
 from click.testing import CliRunner
 from pandas.testing import assert_frame_equal
@@ -58,14 +59,17 @@ from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDataset
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     aggregate_single_value,
     read_csv,
 )
-from dsgrid.spark.types import (
-    DataFrame,
+from dsgrid.ibis.operations import filter_sql
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.session import (
     DoubleType,
     F,
+    custom_time_zone,
     SparkSession,
     StructField,
     StringType,
@@ -80,7 +84,6 @@ from dsgrid.tests.common import (
 )
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -94,6 +97,41 @@ DIMENSION_MAPPING_SCHEMA = StructType(
 
 
 logger = logging.getLogger(__name__)
+
+
+def _collect(df):
+    if isinstance(df, ibis.Table):
+        return list(df.execute().itertuples(index=False, name="Row"))
+    return df.collect()
+
+
+def _count(df):
+    if isinstance(df, ibis.Table):
+        return df.count().execute()
+    return df.count()
+
+
+def _filter(df, predicate):
+    return filter_sql(df, predicate)
+
+
+def _sum_by_group(df, group_cols):
+    if isinstance(df, ibis.Table):
+        return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
+    return df.groupBy(*group_cols).agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
+
+
+def _order_by(df, *columns):
+    if isinstance(df, ibis.Table):
+        return df.order_by(*columns)
+    return df.sort(*columns)
+
+
+def _row_value(row, column):
+    try:
+        return row[column]
+    except TypeError:
+        return getattr(row, column)
 
 
 @pytest.fixture(scope="module")
@@ -123,22 +161,38 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         persist_intermediate_table=False,
         load_cached_table=False,
     )
-    df = read_parquet(str(output_dir / query.name / "table.parquet")).filter("county == '06037'")
+    df = filter_sql(
+        read_parquet(str(output_dir / query.name / "table.parquet")), "county == '06037'"
+    )
     end_uses = ["electricity_cooling", "electricity_heating"]
     gcols = [x for x in df.columns if x not in {"end_use", "value"}]
-    df = (
-        df.filter(F.col("end_use").isin(end_uses))
-        .groupBy(*gcols)
-        .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-    )
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    with custom_time_zone(tz):
-        expected = (
-            df.groupBy("county", F.hour("time_est").alias("hour"))
-            .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
-            .filter("hour == 16")
-            .collect()[0][VALUE_COLUMN]
+    if isinstance(df, ibis.Table):
+        df = filter_sql(
+            df,
+            "end_use IN ('electricity_cooling', 'electricity_heating')",
         )
+        df = df.group_by(gcols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
+        with custom_time_zone(tz):
+            expected_df = (
+                df.mutate(hour=df["time_est"].hour())
+                .group_by(["county", "hour"])
+                .aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].mean()})
+            )
+            expected = filter_sql(expected_df, "hour == 16").execute()[VALUE_COLUMN].iloc[0]
+    else:
+        df = (
+            df.filter(F.col("end_use").isin(end_uses))
+            .groupBy(*gcols)
+            .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
+        )
+        with custom_time_zone(tz):
+            expected = (
+                df.groupBy("county", F.hour("time_est").alias("hour"))
+                .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
+                .filter("hour == 16")
+                .collect()[0][VALUE_COLUMN]
+            )
     yield {
         "la_electricity_hour_16": expected,
     }
@@ -417,20 +471,12 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
         assert result.exit_code == 0
 
     baseline_df = read_parquet(output_dir / "baseline" / "table.parquet")
-    baseline_years = sorted(
-        (
-            int(x["Model Years 2010 to 2050"])
-            for x in baseline_df.select("Model Years 2010 to 2050").distinct().collect()
-        )
-    )
+    baseline_years_pdf = table_to_pandas(baseline_df.select("Model Years 2010 to 2050").distinct())
+    baseline_years = sorted(int(x) for x in baseline_years_pdf["Model Years 2010 to 2050"])
     assert baseline_years == [2010, 2020, 2030, 2040, 2050]
     five_year_df = read_parquet(output_dir / "five_year_intervals" / "table.parquet")
-    five_year_years = sorted(
-        (
-            int(x["Five Year Intervals"])
-            for x in five_year_df.select("Five Year Intervals").distinct().collect()
-        )
-    )
+    five_year_years_pdf = table_to_pandas(five_year_df.select("Five Year Intervals").distinct())
+    five_year_years = sorted(int(x) for x in five_year_years_pdf["Five Year Intervals"])
     assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
 
     def get_pivoted_value_sum(df):
@@ -448,14 +494,15 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     )
     baseline_sum = get_value_sum(baseline_df)
     baseline_years_str = [str(x) for x in baseline_years]
+    baseline_years_sql = ", ".join(f"'{x}'" for x in baseline_years_str)
     five_year_sum = get_value_sum(
-        five_year_df.filter(F.col("Five Year Intervals").isin(baseline_years_str))
+        _filter(five_year_df, f'"Five Year Intervals" IN ({baseline_years_sql})')
     )
     assert math.isclose(five_year_sum, baseline_sum)
 
-    val1 = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2020"))
-    val2 = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2030"))
-    interpolated_val = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2025"))
+    val1 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2020'"))
+    val2 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2030'"))
+    interpolated_val = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2025'"))
     assert math.isclose(interpolated_val, val1 / 2 + val2 / 2)
 
 
@@ -518,7 +565,7 @@ def test_map_dataset(tmp_path):
         "subsector",
         "end_use",
     ]
-    dfp1 = df1.sort(*columns).toPandas()
+    dfp1 = table_to_pandas(_order_by(df1, *columns))
     checkpoint_files = [x for x in scratch_dir.iterdir() if x.suffix == ".json"]
     assert len(checkpoint_files) == 2
     checkpoint_files.sort(key=lambda x: x.stat().st_mtime)
@@ -534,7 +581,7 @@ def test_map_dataset(tmp_path):
         result2 = runner.invoke(cli, cmd2)
         assert result2.exit_code == 0
         df2 = read_parquet(Path(out_dir) / dataset_id / "table.parquet")
-        dfp2 = df2.sort(*columns).toPandas()
+        dfp2 = table_to_pandas(_order_by(df2, *columns))
         assert_frame_equal(dfp1, dfp2)
 
 
@@ -558,57 +605,65 @@ def test_dataset_queries(tmp_path):
         result = runner.invoke(cli, cmd)
         assert result.exit_code == 0
 
-    rcounty = read_parquet(output_dir / "resstock_county" / "table.parquet")
-    rcounty_renamed = rcounty.withColumn(
-        "geography",
-        F.when(F.col("geography") == "G0600370", "06037")
-        .when(F.col("geography") == "G0600730", "06073")
-        .when(F.col("geography") == "G3600470", "36047")
-        .when(F.col("geography") == "G3600810", "36081"),
+    rcounty = table_to_pandas(read_parquet(output_dir / "resstock_county" / "table.parquet"))
+    rcounty_renamed = rcounty.assign(
+        geography=rcounty["geography"].replace(
+            {
+                "G0600370": "06037",
+                "G0600730": "06073",
+                "G3600470": "36047",
+                "G3600810": "36081",
+            }
+        )
     )
 
-    def add_state(df: DataFrame) -> DataFrame:
-        return df.withColumn(
-            "state",
-            F.when(F.col("geography") == "06037", "CA")
-            .when(F.col("geography") == "06073", "CA")
-            .when(F.col("geography") == "36047", "NY")
-            .when(F.col("geography") == "36081", "NY"),
+    def add_state(df: pd.DataFrame) -> pd.DataFrame:
+        return df.assign(
+            state=df["geography"].map(
+                {
+                    "06037": "CA",
+                    "06073": "CA",
+                    "36047": "NY",
+                    "36081": "NY",
+                }
+            )
         )
 
-    rpcounty = read_parquet(output_dir / "resstock_project_county" / "table.parquet")
-    rstate = read_parquet(output_dir / "resstock_state" / "table.parquet")
+    rpcounty = table_to_pandas(
+        read_parquet(output_dir / "resstock_project_county" / "table.parquet")
+    )
+    rstate = table_to_pandas(read_parquet(output_dir / "resstock_state" / "table.parquet"))
 
     rcounty_renamed = add_state(rcounty_renamed)
     rpcounty = add_state(rpcounty)
 
     res_rcounty = (
-        rcounty_renamed.groupBy("geography", "metric")
-        .agg(F.sum("value").alias("value"))
-        .sort("geography", "metric")
-        .toPandas()
+        rcounty_renamed.groupby(["geography", "metric"], as_index=False)["value"]
+        .sum()
+        .sort_values(["geography", "metric"])
+        .reset_index(drop=True)
     )
     res_rpcounty = (
-        rpcounty.groupBy("geography", "metric")
-        .agg(F.sum("value").alias("value"))
-        .sort("geography", "metric")
-        .toPandas()
+        rpcounty.groupby(["geography", "metric"], as_index=False)["value"]
+        .sum()
+        .sort_values(["geography", "metric"])
+        .reset_index(drop=True)
     )
     assert_frame_equal(res_rcounty, res_rpcounty)
 
     res_rpcounty_state = (
-        rpcounty.drop("geography")
-        .withColumnRenamed("state", "geography")
-        .groupBy("geography", "metric")
-        .agg(F.sum("value").alias("value"))
-        .sort("geography", "metric")
-        .toPandas()
+        rpcounty.drop(columns=["geography"])
+        .rename(columns={"state": "geography"})
+        .groupby(["geography", "metric"], as_index=False)["value"]
+        .sum()
+        .sort_values(["geography", "metric"])
+        .reset_index(drop=True)
     )
     res_state = (
-        rstate.groupBy("geography", "metric")
-        .agg(F.sum("value").alias("value"))
-        .sort("geography", "metric")
-        .toPandas()
+        rstate.groupby(["geography", "metric"], as_index=False)["value"]
+        .sum()
+        .sort_values(["geography", "metric"])
+        .reset_index(drop=True)
     )
     assert_frame_equal(res_rpcounty_state, res_state)
 
@@ -853,12 +908,11 @@ class QueryTestElectricityValues(QueryTestBase):
 
     def validate(self, expected_values=None):
         county = "06037"
-        county_name = (
-            self._project.config.get_dimension_records("county")
-            .filter(f"id == {county}")
-            .collect()[0]
-            .name
-        )
+        county_name = _collect(
+            _filter(
+                self._project.config.get_dimension_records("county"), f"id == '{county}'"
+            ).limit(1)
+        )[0].name
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         assert "natural_gas_heating" not in df.columns
         non_value_columns = set(
@@ -868,7 +922,7 @@ class QueryTestElectricityValues(QueryTestBase):
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = [VALUE_COLUMN]
 
-        pdf = df.toPandas()
+        pdf = table_to_pandas(df)
         # Check time zone conversion
         if self._model.result.time_zone:
             expected.append("time_zone")
@@ -896,15 +950,15 @@ class QueryTestElectricityValues(QueryTestBase):
         success = set(value_columns) == set(expected)
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
+        if not _collect(_filter(df.select("county").distinct(), f"county == '{county_name}'")):
             logger.error("County name = %s is not present", county_name)
             success = False
         if success:
             total_cooling = aggregate_single_value(
-                df.filter("end_use == 'Cooling'"), "sum", VALUE_COLUMN
+                _filter(df, "end_use == 'Cooling'"), "sum", VALUE_COLUMN
             )
             total_heating = aggregate_single_value(
-                df.filter("end_use == 'Heating'"), "sum", VALUE_COLUMN
+                _filter(df, "end_use == 'Heating'"), "sum", VALUE_COLUMN
             )
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
             assert math.isclose(total_cooling, expected["electricity_cooling"])
@@ -1299,20 +1353,20 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
         county = "06037"
         end_use = "electricity_end_uses"
         assert (
-            df.filter(f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'")
-            .select("hour")
-            .distinct()
-            .count()
+            _count(
+                _filter(df, f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'")
+                .select("hour")
+                .distinct()
+            )
             == 24
         )
-        filtered_values = (
-            df.filter(f"county == '{county}'")
-            .filter(f"hour == {hour}")
-            .filter(f"end_uses_by_fuel_type == '{end_use}'")
-            .collect()
+        filtered_values = _collect(
+            _filter(
+                df,
+                f"county == '{county}' and hour == {hour} and end_uses_by_fuel_type == '{end_use}'",
+            )
         )
 
-        df.filter(f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'").show()
         assert len(filtered_values) == 1
         assert math.isclose(filtered_values[0].value, expected_values["la_electricity_hour_16"])
         return True
@@ -1436,14 +1490,14 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.csv"
         df = read_csv(filename)
-        years = df.select("year").distinct().collect()
+        years = _collect(df.select("year").distinct())
         assert len(years) == 1
-        assert years[0].year == 2012
+        assert str(years[0].year) == "2012"
+        if isinstance(df, ibis.Table):
+            df = df.mutate(value=df[VALUE_COLUMN].cast("float64"))
         validate_electricity_use_by_state(
             "sum",
-            df.groupBy("state", "end_uses_by_fuel_type", "year").agg(
-                F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
-            ),
+            _sum_by_group(df, ["state", "end_uses_by_fuel_type", "year"]),
             self.get_raw_stats(),
             "comstock_resstock",
         )
@@ -1525,7 +1579,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
             )
 
         expected = aggregate_single_value(df.filter(make_expr(df)), "max", VALUE_COLUMN)
-        actual = peak_load.filter(make_expr(peak_load)).collect()[0][VALUE_COLUMN]
+        actual = _row_value(_collect(peak_load.filter(make_expr(peak_load)))[0], VALUE_COLUMN)
         assert math.isclose(actual, expected)
         return True
 
@@ -1572,12 +1626,12 @@ class QueryTestMapAnnualTime(QueryTestBase):
 
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
-        distinct_model_years = df.select(DimensionType.MODEL_YEAR.value).distinct().collect()
+        distinct_model_years = _collect(df.select(DimensionType.MODEL_YEAR.value).distinct())
         assert len(distinct_model_years) == 1
-        assert distinct_model_years[0][DimensionType.MODEL_YEAR.value] == "2020"
+        assert _row_value(distinct_model_years[0], DimensionType.MODEL_YEAR.value) == "2020"
         expected_ca_res = calc_expected_eia_861_ca_res_load_value()
         actual_ca_res = aggregate_single_value(
-            df.filter("state == 'CA' and sector == 'res'"),
+            _filter(df, "state == 'CA' and sector == 'res'"),
             "sum",
             "electricity_unspecified",
         )
@@ -1666,17 +1720,12 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         df = read_parquet(
             str(self.output_dir / "composite_datasets" / self._model.dataset_id / "table.parquet")
         )
-        assert sorted([x.end_use for x in df.select("end_use").distinct().collect()]) == [
+        assert sorted([x.end_use for x in _collect(df.select("end_use").distinct())]) == [
             "electricity_cooling",
             "electricity_heating",
         ]
-        summary = (
-            df.select("end_use", VALUE_COLUMN)
-            .groupBy("end_use")
-            .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-            .collect()
-        )
-        totals = {x.end_use: x[VALUE_COLUMN] for x in summary}
+        summary = _collect(_sum_by_group(df.select("end_use", VALUE_COLUMN), ["end_use"]))
+        totals = {x.end_use: _row_value(x, VALUE_COLUMN) for x in summary}
         expected = self.get_raw_stats()["overall"]["resstock"]["sum"]
         assert math.isclose(totals["electricity_cooling"], expected["electricity_cooling"])
         assert math.isclose(totals["electricity_heating"], expected["electricity_heating"])
@@ -1778,32 +1827,34 @@ class QueryTestUnitMapping(QueryTestBase):
         dataset = project.get_dataset("test_efs_comstock")
         ld = dataset._handler._load_data
         lk = dataset._handler._load_data_lookup
-        raw_ld = ld.join(lk, on="id").drop("id")
+        raw_ld = drop_columns(join_multiple_columns(ld, lk, ["id"]), "id")
         # This test dataset has some fractional mapping values included.
         # subsector = hospital and model_year = 2020 are 1.0, fans are 1.0
-        expected_cooling = (
-            raw_ld.sort("timestamp")
-            .filter("subsector == 'com__Hospital' and metric = 'com_cooling'")
+        expected_cooling = _collect(
+            _filter(raw_ld, "subsector == 'com__Hospital' and metric = 'com_cooling'")
+            .order_by("timestamp")
             .limit(1)
-            .collect()[0]
-        )
-        expected_fans = (
-            raw_ld.sort("timestamp")
-            .filter("subsector == 'com__Hospital' and metric = 'com_fans'")
+        )[0]
+        expected_fans = _collect(
+            _filter(raw_ld, "subsector == 'com__Hospital' and metric = 'com_fans'")
+            .order_by("timestamp")
             .limit(1)
-            .collect()[0]
-        )
+        )[0]
         subsector = expected_cooling.subsector.replace("com__", "")
-        actual = (
-            df.filter(F.col("ComStock Subsectors EFS") == subsector)
-            .filter(F.col("US Counties 2010 - ComStock Only") == expected_cooling.geography)
-            .filter(F.col("Model Years 2010 to 2050") == "2020")
-            .sort("Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total")
+        actual = _collect(
+            _filter(
+                df,
+                f"""
+                "ComStock Subsectors EFS" = '{subsector}'
+                AND "US Counties 2010 - ComStock Only" = '{expected_cooling.geography}'
+                AND "Model Years 2010 to 2050" = '2020'
+                """,
+            )
+            .order_by("Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total")
             .limit(1)
-            .collect()[0]
-        )
-        assert actual.fans == expected_fans[VALUE_COLUMN] * 0.9
-        assert actual.cooling == expected_cooling[VALUE_COLUMN] * 1000
+        )[0]
+        assert actual.fans == _row_value(expected_fans, VALUE_COLUMN) * 0.9
+        assert actual.cooling == _row_value(expected_cooling, VALUE_COLUMN) * 1000
         return True
 
 
@@ -1811,20 +1862,23 @@ def validate_electricity_use_by_county(
     op, results_path, raw_stats, datasets, expected_county_count
 ):
     results = read_parquet(results_path)
-    counties = [str(x.county) for x in results.select("county").distinct().collect()]
+    counties = [str(x.county) for x in _collect(results.select("county").distinct())]
     assert len(counties) == expected_county_count, counties
     stats = raw_stats["by_county"]
     col = "end_uses_by_fuel_type"
     for county in counties:
-        actual = results.filter(
-            f"county == '{county}' and {col} == 'electricity_end_uses'"
-        ).collect()[0][VALUE_COLUMN]
+        actual = _row_value(
+            _collect(
+                _filter(results, f"county == '{county}' and {col} == 'electricity_end_uses'")
+            )[0],
+            VALUE_COLUMN,
+        )
         expected = stats[county][datasets][op]["electricity"]
         assert math.isclose(actual, expected)
 
 
-def validate_electricity_use_by_state(op, results_path: DataFrame | Path, raw_stats, datasets):
-    if isinstance(results_path, DataFrame):
+def validate_electricity_use_by_state(op, results_path: ibis.Table | Path, raw_stats, datasets):
+    if isinstance(results_path, ibis.Table | ibis.Table):
         results = results_path
     else:
         results = read_parquet(results_path)
@@ -1837,12 +1891,14 @@ def validate_electricity_use_by_state(op, results_path: DataFrame | Path, raw_st
         exp_ny = get_expected_ny_max_electricity(raw_stats, datasets)
 
     col = "end_uses_by_fuel_type"
-    actual_ca = results.filter(f"state == 'CA' and {col} == 'electricity_end_uses'").collect()[0][
-        VALUE_COLUMN
-    ]
-    actual_ny = results.filter(f"state == 'NY' and {col} == 'electricity_end_uses'").collect()[0][
-        VALUE_COLUMN
-    ]
+    actual_ca = _row_value(
+        _collect(_filter(results, f"state == 'CA' and {col} == 'electricity_end_uses'"))[0],
+        VALUE_COLUMN,
+    )
+    actual_ny = _row_value(
+        _collect(_filter(results, f"state == 'NY' and {col} == 'electricity_end_uses'"))[0],
+        VALUE_COLUMN,
+    )
     assert math.isclose(actual_ca, exp_ca)
     assert math.isclose(actual_ny, exp_ny)
 
@@ -1902,13 +1958,13 @@ def calc_expected_eia_861_ca_res_load_value():
     assert mapping_id is not None
     records = project.dimension_mapping_manager.get_by_id(mapping_id).get_records_dataframe()
 
-    fraction_06037 = records.filter("to_id == '06037'").collect()[0].from_fraction
-    fraction_06073 = records.filter("to_id == '06073'").collect()[0].from_fraction
+    fraction_06037 = _collect(_filter(records, "to_id == '06037'"))[0].from_fraction
+    fraction_06073 = _collect(_filter(records, "to_id == '06073'"))[0].from_fraction
     dataset = project.get_dataset(dataset_id)
-    raw = dataset._handler._load_data.filter("geography == 'CA' and sector == 'res'").collect()
+    raw = _collect(_filter(dataset._handler._load_data, "geography == 'CA' and sector == 'res'"))
     assert len(raw) == 1
     num_scenarios = 2
-    elec_mwh_state = raw[0][VALUE_COLUMN] * num_scenarios
+    elec_mwh_state = _row_value(raw[0], VALUE_COLUMN) * num_scenarios
     elec_mwh_selected_counties = elec_mwh_state * fraction_06037 + elec_mwh_state * fraction_06073
     return elec_mwh_selected_counties
 

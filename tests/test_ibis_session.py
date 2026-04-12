@@ -1,35 +1,71 @@
+from enum import Enum
 from functools import reduce
-from typing import Optional
+from typing import Optional, Union
 
 import ibis
 import pytest
 
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation, DSGInvalidParameter
+from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.operations import make_temp_view_name
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import (
+    ByteType,
     BooleanType,
+    check_for_nulls,
+    create_dataframe,
+    create_dataframe_from_dicts,
+    create_dataframe_from_dimension_ids,
+    create_dataframe_from_ids,
     create_dataframe_from_product,
+    cross_join_dfs,
+    CsvPartitionWriter,
     custom_runtime_conf,
+    custom_time_zone,
+    DoubleType,
     F,
+    FloatType,
+    get_active_session,
+    get_current_time_zone,
+    get_duckdb_runtime_session,
     get_runtime_session,
     get_type_from_union,
     IntegerType,
+    is_runtime_session_active,
+    is_table_stored,
+    list_tables,
+    load_stored_table,
+    LongType,
+    read_dataframe,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
     save_table,
+    set_current_time_zone,
+    ShortType,
+    SparkSession,
     SparkConf,
     StringType,
     StructField,
     StructType,
+    TimestampNTZType,
+    TimestampType,
     _duckdb_type_from_spark_type,
+    _ibis_type_from_spark_type,
+    _is_duckdb_io_exception,
+    _is_spark_parquet_schema_exception,
     _read_natively,
     _schema_names,
     _schema_types,
     try_read_dataframe,
+    try_load_stored_table,
+    union,
     use_duckdb,
+    write_dataframe_and_auto_partition,
     write_dataframe,
+    _write_table,
 )
 
 
@@ -101,6 +137,11 @@ def test_get_type_from_union():
     assert get_type_from_union(Optional[DayType]) is str
 
 
+def test_get_type_from_union_invalid():
+    with pytest.raises(NotImplementedError, match="Unhandled Union type"):
+        get_type_from_union(Union[str, int, None])
+
+
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
 def test_duckdb_spark_function_shim_raises():
     with pytest.raises(DSGInvalidOperation, match="Spark function F.col is not available"):
@@ -116,10 +157,84 @@ def test_duckdb_spark_conf_shim():
 
 
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_duckdb_runtime_session_shims():
+    session = get_runtime_session()
+    assert get_duckdb_runtime_session() is session
+    assert get_active_session() is session
+    assert SparkSession.getActiveSession() is None
+    assert (
+        SparkSession.builder.config("spark.sql.shuffle.partitions", "1").getOrCreate() is session
+    )
+    assert is_runtime_session_active()
+
+    session.conf.set("spark.sql.shuffle.partitions", 3)
+    assert session.conf.get("spark.sql.shuffle.partitions") == "3"
+    assert session.conf.get("missing", "fallback") == "fallback"
+
+    table_name = make_temp_view_name()
+    table = session.createDataFrame([(1, "a")], ["id", "name"])
+    make_runtime_backend().create_view(table_name, table)
+    assert session.catalog.tableExists(f"default.{table_name}")
+    assert is_table_stored(table_name)
+    assert table_name in list_tables()
+    assert not session.catalog.isCached(table_name)
+    assert session.table(f"default.{table_name}").count().execute() == 1
+    assert load_stored_table(table_name).count().execute() == 1
+    assert try_load_stored_table(table_name) is not None
+    assert try_load_stored_table(f"{table_name}_missing") is None
+    assert session.sql("SELECT 1 AS value").execute()["value"].iloc[0] == 1
+    with pytest.raises(DSGInvalidOperation, match="keyword dataframe bindings"):
+        session.sql("SELECT * FROM {table}", table=table)
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_duckdb_reader_shims(tmp_path):
+    session = get_runtime_session()
+
+    csv_no_header = tmp_path / "no_header.csv"
+    csv_no_header.write_text("1,a\n2,b\n")
+    schema = StructType().add("id", IntegerType(), nullable=False).add("name", StringType())
+    table = session.read.csv(csv_no_header.as_posix(), header=False, schema=schema)
+    assert list(table.columns) == ["id", "name"]
+    assert table.count().execute() == 2
+
+    csv_with_header = tmp_path / "with_header.csv"
+    csv_with_header.write_text("id,name\n1,a\n")
+    table = session.read.csv(csv_with_header.as_posix(), header=True, schema=schema)
+    assert table.schema()["id"].is_integer()
+
+    json_file = tmp_path / "table.json"
+    json_file.write_text('[{"id": 1, "name": "a"}]\n')
+    assert session.read.json(json_file.as_posix()).count().execute() == 1
+
+    parquet_file = tmp_path / "table.parquet"
+    write_dataframe(table, parquet_file)
+    assert session.read.parquet(parquet_file.as_posix()).count().execute() == 1
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
 def test_save_table_duckdb_raises():
     table = get_runtime_session().createDataFrame([(1,)], ["a"])
     with pytest.raises(DSGInvalidOperation, match="save_table is not supported"):
         save_table(table, "not_supported")
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_create_dataframe_helpers_duckdb():
+    assert create_dataframe([("a",)], require_unique=["col0"]).count().execute() == 1
+    assert list(create_dataframe_from_ids(["a", "b"], "id").columns) == ["id"]
+    assert list(create_dataframe_from_dicts([{"id": "a"}]).columns) == ["id"]
+
+    with pytest.raises(DSGInvalidParameter, match="records cannot be empty"):
+        create_dataframe_from_dicts([])
+
+    table = create_dataframe_from_dimension_ids(
+        [["geo1", "2020"]],
+        DimensionType.GEOGRAPHY,
+        DimensionType.MODEL_YEAR,
+        cache=False,
+    )
+    assert list(table.columns) == ["geography", "model_year"]
 
 
 def test_read_natively_unsupported_extension(tmp_path):
@@ -151,8 +266,35 @@ def test_schema_helpers():
         "active": "BOOLEAN",
         "count": "INTEGER",
     }
+    assert _schema_types(StructType().add("score", DoubleType())) == {"score": "float64"}
     assert _schema_types({"a": "string"}) == {"a": "string"}
     assert _schema_types(["a", "b"]) is None
+
+
+def test_schema_type_mappings():
+    expected = [
+        (BooleanType(), "boolean", "BOOLEAN"),
+        (ByteType(), "int8", "TINYINT"),
+        (ShortType(), "int16", "SMALLINT"),
+        (IntegerType(), "int32", "INTEGER"),
+        (LongType(), "int64", "BIGINT"),
+        (FloatType(), "float32", "FLOAT"),
+        (DoubleType(), "float64", "DOUBLE"),
+        (StringType(), "string", "VARCHAR"),
+        (TimestampType(), "timestamp", "TIMESTAMP"),
+        (TimestampNTZType(), "timestamp", "TIMESTAMP"),
+    ]
+    for data_type, ibis_type, duckdb_type in expected:
+        assert _ibis_type_from_spark_type(data_type) == ibis_type
+        assert _duckdb_type_from_spark_type(data_type) == duckdb_type
+
+
+def test_schema_type_invalid():
+    class UnsupportedType:
+        pass
+
+    with pytest.raises(NotImplementedError, match="Unsupported schema data type"):
+        _ibis_type_from_spark_type(UnsupportedType())
 
 
 def test_duckdb_type_from_spark_type_invalid():
@@ -163,9 +305,96 @@ def test_duckdb_type_from_spark_type_invalid():
         _duckdb_type_from_spark_type(UnsupportedType())
 
 
+def test_parquet_exception_detection():
+    class AnalysisException(Exception):
+        pass
+
+    class IOException(Exception):
+        __module__ = "duckdb.fake"
+
+    assert _is_spark_parquet_schema_exception(
+        AnalysisException("Unable to infer schema for Parquet. It must be specified manually.")
+    )
+    assert _is_spark_parquet_schema_exception(AnalysisException("PATH_NOT_FOUND"))
+    assert _is_spark_parquet_schema_exception(AnalysisException("Path does not exist"))
+    assert not _is_spark_parquet_schema_exception(AnalysisException("other"))
+    assert _is_duckdb_io_exception(IOException("bad parquet"))
+    assert not _is_duckdb_io_exception(ValueError("bad parquet"))
+
+
 def test_require_unique_raises():
     table = get_runtime_session().createDataFrame([("a",), ("a",)], ["id"])
     with pytest.raises(DSGInvalidField, match="duplicate entries"):
         from dsgrid.ibis.session import _post_process_dataframe
 
         _post_process_dataframe(table, require_unique=["id"])
+
+
+def test_read_dataframe_and_write_error_paths(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        read_dataframe(tmp_path / "missing.csv")
+
+    unsupported = tmp_path / "table.txt"
+    unsupported.write_text("a\n1\n")
+    with pytest.raises(AssertionError, match="Unsupported file extension"):
+        read_dataframe(unsupported)
+
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    with pytest.raises(NotImplementedError, match="Unsupported file format"):
+        _write_table(table, (tmp_path / "table.invalid").as_posix(), "invalid")
+
+    with pytest.raises(DSGInvalidParameter, match="only supports Parquet"):
+        write_dataframe_and_auto_partition(table, tmp_path / "table.csv")
+
+
+def test_check_for_nulls_and_cross_join_union():
+    table = get_runtime_session().createDataFrame([(1, "a"), (2, "b")], ["id", "name"])
+    check_for_nulls(table)
+    check_for_nulls(table, exclude_columns={"id", "name"})
+
+    if use_duckdb():
+        with_null_schema = StructType(
+            [StructField("id", IntegerType()), StructField("name", StringType())]
+        )
+        with_null = get_runtime_session().createDataFrame([(1, None)], with_null_schema)
+        with pytest.raises(DSGInvalidField, match="contains NULL"):
+            check_for_nulls(with_null)
+
+    assert cross_join_dfs([table]).columns == table.columns
+    other = get_runtime_session().createDataFrame([("x",), ("y",)], ["letter"])
+    assert cross_join_dfs([table, other]).count().execute() == 4
+    assert union([table]).count().execute() == 2
+    assert union([table, table]).count().execute() == 4
+    mismatched = get_runtime_session().createDataFrame([(1,)], ["other"])
+    with pytest.raises(Exception, match="columns don't match"):
+        union([table, mismatched])
+
+
+def test_current_time_zone_contexts():
+    original = get_current_time_zone()
+    try:
+        set_current_time_zone("UTC")
+        assert get_current_time_zone() == "UTC"
+        with custom_time_zone("America/Denver"):
+            assert get_current_time_zone() == "America/Denver"
+        assert get_current_time_zone() == "UTC"
+    finally:
+        set_current_time_zone(original)
+
+
+def test_csv_partition_writer_rollover(tmp_path):
+    csv_dir = tmp_path / "csv_parts"
+    with CsvPartitionWriter(csv_dir, max_partition_size_mb=0) as writer:
+        writer.add_row(("a", "b"))
+        writer.add_row(("c", "d"))
+
+    files = sorted(csv_dir.iterdir())
+    assert [x.name for x in files] == ["part1.csv", "part2.csv"]
+    assert files[0].read_text() == "a,b\n"
+
+
+def test_get_type_from_enum_union():
+    class Example(Enum):
+        ONE = "one"
+
+    assert get_type_from_union(Optional[Example]) is str

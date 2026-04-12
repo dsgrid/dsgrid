@@ -240,6 +240,31 @@ def test_to_units(pivoted_tables, inputs):
     check_column_values(row, expected_val, UNIT_COLUMNS_ENERGY)
 
 
+@pytest.mark.parametrize(
+    "inputs",
+    (
+        (power.to_kw, KW_VAL),
+        (power.to_mw, MW_VAL),
+        (power.to_gw, GW_VAL),
+        (power.to_tw, TW_VAL),
+    ),
+)
+def test_to_power_units(records_dataframe_power, inputs):
+    data = [
+        {
+            "fans": KW_VAL,
+            "cooling": MW_VAL,
+            "dryer": GW_VAL,
+            "ev_l1l2": TW_VAL,
+            "unitless": KW_VAL,
+        },
+    ]
+    df = create_dataframe_from_dicts(data)
+    func, expected_val = inputs
+    row = _convert_units(df, records_dataframe_power, func)
+    check_column_values(row, expected_val, UNIT_COLUMNS_POWER)
+
+
 @pytest.mark.parametrize("to_unit", [KWH, MWH, GWH, TWH, THERM, MBTU])
 def test_from_any_to_any_energy(unpivoted_tables_energy, to_unit):
     df, records = unpivoted_tables_energy

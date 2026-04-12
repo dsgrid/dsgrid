@@ -39,6 +39,9 @@ from dsgrid.ibis.session import (
     list_tables,
     load_stored_table,
     LongType,
+    overwrite_dataframe_file,
+    persist_intermediate_query,
+    persist_table,
     read_dataframe,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
@@ -65,6 +68,7 @@ from dsgrid.ibis.session import (
     use_duckdb,
     write_dataframe_and_auto_partition,
     write_dataframe,
+    _create_ibis_table,
     _write_table,
 )
 
@@ -345,6 +349,39 @@ def test_read_dataframe_and_write_error_paths(tmp_path):
 
     with pytest.raises(DSGInvalidParameter, match="only supports Parquet"):
         write_dataframe_and_auto_partition(table, tmp_path / "table.csv")
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB file overwrite paths only apply to DuckDB")
+def test_persist_and_overwrite_file_helpers(tmp_path):
+    table = get_runtime_session().createDataFrame([(1, "a")], ["id", "name"])
+    replacement = get_runtime_session().createDataFrame([(2, "b")], ["id", "name"])
+    assert _create_ibis_table(table) is table
+
+    csv_file = tmp_path / "table.csv"
+    write_dataframe(table, csv_file)
+    overwritten_csv = overwrite_dataframe_file(csv_file, replacement)
+    assert overwritten_csv.count().execute() == 1
+
+    json_file = tmp_path / "table.json"
+    overwritten_json = overwrite_dataframe_file(json_file, replacement)
+    assert overwritten_json.count().execute() == 1
+
+    with pytest.raises(NotImplementedError, match="Unsupported file suffix"):
+        overwrite_dataframe_file(tmp_path / "table.txt", table)
+
+    if use_duckdb():
+        duckdb_json = tmp_path / "duckdb.json"
+        write_dataframe(table, duckdb_json)
+        assert not duckdb_json.exists()
+        assert (tmp_path / "duckdb.parquet").exists()
+
+    with ScratchDirContext(tmp_path / "scratch") as context:
+        path = persist_table(table, context, tag="test")
+        assert path.exists()
+        persisted = persist_intermediate_query(table, context)
+        assert persisted.count().execute() == 1
+        persisted_auto = persist_intermediate_query(table, context, auto_partition=True)
+        assert persisted_auto.count().execute() == 1
 
 
 def test_check_for_nulls_and_cross_join_union():

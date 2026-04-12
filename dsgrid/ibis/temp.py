@@ -17,12 +17,12 @@ def drop_temp_tables_and_views() -> None:
     if dsgrid.runtime_config.backend_engine != BackendEngine.SPARK:
         return
 
-    from dsgrid.ibis.session import get_pyspark_session, is_runtime_session_active
+    from dsgrid.ibis.session import get_spark_session, is_runtime_session_active
 
     if not is_runtime_session_active():
         return
 
-    spark = get_pyspark_session()
+    spark = get_spark_session()
     for row in spark.sql(f"SHOW TABLES LIKE '*{TEMP_TABLE_PREFIX}*'").collect():
         spark.sql(f"DROP TABLE {row.tableName}")
     for row in spark.sql(f"SHOW VIEWS LIKE '*{TEMP_TABLE_PREFIX}*'").collect():

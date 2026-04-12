@@ -1,7 +1,12 @@
 import pytest
 import ibis
 
-from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
+from dsgrid.dataset.dataset_expression_handler import (
+    DatasetExpressionHandler,
+    evaluate_expression,
+    join_multiple_columns,
+    _operator_to_sql,
+)
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import cache
 from dsgrid.ibis.operations import filter_sql
@@ -150,3 +155,31 @@ def test_invalid_union():
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
     with pytest.raises(DSGInvalidOperation, match=r"Union.* datasets have identical columns"):
         evaluate_expression("dataset1 | dataset2", datasets)
+
+
+def test_join_multiple_columns_direct():
+    df1 = create_dataframe_from_dicts(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_cooling": 2},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 3},
+        ]
+    )
+    df2 = create_dataframe_from_dicts(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_heating": 4},
+            {"county": "Boulder", "model_year": "2030", "elec_heating": 5},
+        ]
+    )
+    joined = join_multiple_columns(df1, df2, STACKED_DIMENSION_COLUMNS)
+    rows = sorted(_collect(joined), key=lambda row: row.county)
+    assert rows[0].county == "Boulder"
+    assert rows[0].elec_cooling == 3
+    assert rows[0].elec_heating == 5
+    assert rows[1].county == "Jefferson"
+    assert rows[1].elec_cooling == 2
+    assert rows[1].elec_heating == 4
+
+
+def test_operator_to_sql_invalid():
+    with pytest.raises(NotImplementedError, match="Unsupported operator"):
+        _operator_to_sql(max)

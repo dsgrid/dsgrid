@@ -297,14 +297,14 @@ def is_runtime_session_active() -> bool:
     return get_duckdb_runtime_session() is not None or SparkSession.getActiveSession() is not None
 
 
-def get_pyspark_session() -> Any:
-    """Return the active PySpark session, creating one if Spark is the configured backend."""
+def get_spark_session() -> Any:
+    """Return the active SparkSession, creating one if Spark is the configured backend."""
     if use_duckdb():
         return None
     session = SparkSession.getActiveSession()
     if session is None:
         logger.warning("Could not find a SparkSession. Create a new one.")
-        session = _create_pyspark_session()
+        session = _create_spark_session()
     return session
 
 
@@ -314,7 +314,7 @@ def get_runtime_session() -> Any:
     if session is not None:
         return session
 
-    return _SparkRuntimeSession(get_pyspark_session())
+    return _SparkRuntimeSession(get_spark_session())
 
 
 def get_current_time_zone() -> str:
@@ -353,11 +353,11 @@ def init_runtime_session(name="dsgrid", check_env=True, spark_conf=None) -> Any:
         logger.info("Using DuckDB as the backend engine.")
         return _DUCKDB_RUNTIME_SESSION
 
-    return _SparkRuntimeSession(_create_pyspark_session(name, check_env, spark_conf))
+    return _SparkRuntimeSession(_create_spark_session(name, check_env, spark_conf))
 
 
-def _create_pyspark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any:
-    """Initialize and return the raw PySpark session."""
+def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any:
+    """Initialize and return the raw SparkSession."""
     logger.info("Using Spark as the backend engine.")
     cluster = os.environ.get("SPARK_CLUSTER")
     conf = SparkConf().setAppName(name)
@@ -422,7 +422,7 @@ def restart_runtime_session(*args, force=False, **kwargs) -> Any:
     if session is not None:
         return session
 
-    session = get_pyspark_session()
+    session = get_spark_session()
     if session is None:
         return init_runtime_session(*args, **kwargs)
     needs_restart = force
@@ -447,7 +447,7 @@ def restart_runtime_session(*args, force=False, **kwargs) -> Any:
     if needs_restart:
         session.stop()
         logger.info("Stopped the SparkSession so that it can be restarted with a new config.")
-        session = _create_pyspark_session(*args, **kwargs)
+        session = _create_spark_session(*args, **kwargs)
         if session.conf.get("spark.sql.session.timeZone") != new_time_zone:
             # We set this value in query_submitter.py and that change will get lost
             # when the session is restarted.
@@ -1041,7 +1041,7 @@ def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
 
     full_name = f"{database}.{table_name}"
     view = create_temp_view(table)
-    writer = get_pyspark_session().table(view).write
+    writer = get_spark_session().table(view).write
     if overwrite:
         writer.mode("overwrite").saveAsTable(full_name)
     else:
@@ -1055,7 +1055,7 @@ def list_tables(database=DSGRID_DB_NAME):
 
 def drop_table(table_name, database=DSGRID_DB_NAME):
     if is_table_stored(table_name, database=database):
-        get_pyspark_session().sql(f"DROP TABLE {table_name}")
+        get_spark_session().sql(f"DROP TABLE {table_name}")
         logger.info("Dropped table %s", table_name)
 
 
@@ -1153,7 +1153,7 @@ def _table_count(table: ibis.Table) -> int:
 def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
     view = create_temp_view(df)
     if not use_duckdb():
-        writer = get_pyspark_session().table(view).write.mode("overwrite")
+        writer = get_spark_session().table(view).write.mode("overwrite")
         if file_format == "parquet":
             writer.parquet(path)
         elif file_format == "csv":

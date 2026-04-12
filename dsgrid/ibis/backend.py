@@ -21,9 +21,9 @@ def make_runtime_backend(**kwargs: Any) -> IbisBackend:
     if config.backend_engine == BackendEngine.SPARK:
         session = kwargs.pop("session", None)
         if session is None:
-            from dsgrid.ibis.session import get_pyspark_session
+            from dsgrid.ibis.session import get_spark_session
 
-            session = get_pyspark_session()
+            session = get_spark_session()
         key = _make_backend_cache_key(config.backend_engine, {**kwargs, "session": session})
         if _RUNTIME_BACKEND is not None and _RUNTIME_BACKEND_KEY == key:
             return _RUNTIME_BACKEND

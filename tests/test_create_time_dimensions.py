@@ -260,7 +260,7 @@ def check_date_range_creation(time_dimension_model, time_based_data_adjustment=N
     if 24 % hours != 0:
         msg = f"Time frequency of {hours} hours does not evenly divide 24 hours."
         raise ValueError(msg)
-    periods = 24 // hours
+    periods = int(24 // hours)
 
     for yr in years:
         if ld_adj == LeapDayAdjustmentType.NONE:

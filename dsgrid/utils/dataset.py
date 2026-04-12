@@ -52,7 +52,7 @@ from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import (
     check_for_nulls,
-    get_pyspark_session,
+    get_spark_session,
     get_runtime_session,
     persist_table,
     write_dataframe,
@@ -66,7 +66,7 @@ def _create_shared_chronify_store() -> chronify.Store:
     """Create a chronify Store that uses dsgrid's active runtime session through Ibis."""
     if use_duckdb():
         return create_chronify_store()
-    return create_chronify_store(session=get_pyspark_session())
+    return create_chronify_store(session=get_spark_session())
 
 
 def _create_runtime_chronify_store() -> chronify.Store:
@@ -560,7 +560,7 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     try:
         dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
-            time_zone_column,
+            None,
         )
         return _get_chronify_result(store, dst_schema, df)
     finally:
@@ -690,7 +690,7 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     store.localize_time_zone_by_column(
         src_schema.name,
-        time_zone_column=time_zone_column,
+        time_zone_column=None,
         output_file=output_file,
     )
     return _read_chronify_output(df, output_file)

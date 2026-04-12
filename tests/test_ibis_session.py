@@ -4,16 +4,29 @@ from typing import Optional
 import ibis
 import pytest
 
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import (
+    BooleanType,
     create_dataframe_from_product,
     custom_runtime_conf,
+    F,
     get_runtime_session,
     get_type_from_union,
+    IntegerType,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
+    save_table,
+    SparkConf,
+    StringType,
+    StructField,
+    StructType,
+    _duckdb_type_from_spark_type,
+    _read_natively,
+    _schema_names,
+    _schema_types,
     try_read_dataframe,
     use_duckdb,
     write_dataframe,
@@ -86,3 +99,73 @@ def test_create_dataframe_from_product(tmp_path):
 def test_get_type_from_union():
     assert get_type_from_union(Optional[str]) is str
     assert get_type_from_union(Optional[DayType]) is str
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_duckdb_spark_function_shim_raises():
+    with pytest.raises(DSGInvalidOperation, match="Spark function F.col is not available"):
+        F.col("a")
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_duckdb_spark_conf_shim():
+    conf = SparkConf()
+    assert conf.setAppName("test") is conf
+    assert conf.set("spark.sql.shuffle.partitions", "1") is conf
+    assert conf.get("spark.sql.shuffle.partitions", "200") == "200"
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
+def test_save_table_duckdb_raises():
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    with pytest.raises(DSGInvalidOperation, match="save_table is not supported"):
+        save_table(table, "not_supported")
+
+
+def test_read_natively_unsupported_extension(tmp_path):
+    filename = tmp_path / "table.txt"
+    filename.write_text("a\n1\n")
+    with pytest.raises(NotImplementedError, match="Unsupported file extension"):
+        _read_natively(filename)
+
+
+def test_schema_helpers():
+    schema = StructType(
+        [
+            StructField("name", StringType()),
+            StructField("active", BooleanType()),
+            StructField("count", IntegerType()),
+        ]
+    )
+    assert _schema_names(schema) == ["name", "active", "count"]
+    assert _schema_names(["a", "b"]) == ["a", "b"]
+    assert _schema_names(1) == []
+
+    assert _schema_types(schema) == {
+        "name": "string",
+        "active": "boolean",
+        "count": "int32",
+    }
+    assert _schema_types(schema, ibis_types=False) == {
+        "name": "VARCHAR",
+        "active": "BOOLEAN",
+        "count": "INTEGER",
+    }
+    assert _schema_types({"a": "string"}) == {"a": "string"}
+    assert _schema_types(["a", "b"]) is None
+
+
+def test_duckdb_type_from_spark_type_invalid():
+    class UnsupportedType:
+        pass
+
+    with pytest.raises(NotImplementedError, match="Unsupported schema data type"):
+        _duckdb_type_from_spark_type(UnsupportedType())
+
+
+def test_require_unique_raises():
+    table = get_runtime_session().createDataFrame([("a",), ("a",)], ["id"])
+    with pytest.raises(DSGInvalidField, match="duplicate entries"):
+        from dsgrid.ibis.session import _post_process_dataframe
+
+        _post_process_dataframe(table, require_unique=["id"])

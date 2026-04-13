@@ -15,6 +15,7 @@ from dsgrid.query.models import DatasetQueryModel, ProjectQueryModel
 from dsgrid.query.query_context import QueryContext
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.ibis.operations import (
+    coalesce,
     drop_columns,
     except_all,
     intersect,
@@ -333,7 +334,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             columns_to_drop.append(col)
         lookup = drop_columns(lookup, *columns_to_drop)
 
-        lookup2 = _coalesce(lookup, 1)
+        lookup2 = coalesce(lookup, 1)
         store.replace_lookup_table(lookup2, self.dataset_id, self._config.model.version)
         load_df = join_multiple_columns(load_df, lookup2.select("id").distinct(), ["id"])
         ld_columns = set(load_df.columns)
@@ -352,10 +353,6 @@ def _cache(df: ibis.Table) -> ibis.Table:
 
 def _unpersist(df: ibis.Table) -> None:
     return None
-
-
-def _coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
-    return df
 
 
 def _collect_limited_error_rows(df: ibis.Table) -> list[dict]:

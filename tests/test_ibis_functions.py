@@ -7,7 +7,7 @@ import ibis
 import pandas as pd
 import pytest
 
-from dsgrid.ibis.operations import filter_sql
+from dsgrid.ibis.operations import filter_sql, rename_columns
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.ibis.functions import (
     aggregate,
@@ -260,6 +260,14 @@ def test_read_csv(tmp_path: Path) -> None:
             )
         )
         == 3
+    )
+
+
+def test_rename_columns(dataframe):
+    renamed = rename_columns(dataframe, {"metric": "end_use", "value": "amount"})
+    assert set(renamed.columns) == {"index", "end_use", "amount"}
+    assert aggregate_single_value(renamed, "sum", "amount") == aggregate_single_value(
+        dataframe, "sum", "value"
     )
 
 

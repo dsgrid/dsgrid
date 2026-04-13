@@ -23,7 +23,7 @@ from dsgrid.exceptions import (
     DSGInvalidParameter,
 )
 from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import create_temp_view, cross_join, make_temp_view_name
+from dsgrid.ibis.operations import coalesce, create_temp_view, cross_join, make_temp_view_name
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.loggers import disable_console_logging
@@ -931,7 +931,7 @@ def write_dataframe_and_auto_partition(
     if abs(actual - desired) / desired * 100 < rtol_pct:
         logger.info("No change in number of partitions is needed for %s.", filename)
     elif actual > desired:
-        df = df.coalesce(desired)
+        df = coalesce(df, desired)
         df = overwrite_dataframe_file(filename, df)
         duration_second_write = time.time() - end_initial_write
         logger.info(

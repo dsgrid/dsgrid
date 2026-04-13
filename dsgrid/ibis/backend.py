@@ -3,7 +3,6 @@ from typing import Any
 
 import chronify
 import ibis
-import pandas as pd
 from chronify.ibis import IbisBackend, make_backend
 
 import dsgrid
@@ -63,17 +62,6 @@ def read_parquet_expr(path: Path | str) -> ibis.Table:
     """Read Parquet data into an Ibis table expression."""
     path_str = Path(path).as_posix()
     return make_runtime_backend().connection.read_parquet(path_str)
-
-
-def read_json_expr(path: Path | str) -> ibis.Table:
-    """Read JSON data into an Ibis table expression."""
-    path = Path(path)
-    return make_runtime_backend().connection.read_json(path.as_posix())
-
-
-def read_csv_pandas(path: Path | str, schema: dict[str, str] | None = None) -> pd.DataFrame:
-    """Read CSV data through Ibis and return a pandas DataFrame."""
-    return read_csv_expr(path, schema=schema).execute()
 
 
 def _make_backend_cache_key(

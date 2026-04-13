@@ -46,8 +46,7 @@ def create_chronify_store(**kwargs: Any) -> chronify.Store:
 
 def read_csv_expr(path: Path | str, schema: dict[str, str] | None = None) -> ibis.Table:
     """Read CSV data into an Ibis table expression."""
-    path = Path(path)
-    path_str = path.as_posix() + "/**/*.csv" if path.is_dir() else path.as_posix()
+    path_str = Path(path).as_posix()
     if dsgrid.runtime_config.backend_engine == BackendEngine.SPARK:
         from dsgrid.ibis.session import get_runtime_session
 
@@ -62,8 +61,7 @@ def read_csv_expr(path: Path | str, schema: dict[str, str] | None = None) -> ibi
 
 def read_parquet_expr(path: Path | str) -> ibis.Table:
     """Read Parquet data into an Ibis table expression."""
-    path = Path(path)
-    path_str = path.as_posix() + "/**/*.parquet" if path.is_dir() else path.as_posix()
+    path_str = Path(path).as_posix()
     return make_runtime_backend().connection.read_parquet(path_str)
 
 

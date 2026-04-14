@@ -15,7 +15,7 @@ from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
 from dsgrid.ibis.operations import create_temp_view, filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
-from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.types import get_str_type, use_duckdb
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.ibis.session import (
     get_runtime_session,
@@ -187,7 +187,7 @@ def map_annual_time_to_date_time(
             select_columns.append(handle_column_spaces(column))
     if myear_column not in df.columns:
         select_columns.append(
-            f"CAST({handle_column_spaces(annual_col)} AS VARCHAR) AS {handle_column_spaces(myear_column)}"
+            f"CAST({handle_column_spaces(annual_col)} AS {get_str_type()}) AS {handle_column_spaces(myear_column)}"
         )
     return select_expr(df2, select_columns)
 

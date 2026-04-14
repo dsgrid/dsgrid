@@ -58,12 +58,13 @@ def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
     """
     if use_duckdb():
         return df
+    view = create_temp_view(df)
     backend = cast(Any, make_runtime_backend())
-    spark_df = backend._session.sql(backend.compile(df))
+    spark_df = backend.connection._session.sql(f"SELECT * FROM {view}")
     coalesced = spark_df.coalesce(num_partitions)
-    view = make_temp_view_name()
-    coalesced.createOrReplaceTempView(view)
-    return backend.table(view)
+    coalesced_view = make_temp_view_name()
+    coalesced.createOrReplaceTempView(coalesced_view)
+    return backend.connection.table(coalesced_view)
 
 
 def filter_sql(df: ibis.Table, predicate: str) -> ibis.Table:

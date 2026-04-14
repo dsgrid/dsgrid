@@ -24,10 +24,9 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.ibis.operations import create_temp_view, drop_columns, join_multiple_columns
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import get_unique_values
-from dsgrid.ibis.types import use_duckdb
-from dsgrid.ibis.session import get_runtime_session, read_dataframe
+from dsgrid.ibis.session import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -899,14 +898,7 @@ class DatasetConfig(ConfigBase):
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                escaped = val.replace("'", "''")
-                if use_duckdb():
-                    view = create_temp_view(df)
-                    df = get_runtime_session().sql(
-                        f"SELECT *, '{escaped}' AS \"{col}\" FROM {view}"
-                    )
-                else:
-                    df = df.selectExpr("*", f"'{escaped}' AS {col}")
+                df = df.mutate(**{col: ibis.literal(val)})
         return df
 
     def remove_trivial_dimensions(self, df):

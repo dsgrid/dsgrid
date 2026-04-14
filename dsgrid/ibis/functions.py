@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 
 import ibis
 
+import dsgrid
+from dsgrid.common import BackendEngine
 from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.io import read_csv
 from dsgrid.ibis.operations import (
@@ -139,10 +141,13 @@ def write_csv(
             path_obj.unlink()
         else:
             raise FileExistsError(path_str)
-    view = create_temp_view(df)
-    escaped_path = path_str.replace("'", "''")
-    header_arg = "true" if header else "false"
-    conn = cast(Any, make_runtime_backend().connection)
-    conn.raw_sql(
-        f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER {header_arg})"
-    )
+    if dsgrid.runtime_config.backend_engine == BackendEngine.SPARK:
+        df.to_pandas().to_csv(path_str, index=False, header=header)
+    else:
+        view = create_temp_view(df)
+        escaped_path = path_str.replace("'", "''")
+        header_arg = "true" if header else "false"
+        conn = cast(Any, make_runtime_backend().connection)
+        conn.raw_sql(
+            f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER {header_arg})"
+        )

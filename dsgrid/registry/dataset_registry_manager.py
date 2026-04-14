@@ -806,9 +806,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             df = get_runtime_session().createDataFrame(pd.read_csv(path, dtype="string"))
         else:
             df = read_dataframe(path)
-            view = create_temp_view(df)
-            cols = ", ".join(f"CAST({col} AS VARCHAR) AS {col}" for col in df.columns)
-            df = get_runtime_session().sql(f"SELECT {cols} FROM {view}")
+            df = df.cast({col: "string" for col in df.columns})
         return df
 
     def _read_table_from_user_path(

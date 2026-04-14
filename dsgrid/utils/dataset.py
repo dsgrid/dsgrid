@@ -122,18 +122,15 @@ def _rename_column(df: ibis.Table, old: str, new: str) -> ibis.Table:
 
 
 def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
-    if not _is_ibis_table(df):
-        return df.select(*template.columns)
-    view = create_temp_view(df)
     schema = template.schema()
-    exprs = []
+    exprs = {}
     for column in template.columns:
-        sql_type = _to_duckdb_sql_type(schema[column])
+        target_type = schema[column]
         if column in df.columns:
-            exprs.append(f'CAST("{column}" AS {sql_type}) AS "{column}"')
+            exprs[column] = df[column].cast(target_type)
         else:
-            exprs.append(f'CAST(NULL AS {sql_type}) AS "{column}"')
-    return make_runtime_backend().sql(f"SELECT {', '.join(exprs)} FROM {view}")
+            exprs[column] = ibis.null().cast(target_type)
+    return df.select(**exprs)
 
 
 def _to_duckdb_sql_type(data_type) -> str:
@@ -901,19 +898,7 @@ def unpivot_dataframe(
     new_rows = _align_to_table_schema(new_rows, df)
 
     non_null_rows = filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL")
-    if _is_ibis_table(df):
-        left_view = create_temp_view(non_null_rows)
-        right_view = create_temp_view(new_rows)
-        columns = ", ".join(f'"{x}"' for x in df.columns)
-        unioned = make_runtime_backend().sql(
-            f"""
-            SELECT {columns} FROM {left_view}
-            UNION ALL
-            SELECT {columns} FROM {right_view}
-            """
-        )
-    else:
-        unioned = non_null_rows.union(new_rows)
+    unioned = ibis.union(non_null_rows, new_rows)
     return unioned.select(*ids, variable_column, VALUE_COLUMN)
 
 
@@ -928,18 +913,7 @@ def convert_types_if_necessary(df: ibis.Table) -> ibis.Table:
     if not columns_to_cast:
         return df
 
-    view = create_temp_view(df)
-    select_exprs = []
-    for column in df.columns:
-        quoted = handle_column_spaces(column)
-        if column in columns_to_cast:
-            select_exprs.append(f"CAST({quoted} AS VARCHAR) AS {column}")
-        else:
-            select_exprs.append(quoted)
-    query = f"SELECT {', '.join(select_exprs)} FROM {view}"
-    if _is_ibis_table(df):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+    return df.mutate(**{col: df[col].cast("string") for col in columns_to_cast})
 
 
 def merge_expected_associations_tables(

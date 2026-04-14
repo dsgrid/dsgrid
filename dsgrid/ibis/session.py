@@ -23,7 +23,13 @@ from dsgrid.exceptions import (
     DSGInvalidParameter,
 )
 from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import coalesce, create_temp_view, cross_join, make_temp_view_name
+from dsgrid.ibis.operations import (
+    coalesce,
+    create_temp_view,
+    cross_join,
+    handle_column_spaces,
+    make_temp_view_name,
+)
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.loggers import disable_console_logging
@@ -781,9 +787,8 @@ def check_for_nulls(df, exclude_columns=None):
     if not cols_to_check:
         return
     view = create_temp_view(df)
-    quote = '"'
-    cols_str = ", ".join(f"{quote}{x}{quote}" for x in cols_to_check)
-    filter_str = " OR ".join((f"{quote}{x}{quote} IS NULL" for x in cols_to_check))
+    cols_str = ", ".join(handle_column_spaces(x) for x in cols_to_check)
+    filter_str = " OR ".join(f"{handle_column_spaces(x)} IS NULL" for x in cols_to_check)
 
     try:
         # Avoid iterating with many checks unless we know there is at least one failure.
@@ -791,9 +796,9 @@ def check_for_nulls(df, exclude_columns=None):
         if not is_table_empty(nulls):
             cols_with_null = set()
             for col in cols_to_check:
+                quoted_col = handle_column_spaces(col)
                 col_nulls = sql(
-                    f"SELECT {quote}{col}{quote} FROM {view} "
-                    f"WHERE {quote}{col}{quote} IS NULL LIMIT 1"
+                    f"SELECT {quoted_col} FROM {view} " f"WHERE {quoted_col} IS NULL LIMIT 1"
                 )
                 if not is_table_empty(col_nulls):
                     cols_with_null.add(col)

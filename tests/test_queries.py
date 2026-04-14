@@ -115,6 +115,14 @@ def _filter(df, predicate):
     return filter_sql(df, predicate)
 
 
+def _sql_ident(column):
+    from dsgrid.ibis.backend import make_runtime_backend
+
+    if make_runtime_backend().name == "spark":
+        return "`" + column.replace("`", "``") + "`"
+    return '"' + column.replace('"', '""') + '"'
+
+
 def _sum_by_group(df, group_cols):
     if isinstance(df, ibis.Table):
         return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
@@ -496,13 +504,14 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     baseline_years_str = [str(x) for x in baseline_years]
     baseline_years_sql = ", ".join(f"'{x}'" for x in baseline_years_str)
     five_year_sum = get_value_sum(
-        _filter(five_year_df, f'"Five Year Intervals" IN ({baseline_years_sql})')
+        _filter(five_year_df, f"{_sql_ident('Five Year Intervals')} IN ({baseline_years_sql})")
     )
     assert math.isclose(five_year_sum, baseline_sum)
 
-    val1 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2020'"))
-    val2 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2030'"))
-    interpolated_val = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2025'"))
+    fy_ident = _sql_ident("Five Year Intervals")
+    val1 = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2020'"))
+    val2 = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2030'"))
+    interpolated_val = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2025'"))
     assert math.isclose(interpolated_val, val1 / 2 + val2 / 2)
 
 
@@ -1845,9 +1854,9 @@ class QueryTestUnitMapping(QueryTestBase):
             _filter(
                 df,
                 f"""
-                "ComStock Subsectors EFS" = '{subsector}'
-                AND "US Counties 2010 - ComStock Only" = '{expected_cooling.geography}'
-                AND "Model Years 2010 to 2050" = '2020'
+                {_sql_ident('ComStock Subsectors EFS')} = '{subsector}'
+                AND {_sql_ident('US Counties 2010 - ComStock Only')} = '{expected_cooling.geography}'
+                AND {_sql_ident('Model Years 2010 to 2050')} = '2020'
                 """,
             )
             .order_by("Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total")

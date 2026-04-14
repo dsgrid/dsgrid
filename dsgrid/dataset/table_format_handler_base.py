@@ -19,8 +19,8 @@ from dsgrid.utils.dataset import (
     map_stacked_dimension,
     remove_invalid_null_timestamps,
 )
-from dsgrid.ibis.operations import create_temp_view, drop_columns, join, rename_columns
-from dsgrid.ibis.session import get_runtime_session, persist_intermediate_query
+from dsgrid.ibis.operations import drop_columns, join, rename_columns
+from dsgrid.ibis.session import persist_intermediate_query
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 
@@ -112,17 +112,15 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
-            view = create_temp_view(df)
-            select_exprs = []
+            exprs = {}
             for col in df.columns:
                 if col == "fraction":
                     continue
-                quoted = handle_column_spaces(col)
                 if col in value_columns:
-                    select_exprs.append(f"{quoted} * fraction AS {handle_column_spaces(col)}")
+                    exprs[col] = df[col] * df["fraction"]
                 else:
-                    select_exprs.append(quoted)
-            df = get_runtime_session().sql(f"SELECT {', '.join(select_exprs)} FROM {view}")
+                    exprs[col] = df[col]
+            df = df.select(**exprs)
 
         return df
 

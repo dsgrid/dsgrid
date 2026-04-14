@@ -42,7 +42,8 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
-from dsgrid.ibis.operations import create_temp_view, drop_columns, filter_sql
+from dsgrid.ibis.functions import select_expr
+from dsgrid.ibis.operations import drop_columns, filter_sql
 from dsgrid.ibis.types import (
     DUCKDB_COLUMN_TYPES,
     SPARK_COLUMN_TYPES,
@@ -551,7 +552,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             f"     ELSE FALSE END "
             f"ELSE ABS(CAST({offset_col} AS DOUBLE)) > 24 END AS invalid_offset"
         )
-        check_df = _select_expr(df, [invalid_expr])
+        check_df = select_expr(df, [invalid_expr])
         if not is_table_empty(filter_sql(check_df, "invalid_offset")):
             msg = (
                 "Invalid UTC offset detected. Offsets must be 24 hours or less "
@@ -675,7 +676,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     ) -> ibis.Table:
         """Apply the timestamp transformation to the dataframe."""
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
-        return _select_expr(df, existing_cols + [timestamp_sql])
+        return select_expr(df, existing_cols + [timestamp_sql])
 
     def _update_config_for_timestamp(
         self,
@@ -1215,11 +1216,3 @@ class DatasetRegistryManager(RegistryManagerBase):
                 "Please report this error to the dsgrid team. The registry may need recovery."
             )
             raise
-
-
-def _select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = ",".join(exprs)
-        return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
-    return df.selectExpr(*exprs)

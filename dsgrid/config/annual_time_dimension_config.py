@@ -13,9 +13,8 @@ from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
-from dsgrid.ibis.operations import create_temp_view, filter_sql
+from dsgrid.ibis.operations import cross_join, filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
-from dsgrid.ibis.types import get_str_type, use_duckdb
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.ibis.session import (
     get_runtime_session,
@@ -161,7 +160,7 @@ def map_annual_time_to_date_time(
     # each value associated with an annual time represents the total over that year.
     with set_session_time_zone(dt_dim.model.time_zone_format.time_zone):
         years = table_column_to_list(
-            select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"]).distinct(),
+            dt_df.select(year=dt_df[time_col].year()).distinct(),
             "year",
         )
         if len(years) != 1:
@@ -175,40 +174,14 @@ def map_annual_time_to_date_time(
     df2 = cross_join(df, dt_df)
     frequency: timedelta = dt_dim.get_frequency()
     value_divisor = measured_duration / frequency
-    select_columns = []
+    exprs: dict[str, ibis.Expr] = {}
     for column in df2.columns:
         if column == annual_col:
             continue
         if column in value_columns:
-            select_columns.append(
-                f"{handle_column_spaces(column)} / {value_divisor} AS {handle_column_spaces(column)}"
-            )
+            exprs[column] = df2[column] / value_divisor
         else:
-            select_columns.append(handle_column_spaces(column))
+            exprs[column] = df2[column]
     if myear_column not in df.columns:
-        select_columns.append(
-            f"CAST({handle_column_spaces(annual_col)} AS {get_str_type()}) AS {handle_column_spaces(myear_column)}"
-        )
-    return select_expr(df2, select_columns)
-
-
-def cross_join(df1: ibis.Table, df2: ibis.Table) -> ibis.Table:
-    view1 = _create_temp_view(df1)
-    view2 = _create_temp_view(df2)
-    return get_runtime_session().sql(f"SELECT * from {view1} CROSS JOIN {view2}")
-
-
-def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
-    view = _create_temp_view(df)
-    cols = ",".join(exprs)
-    return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
-
-
-def handle_column_spaces(column: str) -> str:
-    if use_duckdb():
-        return f'"{column}"'
-    return f"`{column}`"
-
-
-def _create_temp_view(df: ibis.Table) -> str:
-    return create_temp_view(df)
+        exprs[myear_column] = df2[annual_col].cast("string")
+    return df2.select(**exprs)

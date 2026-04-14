@@ -211,16 +211,6 @@ def sql_from_df(df: ibis.Table, query: str) -> ibis.Table:
 
 
 def pivot(df: ibis.Table, name_column: str, value_column: str) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        query = f"""
-            SELECT * FROM (
-                PIVOT {view}
-                ON "{name_column}"
-                USING SUM({value_column})
-            )
-        """
-        return _sql_on_df(df, query)
     return df.pivot_wider(
         names_from=name_column,
         values_from=value_column,
@@ -229,17 +219,6 @@ def pivot(df: ibis.Table, name_column: str, value_column: str) -> ibis.Table:
 
 
 def unpivot(df: ibis.Table, pivoted_columns, name_column: str, value_column: str) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = ",".join([f'"{x}"' for x in pivoted_columns])
-        query = f"""
-            SELECT * FROM {view}
-            UNPIVOT INCLUDE NULLS (
-                "{value_column}"
-                FOR "{name_column}" in ({cols})
-            )
-        """
-        return _sql_on_df(df, query)
     return df.pivot_longer(pivoted_columns, names_to=name_column, values_to=value_column)
 
 

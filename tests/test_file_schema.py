@@ -466,22 +466,22 @@ def test_read_data_file_unsupported_type_raises(tmp_path):
 def test_read_data_file_missing_column_raises(tmp_path, spark):
     """Test that missing expected columns raises an error.
 
-    When schema specifies columns with data types that don't exist in the file,
-    DuckDB raises a BinderException before we reach the column validation.
+    DuckDB binds column types at read time and raises BinderException; Spark's
+    CSV reader silently drops schema fields not present in the file, so
+    dsgrid's own column validation raises DSGInvalidDataset instead.
     """
     import duckdb
 
     csv_file = tmp_path / "test.csv"
     csv_file.write_text("id,name\n1,a\n")
 
-    # Schema specifies all columns in file plus one that doesn't exist
     columns = [
         Column(name="id", data_type="INTEGER"),
         Column(name="name", data_type="STRING"),
         Column(name="missing_column", data_type="STRING"),
     ]
     schema = FileSchema(path=str(csv_file), columns=columns)
-    with pytest.raises(duckdb.BinderException, match="missing_column"):
+    with pytest.raises((duckdb.BinderException, DSGInvalidDataset), match="missing_column"):
         read_data_file(schema)
 
 

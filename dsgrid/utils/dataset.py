@@ -109,12 +109,8 @@ def _read_chronify_output(df: ibis.Table, output_file: Path) -> ibis.Table:
 
 
 def _with_literal_column(df: ibis.Table, column: str, value) -> ibis.Table:
-    view = create_temp_view(df)
-    literal = "NULL" if value is None else repr(value)
-    query = f"SELECT *, {literal} AS {handle_column_spaces(column)} FROM {view}"
-    if _is_ibis_table(df):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+    expr = ibis.null() if value is None else ibis.literal(value)
+    return df.mutate(**{column: expr})
 
 
 def _rename_column(df: ibis.Table, old: str, new: str) -> ibis.Table:

@@ -433,7 +433,13 @@ def _sorted_rows(df) -> list[Any]:
 
 def _collect(df):
     if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
+        pdf = df.execute()
+        for col in pdf.columns:
+            mask = pdf[col].isna()
+            if mask.any():
+                pdf[col] = pdf[col].astype(object)
+                pdf.loc[mask, col] = None
+        return list(pdf.itertuples(index=False, name="Row"))
     return df.collect()
 
 

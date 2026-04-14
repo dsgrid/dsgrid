@@ -371,6 +371,9 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
         for key, val in spark_conf.items():
             conf.set(key, val)
 
+    if conf.get("spark.sql.session.timeZone") is None:
+        conf.set("spark.sql.session.timeZone", "UTC")
+
     out_ts_type = conf.get("spark.sql.parquet.outputTimestampType")
     if out_ts_type is None:
         conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
@@ -387,6 +390,9 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
         conf.setMaster(cluster)
 
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
+
+    if spark.conf.get("spark.sql.session.timeZone") != conf.get("spark.sql.session.timeZone"):
+        spark.conf.set("spark.sql.session.timeZone", conf.get("spark.sql.session.timeZone"))
 
     with disable_console_logging():
         log_runtime_conf(spark)

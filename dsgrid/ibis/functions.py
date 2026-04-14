@@ -71,9 +71,6 @@ __all__ = [
 
 
 def aggregate(df: ibis.Table, agg_func: str, column: str, alias: str) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        return get_runtime_session().sql(f'SELECT {agg_func}("{column}") AS "{alias}" FROM {view}')
     value = getattr(df[column], agg_func)()
     return df.aggregate(**{alias: value})
 

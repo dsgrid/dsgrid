@@ -73,7 +73,7 @@ from dsgrid.registry.common import (
     RegistryManagerParams,
 )
 from dsgrid.ibis.functions import write_csv
-from dsgrid.ibis.operations import create_temp_view, except_all
+from dsgrid.ibis.operations import except_all
 from dsgrid.ibis.table_utils import get_unique_values, table_column_to_list
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.timing import track_timing, timer_stats_collector
@@ -81,7 +81,6 @@ from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import (
-    get_runtime_session,
     models_to_dataframe,
     persist_table,
     read_dataframe,
@@ -1202,10 +1201,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         f"has values of 1.0: {p_mapping.model.mapping_id} - {fraction_vals}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
-                records_view = create_temp_view(records)
-                reverse_records = get_runtime_session().sql(
-                    f"SELECT to_id AS from_id, from_id AS to_id FROM {records_view}"
-                )
+                reverse_records = records.select(from_id=records.to_id, to_id=records.from_id)
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
                 write_csv(reverse_records, dst, overwrite=True)
                 dimension_type = to_dim.model.dimension_type.value

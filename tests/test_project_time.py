@@ -337,7 +337,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 def check_exploded_tempo_time(project_time_dim, load_data):
     """
     - DF.show() (and probably all arithmetics) use spark.sql.session.timeZone
-    - DF.toPandas() likely goes through spark.sql.session.timeZone
+    - DF.to_pandas() likely goes through spark.sql.session.timeZone
     - DF.collect() converts timestamps to system time_zone (different from spark.sql.session.timeZone!)
     - hour(F.col(timestamp)) extracts hour from timestamp col as exactly shown in DF.show()
     - spark.sql.session.timeZone time that is consistent with system time seems to show time correctly
@@ -492,6 +492,10 @@ def _distinct_sum_count_by_group(df, groupby_cols):
 
 
 def _sql_ident(column):
+    from dsgrid.ibis.backend import make_runtime_backend
+
+    if make_runtime_backend().name == "spark":
+        return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'
 
 
@@ -505,50 +509,35 @@ def _sql_string(value):
 # here.
 
 
+def _tz_convert_sql(
+    df: ibis.Table, time_column: str, time_zone: str, new_column: str, spark_func: str
+) -> ibis.Table:
+    view = create_temp_view(df)
+    cols = df.columns[:]
+    if time_column == new_column:
+        cols.remove(time_column)
+    cols_str = ",".join(_sql_ident(c) for c in cols)
+    tc = _sql_ident(time_column)
+    nc = _sql_ident(new_column)
+    if use_duckdb():
+        expr = f"CAST(timezone('{time_zone}', {tc}) AS TIMESTAMPTZ)"
+    else:
+        expr = f"{spark_func}({tc}, '{time_zone}')"
+    return get_runtime_session().sql(f"SELECT {cols_str}, {expr} AS {nc} FROM {view}")
+
+
 def from_utc_timestamp(
     df: ibis.Table, time_column: str, time_zone: str, new_column: str
 ) -> ibis.Table:
     """Refer to pyspark.sql.functions.from_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_runtime_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
-    return df2
+    return _tz_convert_sql(df, time_column, time_zone, new_column, "from_utc_timestamp")
 
 
 def to_utc_timestamp(
     df: ibis.Table, time_column: str, time_zone: str, new_column: str
 ) -> ibis.Table:
     """Refer to pyspark.sql.functions.to_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_runtime_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
-    return df2
+    return _tz_convert_sql(df, time_column, time_zone, new_column, "to_utc_timestamp")
 
 
 def make_date_time_df(

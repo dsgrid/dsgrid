@@ -10,6 +10,7 @@ from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import write_csv
 
 from dsgrid.ibis.session import models_to_dataframe
+from dsgrid.ibis.temp import TEMP_TABLE_PREFIX
 
 
 logger = logging.getLogger(__name__)
@@ -122,8 +123,11 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
         """Return the records in an Ibis table. Cached on first call."""
         # id provides uniqueness and the config_id could help inspect what's in cache in case we
         # ever need that.
+        # Prefix with the dsgrid temp-view prefix so this cached view is cleared together with
+        # the underlying tmp views it references (see drop_temp_tables_and_views); otherwise the
+        # outer view becomes a dangling reference once its underlying temp view is dropped.
         # Spark doesn't allow dashes in the table name.
-        table_name = f"{self.config_id}__{id(self)}".replace("-", "_")
+        table_name = f"{TEMP_TABLE_PREFIX}_cached__{self.config_id}__{id(self)}".replace("-", "_")
         df = models_to_dataframe(self.model.records, table_name=table_name)
         logger.debug("Loaded %s records dataframe", self.config_id)
         return df

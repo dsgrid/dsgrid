@@ -385,6 +385,9 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
         )
     conf.set("spark.sql.legacy.parquet.nanosAsLong", "true")
 
+    if cluster is None:
+        _apply_local_mode_defaults(conf)
+
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
@@ -399,6 +402,36 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
         logger.info("Custom configuration settings: %s", spark_conf)
 
     return spark
+
+
+def _apply_local_mode_defaults(conf: Any) -> None:
+    """Apply sensible defaults for Spark running in local mode.
+
+    Spark's out-of-the-box ``spark.sql.shuffle.partitions=200`` is catastrophic for small
+    local jobs. Worse, dsgrid's plans cascade several joins/aggregations, and observed
+    task counts grow roughly as ``spark.default.parallelism ** (stage depth)`` — on a
+    12-core machine we have seen a single stage produce 248 832 tasks whose per-task
+    overhead dwarfs the real work. A very small default bounds the damage.
+
+    Values already set on ``conf`` by the caller (via ``spark_conf=``) are preserved.
+    If ``SPARK_CONF_DIR`` is set we skip entirely and defer to the user's
+    ``spark-defaults.conf`` — ``SparkConf()`` does not pre-load that file, so we cannot
+    detect per-key overrides from it and fall back to "user is in charge".
+
+    Callers with heavier workloads should override via ``SPARK_CONF_DIR`` /
+    ``spark-defaults.conf`` or the ``spark_conf=`` kwarg.
+    """
+    if os.environ.get("SPARK_CONF_DIR"):
+        return
+    defaults = {
+        "spark.sql.shuffle.partitions": "4",
+        "spark.default.parallelism": "4",
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true",
+    }
+    for key, val in defaults.items():
+        if conf.get(key) is None:
+            conf.set(key, val)
 
 
 def log_runtime_conf(spark: Any):

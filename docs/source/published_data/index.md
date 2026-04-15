@@ -4,6 +4,7 @@ This section provides information about dsgrid datasets that have been published
 
 - **[Published Datasets](published_datasets.md)** - Browse the catalog of published dsgrid datasets, with links to detailed documentation and access information.
 - **[Working with Published Data](working_with_published_data/index.md)** - Tutorials and guides for accessing and analyzing dsgrid data
+- **[How to Cite](../citation.md)** - Citation formats for dsgrid software, datasets, and publications
 
 ```{toctree}
 :maxdepth: 2

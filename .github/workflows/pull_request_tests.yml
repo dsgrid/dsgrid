@@ -65,13 +65,19 @@ jobs:
         fail_ci_if_error: false
         verbose: true
 
-  tests-spark-smoke:
+  tests-spark:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v6
       with:
         submodules: true
+
+    - name: Set up Java 21
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "21"
 
     - name: Set up Python 3.13
       uses: actions/setup-python@v6
@@ -86,11 +92,10 @@ jobs:
         pip install maturin
         pip install -e '.[dev,spark]'
 
-    - name: Run Spark smoke tests
+    - name: Run tests
       run: |
         source .venv/bin/activate
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_ibis_session.py tests/test_ibis_functions.py tests/test_localize_timestamps_if_necessary.py
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_file_schema.py -k "read_data_file_csv or read_data_file_parquet"
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0

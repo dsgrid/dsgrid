@@ -37,10 +37,11 @@ from dsgrid.ibis.session import (
     BooleanType,
     ByteType,
     DoubleType,
-    F,
+    get_current_time_zone,
     get_runtime_session,
     persist_table,
     read_dataframe,
+    set_current_time_zone,
     StringType,
     StructType,
     StructField,
@@ -136,10 +137,7 @@ def test_time_mapping(
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
     df = one_weekday_day_and_one_weekend_day_per_month_by_hour_table
     # This dataset has only California counties.
-    if use_duckdb():
-        df = df.mutate(time_zone=ibis.literal("America/Los_Angeles"))
-    else:
-        df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
+    df = df.mutate(time_zone=ibis.literal("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
     if use_duckdb():
@@ -164,25 +162,34 @@ def test_time_mapping(
         )
     zi = ZoneInfo("Etc/GMT+5")
     if use_duckdb():
-        timestamps = mapped_df.select("timestamp").distinct().order_by("timestamp").execute()
-        est_timestamps = [x.astimezone(zi) for x in timestamps["timestamp"]]
+        ts_series = (
+            mapped_df.select("timestamp").distinct().order_by("timestamp").execute()["timestamp"]
+        )
+        est_timestamps = [x.astimezone(zi) for x in ts_series]
     else:
-        timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
-        est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]
+        # Under Spark, the session time zone is set to America/Los_Angeles, which would
+        # cause naive Timestamps read from the UTC-stored parquet to be mis-interpreted.
+        # Temporarily read under UTC so the naive Timestamps reflect UTC wall-clock.
+        orig_tz = get_current_time_zone()
+        set_current_time_zone("UTC")
+        try:
+            ts_series = (
+                mapped_df.select("timestamp")
+                .distinct()
+                .order_by("timestamp")
+                .execute()["timestamp"]
+            )
+        finally:
+            set_current_time_zone(orig_tz)
+        est_timestamps = [x.tz_localize("UTC").astimezone(zi) for x in ts_series]
     start = datetime(year=2018, month=1, day=1, tzinfo=zi)
     resolution = timedelta(hours=1)
     expected_timestamps = [start + i * resolution for i in range(8760)]
     assert est_timestamps == expected_timestamps
-    if use_duckdb():
-        assert is_dataframe_empty(mapped_df.filter(mapped_df[VALUE_COLUMN].isnull()))
-    else:
-        assert is_dataframe_empty(mapped_df.filter(f"{VALUE_COLUMN} IS NULL"))
+    assert is_dataframe_empty(mapped_df.filter(mapped_df[VALUE_COLUMN].isnull()))
 
     max_value = aggregate_single_value(df.select(VALUE_COLUMN), "max", VALUE_COLUMN)
-    if use_duckdb():
-        max_row = df.filter(df[VALUE_COLUMN] == max_value).limit(1).execute().iloc[0]
-    else:
-        max_row = df.filter(f"value == {max_value}").collect()[0]
+    max_row = df.filter(df[VALUE_COLUMN] == max_value).limit(1).execute().iloc[0]
     # Expected max is determined by manually inspecting the file.
     expected_max = 0.9995036580360138
     assert math.isclose(max_value, expected_max)
@@ -200,15 +207,12 @@ def test_time_mapping(
     assert max_row.geography == expected_geo
     assert max_row.model_year == expected_model_year
     assert max_row.scenario == expected_scenario
+    mapped_df_at_max = mapped_df.filter(mapped_df[VALUE_COLUMN] == max_value)
+    view = create_temp_view(mapped_df)
     if use_duckdb():
-        mapped_df_at_max = mapped_df.filter(mapped_df[VALUE_COLUMN] == max_value)
-        view = create_temp_view(mapped_df)
         func = "ISODOW"
         saturday = 6
     else:
-        mapped_df_at_max = mapped_df.filter(f"value == {max_value}")
-        view = "tmp_view"
-        mapped_df.createOrReplaceTempView(view)
         func = "WEEKDAY"
         saturday = 5
 
@@ -226,23 +230,11 @@ def test_time_mapping(
     """
     spark = get_runtime_session()
     filtered_mapped_df = spark.sql(query)
-    if use_duckdb():
-        assert mapped_df_at_max.count().execute() == num_weekdays_in_march_2018
-        assert filtered_mapped_df.count().execute() == num_weekdays_in_march_2018
-        distinct_values = filtered_mapped_df.select("value").distinct().execute()
-        assert len(distinct_values) == 1
-        assert math.isclose(distinct_values["value"].iloc[0], expected_max)
-        left = mapped_df_at_max.order_by("timestamp").execute().reset_index(drop=True)
-        right = filtered_mapped_df.order_by("timestamp").execute().reset_index(drop=True)
-        assert left.equals(right)
-    else:
-        assert mapped_df_at_max.count() == num_weekdays_in_march_2018
-        assert filtered_mapped_df.count() == num_weekdays_in_march_2018
-        assert filtered_mapped_df.select("value").distinct().count() == 1
-        assert math.isclose(
-            filtered_mapped_df.select("value").distinct().collect()[0]["value"], expected_max
-        )
-        assert (
-            mapped_df_at_max.sort("timestamp").collect()
-            == filtered_mapped_df.sort("timestamp").collect()
-        )
+    assert mapped_df_at_max.count().execute() == num_weekdays_in_march_2018
+    assert filtered_mapped_df.count().execute() == num_weekdays_in_march_2018
+    distinct_values = filtered_mapped_df.select("value").distinct().execute()
+    assert len(distinct_values) == 1
+    assert math.isclose(distinct_values["value"].iloc[0], expected_max)
+    left = mapped_df_at_max.order_by("timestamp").execute().reset_index(drop=True)
+    right = filtered_mapped_df.order_by("timestamp").execute().reset_index(drop=True)
+    assert left.equals(right)

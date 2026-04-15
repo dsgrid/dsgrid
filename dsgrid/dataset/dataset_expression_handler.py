@@ -5,7 +5,7 @@ import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import create_temp_view
+from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.utils.py_expression_eval import Parser
 from dsgrid.ibis.session import get_runtime_session
 
@@ -82,11 +82,15 @@ def evaluate_expression(expr: str, dataset_mapping: dict[str, DatasetExpressionH
 def join_multiple_columns(df1: ibis.Table, df2: ibis.Table, columns: list[str], how="inner"):
     view1 = _create_temp_view(df1)
     view2 = _create_temp_view(df2)
-    view2_columns = ",".join((f'{view2}."{x}"' for x in df2.columns if x not in df1.columns))
+    view2_columns = ",".join(
+        (f"{view2}.{handle_column_spaces(x)}" for x in df2.columns if x not in df1.columns)
+    )
     select_columns = f"{view1}.*"
     if view2_columns:
         select_columns += f", {view2_columns}"
-    on_str = " AND ".join((f'{view1}."{x}" = {view2}."{x}"' for x in columns))
+    on_str = " AND ".join(
+        (f"{view1}.{handle_column_spaces(x)} = {view2}.{handle_column_spaces(x)}" for x in columns)
+    )
     query = f"""
         SELECT {select_columns}
         FROM {view1}
@@ -113,11 +117,17 @@ def _apply_op_with_sql(
     value_column_set = set(value_columns)
     select_columns = []
     for column in df1.columns:
+        quoted = handle_column_spaces(column)
         if column in value_column_set:
-            select_columns.append(f'{view1}."{column}" {op_str} {view2}."{column}" AS "{column}"')
+            select_columns.append(f"{view1}.{quoted} {op_str} {view2}.{quoted} AS {quoted}")
         else:
-            select_columns.append(f'{view1}."{column}"')
-    on_str = " AND ".join((f'{view1}."{x}" = {view2}."{x}"' for x in dimension_columns))
+            select_columns.append(f"{view1}.{quoted}")
+    on_str = " AND ".join(
+        (
+            f"{view1}.{handle_column_spaces(x)} = {view2}.{handle_column_spaces(x)}"
+            for x in dimension_columns
+        )
+    )
     query = f"""
         SELECT {", ".join(select_columns)}
         FROM {view1}

@@ -336,6 +336,9 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         lookup2 = coalesce(lookup, 1)
         store.replace_lookup_table(lookup2, self.dataset_id, self._config.model.version)
+        # Re-read the lookup after the replace so that subsequent operations do not reference
+        # the previous on-disk part files, which have been deleted.
+        lookup2 = store.read_lookup_table(self.dataset_id, self._config.model.version)
         load_df = join_multiple_columns(load_df, lookup2.select("id").distinct(), ["id"])
         ld_columns = set(load_df.columns)
         for dim in dimensions:

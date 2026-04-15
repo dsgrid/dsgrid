@@ -97,12 +97,13 @@ def geo_dataframe(spark) -> Generator[ibis.Table, None, None]:
 
 @pytest.fixture(scope="module")
 def time_dataframe(spark) -> Generator[ibis.Table, None, None]:
+    utc = ZoneInfo("UTC")
     df = spark.createDataFrame(
         [
-            (datetime(2020, 1, 1, 0), "cooling", 1.0),
-            (datetime(2020, 1, 1, 0), "heating", 2.0),
-            (datetime(2020, 1, 1, 1), "cooling", 3.0),
-            (datetime(2020, 1, 1, 1), "heating", 4.0),
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "cooling", 1.0),
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "heating", 2.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "cooling", 3.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "heating", 4.0),
         ],
         ["timestamp", "metric", "value"],
     )
@@ -178,7 +179,9 @@ def test_interval(time_dataframe):
             )
         )
     ]
-    assert res == [datetime(2020, 1, 1, 1), datetime(2020, 1, 1, 2)]
+    utc = ZoneInfo("UTC")
+    actual = [x.replace(tzinfo=utc) if x.tzinfo is None else x.astimezone(utc) for x in res]
+    assert actual == [datetime(2020, 1, 1, 1, tzinfo=utc), datetime(2020, 1, 1, 2, tzinfo=utc)]
 
 
 def test_join(spark, dataframe):

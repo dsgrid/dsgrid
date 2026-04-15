@@ -101,8 +101,6 @@ def perform_interval_op(
     cols_str = ",".join([handle_column_spaces(x) for x in cols])
     time_col = handle_column_spaces(time_column)
     expr = f"{time_col} {op} INTERVAL {val} {unit}"
-    if not use_duckdb():
-        expr = f"from_utc_timestamp({expr}, '{_get_local_time_zone_name()}')"
     query = f"SELECT {expr} AS {alias}, {cols_str} from {view}"
     return get_runtime_session().sql(query)
 

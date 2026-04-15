@@ -32,6 +32,7 @@ from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
 from dsgrid.ibis.session import (
     F,
     FloatType,
+    create_dataframe_from_pandas,
     get_runtime_session,
     StructField,
     StructType,
@@ -269,8 +270,10 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
                 time_df = time_df.union(local_time_df)
             idx += 1
         assert isinstance(time_df, ibis.Table | ibis.Table)
+        # Materialize now, while the session time zone is UTC, so that hour/day/month
+        # values extracted from local_time are not recomputed under the original session
+        # time zone after the finally block restores it.
         if use_duckdb():
-            # DuckDB does not persist the hour value unless we create a table.
             view = create_temp_view(time_df)
             table = make_temp_view_name()
             spark = get_runtime_session()
@@ -278,6 +281,9 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
                 f"CREATE TABLE {table} AS SELECT * FROM {view}"
             )
             time_df = spark.sql(f"SELECT * FROM {table}")
+        else:
+            time_df_pdf = _to_pandas(time_df)
+            time_df = create_dataframe_from_pandas(time_df_pdf)
     finally:
         # reset session time_zone
         set_current_time_zone(session_tz_orig)

@@ -30,9 +30,9 @@ Registers the dataset as a standalone entity in the registry. Validates internal
 
 Submits the registered dataset to a specific project. Dimension mappings are usually required to align dataset dimensions with project base dimensions. Validates that dimension mappings are consistent and that the dataset provides all expected data points.
 
-6. **Review project requirements** — Check what dimensions and data points the project expects from your dataset. Browse the project's repository of config files or use [How to Browse the Registry](../user_guide/how_tos/browse_registry) to inspect the project's base dimensions.
-7. **Create dimension mappings** — Map dataset dimensions to project base dimensions.
-8. **Submit your dataset to the project** — Run `dsgrid registry projects submit-dataset` (or use `register-and-submit-dataset` for a combined operation). Follow the [Dataset Submission Process](../user_guide/dataset_submittal/submission_process) for details.
+6. **Review project requirements** — Check what dimensions and data points the project expects from your dataset. The project config's `required_dimensions` entry for your dataset controls which dimension records and combinations you must provide. Use [How to Browse the Registry](../user_guide/how_tos/browse_registry) to inspect the project's base dimensions, or dump the project config with `dsgrid registry projects dump`. See [Understanding Project Requirements](../user_guide/dataset_submittal/submission_process.md#understanding-project-requirements) for details on reading the requirements.
+7. **Create dimension mappings** — For each dimension type where your dataset's dimension differs from the project's base dimension, create a dimension mapping. Follow [How to Create Dimension Mappings](../user_guide/how_tos/how_to_dimension_mappings) for the step-by-step process and see [Dimension Mapping Concepts](../user_guide/dataset_mapping/dimension_mapping_concepts) for config structure and CSV format. If a dataset dimension is identical to the project's base dimension (same registered dimension), no mapping is needed for that type.
+8. **Submit your dataset to the project** — Run `dsgrid registry projects submit-dataset` (or use `register-and-submit-dataset` for a combined operation). dsgrid will register any new mappings, identify the target base dimensions, and validate that the mapped dataset covers all required dimension combinations. See the [Submission Process](../user_guide/dataset_submittal/submission_process) for command options and mapping file formats, and [Submission Checks](../user_guide/dataset_submittal/submission_checks) for details on the validation checks and troubleshooting.
 
 ## When You Need Apache Spark
 
@@ -55,6 +55,7 @@ Small datasets can be registered using the default DuckDB backend. If your datas
 - [How to Create Dataset Dimensions](../user_guide/how_tos/how_to_dimensions)
 - [How to Define a Time Dimension](../user_guide/how_tos/how_to_time_dimension)
 - [How to Handle Dimension Associations](../user_guide/how_tos/how_to_dimension_associations)
+- [How to Create Dimension Mappings](../user_guide/how_tos/how_to_dimension_mappings)
 
 ### Tutorials
 
@@ -68,3 +69,11 @@ Small datasets can be registered using the default DuckDB backend. If your datas
 - [Dimensions Data Model](../software_reference/data_models/dimension_model)
 - [Dimension Record Classes](../software_reference/data_models/dimension_classes)
 - [Dimension Mappings Data Model](../software_reference/data_models/dimension_mapping_model)
+- [Project Config Data Model](../software_reference/data_models/project_model)
+
+### Submission
+
+- [Submission Process](../user_guide/dataset_submittal/submission_process)
+- [Submission Checks](../user_guide/dataset_submittal/submission_checks)
+- [Dimension Mapping Concepts](../user_guide/dataset_mapping/dimension_mapping_concepts)
+- [Dimension Mapping Types](../user_guide/dataset_mapping/dimension_mapping_types)

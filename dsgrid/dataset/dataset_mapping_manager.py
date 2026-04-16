@@ -35,9 +35,10 @@ class DatasetMappingManager:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args, **kwargs) -> None:
-        # Don't cleanup if an exception occurred.
-        self.cleanup()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is None:
+            self.cleanup()
+        # else don't cleanup if an exception occurred.
 
     @property
     def plan(self) -> DatasetMappingPlan:

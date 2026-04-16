@@ -214,6 +214,45 @@ def test_map_annual_time_total_to_datetime(
     assert count_timestamps_per_model_year[0].count_timestamps == num_timestamps
 
 
+def test_map_annual_time_total_to_datetime_with_existing_model_year(
+    annual_time_dimension, date_time_dimension
+):
+    """Verify map_annual_time_to_date_time preserves a model_year column when it is
+    already present on the input table (the branch where a new model_year is NOT added)."""
+    annual_time_dimension.model.measurement_type = MeasurementType.TOTAL
+    data = [
+        {
+            "time_year": 2019,
+            "model_year": "2030",
+            "geography": "CO",
+            "electricity_sales": 602872.1,
+        },
+        {
+            "time_year": 2020,
+            "model_year": "2031",
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+    ]
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+    value_columns = {"electricity_sales"}
+    out = map_annual_time_to_date_time(
+        df, annual_time_dimension, date_time_dimension, value_columns
+    )
+    # The pre-existing model_year values must be preserved (not overwritten by the annual
+    # time year cast). Each input row expands to (24 * 7) timestamps.
+    assert "model_year" in out.columns
+    assert "time_year" not in out.columns
+    pairs = _collect(out.select("model_year", "electricity_sales").distinct())
+    by_model_year = {row.model_year: row.electricity_sales for row in pairs}
+    assert set(by_model_year) == {"2030", "2031"}
+    expected_divisor = 366 * 24  # leap day enabled in this fixture
+    assert by_model_year["2030"] == pytest.approx(602872.1 / expected_divisor)
+    assert by_model_year["2031"] == pytest.approx(702872.1 / expected_divisor)
+
+
 def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):
     df, time_col, model_year_col = annual_dataframe_with_model_year_valid
     check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)

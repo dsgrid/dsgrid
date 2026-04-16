@@ -164,7 +164,7 @@ def map_annual_time_to_date_time(
             "year",
         )
         if len(years) != 1:
-            msg = "DateTime dimension has more than one year: {years=}"
+            msg = f"DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)
         if annual_dim.model.include_leap_day and is_leap_year(years[0]):
             measured_duration = timedelta(days=366)

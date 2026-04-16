@@ -5,7 +5,7 @@ from typing import Self
 
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.ibis.operations import coalesce
+from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.session import read_dataframe, write_dataframe, write_dataframe_and_auto_partition
 
 

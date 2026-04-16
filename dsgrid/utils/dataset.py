@@ -33,7 +33,6 @@ from dsgrid.exceptions import (
 from dsgrid.ibis.backend import create_chronify_store, make_runtime_backend, read_parquet_expr
 from dsgrid.ibis.io import read_parquet
 from dsgrid.ibis.operations import (
-    coalesce,
     count_distinct_on_group_by,
     create_temp_view,
     cross_join,
@@ -46,6 +45,7 @@ from dsgrid.ibis.operations import (
     rename_columns,
     unpivot,
 )
+from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import table_to_records
 from dsgrid.ibis.types import is_table_empty, use_duckdb
@@ -280,10 +280,7 @@ def _apply_scaling_factor_sql(
             ) AS {value_column}
         FROM {view}
     """
-    if _is_ibis_table(df):
-        return make_runtime_backend().sql(query)
-    spark = get_runtime_session()
-    return spark.sql(query)
+    return make_runtime_backend().sql(query)
 
 
 def check_historical_annual_time_model_year_consistency(
@@ -553,7 +550,7 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     try:
         dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
-            None,
+            time_zone_column,
         )
         return _get_chronify_result(store, dst_schema, df)
     finally:
@@ -683,7 +680,7 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     store.localize_time_zone_by_column(
         src_schema.name,
-        time_zone_column=None,
+        time_zone_column=time_zone_column,
         output_file=output_file,
     )
     return _read_chronify_output(df, output_file)
@@ -1057,7 +1054,6 @@ def filter_out_expected_missing_associations(
 ) -> ibis.Table:
     """Filter out rows that are expected to be missing from the main dataframe."""
     missing_columns = [DimensionType.from_column(x).value for x in missing_df.columns]
-    spark = get_runtime_session()
     main_view = create_temp_view(main_df)
     assoc_view = create_temp_view(missing_df)
     main_columns = ",".join((f"{main_view}.{x}" for x in main_df.columns))
@@ -1068,8 +1064,7 @@ def filter_out_expected_missing_associations(
         ANTI JOIN {assoc_view}
         ON {join_str}
     """
-    res = spark.sql(query)
-    return res
+    return make_runtime_backend().sql(query)
 
 
 def split_expected_missing_rows(

@@ -48,9 +48,7 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
-    create_temp_view,
     drop_columns,
     except_all,
     join,
@@ -79,7 +77,6 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import (
     check_for_nulls,
     create_dataframe_from_product,
-    get_runtime_session,
     persist_table,
     read_dataframe,
     write_dataframe,
@@ -1028,23 +1025,9 @@ def _count_distinct_column(df: ibis.Table, column: str) -> int:
 
 
 def _count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:
-    view = create_temp_view(df)
     if not columns:
-        query = f"SELECT COUNT(*) AS count FROM {view}"
-        if isinstance(df, ibis.Table):
-            return make_runtime_backend().sql(query)
-        return get_runtime_session().sql(query)
-
-    cols = ", ".join(columns)
-    group_by = cols
-    query = f"""
-        SELECT {cols}, COUNT(*) AS count
-        FROM {view}
-        GROUP BY {group_by}
-    """
-    if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+        return df.aggregate(count=df.count())
+    return df.group_by(*columns).aggregate(count=df.count())
 
 
 def _unpersist(df: ibis.Table) -> None:
@@ -1056,13 +1039,7 @@ def _apply_fraction_sql(
     group_by_columns: list[str],
     value_columns: list[str],
 ) -> ibis.Table:
-    view = create_temp_view(df)
-    group_cols = ", ".join(group_by_columns)
-    value_exprs = ", ".join(f"SUM({x} * fraction) AS {x}" for x in value_columns)
-    select_exprs = ", ".join(x for x in (group_cols, value_exprs) if x)
-    query = f"SELECT {select_exprs} FROM {view}"
-    if group_cols:
-        query += f" GROUP BY {group_cols}"
-    if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+    aggs = {col: (df[col] * df["fraction"]).sum() for col in value_columns}
+    if group_by_columns:
+        return df.group_by(*group_by_columns).aggregate(**aggs)
+    return df.aggregate(**aggs)

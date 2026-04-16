@@ -24,12 +24,12 @@ from dsgrid.exceptions import (
 )
 from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
-    coalesce,
     create_temp_view,
     cross_join,
     handle_column_spaces,
     make_temp_view_name,
 )
+from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.loggers import disable_console_logging
@@ -342,12 +342,12 @@ def set_current_time_zone(time_zone: str) -> None:
     """Set the current time zone."""
     session = get_runtime_session()
     if use_duckdb():
+        escaped = time_zone.replace("'", "''")
         if isinstance(session, _DuckDBRuntimeSession):
-            escaped = time_zone.replace("'", "''")
             conn = cast(Any, make_runtime_backend().connection)
             conn.raw_sql(f"SET TimeZone='{escaped}'")
         else:
-            session.sql(f"SET TimeZone='{time_zone}'")
+            session.sql(f"SET TimeZone='{escaped}'")
         return
 
     session.conf.set("spark.sql.session.timeZone", time_zone)
@@ -649,7 +649,8 @@ def _read_with_runtime(filename):
     elif suffix == ".json":
         df = read_json(filename)
     else:
-        assert False, f"Unsupported file extension: {filename}"
+        msg = f"Unsupported file extension: {filename}"
+        raise NotImplementedError(msg)
     return df
 
 

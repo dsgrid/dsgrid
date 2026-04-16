@@ -269,7 +269,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             else:
                 time_df = time_df.union(local_time_df)
             idx += 1
-        assert isinstance(time_df, ibis.Table | ibis.Table)
+        assert isinstance(time_df, ibis.Table)
         # Materialize now, while the session time zone is UTC, so that hour/day/month
         # values extracted from local_time are not recomputed under the original session
         # time zone after the finally block restores it.

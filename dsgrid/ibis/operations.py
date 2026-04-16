@@ -1,3 +1,4 @@
+import logging
 from typing import Any, cast
 from tempfile import NamedTemporaryFile
 
@@ -6,6 +7,8 @@ import ibis
 from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.types import use_duckdb
+
+logger = logging.getLogger(__name__)
 
 
 def create_temp_view(df: ibis.Table) -> str:
@@ -36,6 +39,12 @@ def create_temp_view(df: ibis.Table) -> str:
         pass
     tmp_file = NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp_file.close()
+    logger.warning(
+        "create_temp_view fell back to parquet round-trip via %s; this materializes the "
+        "full table to disk and may indicate a cross-backend reference that should be "
+        "registered into the runtime backend earlier.",
+        tmp_file.name,
+    )
     df.to_parquet(tmp_file.name)
     escaped_path = tmp_file.name.replace("'", "''")
     conn.raw_sql(f"DROP TABLE IF EXISTS {view}")
@@ -47,24 +56,6 @@ def create_temp_view(df: ibis.Table) -> str:
 def cross_join(df1: ibis.Table, df2: ibis.Table) -> ibis.Table:
     df1, df2 = _ensure_same_backend(df1, df2)
     return df1.cross_join(df2)
-
-
-def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
-    """Reduce the number of output partitions.
-
-    On DuckDB this is a no-op (single-file output by default). On Spark it
-    coalesces the underlying PySpark DataFrame and re-registers it as an
-    Ibis table so downstream writers produce `num_partitions` files.
-    """
-    if use_duckdb():
-        return df
-    view = create_temp_view(df)
-    backend = cast(Any, make_runtime_backend())
-    spark_df = backend.connection._session.sql(f"SELECT * FROM {view}")
-    coalesced = spark_df.coalesce(num_partitions)
-    coalesced_view = make_temp_view_name()
-    coalesced.createOrReplaceTempView(coalesced_view)
-    return backend.connection.table(coalesced_view)
 
 
 def filter_sql(df: ibis.Table, predicate: str) -> ibis.Table:

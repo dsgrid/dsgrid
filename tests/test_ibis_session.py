@@ -340,7 +340,7 @@ def test_read_dataframe_and_write_error_paths(tmp_path):
 
     unsupported = tmp_path / "table.txt"
     unsupported.write_text("a\n1\n")
-    with pytest.raises(AssertionError, match="Unsupported file extension"):
+    with pytest.raises(NotImplementedError, match="Unsupported file extension"):
         read_dataframe(unsupported)
 
     table = get_runtime_session().createDataFrame([(1,)], ["a"])

@@ -5,7 +5,6 @@ from dsgrid.dataset.dataset_expression_handler import (
     DatasetExpressionHandler,
     evaluate_expression,
     join_multiple_columns,
-    _operator_to_sql,
 )
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import cache
@@ -178,8 +177,3 @@ def test_join_multiple_columns_direct():
     assert rows[1].county == "Jefferson"
     assert rows[1].elec_cooling == 2
     assert rows[1].elec_heating == 4
-
-
-def test_operator_to_sql_invalid():
-    with pytest.raises(NotImplementedError, match="Unsupported operator"):
-        _operator_to_sql(max)

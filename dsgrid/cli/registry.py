@@ -736,7 +736,7 @@ $ dsgrid registry projects submit-dataset \\ \n
     type=click.Path(exists=True),
     show_default=True,
     help="Dimension mapping file. Must match the data model defined by "
-    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingsconfig",
     callback=path_callback,
 )
 @click.option(
@@ -744,9 +744,9 @@ $ dsgrid registry projects submit-dataset \\ \n
     "--dimension-mapping-references-file",
     type=click.Path(exists=True),
     show_default=True,
-    help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
-    "Use it when the mappings are already registered. Must mach the data model defined by "
-    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
+    help="Dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    "Use it when the mappings are already registered. Must match the data model defined by "
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingreferencelistmodel",
     callback=path_callback,
 )
 @click.option(
@@ -821,7 +821,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "--dimension-mapping-file",
     type=click.Path(exists=True),
     help="Dimension mapping file. Must match the data model defined by "
-    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingsconfig",
     callback=path_callback,
 )
 @click.option(
@@ -829,9 +829,9 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "--dimension-mapping-references-file",
     type=click.Path(exists=True),
     show_default=True,
-    help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
-    "Use it when the mappings are already registered. Must mach the data model defined by "
-    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
+    help="Dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    "Use it when the mappings are already registered. Must match the data model defined by "
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingreferencelistmodel",
     callback=path_callback,
 )
 @click.option(

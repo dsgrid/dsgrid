@@ -323,4 +323,4 @@ spark-submit --master=spark://<master_hostname>:7077 $(which dsgrid-cli.py) regi
 
 - Learn how to [map a dataset](map_dataset) to project dimensions
 - Explore [querying project data](query_project)
-- Understand [dimension mapping concepts](../dataset_mapping/concepts)
+- Understand [dimension mapping concepts](../dataset_mapping/dimension_mapping_concepts)

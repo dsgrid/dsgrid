@@ -1,25 +1,15 @@
 # Dataset Mapping
 
-Learn how to map datasets between different dimension systems.
+Dimension mappings transform data between different dimensional representations,
+enabling datasets with different schemes to be integrated or aggregated. This
+section covers the concepts, mapping types, and the dataset query workflow.
 
-## Core Concepts
-
-Understand how dimension mappings enable integration of diverse datasets into unified projects.
+For a guided introduction, see [Getting Started: Dataset Mappers](../../getting_started/dataset_mappers).
 
 ```{toctree}
 :maxdepth: 1
 
-concepts
-dimension_mappings
-mapping_types
-mapping_workflows
+dimension_mapping_concepts
+dimension_mapping_types
+dataset_query_concepts
 ```
-
-## Tutorials
-
-- [Map a Dataset](../tutorials/map_dataset)
-
-
-:::{note}
-See also: [Dimension Mapping Data Models](../../software_reference/data_models/dimension_mapping_model)
-:::

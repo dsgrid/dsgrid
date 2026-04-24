@@ -46,6 +46,18 @@ MODELS = [
         "source/software_reference/data_models/project_model.md",
         [],
     ),
+    (
+        "Dataset Query",
+        "dsgrid.query.models.DatasetQueryModel",
+        "source/software_reference/data_models/dataset_query_model.md",
+        [],
+    ),
+    (
+        "Project Query",
+        "dsgrid.query.models.ProjectQueryModel",
+        "source/software_reference/data_models/project_query_model.md",
+        [],
+    ),
 ]
 
 

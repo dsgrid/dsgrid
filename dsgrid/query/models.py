@@ -490,11 +490,13 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
     replace_ids_with_names: bool = Field(
-        description="Replace dimension record IDs with their names in result tables.",
+        description="Replace dimension record IDs with their names in result tables. "
+        "Project queries only; not supported in dataset queries.",
         default=False,
     )
     aggregations: list[AggregationModel] = Field(
-        description="Defines how to aggregate dimensions",
+        description="Defines how to aggregate dimensions. "
+        "Project queries only; dataset queries achieve aggregation through mappings to to_dimensions.",
         default=[],
     )
     aggregate_each_dataset: bool = Field(
@@ -504,16 +506,20 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         "the default behavior of performing one aggregation on the overall dataset. WARNING: "
         "For a standard query that performs a union of datasets, setting this value to True could "
         "produce rows with duplicate dimension combinations, especially if one or more "
-        "dimensions are also dropped.",
+        "dimensions are also dropped. "
+        "Project queries only; not supported in dataset queries.",
         default=False,
     )
     reports: list[ReportInputModel] = Field(
-        description="Run these pre-defined reports on the result.", default=[]
+        description="Run these pre-defined reports on the result. "
+        "Project queries only; not supported in dataset queries.",
+        default=[],
     )
     column_type: ColumnType = Field(
         description="Whether to make the result table columns dimension types. Default behavior "
         "is to use dimension names. In order to register a result table as a derived "
-        f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
+        f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}. "
+        "Project queries only; not supported in dataset queries.",
         default=ColumnType.DIMENSION_NAMES,
     )
     table_format: TableFormatModel = StackedTableFormatModel()
@@ -523,14 +529,16 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         default=[],
     )
     dimension_filters: list[DimensionFilters] = Field(
-        description="Filters to apply to the result. Must contain columns in the result.",
+        description="Filters to apply to the result. Must contain columns in the result. "
+        "Project queries only; not supported in dataset queries.",
         default=[],
     )
     # TODO #205: implement
     time_zone: str | Literal["geography"] | None = Field(
         description="Convert the results to this time zone. If 'geography', use the time zone "
         "of the geography dimension. The resulting time column will be time zone-naive with "
-        "time zone recorded in a separate column.",
+        "time zone recorded in a separate column. "
+        "Project queries only; not supported in dataset queries.",
         default=None,
     )
 

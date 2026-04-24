@@ -114,26 +114,10 @@ detailed_metric_2,aggregated_metric_A,1.0
 
 ## Mapping Types
 
-### Many-to-One Aggregation
-
-Multiple base records map to a single supplemental record (e.g., counties to states):
-
-- **Use when**: Natural hierarchical aggregation exists
-- **Example**: Geographic rollups, sector consolidation
-
-### One-to-One
-
-Direct correspondence between base and supplemental (e.g., renaming):
-
-- **Use when**: Same granularity, different labeling
-- **Example**: Alternative naming conventions
-
-### Many-to-Many
-
-Complex relationships with fractional allocations:
-
-- **Use when**: Records split or combine in complex ways
-- **Example**: Subsector disaggregations, fuel type groupings
+Base-to-supplemental mappings use the same mapping types as any other dimension
+mapping. See [Dimension Mapping Types](../dataset_mapping/dimension_mapping_types)
+for the complete reference, including `from_fraction` rules and a decision tree
+for choosing the right type.
 
 ## Best Practices
 
@@ -178,5 +162,5 @@ office_large,commercial_buildings
 ## Next Steps
 
 - Learn about [base dimensions](how_to_base_dimensions)
-- Understand [dimension mapping concepts](../dataset_mapping/concepts)
+- Understand [dimension mapping concepts](../dataset_mapping/dimension_mapping_concepts)
 - Follow the [create project tutorial](../tutorials/create_project)

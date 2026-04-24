@@ -1,6 +1,4 @@
-# Query Concepts
-
-## Project Queries
+# Project Query Concepts
 
 This section describes how dsgrid processes queries when you run the command `dsgrid query project run -o query_output`.
 

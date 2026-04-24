@@ -172,7 +172,7 @@ For `aligned_in_std_clock_time`, localization uses the per-row `time_zone` colum
 
 To store timezone-naive timestamps without any localization, set `format_type` to `aligned_in_absolute_time` and `time_zone` to `null`:
 
-For practical examples of timezone-naive data in actual Parquet files, see [Data File Formats — Timezone-naive timestamps](./data_file_formats.md#timestamp-ntz).
+For practical examples of timezone-naive data in actual Parquet files, see {ref}`timestamp-ntz`.
 
 ```javascript
   ...

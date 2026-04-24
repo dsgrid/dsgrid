@@ -1,0 +1,61 @@
+cff-version: 1.2.0
+type: software
+title: "dsgrid: Demand-Side Grid Toolkit"
+message: >-
+  If you use this software, please cite it using the preferred citation below.
+authors:
+  - family-names: Hale
+    given-names: Elaine
+    orcid: "https://orcid.org/0000-0003-2571-0386"
+    affiliation: National Laboratory of the Rockies
+  - family-names: Thom
+    given-names: Daniel
+    affiliation: National Laboratory of the Rockies
+  - family-names: Liu
+    given-names: Lixi
+    affiliation: National Laboratory of the Rockies
+  - family-names: Mooney
+    given-names: Meghan
+    affiliation: National Laboratory of the Rockies
+repository-code: "https://github.com/dsgrid/dsgrid"
+url: "https://www.nlr.gov/analysis/dsgrid"
+license: BSD-3-Clause
+preferred-citation:
+  type: report
+  title: "The Demand-Side Grid (dsgrid) Model Documentation"
+  authors:
+    - family-names: Hale
+      given-names: Elaine
+    - family-names: Horsey
+      given-names: Henry
+    - family-names: Johnson
+      given-names: Brandon
+    - family-names: Muratori
+      given-names: Matteo
+    - family-names: Wilson
+      given-names: Eric
+    - family-names: Borlaug
+      given-names: Brennan
+    - family-names: Christensen
+      given-names: Craig
+    - family-names: Farthing
+      given-names: Amanda
+    - family-names: Hettinger
+      given-names: Dylan
+    - family-names: Parker
+      given-names: Andrew
+    - family-names: Robertson
+      given-names: Joseph
+    - family-names: Rossol
+      given-names: Michael
+    - family-names: Stephen
+      given-names: Gord
+    - family-names: Wood
+      given-names: Eric
+    - family-names: Vairamohan
+      given-names: Baskar
+  year: 2018
+  institution:
+    name: National Renewable Energy Laboratory
+  number: "NREL/TP-6A20-71492"
+  doi: "10.2172/1465659"

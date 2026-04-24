@@ -45,22 +45,32 @@ Small datasets can be registered using the default DuckDB backend. If your datas
 
 ### Core Concepts
 
+*Phase 1*
 - [Dimension Concepts](../user_guide/dataset_registration/dimension_concepts)
 - [Dataset Concepts](../user_guide/dataset_registration/dataset_concepts)
 - [Data File Formats](../user_guide/dataset_registration/data_file_formats)
 
+*Phase 2*
+- [Dimension Mapping Concepts](../user_guide/dataset_mapping/dimension_mapping_concepts)
+- [Dimension Mapping Types](../user_guide/dataset_mapping/dimension_mapping_types)
+- [Submission Process](../user_guide/dataset_submittal/submission_process)
+- [Submission Checks](../user_guide/dataset_submittal/submission_checks)
+
 ### How-Tos
 
-- [How to Browse the Registry](../user_guide/how_tos/browse_registry)
+*Phase 1*
 - [How to Create Dataset Dimensions](../user_guide/how_tos/how_to_dimensions)
 - [How to Define a Time Dimension](../user_guide/how_tos/how_to_time_dimension)
 - [How to Handle Dimension Associations](../user_guide/how_tos/how_to_dimension_associations)
+
+*Phase 2*
+- [How to Browse the Registry](../user_guide/how_tos/browse_registry)
 - [How to Create Dimension Mappings](../user_guide/how_tos/how_to_dimension_mappings)
 
 ### Tutorials
 
-- [Create and Submit a Dataset](../user_guide/tutorials/create_and_submit_dataset)
 - [Define Dimension Associations](../user_guide/tutorials/define_dimension_associations)
+- [Create and Submit a Dataset](../user_guide/tutorials/create_and_submit_dataset)
 
 ### Reference
 
@@ -70,10 +80,3 @@ Small datasets can be registered using the default DuckDB backend. If your datas
 - [Dimension Record Classes](../software_reference/data_models/dimension_classes)
 - [Dimension Mappings Data Model](../software_reference/data_models/dimension_mapping_model)
 - [Project Config Data Model](../software_reference/data_models/project_model)
-
-### Submission
-
-- [Submission Process](../user_guide/dataset_submittal/submission_process)
-- [Submission Checks](../user_guide/dataset_submittal/submission_checks)
-- [Dimension Mapping Concepts](../user_guide/dataset_mapping/dimension_mapping_concepts)
-- [Dimension Mapping Types](../user_guide/dataset_mapping/dimension_mapping_types)

@@ -1,6 +1,6 @@
 # Apache Spark
 
-Guide for using Apache Spark as dsgrid's distributed Ibis backend.
+Guide for using Apache Spark as dsgrid's distributed Ibis backend. Spark is optional — DuckDB is the default backend and is sufficient for local work and moderate-sized datasets. Use Spark when datasets or aggregations exceed what a single node can handle.
 
 ## Core Concepts
 
@@ -8,9 +8,6 @@ Guide for using Apache Spark as dsgrid's distributed Ibis backend.
 :maxdepth: 1
 
 overview
-when_to_use_spark
-kestrel_setup
-spark_cluster
 ```
 
 ## How-Tos

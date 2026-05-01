@@ -3,10 +3,11 @@
 from pathlib import Path
 from typing import Any, Iterable
 
-from pydantic import Field, ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationError, ValidationInfo, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.files import load_data
 
 
@@ -185,4 +186,8 @@ def _fix_paths(data: dict[str, Any], fields: Iterable[str]) -> None:
 
 def create_registration(input_file: Path):
     """Create registration inputs."""
-    return RegistrationModel(**load_data(input_file))
+    try:
+        return RegistrationModel(**load_data(input_file))
+    except ValidationError as e:
+        msg = f"Validation error in registration file '{input_file}': {e}"
+        raise DSGInvalidParameter(msg) from e

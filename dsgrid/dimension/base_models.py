@@ -215,6 +215,15 @@ def check_timezone_in_geography(dimension, err_msg=None):
         raise ValueError(err_msg)
 
     record_tzs = {rec.time_zone for rec in dimension.records if rec.time_zone is not None}
+    if not record_tzs:
+        raise DSGInvalidDimension(
+            err_msg
+            or "Geography dimension records have a 'time_zone' field but all values "
+            "are null. At least one record must have a valid IANA time zone "
+            "(e.g., 'Etc/GMT+5'). Check that the geography CSV file includes a "
+            "'time_zone' column with populated values."
+        )
+
     invalid_tzs = []
     for tz in record_tzs:
         try:

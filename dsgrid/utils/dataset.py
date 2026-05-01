@@ -5,13 +5,14 @@ from typing import Iterable
 from datetime import tzinfo
 
 import chronify
+import pandas as pd
 from chronify.models import TableSchema
 
 import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -49,6 +50,7 @@ from dsgrid.spark.types import (
     LongType,
     ShortType,
     StringType,
+    TimestampType,
     use_duckdb,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -88,7 +90,7 @@ def map_stacked_dimension(
 
 def add_time_zone(
     load_data_df: DataFrame,
-    geography_dim: DimensionConfig,
+    geography_dim: DimensionBaseConfigWithFiles,
     df_key: str = "geography",
     dim_key: str = "id",
 ):
@@ -97,7 +99,7 @@ def add_time_zone(
     Parameters
     ----------
     load_data_df : DataFrame
-    geography_dim: DimensionConfig
+    geography_dim: DimensionBaseConfigWithFiles
 
     Returns
     -------
@@ -793,6 +795,60 @@ def _to_chronify_time_based_data_adjustment(
     )
 
 
+def _df_time_column_is_tz_aware(df: DataFrame, time_column: str) -> bool:
+    """Return True when df's `time_column` is a tz-aware datetime.
+
+    A positive `TimestampType` check is required because DuckDB-Spark uses precision-
+    specific NTZ classes (`TimestampMilisecondNTZType`, etc.) that do not subclass
+    `TimestampNTZType`; a negative check would mis-classify NTZ parquet columns as
+    tz-aware. `TimestampType` is the tz-aware leaf class in both backends.
+    """
+    return isinstance(df.schema[time_column].dataType, TimestampType)
+
+
+def _adjust_time_config_for_post_localization(
+    time_config: chronify.TimeBaseModel,
+    time_dim: TimeDimensionBaseConfig,
+    df: DataFrame,
+) -> chronify.TimeBaseModel:
+    """Reflect post-localization shape in the chronify time_config.
+
+    `DateTimeDimensionConfig.to_chronify()` describes the pre-localization shape
+    (NTZ dtype + naive `start`) when the dim has a `localize_to_single_tz` plan,
+    because some pipelines (e.g. `localize_time_zone_with_chronify_*`) invoke
+    chronify *before* localization. The query path, however, hands chronify a
+    DataFrame whose time column has already been localized (the registered
+    parquet on disk is `TIMESTAMP WITH TIME ZONE`). When the actual time column
+    is tz-aware, rebuild the time_config so its dtype/start match the data.
+    """
+    if not isinstance(time_dim, DateTimeDimensionConfig):
+        return time_config
+    if time_dim.get_localization_plan() != "localize_to_single_tz":
+        return time_config
+    # `localize_to_single_tz` only ever pairs with the ALIGNED_IN_ABSOLUTE_TIME
+    # branch of `to_chronify()`, which returns `DatetimeRange`.
+    if not isinstance(time_config, chronify.DatetimeRange):
+        return time_config
+
+    time_columns = time_dim.get_load_data_time_columns()
+    if len(time_columns) != 1 or not _df_time_column_is_tz_aware(df, time_columns[0]):
+        return time_config
+
+    tz = time_dim.get_chronify_time_zone()
+    new_start = pd.Timestamp(time_config.start)
+    if new_start.tzinfo is None:
+        new_start = new_start.tz_localize(tz)
+    return chronify.DatetimeRange(
+        dtype=chronify.TimeDataType.TIMESTAMP_TZ,
+        time_column=time_config.time_column,
+        start=new_start,
+        length=time_config.length,
+        resolution=time_config.resolution,
+        measurement_type=time_config.measurement_type,
+        interval_type=time_config.interval_type,
+    )
+
+
 def _get_src_schema(
     df: DataFrame,
     from_time_dim: TimeDimensionBaseConfig,
@@ -801,7 +857,9 @@ def _get_src_schema(
 ) -> TableSchema:
     src = src_name or "src_" + make_temp_view_name()
     time_col_list = from_time_dim.get_load_data_time_columns()
-    time_config = from_time_dim.to_chronify()
+    time_config = _adjust_time_config_for_post_localization(
+        from_time_dim.to_chronify(), from_time_dim, df
+    )
     time_array_id_columns = [
         x
         for x in df.columns
@@ -822,7 +880,9 @@ def _get_dst_schema(
     to_time_dim: TimeDimensionBaseConfig,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
-    time_config = to_time_dim.to_chronify()
+    time_config = _adjust_time_config_for_post_localization(
+        to_time_dim.to_chronify(), to_time_dim, df
+    )
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_array_id_columns = [
         x
@@ -1215,6 +1275,18 @@ def localize_timestamps_if_necessary(
             if TIME_ZONE_COLUMN not in df.columns:
                 geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
                 df = add_time_zone(df, geo_dim)
+
+            if df.filter(f"{TIME_ZONE_COLUMN} IS NOT NULL").count() == 0:
+                msg = (
+                    f"The '{TIME_ZONE_COLUMN}' column is all null after joining "
+                    f"with geography dimension records. The geography dimension "
+                    f"records file must include a 'time_zone' column with valid "
+                    f"IANA time zone values (e.g., 'Etc/GMT+5') for "
+                    f"'aligned_in_std_clock_time' localization during registration. "
+                    f"Note: 'use_project_geography_time_zone' only applies during "
+                    f"query-time mapping, not during registration."
+                )
+                raise DSGInvalidOperation(msg)
 
             match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):

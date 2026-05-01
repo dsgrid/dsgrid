@@ -629,7 +629,7 @@ When using timezone-naive timestamps (`TIMESTAMP_NTZ`) or time-in-parts formats,
 There are two ways to source the `time_zone` column:
 
 - **Dataset geography records** (default) — include a `time_zone` column with IANA time zone strings (e.g., `America/New_York`) in the dataset's geography dimension records file. dsgrid automatically joins this column to the data during registration.
-- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config. dsgrid will read time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config. dsgrid will read time zones from the project's geography dimension instead during query-time mapping. Note: if your timestamps are timezone-naive (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), the dataset's geography records must still include a `time_zone` column because dsgrid localizes timestamps during registration before any project mapping occurs.
 
 In both cases, the resulting data table has a `time_zone` column containing IANA time zone strings, with one value per row. The `time_zones` list in your time dimension config must include all unique values that appear in this column.
 

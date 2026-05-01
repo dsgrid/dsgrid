@@ -12,7 +12,7 @@ import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -50,7 +50,7 @@ from dsgrid.spark.types import (
     LongType,
     ShortType,
     StringType,
-    TimestampNTZType,
+    TimestampType,
     use_duckdb,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -796,8 +796,14 @@ def _to_chronify_time_based_data_adjustment(
 
 
 def _df_time_column_is_tz_aware(df: DataFrame, time_column: str) -> bool:
-    """Return True when df's `time_column` is a tz-aware datetime."""
-    return not isinstance(df.schema[time_column].dataType, TimestampNTZType)
+    """Return True when df's `time_column` is a tz-aware datetime.
+
+    A positive `TimestampType` check is required because DuckDB-Spark uses precision-
+    specific NTZ classes (`TimestampMilisecondNTZType`, etc.) that do not subclass
+    `TimestampNTZType`; a negative check would mis-classify NTZ parquet columns as
+    tz-aware. `TimestampType` is the tz-aware leaf class in both backends.
+    """
+    return isinstance(df.schema[time_column].dataType, TimestampType)
 
 
 def _adjust_time_config_for_post_localization(
@@ -1271,7 +1277,7 @@ def localize_timestamps_if_necessary(
                 df = add_time_zone(df, geo_dim)
 
             if df.filter(f"{TIME_ZONE_COLUMN} IS NOT NULL").count() == 0:
-                raise DSGInvalidOperation(
+                msg = (
                     f"The '{TIME_ZONE_COLUMN}' column is all null after joining "
                     f"with geography dimension records. The geography dimension "
                     f"records file must include a 'time_zone' column with valid "
@@ -1280,6 +1286,7 @@ def localize_timestamps_if_necessary(
                     f"Note: 'use_project_geography_time_zone' only applies during "
                     f"query-time mapping, not during registration."
                 )
+                raise DSGInvalidOperation(msg)
 
             match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
                 case (BackendEngine.SPARK, True):

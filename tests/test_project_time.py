@@ -342,16 +342,20 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
 def check_exploded_tempo_time(project_time_dim, load_data):
     """
-    - DF.show() (and probably all arithmetics) use spark.sql.session.timeZone
-    - DF.to_pandas() likely goes through spark.sql.session.timeZone
-    - DF.collect() converts timestamps to system time_zone (different from spark.sql.session.timeZone!)
-    - hour(F.col(timestamp)) extracts hour from timestamp col as exactly shown in DF.show()
-    - spark.sql.session.timeZone time that is consistent with system time seems to show time correctly
-        (in session time) for DF.show(), however, it does not work well with time converting functions
-        from spark.sql.functions
-    - On the other hand, even though spark.sql.session.timeZone=UTC does not always show time correctly
-        in DF.show(), it converts time correctly when using F.from_utc_timestamp() and F.to_utc_timestamp().
-        Thus, we explicitly set session_tz to UTC when extracting timeinfo from local_time column.
+    Notes on time-zone semantics under Spark (preserved from prior behavior; the
+    Ibis layer routes both backends through the same SQL on the Spark runtime):
+
+    - Arithmetic and SQL functions on TIMESTAMP columns use ``spark.sql.session.timeZone``.
+    - Materializing a table to pandas (``ibis.Table.execute()`` / ``.to_pandas()``)
+      converts via ``spark.sql.session.timeZone``.
+    - ``hour(timestamp_col)`` extracts the hour in the session time zone, matching
+      what would be displayed by Spark's row formatter.
+    - Setting ``spark.sql.session.timeZone`` to match the local system tz makes
+      display look correct but interacts badly with ``from_utc_timestamp`` /
+      ``to_utc_timestamp``. Conversely, setting it to UTC does not always render
+      timestamps the way you'd expect, but the conversion functions then behave
+      correctly. We explicitly set ``session_tz`` to UTC before extracting
+      timeinfo from the ``local_time`` column for that reason.
     """
 
     # extract data for comparison
@@ -509,15 +513,27 @@ def _sql_string(value):
     return str(value).replace("'", "''")
 
 
-# The duckdb implementations of the next two functions may not be fully correct or ideal.
-# We don't need them in the dsgrid package because time mapping is performed in chronify.
-# There are some extensive tests in this file that rely on them, and so we are keeping them
-# here.
+# The DuckDB implementations of from_utc_timestamp / to_utc_timestamp may not be fully
+# correct or ideal. We don't need them in the dsgrid package because time mapping is
+# performed in chronify. There are some extensive tests in this file that rely on them,
+# so we keep them here.
 
 
-def _tz_convert_sql(
-    df: ibis.Table, time_column: str, time_zone: str, new_column: str, spark_func: str
+def _convert_timestamp_tz(
+    df: ibis.Table,
+    time_column: str,
+    time_zone: str,
+    new_column: str,
+    *,
+    direction: str,
 ) -> ibis.Table:
+    """Run Spark's ``from_utc_timestamp`` / ``to_utc_timestamp`` (or DuckDB equivalent).
+
+    ``direction`` must be ``"from_utc"`` or ``"to_utc"``.
+    """
+    if direction not in {"from_utc", "to_utc"}:
+        msg = f"direction must be 'from_utc' or 'to_utc'; got {direction!r}"
+        raise ValueError(msg)
     view = create_temp_view(df)
     cols = df.columns[:]
     if time_column == new_column:
@@ -526,8 +542,11 @@ def _tz_convert_sql(
     tc = _sql_ident(time_column)
     nc = _sql_ident(new_column)
     if use_duckdb():
+        # DuckDB has a single ``timezone(zone, ts)`` builtin that handles both directions
+        # via TIMESTAMPTZ casting.
         expr = f"CAST(timezone('{time_zone}', {tc}) AS TIMESTAMPTZ)"
     else:
+        spark_func = "from_utc_timestamp" if direction == "from_utc" else "to_utc_timestamp"
         expr = f"{spark_func}({tc}, '{time_zone}')"
     return get_runtime_session().sql(f"SELECT {cols_str}, {expr} AS {nc} FROM {view}")
 
@@ -535,15 +554,15 @@ def _tz_convert_sql(
 def from_utc_timestamp(
     df: ibis.Table, time_column: str, time_zone: str, new_column: str
 ) -> ibis.Table:
-    """Refer to pyspark.sql.functions.from_utc_timestamp."""
-    return _tz_convert_sql(df, time_column, time_zone, new_column, "from_utc_timestamp")
+    """Refer to ``pyspark.sql.functions.from_utc_timestamp``."""
+    return _convert_timestamp_tz(df, time_column, time_zone, new_column, direction="from_utc")
 
 
 def to_utc_timestamp(
     df: ibis.Table, time_column: str, time_zone: str, new_column: str
 ) -> ibis.Table:
-    """Refer to pyspark.sql.functions.to_utc_timestamp."""
-    return _tz_convert_sql(df, time_column, time_zone, new_column, "to_utc_timestamp")
+    """Refer to ``pyspark.sql.functions.to_utc_timestamp``."""
+    return _convert_timestamp_tz(df, time_column, time_zone, new_column, direction="to_utc")
 
 
 def make_date_time_df(

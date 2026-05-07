@@ -4,8 +4,9 @@ from tempfile import NamedTemporaryFile
 
 import ibis
 
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.temp import make_temp_view_name
+from dsgrid.ibis.temp import make_temp_view_name, track_temp_file
 from dsgrid.ibis.types import use_duckdb
 
 logger = logging.getLogger(__name__)
@@ -39,10 +40,12 @@ def create_temp_view(df: ibis.Table) -> str:
         pass
     tmp_file = NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp_file.close()
+    track_temp_file(tmp_file.name)
     logger.warning(
         "create_temp_view fell back to parquet round-trip via %s; this materializes the "
         "full table to disk and may indicate a cross-backend reference that should be "
-        "registered into the runtime backend earlier.",
+        "registered into the runtime backend earlier. The file is tracked for cleanup by "
+        "drop_temp_tables_and_views/atexit.",
         tmp_file.name,
     )
     df.to_parquet(tmp_file.name)
@@ -100,11 +103,21 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
 
 
 def _promote_dtype(t1, t2):
+    """Pick a target type for a numeric type mismatch on a join key or set-op column.
+
+    Raises ``DSGInvalidOperation`` when at least one side is non-numeric, so that
+    callers fail loudly instead of silently coercing comparable types (timestamps,
+    strings, booleans, ...) into strings.
+    """
     if t1.is_integer() and t2.is_integer():
         return "int64"
     if t1.is_numeric() and t2.is_numeric():
         return "float64"
-    return "string"
+    msg = (
+        f"Cannot promote types {t1} and {t2} to a common numeric type. "
+        "Cast both sides explicitly before joining or applying a set operation."
+    )
+    raise DSGInvalidOperation(msg)
 
 
 def _align_set_op_schemas(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, ibis.Table]:

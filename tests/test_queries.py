@@ -172,35 +172,20 @@ def la_expected_electricity_hour_16(tmp_path_factory):
     df = filter_sql(
         read_parquet(str(output_dir / query.name / "table.parquet")), "county == '06037'"
     )
-    end_uses = ["electricity_cooling", "electricity_heating"]
     gcols = [x for x in df.columns if x not in {"end_use", "value"}]
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    if isinstance(df, ibis.Table):
-        df = filter_sql(
-            df,
-            "end_use IN ('electricity_cooling', 'electricity_heating')",
+    df = filter_sql(
+        df,
+        "end_use IN ('electricity_cooling', 'electricity_heating')",
+    )
+    df = df.group_by(gcols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
+    with custom_time_zone(tz):
+        expected_df = (
+            df.mutate(hour=df["time_est"].hour())
+            .group_by(["county", "hour"])
+            .aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].mean()})
         )
-        df = df.group_by(gcols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
-        with custom_time_zone(tz):
-            expected_df = (
-                df.mutate(hour=df["time_est"].hour())
-                .group_by(["county", "hour"])
-                .aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].mean()})
-            )
-            expected = filter_sql(expected_df, "hour == 16").execute()[VALUE_COLUMN].iloc[0]
-    else:
-        df = (
-            df.filter(F.col("end_use").isin(end_uses))
-            .groupBy(*gcols)
-            .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-        )
-        with custom_time_zone(tz):
-            expected = (
-                df.groupBy("county", F.hour("time_est").alias("hour"))
-                .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
-                .filter("hour == 16")
-                .collect()[0][VALUE_COLUMN]
-            )
+        expected = filter_sql(expected_df, "hour == 16").execute()[VALUE_COLUMN].iloc[0]
     yield {
         "la_electricity_hour_16": expected,
     }
@@ -1887,7 +1872,7 @@ def validate_electricity_use_by_county(
 
 
 def validate_electricity_use_by_state(op, results_path: ibis.Table | Path, raw_stats, datasets):
-    if isinstance(results_path, ibis.Table | ibis.Table):
+    if isinstance(results_path, ibis.Table):
         results = results_path
     else:
         results = read_parquet(results_path)

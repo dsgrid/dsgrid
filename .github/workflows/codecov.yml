@@ -21,6 +21,13 @@ jobs:
       with:
         submodules: true
 
+    - name: Set up Java 21
+      if: runner.os == 'Linux'
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: "21"
+
     - name: Setup Python
       uses: actions/setup-python@v6
       with:
@@ -48,8 +55,7 @@ jobs:
         DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
         # Restart from scratch.
         rm -rf tests/data/registry
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_ibis_session.py tests/test_ibis_functions.py tests/test_localize_timestamps_if_necessary.py
-        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests/test_file_schema.py -k "read_data_file_csv or read_data_file_parquet"
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
 
     - name: Generate coverage report (Windows)
       if: runner.os == 'Windows'

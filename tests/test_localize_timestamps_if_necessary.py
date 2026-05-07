@@ -19,7 +19,6 @@ import pytest
 import pandas as pd
 
 from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN
-from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     TimeIntervalType,
@@ -47,6 +46,8 @@ from dsgrid.ibis.session import (
 )
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+from tests._helpers import to_pandas as _to_pandas
 
 
 @pytest.fixture(scope="module")
@@ -413,7 +414,3 @@ def test_ntz_no_time_zone_is_noop(spark, tmp_path):
     )
     assert changed is False
     assert res_df is sdf
-
-
-def _to_pandas(df):
-    return table_to_pandas(df)

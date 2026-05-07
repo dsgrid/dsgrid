@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 from dsgrid.ibis.operations import filter_sql, rename_columns
-from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.ibis.functions import (
     aggregate,
     aggregate_single_value,
@@ -35,28 +34,11 @@ from dsgrid.ibis.session import (
     SparkSession,
 )
 
-
-def _collect(df):
-    if hasattr(df, "execute"):
-        return list(table_to_pandas(df).itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df):
-    count = df.count()
-    if hasattr(count, "execute"):
-        return count.execute()
-    return count
+from tests._helpers import collect as _collect, count as _count, order_by as _order_by
 
 
 def _filter(df, predicate):
     return filter_sql(df, predicate)
-
-
-def _order_by(df, *columns):
-    if hasattr(df, "order_by"):
-        return df.order_by(*columns)
-    return df.sort(*columns)
 
 
 @pytest.fixture(scope="module")

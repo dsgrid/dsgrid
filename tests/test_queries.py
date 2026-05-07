@@ -86,6 +86,13 @@ from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
+from tests._helpers import (
+    collect as _collect,
+    count as _count,
+    order_by as _order_by,
+    row_value as _row_value,
+)
+
 
 DIMENSION_MAPPING_SCHEMA = StructType(
     [
@@ -97,18 +104,6 @@ DIMENSION_MAPPING_SCHEMA = StructType(
 
 
 logger = logging.getLogger(__name__)
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df):
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
 
 
 def _filter(df, predicate):
@@ -127,19 +122,6 @@ def _sum_by_group(df, group_cols):
     if isinstance(df, ibis.Table):
         return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
     return df.groupBy(*group_cols).agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-
-
-def _order_by(df, *columns):
-    if isinstance(df, ibis.Table):
-        return df.order_by(*columns)
-    return df.sort(*columns)
-
-
-def _row_value(row, column):
-    try:
-        return row[column]
-    except TypeError:
-        return getattr(row, column)
 
 
 @pytest.fixture(scope="module")

@@ -13,25 +13,13 @@ from dsgrid.exceptions import (
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.ibis.operations import filter_sql
-from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+from tests._helpers import collect as _collect, count as _count
 
 
 PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
-
-
-def _collect(df):
-    if hasattr(df, "execute"):
-        return list(table_to_pandas(df).itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df):
-    count = df.count()
-    if hasattr(count, "execute"):
-        return count.execute()
-    return count
 
 
 @pytest.fixture(scope="module")

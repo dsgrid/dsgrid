@@ -31,29 +31,13 @@ from dsgrid.ibis.session import (
 )
 from dsgrid.ibis.session import write_dataframe
 
+from tests._helpers import collect as _collect, count as _count, order_by as _order_by
+
 
 @pytest.fixture(scope="module")
 def spark() -> Generator[SparkSession, None, None]:
     spark = get_runtime_session()
     yield spark
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df) -> int:
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
-
-
-def _order_by(df, *columns):
-    if isinstance(df, ibis.Table):
-        return df.order_by(*columns)
-    return df.orderBy(*columns)
 
 
 def _with_string_column(df, column: str, alias: str):

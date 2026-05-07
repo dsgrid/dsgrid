@@ -28,7 +28,7 @@ from dsgrid.ibis.functions import (
     set_current_time_zone,
     perform_interval_op,
 )
-from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
+from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.ibis.session import (
     F,
     FloatType,
@@ -43,6 +43,13 @@ from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
+
+from tests._helpers import (
+    collect as _collect,
+    order_by as _order_by,
+    row_value as _row_value,
+    to_pandas as _to_pandas,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -411,27 +418,6 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     ), f"Mismatch:\nn_model={n_model}, n_project={n_project}, n_tempo={n_tempo}\n{mismatch}"
 
 
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _order_by(df, *columns):
-    if isinstance(df, ibis.Table):
-        return df.order_by(*columns)
-    return df.sort(*columns)
-
-
-def _row_value(row, key):
-    if isinstance(key, int):
-        return row[key]
-    try:
-        return row[key]
-    except TypeError:
-        return getattr(row, key)
-
-
 def _as_timezone(value, tz):
     if value.tzinfo is None:
         if hasattr(value, "tz_localize"):
@@ -439,10 +425,6 @@ def _as_timezone(value, tz):
         else:
             value = value.replace(tzinfo=ZoneInfo("UTC"))
     return value.astimezone(tz)
-
-
-def _to_pandas(df):
-    return table_to_pandas(df)
 
 
 def _with_literal_column(df, column, value):

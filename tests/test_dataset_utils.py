@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 
-import ibis
 import pytest
 
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -39,6 +38,8 @@ from dsgrid.utils.dataset import (
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+from tests._helpers import collect as _collect, count as _count
 
 
 @pytest.fixture(scope="module")
@@ -429,24 +430,6 @@ def _sorted_rows(df) -> list[Any]:
     """Collect an Ibis table into a sorted list of tuples for easy comparison."""
     cols = sorted(df.columns)
     return sorted(_collect(df.select(*cols).distinct()), key=lambda r: tuple(r))
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        pdf = df.execute()
-        for col in pdf.columns:
-            mask = pdf[col].isna()
-            if mask.any():
-                pdf[col] = pdf[col].astype(object)
-                pdf.loc[mask, col] = None
-        return list(pdf.itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df) -> int:
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
 
 
 def _first(df):

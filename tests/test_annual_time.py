@@ -21,17 +21,7 @@ from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
 from dsgrid.ibis.session import F, create_dataframe_from_dicts, use_duckdb
 
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df) -> int:
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
+from tests._helpers import collect as _collect, count as _count
 
 
 def _count_timestamps_per_model_year(df, time_col: str):

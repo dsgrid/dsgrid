@@ -6,10 +6,11 @@ import pytest
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
-from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
+
+from tests._helpers import collect as _collect
 
 
 PROJECT_ID = "test_efs"
@@ -40,12 +41,6 @@ FILTER_CONFIG = {
         }
     ],
 }
-
-
-def _collect(df):
-    if hasattr(df, "execute"):
-        return list(table_to_pandas(df).itertuples(index=False, name="Row"))
-    return df.collect()
 
 
 def test_filter_registry(cached_registry, tmp_path):

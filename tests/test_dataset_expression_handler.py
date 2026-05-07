@@ -1,5 +1,4 @@
 import pytest
-import ibis
 
 from dsgrid.dataset.dataset_expression_handler import (
     DatasetExpressionHandler,
@@ -10,6 +9,8 @@ from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import create_dataframe_from_dicts
+
+from tests._helpers import collect as _collect, count as _count
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -119,18 +120,6 @@ def test_invalid_join():
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
     with pytest.raises(DSGInvalidOperation, match="has a different row count"):
         evaluate_expression("dataset1 + dataset2", datasets)
-
-
-def _count(df):
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
 
 
 def test_invalid_union():

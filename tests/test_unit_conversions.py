@@ -1,6 +1,5 @@
 import math
 
-import ibis
 import pytest
 
 import dsgrid.units.energy as energy
@@ -45,6 +44,12 @@ from dsgrid.units.constants import (
 )
 from dsgrid.ibis.session import create_dataframe_from_dicts
 from dsgrid.ibis.session import get_runtime_session
+
+from tests._helpers import (
+    collect as _collect,
+    first_value as _first_value,
+    row_value as _row_value,
+)
 
 
 KWH_VAL = 1234.5
@@ -346,20 +351,3 @@ def _with_sql_column(df, column, expr):
     view = create_temp_view(df)
     cols = ", ".join(x for x in df.columns if x != column)
     return get_runtime_session().sql(f"SELECT {cols}, {expr} AS {column} FROM {view}")
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _first_value(df, column):
-    return getattr(_collect(df.limit(1))[0], column)
-
-
-def _row_value(row, column):
-    try:
-        return row[column]
-    except TypeError:
-        return getattr(row, column)

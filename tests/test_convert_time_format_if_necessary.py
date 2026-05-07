@@ -13,8 +13,6 @@ import pytest
 from unittest.mock import MagicMock
 from pathlib import Path
 
-import ibis
-
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.config.dimensions import (
     TimeFormatInPartsModel,
@@ -26,6 +24,8 @@ from dsgrid.ibis.functions import (
 )
 from dsgrid.ibis.types import use_duckdb
 import pandas as pd
+
+from tests._helpers import collect as _collect
 
 
 def _utc_ts_str_expr() -> str:
@@ -350,9 +350,3 @@ def test_cast_with_offset_24_string_previous_behavior():
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()

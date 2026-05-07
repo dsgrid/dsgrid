@@ -4,7 +4,6 @@ from collections import namedtuple
 from pathlib import Path
 
 import pytest
-import ibis
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
@@ -28,6 +27,8 @@ from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 from dsgrid.ibis.session import read_dataframe
+
+from tests._helpers import collect as _collect, order_by as _order_by
 
 
 REGISTRY_PATH = (
@@ -142,15 +143,3 @@ def test_create_derived_dataset_config(tmp_path):
     assert result.exit_code == 0
     assert dataset_config_file.exists()
     shutil.rmtree(dataset_dir)
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _order_by(df, *columns):
-    if isinstance(df, ibis.Table):
-        return df.order_by(*columns)
-    return df.sort(*columns)

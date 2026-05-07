@@ -21,8 +21,8 @@ class DatasetExpressionHandler:
         orig_other_count = _count_rows(other.df)
         if orig_self_count != orig_other_count:
             msg = (
-                f"{op =} requires that the datasets have the same length "
-                f"{orig_self_count =} {orig_other_count =}"
+                f"{op=} requires that the datasets have the same length "
+                f"{orig_self_count=} {orig_other_count=}"
             )
             raise DSGInvalidOperation(msg)
 
@@ -37,8 +37,8 @@ class DatasetExpressionHandler:
         joined_count = _count_rows(df)
         if joined_count != orig_self_count:
             msg = (
-                f"join for operation {op =} has a different row count than the original. "
-                f"{orig_self_count =} {joined_count =}"
+                f"join for operation {op=} has a different row count than the original. "
+                f"{orig_self_count=} {joined_count=}"
             )
             raise DSGInvalidOperation(msg)
 
@@ -57,7 +57,7 @@ class DatasetExpressionHandler:
         if self.df.columns != other.df.columns:
             msg = (
                 "Union is only allowed when datasets have identical columns: "
-                f"{self.df.columns =} vs {other.df.columns =}"
+                f"{self.df.columns=} vs {other.df.columns=}"
             )
             raise DSGInvalidOperation(msg)
         return DatasetExpressionHandler(

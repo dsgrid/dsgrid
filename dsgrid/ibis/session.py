@@ -641,7 +641,7 @@ def _read_with_runtime(filename):
         except Exception as exc:
             if _is_spark_parquet_schema_exception(exc) or _is_duckdb_io_exception(exc):
                 logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
-                msg = f"Cannot read {filename =}"
+                msg = f"Cannot read {filename=}"
                 raise DSGInvalidFile(msg)
             else:
                 raise
@@ -775,10 +775,10 @@ def get_type_from_union(python_type) -> Type:
     else:
         types = [x for x in args if not issubclass(x, type(None))]
         if not types:
-            msg = f"Unhandled Union type: {python_type =} {args =}"
+            msg = f"Unhandled Union type: {python_type=} {args=}"
             raise NotImplementedError(msg)
         elif len(types) > 1:
-            msg = f"Unhandled Union type: {types =}"
+            msg = f"Unhandled Union type: {types=}"
             raise NotImplementedError(msg)
         else:
             python_type = types[0]
@@ -1497,7 +1497,7 @@ def union(dfs: list[ibis.Table]) -> ibis.Table:
     if len(dfs) > 1:
         for dft in dfs[1:]:
             if df.columns != dft.columns:
-                msg = f"columns don't match: {df.columns =} {dft.columns =}"
+                msg = f"columns don't match: {df.columns=} {dft.columns=}"
                 raise Exception(msg)
             df = df.union(dft)
     return df

@@ -858,10 +858,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             assert pivoted_dimension_type is not None
             existing_columns = set(df.columns)
             if diff := set(time_columns) - existing_columns:
-                msg = f"Expected time columns are not present in the table: {diff =}"
+                msg = f"Expected time columns are not present in the table: {diff=}"
                 raise DSGInvalidDataset(msg)
             if diff := set(pivoted_columns) - existing_columns:
-                msg = f"Expected pivoted_columns are not present in the table: {diff =}"
+                msg = f"Expected pivoted_columns are not present in the table: {diff=}"
                 raise DSGInvalidDataset(msg)
             df = unpivot_dataframe(df, pivoted_columns, pivoted_dimension_type.value, time_columns)
 

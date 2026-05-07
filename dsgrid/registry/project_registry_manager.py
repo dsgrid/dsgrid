@@ -391,7 +391,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         mappings = []
         if len(dimensions) != len(dimension_references):
-            msg = f"Bug: mismatch in sizes: {dimensions =} {dimension_references =}"
+            msg = f"Bug: mismatch in sizes: {dimensions=} {dimension_references=}"
             raise Exception(msg)
 
         for dim, ref in zip(dimensions, dimension_references):
@@ -497,7 +497,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     dimensions.append(dim)
                     key = (subset_dimension.dimension_type, selector.name)
                     if key in subset_refs:
-                        msg = f"Bug: unhandled case of duplicate dimension name: {key =}"
+                        msg = f"Bug: unhandled case of duplicate dimension name: {key=}"
                         raise Exception(msg)
                     subset_refs[key] = subset_dimension
 
@@ -568,12 +568,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                             base_dims.append(cast(DimensionBaseConfigWithFiles, base_dim))
                             break
                 if len(base_dims) == 0:
-                    msg = f"Did not find a base dimension for {subset_dimension_group =}"
+                    msg = f"Did not find a base dimension for {subset_dimension_group=}"
                     raise Exception(msg)
                 elif len(base_dims) > 1:
                     msg = (
-                        f"Found multiple base dimensions for {dimension_type =}. Please specify "
-                        f"'base_dimension_name' in {subset_dimension_group =}"
+                        f"Found multiple base dimensions for {dimension_type=}. Please specify "
+                        f"'base_dimension_name' in {subset_dimension_group=}"
                     )
                     raise DSGInvalidParameter(msg)
                 base_dim = base_dims[0]
@@ -791,7 +791,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     )
                 else:
                     msg = (
-                        f"{dataset_id =} requires a base dimension name for "
+                        f"{dataset_id=} requires a base dimension name for "
                         f"{dim_type} because the project has {len(base_dims)} base dimensions."
                     )
                     raise DSGInvalidDimensionMapping(msg)
@@ -816,7 +816,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         ) as context:
             conn = context.connection
             if not self.has_id(project_id, conn=conn):
-                msg = f"{project_id =}"
+                msg = f"{project_id=}"
                 raise DSGValueNotRegistered(msg)
 
             dataset_config = DatasetConfig.load_from_user_path(
@@ -1058,8 +1058,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         status = dataset_model.status
         if status != DatasetRegistryStatus.UNREGISTERED:
             msg = (
-                f"{dataset_id =} cannot be submitted to project={project_config.config_id} with "
-                f"{status =}"
+                f"{dataset_id=} cannot be submitted to project={project_config.config_id} with "
+                f"{status=}"
             )
             raise DSGDuplicateValueRegistered(msg)
 
@@ -1401,8 +1401,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                             project_dim_name = project_dim.model.name
                             if dim_type in base_dimension_names:
                                 msg = (
-                                    f"Found multiple project base dimensions for {dataset_id =} "
-                                    f"and {dim_type =}: {base_dimension_names[dim_type]} and "
+                                    f"Found multiple project base dimensions for {dataset_id=} "
+                                    f"and {dim_type=}: {base_dimension_names[dim_type]} and "
                                     f"{project_dim_name}. Please specify a mapping."
                                 )
                                 raise DSGInvalidDataset(msg)

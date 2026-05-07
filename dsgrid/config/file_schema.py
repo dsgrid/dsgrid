@@ -42,7 +42,7 @@ class Column(DSGBaseModel):
         type_upper = data_type.upper()
         if type_upper not in SUPPORTED_TYPES:
             supported_data_types = sorted(SUPPORTED_TYPES)
-            msg = f"{data_type =} is not one of {supported_data_types =}"
+            msg = f"{data_type=} is not one of {supported_data_types=}"
             raise ValueError(msg)
         return type_upper
 
@@ -123,7 +123,7 @@ def read_data_file(
     actual_columns = set(df.columns)
     diff = expected_columns.difference(actual_columns)
     if diff:
-        msg = f"Expected columns {diff} are not in {actual_columns =}"
+        msg = f"Expected columns {diff} are not in {actual_columns=}"
         raise DSGInvalidDataset(msg)
 
     df = _drop_ignored_columns(df, schema.ignore_columns)
@@ -187,7 +187,7 @@ def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, s
         col_type = val.upper()
         if col_type not in backend_mapping:
             options = " ".join(sorted(backend_mapping.keys()))
-            msg = f"column type = {val} is not supported. {options =}"
+            msg = f"column type = {val} is not supported. {options=}"
             raise DSGInvalidField(msg)
         mapped_schema[key] = backend_mapping[col_type]
     return mapped_schema

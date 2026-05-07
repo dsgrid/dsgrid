@@ -346,12 +346,12 @@ class Project:
                 case ColumnType.DIMENSION_NAMES:
                     pass
                 case _:
-                    msg = f"BUG: unhandled {context.model.result.column_type =}"
+                    msg = f"BUG: unhandled {context.model.result.column_type=}"
                     raise NotImplementedError(msg)
             names = list(
                 context.get_dimension_column_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
             )
-            assert len(names) == 1, f"{dataset_id =} {names =}"
+            assert len(names) == 1, f"{dataset_id=} {names=}"
             return names[0]
 
         iv_path = self._process_dataset(
@@ -369,7 +369,7 @@ class Project:
         if model_year_column != model_year_column_gr:
             msg = (
                 "BUG: initial_value and growth rate datasets have different model_year columns: "
-                f"{model_year_column =} {model_year_column_gr =}"
+                f"{model_year_column=} {model_year_column_gr=}"
             )
             raise Exception(msg)
         match context.model.result.column_type:
@@ -383,7 +383,7 @@ class Project:
                 assert time_dim is not None
                 time_columns = set(time_dim.get_load_data_time_columns())
             case _:
-                msg = f"BUG: unhandled {context.model.result.column_type =}"
+                msg = f"BUG: unhandled {context.model.result.column_type=}"
                 raise NotImplementedError(msg)
         with restart_runtime_session_with_custom_conf(
             conf=cast(ProjectQueryModel, context.model).project.get_runtime_conf(
@@ -403,7 +403,7 @@ class Project:
                 case DatasetConstructionMethod.ANNUAL_MULTIPLIER:
                     df = apply_annual_multiplier(iv_df, gr_df, time_columns, value_columns)
                 case _:
-                    msg = f"BUG: Unsupported {dataset.construction_method =}"
+                    msg = f"BUG: Unsupported {dataset.construction_method=}"
                     raise NotImplementedError(msg)
             df = write_dataframe_and_auto_partition(df, dataset_path)
 

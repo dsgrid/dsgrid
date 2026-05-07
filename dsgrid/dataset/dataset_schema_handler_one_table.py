@@ -102,7 +102,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         for column in self._load_data.columns:
             if column not in allowed_columns:
-                msg = f"{column =} is not expected in load_data"
+                msg = f"{column=} is not expected in load_data"
                 raise DSGInvalidDataset(msg)
             if not (
                 column in time_columns or column == VALUE_COLUMN or column == TIME_ZONE_COLUMN

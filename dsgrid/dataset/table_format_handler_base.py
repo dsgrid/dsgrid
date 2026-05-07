@@ -164,7 +164,7 @@ class TableFormatHandlerBase(abc.ABC):
             elif dim_type.value in columns:
                 existing_col = dim_type.value
                 new_cols = context.get_dimension_column_names(dim_type, dataset_id=dataset_id)
-                assert len(new_cols) == 1, f"{dim_type =} {new_cols =}"
+                assert len(new_cols) == 1, f"{dim_type=} {new_cols=}"
                 new_col = next(iter(new_cols))
                 if existing_col != new_col:
                     df = rename_columns(df, {existing_col: new_col})
@@ -195,7 +195,7 @@ class TableFormatHandlerBase(abc.ABC):
     ) -> None:
         name = column.get_column_name()
         if name in column_to_dim_type:
-            assert dim_type == column_to_dim_type[name], f"{name =} {column_to_dim_type}"
+            assert dim_type == column_to_dim_type[name], f"{name=} {column_to_dim_type}"
         column_to_dim_type[name] = dim_type
 
     def _build_group_by_columns(

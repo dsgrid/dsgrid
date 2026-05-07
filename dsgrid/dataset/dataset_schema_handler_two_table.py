@@ -280,7 +280,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         found_id = False
         for column in self._load_data.columns:
             if column not in allowed_columns:
-                msg = f"{column =} is not expected in load_data"
+                msg = f"{column=} is not expected in load_data"
                 raise DSGInvalidDataset(msg)
             if column == "id":
                 found_id = True

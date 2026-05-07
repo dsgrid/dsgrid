@@ -275,7 +275,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         num_matching = len(actual.intersection(expected))
                         msg = (
                             f"Dataset records for dimension type {column} do not match expected "
-                            f"values. {missing =} {extra =} {num_matching =}"
+                            f"values. {missing=} {extra=} {num_matching=}"
                         )
                         raise DSGInvalidDataset(msg)
 
@@ -764,13 +764,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
             to_dim = project_config.get_dimension(mapping.name)
             if to_dim.model.dimension_type == DimensionType.TIME:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because specification "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because specification "
                     f"of the time dimension is not supported: {mapping.name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
             if to_dim.model.dimension_type in actual_mapping_dims:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because it can only "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it can only "
                     f"support mapping one dimension for a given dimension type. "
                     f"type={to_dim.model.dimension_type} "
                     f"first={actual_mapping_dims[to_dim.model.dimension_type]} "
@@ -795,7 +795,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because there is no "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
                     f"dataset-to-project-base mapping defined for {to_dim.model.label}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
@@ -1008,7 +1008,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim = self._config.get_time_dimension()
         if not isinstance(time_dim, IndexTimeDimensionConfig):
             assert time_dim is not None
-            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type =} time type, it applies to INDEX time type only."
+            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: ibis.Table) -> ibis.Table:

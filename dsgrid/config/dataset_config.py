@@ -939,7 +939,7 @@ def get_unique_dimension_record_ids(
             )
     if pivoted_dimension_type is not None:
         if pivoted_dimension_type.value in df.columns:
-            msg = f"{pivoted_dimension_type =} cannot be in the dataframe columns."
+            msg = f"{pivoted_dimension_type=} cannot be in the dataframe columns."
             raise DSGInvalidParameter(msg)
         dimension_type_columns = {x.value for x in DimensionType}
         dimension_type_columns.update(time_columns)

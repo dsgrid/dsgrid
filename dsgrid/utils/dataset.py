@@ -202,7 +202,7 @@ def add_time_zone(
     """
     geo_records = geography_dim.get_records_dataframe()
     if df_key not in load_data_df.columns:
-        msg = f"Cannot locate {df_key =} in load_data_df: {load_data_df.columns}"
+        msg = f"Cannot locate {df_key=} in load_data_df: {load_data_df.columns}"
         raise ValueError(msg)
 
     df = add_column_from_records(

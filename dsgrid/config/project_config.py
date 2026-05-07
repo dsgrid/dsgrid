@@ -146,7 +146,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             for selector in selectors[1:]:
                 columns = sorted(selector.column_values.keys())
                 if columns != first:
-                    msg = f"All selectors must define the same columns: {first =} {columns =}"
+                    msg = f"All selectors must define the same columns: {first=} {columns=}"
                     raise ValueError(msg)
 
         return selectors
@@ -363,7 +363,7 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
     @model_validator(mode="after")
     def check_base(self) -> "RequiredDimensionRecordsByTypeModel":
         if self.base.record_ids and self.base_missing.record_ids:
-            msg = f"base and base_missing cannot both contain record_ids: {self.base =} {self.base_missing =}"
+            msg = f"base and base_missing cannot both contain record_ids: {self.base=} {self.base_missing=}"
             raise ValueError(msg)
         return self
 
@@ -600,7 +600,7 @@ class InputDatasetModel(DSGBaseModel):
             return time_based_data_adjustment
         if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
             return time_based_data_adjustment
-        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment =}."
+        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment=}."
         raise ValueError(msg)
 
         #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
@@ -774,7 +774,7 @@ class ProjectConfig(ConfigBase):
         for dim in self._iter_base_dimensions():
             if dim.model.dimension_type == dimension_type and dim.model.name == dimension_name:
                 return dim
-        msg = f"Did not find a dimension of {dimension_type =} with {dimension_name =}"
+        msg = f"Did not find a dimension of {dimension_type=} with {dimension_name=}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_time_dimension(self) -> TimeDimensionBaseConfig:
@@ -789,13 +789,13 @@ class ProjectConfig(ConfigBase):
             x for x in self._iter_base_dimensions() if x.model.dimension_type == dimension_type
         ]
         if not dims:
-            msg = f"base dimension {dimension_type =} not found"
+            msg = f"base dimension {dimension_type=} not found"
             raise DSGValueNotRegistered(msg)
 
         if len(dims) > 1:
             qnames = " ".join([x.model.name for x in dims])
             msg = (
-                f"Found multiple base dimensions for {dimension_type =}: {qnames}. "
+                f"Found multiple base dimensions for {dimension_type=}: {qnames}. "
                 "Call get_base_dimension() with a specific name."
             )
             raise DSGInvalidDimension(msg)
@@ -811,14 +811,14 @@ class ProjectConfig(ConfigBase):
                 if dimension_name is None or dim.model.name == dimension_name:
                     if res is not None:
                         msg = (
-                            f"Found multiple base dimensions for {dimension_type =}. "
+                            f"Found multiple base dimensions for {dimension_type=}. "
                             "You must specify a dimension query name to remove ambiguity."
                         )
                         raise DSGInvalidOperation(msg)
                     res = dim, key.version
 
         if res is None:
-            msg = f"Did not find a dimension with {dimension_type =} {dimension_name =}"
+            msg = f"Did not find a dimension with {dimension_type=} {dimension_name=}"
             raise DSGValueNotRegistered(msg)
         return res
 
@@ -844,14 +844,14 @@ class ProjectConfig(ConfigBase):
             if dim.model.name == name:
                 return dim
 
-        msg = f"No base dimension with {name =} is stored."
+        msg = f"No base dimension with {name=} is stored."
         raise DSGValueNotRegistered(msg)
 
     def get_dimension_with_records(self, name: str) -> DimensionBaseConfigWithFiles:
         """Return a dimension config matching name that has records."""
         dim = self._dimensions_by_name.get(name)
         if dim is None:
-            msg = f"{name =} is not stored"
+            msg = f"{name=} is not stored"
             raise DSGInvalidDimension(msg)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
             msg = f"{dim.model.label} does not have records"
@@ -997,7 +997,7 @@ class ProjectConfig(ConfigBase):
         for dim in self._iter_base_dimensions():
             if dim.model.dimension_id == dimension_id:
                 return dim
-        msg = f"Did not find a base dimension with {dimension_id =}"
+        msg = f"Did not find a base dimension with {dimension_id=}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_dimension_records_by_id(self, dimension_id: str) -> ibis.Table:
@@ -1046,7 +1046,7 @@ class ProjectConfig(ConfigBase):
             case DimensionCategory.SUPPLEMENTAL:
                 method = self._iter_supplemental_dimensions
             case _:
-                msg = f"{category =}"
+                msg = f"{category=}"
                 raise NotImplementedError(msg)
 
         return sorted((x.model.name for x in method()))
@@ -1341,7 +1341,7 @@ class ProjectConfig(ConfigBase):
                 msg = (
                     "The project config requires these these record IDs in the dataset's 'base' "
                     "field, but they are not in the base dimension records: "
-                    f"name={base_dim_query_name}: {diff =}"
+                    f"name={base_dim_query_name}: {diff=}"
                 )
                 raise DSGInvalidDataset(msg)
         elif reqs.base_missing.record_ids:
@@ -1351,7 +1351,7 @@ class ProjectConfig(ConfigBase):
                 msg = (
                     "The project config requires these these record IDs in the dataset's "
                     "'base_missing' field, but they are not in the base dimension "
-                    f"name={base_dim_query_name}: {diff =}"
+                    f"name={base_dim_query_name}: {diff=}"
                 )
                 raise DSGInvalidDataset(msg)
             record_ids = all_base_record_ids - missing_ids
@@ -1368,7 +1368,7 @@ class ProjectConfig(ConfigBase):
                         assert isinstance(dim, DimensionBaseConfigWithFiles)
                         return dim.get_unique_ids()
 
-        msg = f"subset dimension selector not found: {name =} {selector_name =}"
+        msg = f"subset dimension selector not found: {name=} {selector_name=}"
         raise DSGInvalidDimension(msg)
 
     def _get_required_record_ids_from_subsets(

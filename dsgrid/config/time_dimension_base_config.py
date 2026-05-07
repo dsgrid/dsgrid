@@ -99,7 +99,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if len(time_cols) > 1:
             msg = (
                 "Handling of multiple time columns needs to be implemented in the child class: "
-                f"{type(self)}: {time_cols =}"
+                f"{type(self)}: {time_cols=}"
             )
             raise NotImplementedError(msg)
 

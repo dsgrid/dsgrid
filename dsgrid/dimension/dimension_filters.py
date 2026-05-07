@@ -179,7 +179,7 @@ def _apply_column_operator(
             expr = col.isnull()
         case "isin":
             if not isinstance(value, list | tuple | set):
-                msg = f"value must be a list, tuple, or set for {operator =}"
+                msg = f"value must be a list, tuple, or set for {operator=}"
                 raise DSGInvalidField(msg)
             expr = col.isin(list(value))
         case "like":
@@ -189,7 +189,7 @@ def _apply_column_operator(
         case "startswith":
             expr = col.startswith(value)
         case _:
-            msg = f"{operator =} is not supported"
+            msg = f"{operator=} is not supported"
             raise DSGInvalidField(msg)
     if negate:
         expr = ~expr

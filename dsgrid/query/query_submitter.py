@@ -191,7 +191,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ]
                     msg = (
                         f"Subset dimensions cannot be used in aggregations: "
-                        f"{dimension_name =}. Only base and supplemental dimensions are "
+                        f"{dimension_name=}. Only base and supplemental dimensions are "
                         f"allowed. base={base_names} supplemental={supp_names}"
                     )
                     raise DSGInvalidQuery(msg)
@@ -226,7 +226,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ),
                 ]
             else:
-                msg = f"Unhandled dataset type: {dataset =}"
+                msg = f"Unhandled dataset type: {dataset=}"
                 raise NotImplementedError(msg)
 
             for dataset_id in src_dataset_ids:
@@ -245,7 +245,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 elif base_dimension_names != names:
                     msg = (
                         "Datasets in a query must have the same base dimension query names: "
-                        f"{dataset =} {base_dimension_names} {names}"
+                        f"{dataset=} {base_dimension_names} {names}"
                     )
                     raise DSGInvalidQuery(msg)
 
@@ -265,7 +265,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     msg = (
                         "The dataset's base_dimension_names value is not set and "
                         f"there are multiple base dimensions of type {dim_type} in the project. "
-                        f"Please re-register the dataset with {dataset_id =}."
+                        f"Please re-register the dataset with {dataset_id=}."
                     )
                     raise DSGInvalidDataset(msg)
                 setattr(names, dim_type.value, dims[0].model.name)
@@ -420,7 +420,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         wrap_time_allowed=False,
                     )
         else:
-            msg = f"Unknown input {model.result.time_zone =}"
+            msg = f"Unknown input {model.result.time_zone=}"
             raise DSGInvalidParameter(msg)
 
         repartition = not persist_intermediate_table
@@ -513,7 +513,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = read_dataframe(path)
             unexpected = sorted(set(df.columns).difference(expected_columns))
             if unexpected:
-                msg = f"Unexpected columns are present in {dataset_id =} {unexpected =}"
+                msg = f"Unexpected columns are present in {dataset_id=} {unexpected=}"
                 raise Exception(msg)
             datasets[dataset_id] = DatasetExpressionHandler(
                 df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
@@ -529,7 +529,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
-                msg = f"BUG: unhandled {context.model.result.column_type =}"
+                msg = f"BUG: unhandled {context.model.result.column_type=}"
                 raise NotImplementedError(msg)
 
         return sorted(dim_columns), sorted(time_columns)
@@ -572,7 +572,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         for dim_filter in context.model.result.dimension_filters:
             column_names = context.get_dimension_column_names(dim_filter.dimension_type)
             if len(column_names) > 1:
-                msg = f"Cannot filter {dim_filter} when there are multiple {column_names =}"
+                msg = f"Cannot filter {dim_filter} when there are multiple {column_names=}"
                 raise NotImplementedError(msg)
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 records = dim_filter.get_filtered_records_dataframe(

@@ -5,8 +5,26 @@ from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.tests.common import TEST_PROJECT_PATH
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import dump_data, load_data
 from common import check_config_fields
+
+
+def _write_id_bigint_schema_file(tmp_path) -> str:
+    """Pin the ``id`` join key to BIGINT on both load_data and load_data_lookup.
+
+    DuckDB's CSV reader returns all columns as VARCHAR by default while its JSON
+    reader infers ``id`` as BIGINT. Without a declared schema the join in
+    ``get_unique_dimension_record_ids`` sees a string-vs-int mismatch and fails.
+    """
+    schema_file = tmp_path / "schema.json5"
+    dump_data(
+        {
+            "load_data": [{"name": "id", "data_type": "BIGINT"}],
+            "load_data_lookup": [{"name": "id", "data_type": "BIGINT"}],
+        },
+        schema_file,
+    )
+    return str(schema_file)
 
 
 def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
@@ -38,9 +56,11 @@ def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
         "--output",
         str(tmp_path),
         "--no-prompts",
+        "--schema-file",
+        _write_id_bigint_schema_file(tmp_path),
     ]
     result = runner.invoke(cli, cmd)
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert output_dir.exists()
     dataset_file = output_dir / "dataset.json5"
     assert dataset_file.exists()

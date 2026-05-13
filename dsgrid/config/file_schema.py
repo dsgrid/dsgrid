@@ -1,7 +1,7 @@
 import ibis
 import logging
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from pydantic import Field, field_validator, model_validator
 
@@ -109,13 +109,22 @@ def read_data_file(
 
     match path.suffix:
         case ".parquet":
+            # Parquet is self-describing; honor its on-disk schema (including
+            # precision, e.g. timestamp microseconds) verbatim. The FileSchema
+            # declaration is documentation/validation for Parquet, not a
+            # runtime type override.
             df = read_parquet(path)
         case ".csv":
             backend_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
             column_schema = _get_column_schema(schema, backend_types)
             df = read_csv(path, schema=column_schema)
         case ".json":
+            # JSON readers infer types from content (DuckDB) or default to
+            # strings (Spark). Apply user-declared types after the read so a
+            # FileSchema is the single source of truth for JSON inputs the
+            # same way it is for CSV.
             df = read_json(path)
+            df = _apply_declared_types_post_read(df, schema)
         case _:
             msg = f"Unsupported file type: {path.suffix}"
             raise DSGInvalidDataset(msg)
@@ -191,3 +200,132 @@ def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, s
             raise DSGInvalidField(msg)
         mapped_schema[key] = backend_mapping[col_type]
     return mapped_schema
+
+
+# Map the FileSchema data_type vocabulary (see dsgrid.ibis.types.SUPPORTED_TYPES)
+# to Ibis dtype strings accepted by ``Column.cast``. Used to apply declared
+# types after reading JSON, since the JSON readers don't accept a read-time
+# schema argument the way CSV does.
+_USER_TYPE_TO_IBIS_DTYPE = {
+    "BOOLEAN": "bool",
+    "INT": "int32",
+    "INTEGER": "int32",
+    "TINYINT": "int8",
+    "SMALLINT": "int16",
+    "BIGINT": "int64",
+    "FLOAT": "float32",
+    "DOUBLE": "float64",
+    "STRING": "string",
+    "TEXT": "string",
+    "VARCHAR": "string",
+    "TIMESTAMP_NTZ": "timestamp",
+    "TIMESTAMP_TZ": "timestamp('UTC')",
+}
+
+
+def _declared_type_family(declared: str) -> str:
+    """Bucket a user-facing type name into a coarse compatibility family.
+
+    Only casts within the same family are considered safe enough to apply
+    silently. Cross-family declarations (e.g. declared VARCHAR but the data
+    came in as int64) are left alone so existing validators can surface the
+    real error instead of dsgrid silently coercing the data.
+    """
+    if declared in {"BOOLEAN"}:
+        return "bool"
+    if declared in {"INT", "INTEGER", "TINYINT", "SMALLINT", "BIGINT"}:
+        return "integer"
+    if declared in {"FLOAT", "DOUBLE"}:
+        return "floating"
+    if declared in {"STRING", "TEXT", "VARCHAR"}:
+        return "string"
+    if declared in {"TIMESTAMP_NTZ", "TIMESTAMP_TZ"}:
+        return "timestamp"
+    msg = f"Declared data_type={declared!r} has no family mapping."
+    raise DSGInvalidField(msg)
+
+
+def _actual_type_family(dtype) -> str:
+    """Coarse family bucket for an Ibis runtime dtype."""
+    if dtype.is_boolean():
+        return "bool"
+    if dtype.is_integer():
+        return "integer"
+    if dtype.is_floating():
+        return "floating"
+    if dtype.is_string():
+        return "string"
+    if dtype.is_timestamp():
+        return "timestamp"
+    return "other"
+
+
+def apply_declared_types(
+    df: ibis.Table,
+    columns: list[Column],
+    *,
+    strict_family: bool = True,
+) -> ibis.Table:
+    """Cast columns of ``df`` to match user-declared types in ``columns``.
+
+    Used in two contexts that differ in how much the framework trusts the
+    declaration:
+
+    - Registered datasets (after a JSON read): the FileSchema is declarative;
+      cross-family mismatches usually indicate bad input data and should fail
+      loudly via dsgrid's downstream validators. Pass ``strict_family=True``
+      so this function only normalizes width within the same type family
+      (e.g. int32 ↔ int64) and skips int → string or similar cross-family
+      casts.
+    - CLI ``generate-config --schema-file``: the user is feeding the readers
+      authoritative hints for raw files that have no registered schema yet
+      (e.g. a CSV read as all-VARCHAR that the user knows is an integer ID).
+      Pass ``strict_family=False`` so declared types always take effect.
+
+    Columns declared in ``columns`` but missing from the table are silently
+    ignored; downstream validation surfaces missing required columns with a
+    more useful message. Columns without a ``data_type`` keep their existing
+    type.
+
+    Parameters
+    ----------
+    df : ibis.Table
+    columns : list[Column]
+    strict_family : bool, optional
+        If True, skip casts that cross type families. By default True.
+
+    Returns
+    -------
+    ibis.Table
+
+    Raises
+    ------
+    DSGInvalidField
+        If a declared ``data_type`` has no mapping in
+        :data:`_USER_TYPE_TO_IBIS_DTYPE`.
+    """
+    if not columns:
+        return df
+    schema = df.schema()
+    casts: dict[str, Any] = {}
+    for col in columns:
+        if col.data_type is None or col.name not in schema:
+            continue
+        dtype = _USER_TYPE_TO_IBIS_DTYPE.get(col.data_type)
+        if dtype is None:
+            msg = (
+                f"Declared data_type={col.data_type!r} for column {col.name!r} "
+                f"has no Ibis dtype mapping."
+            )
+            raise DSGInvalidField(msg)
+        if strict_family and _declared_type_family(col.data_type) != _actual_type_family(
+            schema[col.name]
+        ):
+            continue
+        casts[col.name] = df[col.name].cast(dtype)
+    return df.mutate(**casts) if casts else df
+
+
+def _apply_declared_types_post_read(df: ibis.Table, schema: FileSchema) -> ibis.Table:
+    """Internal: apply declared column types after reading a JSON file (strict)."""
+    return apply_declared_types(df, schema.columns, strict_family=True)

@@ -9,7 +9,10 @@ import pytest
 from dsgrid.config.file_schema import (
     Column,
     FileSchema,
+    apply_declared_types,
     read_data_file,
+    _actual_type_family,
+    _declared_type_family,
     _drop_ignored_columns,
     _get_column_renames,
     _get_column_schema,
@@ -765,3 +768,120 @@ def test_read_data_file_parquet_with_ignore_columns(tmp_path, spark):
     assert _count(df) == 2
     assert set(df.columns) == {"id", "name", "value"}
     assert "to_ignore" not in df.columns
+
+
+# apply_declared_types tests
+
+
+def test_apply_declared_types_empty_columns_returns_unchanged(spark):
+    """No declarations means no casts."""
+    df = spark.createDataFrame([(1, "a")], ["id", "name"])
+    before = df.schema()
+    after = apply_declared_types(df, []).schema()
+    assert before == after
+
+
+def test_apply_declared_types_skips_columns_without_data_type(spark):
+    """Columns with data_type=None keep their existing type."""
+    df = spark.createDataFrame([(1, "a")], ["id", "name"])
+    columns = [Column(name="id", data_type=None), Column(name="name", data_type=None)]
+    assert apply_declared_types(df, columns).schema() == df.schema()
+
+
+def test_apply_declared_types_skips_columns_not_in_table(spark):
+    """Declared columns absent from the table are silently ignored.
+
+    Downstream validators surface missing required columns with a useful
+    message; apply_declared_types is not the place to catch that.
+    """
+    df = spark.createDataFrame([(1, "a")], ["id", "name"])
+    columns = [Column(name="ghost", data_type="BIGINT")]
+    assert apply_declared_types(df, columns).schema() == df.schema()
+
+
+def test_apply_declared_types_strict_same_family_int_width(spark):
+    """Same-family widening (e.g. int → int64) is applied even in strict mode."""
+    df = spark.createDataFrame([(1,)], ["id"])  # Spark createDataFrame → int64
+    columns = [Column(name="id", data_type="INT")]  # INT → int32
+    result = apply_declared_types(df, columns, strict_family=True)
+    assert str(result.schema()["id"]) == "int32"
+
+
+def test_apply_declared_types_strict_cross_family_skipped(spark):
+    """Strict mode leaves cross-family declarations alone so a downstream
+    type validator can surface the real error rather than silently coercing
+    (e.g. int data hiding behind a declared VARCHAR loses leading zeros)."""
+    df = spark.createDataFrame([(6037,)], ["geography"])
+    columns = [Column(name="geography", data_type="VARCHAR")]
+    result = apply_declared_types(df, columns, strict_family=True)
+    # int64 stays int64 — no silent coercion to string.
+    assert str(result.schema()["geography"]) == "int64"
+
+
+def test_apply_declared_types_force_cross_family_applied(spark):
+    """strict_family=False force-casts across families.
+
+    Used by the generate-config CLI where the user is authoritatively
+    declaring types for raw files with no registered schema.
+    """
+    df = spark.createDataFrame([("6202",)], ["id"])  # string from DuckDB all_varchar=True
+    columns = [Column(name="id", data_type="BIGINT")]
+    result = apply_declared_types(df, columns, strict_family=False)
+    assert str(result.schema()["id"]) == "int64"
+
+
+def test_apply_declared_types_partial_declaration_only_casts_declared(spark):
+    """Only the declared subset is touched; the rest keeps inferred types."""
+    df = spark.createDataFrame([(1, "a", 1.5)], ["id", "name", "value"])
+    columns = [Column(name="id", data_type="INT")]  # only id
+    result = apply_declared_types(df, columns, strict_family=True)
+    schema = result.schema()
+    assert str(schema["id"]) == "int32"
+    assert str(schema["name"]) == "string"
+    assert "float" in str(schema["value"])  # float32 or float64
+
+
+# _declared_type_family / _actual_type_family tests
+
+
+@pytest.mark.parametrize(
+    "declared,expected_family",
+    [
+        ("BOOLEAN", "bool"),
+        ("INT", "integer"),
+        ("INTEGER", "integer"),
+        ("TINYINT", "integer"),
+        ("SMALLINT", "integer"),
+        ("BIGINT", "integer"),
+        ("FLOAT", "floating"),
+        ("DOUBLE", "floating"),
+        ("STRING", "string"),
+        ("TEXT", "string"),
+        ("VARCHAR", "string"),
+        ("TIMESTAMP_NTZ", "timestamp"),
+        ("TIMESTAMP_TZ", "timestamp"),
+    ],
+)
+def test_declared_type_family_covers_all_supported(declared, expected_family):
+    assert _declared_type_family(declared) == expected_family
+
+
+def test_declared_type_family_unknown_raises():
+    with pytest.raises(DSGInvalidField, match="no family mapping"):
+        _declared_type_family("BOGUS")
+
+
+def test_actual_type_family_covers_common_dtypes():
+    """Run through the family branches on real Ibis dtypes."""
+    assert _actual_type_family(ibis.dtype("bool")) == "bool"
+    assert _actual_type_family(ibis.dtype("int64")) == "integer"
+    assert _actual_type_family(ibis.dtype("int32")) == "integer"
+    assert _actual_type_family(ibis.dtype("float64")) == "floating"
+    assert _actual_type_family(ibis.dtype("string")) == "string"
+    assert _actual_type_family(ibis.dtype("timestamp")) == "timestamp"
+
+
+def test_actual_type_family_unknown_returns_other():
+    """Anything outside the recognized families falls into ``other`` so
+    apply_declared_types' strict-family check leaves the column alone."""
+    assert _actual_type_family(ibis.dtype("array<int64>")) == "other"

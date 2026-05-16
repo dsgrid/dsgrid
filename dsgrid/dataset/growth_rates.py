@@ -132,11 +132,15 @@ def _process_exponential_growth_rate(
 
 def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_column):
     iv_years = get_unique_values(initial_value_df, model_year_column)
-    iv_years_sorted = sorted((int(x) for x in iv_years))
+    # Coerce to int set: dataset.base_year is an int (per the pydantic model),
+    # but iv_years comes back as the raw column values which are strings for
+    # the standard string-typed model_year dimension.
+    iv_years_int = {int(x) for x in iv_years}
+    iv_years_sorted = sorted(iv_years_int)
 
     if dataset.base_year is None:
         base_year = iv_years_sorted[0]
-    elif dataset.base_year in iv_years:
+    elif dataset.base_year in iv_years_int:
         base_year = dataset.base_year
     else:
         msg = f"ProjectionDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"

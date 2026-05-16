@@ -368,7 +368,22 @@ Both `expected_associations` and `missing_associations` accept absolute or relat
 (csv-files)=
 ### CSV Files
 
-While not generally recommended, dsgrid does support CSV data files. By default, dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time zones, dsgrid provides a mechanism for defining column data types directly in the dataset configuration.
+While not generally recommended, dsgrid does support CSV data files. By default,
+dsgrid lets the active Ibis backend infer the schema of the file (DuckDB unless
+Spark is configured). Inference differs by backend and format — notably DuckDB's
+CSV reader returns every column as a string, while its JSON reader infers types —
+so there may be cases of type ambiguities, such as integer vs string, integer vs
+float, and timestamps with time zones. dsgrid provides two ways to declare column
+data types explicitly:
+
+- **In the dataset configuration** — define types in the `columns` field, as
+  shown below. This is authoritative once the dataset is registered.
+- **At config-generation time** — pass `--schema-file` to
+  `dsgrid registry datasets generate-config`. This is a JSON5 file shaped like
+  `{load_data: [{name, data_type}, ...], load_data_lookup: [...]}` and is useful
+  when the raw input files have no declared schema yet and the readers would
+  otherwise infer mismatched types across CSV and JSON inputs (for example, an
+  `id` join key read as a string from CSV but as a 64-bit integer from JSON).
 
 Consider this example that uses county FIPS codes to identify the geography of each data point:
 

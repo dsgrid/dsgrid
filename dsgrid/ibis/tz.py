@@ -2,15 +2,32 @@
 
 Wraps PySpark's ``spark.sql.session.timeZone`` (Spark backend) and
 DuckDB's connection ``TimeZone`` setting (DuckDB backend) under a
-single API. **The two are not equivalent**: on Spark, setting the
-session TZ changes how column-time extractions like ``.year()`` /
-``.hour()`` interpret stored UTC instants; on DuckDB the connection
-TZ only affects rendering of ``TIMESTAMP WITH TIME ZONE`` values.
-See Phase 6 of the Ibis migration plan for the planned reconciliation.
+single render-TZ API.
+
+The two implementations are not symmetric, but they converge on the
+same observable semantic when used correctly:
+
+- **Spark** stores ``TIMESTAMP`` values as UTC microseconds and
+  re-renders them through the session TZ on column extractions like
+  ``.year()`` / ``.hour()``. Setting the session TZ via this module
+  always affects those extractions.
+- **DuckDB** distinguishes between TZ-naive ``TIMESTAMP`` and
+  TZ-aware ``TIMESTAMP WITH TIME ZONE`` (``TIMESTAMPTZ``). The
+  connection ``TimeZone`` setting only affects extractions on
+  ``TIMESTAMPTZ`` columns. **Extractions on plain ``TIMESTAMP``
+  columns are TZ-naive on DuckDB regardless of the connection TZ.**
+
+So the contract for callers of :func:`custom_time_zone` /
+:func:`set_session_time_zone` is: the columns you extract from inside
+the context must be ``TIMESTAMPTZ`` on DuckDB for the requested TZ to
+take effect. If you read timestamps from a TZ-aware source (chronify,
+declared TIMESTAMP_TZ schemas, ``datetime`` objects with ``tzinfo``),
+this happens automatically. Plain string-parsed timestamps without
+TZ info will silently ignore the context manager on DuckDB.
 
 ``custom_time_zone`` and ``set_session_time_zone`` are currently
 identical wrappers; both exist because callers pre-date the rename.
-Treat one as deprecated once Phase 6 is in.
+Treat one as deprecated once a consolidation pass lands.
 """
 
 from contextlib import contextmanager

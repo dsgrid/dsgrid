@@ -1,7 +1,9 @@
 """Tests for dsgrid.config.file_schema module."""
 
 import json
+from datetime import datetime
 from typing import Generator
+from zoneinfo import ZoneInfo
 
 import ibis
 import pytest
@@ -846,3 +848,65 @@ def test_actual_type_family_unknown_returns_other():
     """Anything outside the recognized families falls into ``other`` so
     apply_declared_types' strict-family check leaves the column alone."""
     assert _actual_type_family(ibis.dtype("array<int64>")) == "other"
+
+
+# TIMESTAMP_TZ-on-Spark warning tests
+
+
+def _make_timestamp_tz_schema() -> list:
+    return [Column(name="ts", data_type="TIMESTAMP_TZ")]
+
+
+def test_timestamp_tz_warning_on_duckdb_is_silent(spark):
+    """DuckDB carries per-row TZ tags; no warning expected."""
+    if not use_duckdb():
+        pytest.skip("Test exercises DuckDB-specific silence")
+    df = ibis.memtable({"ts": [datetime(2024, 1, 1, tzinfo=ZoneInfo("UTC"))]}).cast(
+        {"ts": "timestamp('UTC')"}
+    )
+    import warnings as _warnings
+
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+    relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
+    assert relevant == []
+
+
+def test_timestamp_tz_warning_on_spark_non_utc_emits(monkeypatch, spark):
+    """When the session TZ is non-UTC on Spark, declaring TIMESTAMP_TZ warns."""
+    if use_duckdb():
+        pytest.skip("Warning is Spark-only behavior")
+    from dsgrid.config import file_schema as _fs
+
+    monkeypatch.setattr(_fs, "use_duckdb", lambda: False)
+    monkeypatch.setattr(
+        "dsgrid.ibis.tz.get_current_time_zone", lambda: "America/Denver"
+    )
+    df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
+    import warnings as _warnings
+
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+    relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
+    assert len(relevant) == 1
+    assert "Denver" in str(relevant[0].message)
+
+
+def test_timestamp_tz_warning_on_spark_utc_is_silent(monkeypatch, spark):
+    """When the session TZ is UTC on Spark, declaring TIMESTAMP_TZ is silent."""
+    if use_duckdb():
+        pytest.skip("Warning is Spark-only behavior")
+    from dsgrid.config import file_schema as _fs
+
+    monkeypatch.setattr(_fs, "use_duckdb", lambda: False)
+    monkeypatch.setattr("dsgrid.ibis.tz.get_current_time_zone", lambda: "UTC")
+    df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
+    import warnings as _warnings
+
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+    relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
+    assert relevant == []

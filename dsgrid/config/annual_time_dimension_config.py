@@ -156,6 +156,14 @@ def map_annual_time_to_date_time(
 
     # Note that MeasurementType.TOTAL has already been verified, i.e.,
     # each value associated with an annual time represents the total over that year.
+    #
+    # The set_session_time_zone context manager makes .year() resolve in the
+    # target TZ on Spark by swapping spark.sql.session.timeZone. On DuckDB it
+    # sets the connection TimeZone, which only affects TIMESTAMPTZ columns —
+    # which dt_df[time_col] is, because chronify's list_timestamps() returns
+    # TZ-aware pandas Timestamps and createDataFrame maps those to
+    # ``timestamp('UTC')`` (TIMESTAMPTZ). See dsgrid.ibis.tz for the broader
+    # cross-backend contract.
     with set_session_time_zone(dt_dim.model.time_zone_format.time_zone):
         years = table_column_to_list(
             dt_df.select(year=dt_df[time_col].year()).distinct(),

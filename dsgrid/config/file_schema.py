@@ -1,5 +1,6 @@
 import ibis
 import logging
+import warnings
 from pathlib import Path
 from typing import Any, Self
 
@@ -302,8 +303,40 @@ def apply_declared_types(
         if strict_family and spec.family != _actual_type_family(actual_dtype):
             continue
         _check_narrowing(spec, col.name, actual_dtype)
+        _warn_if_timestamp_tz_lossy_on_spark(spec, col.name)
         casts[col.name] = df[col.name].cast(spec.ibis_dtype)
     return df.mutate(**casts) if casts else df
+
+
+def _warn_if_timestamp_tz_lossy_on_spark(spec: "TypeSpec", column_name: str) -> None:
+    """Warn when TIMESTAMP_TZ is declared on Spark with a non-UTC session TZ.
+
+    Spark's ``TIMESTAMP`` type cannot carry a per-row TZ tag; it stores the
+    instant as UTC microseconds and renders it through
+    ``spark.sql.session.timeZone``. When the session TZ is not UTC, a
+    declared TIMESTAMP_TZ silently loses the original TZ offset at render
+    time. Emit a warning so callers can pin the session TZ to UTC (or
+    switch to DuckDB) if they care about the rendered offset.
+    """
+    if spec.name != "TIMESTAMP_TZ" or use_duckdb():
+        return
+    # Lazy import to avoid pulling Spark dependencies on the DuckDB path.
+    from dsgrid.ibis.tz import get_current_time_zone
+
+    try:
+        current_tz = get_current_time_zone()
+    except Exception:  # noqa: BLE001 - getter can fail mid-bootstrap
+        return
+    if current_tz.upper() == "UTC":
+        return
+    msg = (
+        f"Column {column_name!r} declared TIMESTAMP_TZ on the Spark backend, "
+        f"but spark.sql.session.timeZone={current_tz!r} (not UTC). The instant is "
+        "preserved, but the per-row TZ offset will render in the session TZ. "
+        "Pin the session TZ to UTC or switch to the DuckDB backend if you need "
+        "the original TZ offset to survive in rendered output."
+    )
+    warnings.warn(msg, UserWarning, stacklevel=4)
 
 
 def _apply_declared_types_post_read(df: ibis.Table, schema: FileSchema) -> ibis.Table:

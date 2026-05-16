@@ -1085,10 +1085,28 @@ def localize_timestamps_if_necessary(
     scratch_dir_context: ScratchDirContext,
 ) -> tuple[ibis.Table, bool]:
     """Localize tz-naive timestamps to time zone(s) in the dataframe if necessary using Chronify.
+
     Timestamps will be localized if the time dimension has a localization plan.
     The localization plan will specify whether to localize to a single time zone
     or multiple time zones based on a time zone column for tz-naive timestamps.
     If the time dimension doesn't have a localization plan, the dataframe will be returned unchanged.
+
+    Cross-backend contract
+    ----------------------
+    The shape of the localized time column differs by backend:
+
+    - **DuckDB**: the time column becomes ``TIMESTAMP WITH TIME ZONE``
+      carrying an explicit per-row TZ tag.
+    - **Spark**: Spark's ``TIMESTAMP`` type cannot carry a per-row TZ tag.
+      The instant is preserved (UTC microseconds), but column extractions
+      such as ``.year()`` / ``.hour()`` interpret the timestamp in the
+      session TZ. The instant is correct on both backends; the *displayed*
+      time-of-day differs.
+
+    Downstream callers that depend on a specific render TZ must either
+    pin ``spark.sql.session.timeZone`` (e.g. via
+    :func:`~dsgrid.ibis.tz.set_session_time_zone`) or cast the column to
+    ``timestamp('<tz>')`` before extracting.
     """
     time_dim = config.get_dimension(DimensionType.TIME)
     if not isinstance(time_dim, DateTimeDimensionConfig):

@@ -63,81 +63,24 @@ if not use_duckdb():
     from pyspark import SparkConf
     from pyspark.errors import AnalysisException
 else:
-
-    class _UnsupportedSparkFunctions:
-        def __getattr__(self, name):
-            def _unsupported(*args, **kwargs):
-                msg = f"Spark function F.{name} is not available with the Ibis DuckDB backend"
-                raise DSGInvalidOperation(msg)
-
-            return _unsupported
-
-    class _SparkType:
-        pass
-
-    class BooleanType(_SparkType):
-        pass
-
-    class ByteType(_SparkType):
-        pass
-
-    class DoubleType(_SparkType):
-        pass
-
-    class FloatType(_SparkType):
-        pass
-
-    class IntegerType(_SparkType):
-        pass
-
-    class LongType(_SparkType):
-        pass
-
-    class ShortType(_SparkType):
-        pass
-
-    class StringType(_SparkType):
-        pass
-
-    class TimestampNTZType(_SparkType):
-        pass
-
-    class TimestampType(_SparkType):
-        pass
-
-    class StructField:
-        def __init__(self, name, dataType, nullable=True):
-            self.name = name
-            self.dataType = dataType
-            self.nullable = nullable
-
-    class StructType(list):
-        def __init__(self, fields=None):
-            super().__init__(fields or [])
-
-        @property
-        def names(self):
-            return [field.name for field in self]
-
-        def add(self, name, data_type, nullable=True):
-            self.append(StructField(name, data_type, nullable=nullable))
-            return self
-
-    class Row(tuple):
-        pass
-
-    class SparkConf:
-        def setAppName(self, name):
-            return self
-
-        def get(self, name, defaultValue=None):
-            return defaultValue
-
-        def set(self, name, value):
-            return self
-
-    class AnalysisException(Exception):
-        pass
+    from dsgrid.ibis._duckdb_shims import (  # noqa: F401
+        F,
+        AnalysisException,
+        BooleanType,
+        ByteType,
+        DoubleType,
+        FloatType,
+        IntegerType,
+        LongType,
+        Row,
+        ShortType,
+        SparkConf,
+        StringType,
+        StructField,
+        StructType,
+        TimestampNTZType,
+        TimestampType,
+    )
 
     class _SparkSessionBuilder:
         def config(self, *args, **kwargs):
@@ -152,8 +95,6 @@ else:
         @staticmethod
         def getActiveSession():
             return None
-
-    F = _UnsupportedSparkFunctions()
 
 
 logger = logging.getLogger(__name__)

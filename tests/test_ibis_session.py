@@ -8,7 +8,7 @@ import pytest
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation, DSGInvalidParameter
 from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import make_temp_view_name
+from dsgrid.ibis.operations import cross_join_dfs, make_temp_view_name
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -36,7 +36,6 @@ from dsgrid.ibis.session import (
     create_dataframe_from_dimension_ids,
     create_dataframe_from_ids,
     create_dataframe_from_product,
-    cross_join_dfs,
     custom_runtime_conf,
     DoubleType,
     F,

@@ -183,6 +183,17 @@ def _sql_on_df(df: ibis.Table, query: str) -> ibis.Table:
     return make_runtime_backend().sql(query)
 
 
+def cross_join_dfs(dfs: list[ibis.Table]) -> ibis.Table:
+    """Perform a cross join of all tables in dfs."""
+    if len(dfs) == 1:
+        return dfs[0]
+
+    df = dfs[0]
+    for other in dfs[1:]:
+        df = cross_join(df, other)
+    return df
+
+
 def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
     """Reduce the number of output partitions.
 

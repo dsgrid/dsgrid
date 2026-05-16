@@ -40,10 +40,8 @@ from dsgrid.registry.common import (
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import (
-    cross_join_dfs,
-    create_dataframe_from_product,
-)
+from dsgrid.ibis.operations import cross_join_dfs
+from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.config.config_base import ConfigBase

@@ -15,7 +15,6 @@ from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
     coalesce,
     create_temp_view,
-    cross_join,
     make_temp_view_name,
 )
 from dsgrid.ibis.io import (
@@ -456,17 +455,6 @@ def create_dataframe_from_dicts(records: list[dict[str, Any]]) -> ibis.Table:
     data = [tuple(row.values()) for row in records]
     columns = list(records[0].keys())
     return get_runtime_session().createDataFrame(data, columns)
-
-
-def cross_join_dfs(dfs: list[ibis.Table]) -> ibis.Table:
-    """Perform a cross join of all tables in dfs."""
-    if len(dfs) == 1:
-        return dfs[0]
-
-    df = dfs[0]
-    for other in dfs[1:]:
-        df = cross_join(df, other)
-    return df
 
 
 @track_timing(timer_stats_collector)

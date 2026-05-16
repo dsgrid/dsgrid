@@ -163,8 +163,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
         if self.get_localization_plan() == "localize_to_single_tz":
             # dtype is timestamp_ntz, so drop tzinfo
-            return pd.Timestamp(start_time.replace(tzinfo=None))
-        return pd.Timestamp(start_time)
+            return pd.Timestamp(start_time.replace(tzinfo=None))  # ty: ignore[invalid-return-type]
+        return pd.Timestamp(start_time)  # ty: ignore[invalid-return-type]
 
     def get_chronify_time_zone(self) -> tzinfo | None:
         time_zone = self.get_time_zone()

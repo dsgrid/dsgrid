@@ -304,8 +304,9 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
 
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
-    if spark.conf.get("spark.sql.session.timeZone") != conf.get("spark.sql.session.timeZone"):
-        spark.conf.set("spark.sql.session.timeZone", conf.get("spark.sql.session.timeZone"))
+    requested_tz = conf.get("spark.sql.session.timeZone")
+    if requested_tz is not None and spark.conf.get("spark.sql.session.timeZone") != requested_tz:
+        spark.conf.set("spark.sql.session.timeZone", requested_tz)
 
     with disable_console_logging():
         log_runtime_conf(spark)

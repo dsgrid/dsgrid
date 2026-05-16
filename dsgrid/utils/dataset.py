@@ -6,6 +6,7 @@ from datetime import tzinfo
 
 import chronify
 import ibis
+import ibis.expr.datatypes as dt
 import ibis.expr.types as ir
 from chronify.models import TableSchema
 
@@ -136,7 +137,7 @@ def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
     return df.select(**exprs)
 
 
-def _to_duckdb_sql_type(data_type: ibis.expr.datatypes.DataType) -> str:
+def _to_duckdb_sql_type(data_type: dt.DataType) -> str:
     if data_type.is_boolean():
         return "BOOLEAN"
     if data_type.is_int8():
@@ -400,12 +401,15 @@ def _look_for_error_contributors(diff: ibis.Table, dataset_table: ibis.Table) ->
     # query per table. The previous loop issued 2N .execute() calls; this
     # version issues 2 regardless of column count, which matters because
     # this runs on the error path against the full dataset table.
+    # Ibis's stub for Table.aggregate types **kwargs against the same Sequence
+    # type as the positional `having` parameter, so dict-spread aggregation
+    # exprs (which work fine at runtime) trip ty. Suppress per call below.
     cols = list(diff.columns)
-    diff_counts = (
-        diff.aggregate(**{col: diff[col].nunique() for col in cols}).execute().iloc[0]
-    )
+    diff_aggs = {col: diff[col].nunique() for col in cols}
+    dataset_aggs = {col: dataset_table[col].nunique() for col in cols}
+    diff_counts = diff.aggregate(**diff_aggs).execute().iloc[0]  # ty: ignore[invalid-argument-type]
     dataset_counts = (
-        dataset_table.aggregate(**{col: dataset_table[col].nunique() for col in cols})
+        dataset_table.aggregate(**dataset_aggs)  # ty: ignore[invalid-argument-type]
         .execute()
         .iloc[0]
     )
@@ -729,7 +733,7 @@ def _to_chronify_time_based_data_adjustment(
         raise NotImplementedError(msg)
 
     return chronify.TimeBasedDataAdjustment(
-        leap_day_adjustment=cast(Any, adj.leap_day_adjustment.value),
+        leap_day_adjustment=adj.leap_day_adjustment.value,
         daylight_saving_adjustment=chronify_dst_adjustment,
     )
 

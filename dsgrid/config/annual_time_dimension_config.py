@@ -190,4 +190,4 @@ def map_annual_time_to_date_time(
             exprs[column] = df2[column]
     if myear_column not in df.columns:
         exprs[myear_column] = df2[annual_col].cast("string")
-    return df2.select(**exprs)
+    return df2.select(**exprs)  # ty: ignore[invalid-argument-type]

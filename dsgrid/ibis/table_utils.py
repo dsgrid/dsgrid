@@ -6,7 +6,7 @@ import pandas as pd
 
 def count_rows(table: ibis.Table) -> int:
     """Return the row count of a table by executing ``table.count()``."""
-    return int(table.count().execute())
+    return int(table.count().execute())  # ty: ignore[invalid-argument-type]
 
 
 def table_to_pandas(table: Any) -> pd.DataFrame:

@@ -31,9 +31,6 @@ from dsgrid.query.dataset_mapping_plan import (
 )
 from dsgrid.utils.files import compute_hash
 
-SUPPORTED_QUERY_FUNCTIONS = {"hour", "max", "mean", "sum", "year"}
-
-
 DimensionFilters: TypeAlias = Annotated[
     Union[
         DimensionFilterExpressionModel,
@@ -48,12 +45,20 @@ DimensionFilters: TypeAlias = Annotated[
 
 
 class FunctionReference:
-    """Reference a query function without binding to a dataframe backend at model-parse time."""
+    """Reference a query function without binding to a dataframe backend at model-parse time.
+
+    The name is forwarded directly into the SQL the backend executes, e.g.
+    ``MAX(value)`` for an aggregation or ``HOUR(timestamp)`` for a scalar
+    column expression. dsgrid does not maintain its own allowlist; any
+    function the active backend (DuckDB or Spark) accepts will work, and
+    unrecognized names will surface as a backend error at execution time.
+
+    The special-case name ``"mean"`` is translated to SQL ``AVG`` inside
+    :func:`dsgrid.dataset.unpivoted_table._aggregate_value`. All other
+    names are uppercased and passed through unchanged.
+    """
 
     def __init__(self, name: str):
-        if name not in SUPPORTED_QUERY_FUNCTIONS:
-            msg = f"function={name} is not supported"
-            raise ValueError(msg)
         self.name = name
         self.__name__ = name
 

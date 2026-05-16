@@ -15,11 +15,11 @@ from dsgrid.ibis.functions import (
     read_csv,
 )
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns, rename_columns
+from dsgrid.ibis.models import models_to_dataframe
 from dsgrid.ibis.session import (
     F,
     get_runtime_session,
     IntegerType,
-    models_to_dataframe,
 )
 from dsgrid.utils.files import (
     dump_data,

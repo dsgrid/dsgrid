@@ -16,7 +16,7 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import check_for_nulls
+from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.ibis.operations import drop_columns
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase

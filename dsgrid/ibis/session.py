@@ -1,29 +1,21 @@
 """Runtime session and table IO helpers for Ibis-backed execution."""
 
-import enum
 import itertools
 import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from types import UnionType
-from typing import Any, Generator, Iterable, Type, Union, cast, get_args, get_origin
+from typing import Any, Generator, Iterable, cast
 
 import pandas as pd
 import ibis
 
-from dsgrid.data_models import DSGBaseModel
-from dsgrid.exceptions import (
-    DSGInvalidField,
-    DSGInvalidOperation,
-    DSGInvalidParameter,
-)
+from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
 from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
     coalesce,
     create_temp_view,
     cross_join,
-    handle_column_spaces,
     make_temp_view_name,
 )
 from dsgrid.ibis.io import (
@@ -35,7 +27,6 @@ from dsgrid.ibis.io import (
     read_parquet,
 )
 from dsgrid.ibis.types import (
-    is_table_empty,
     spec_for_name,
     spec_for_spark_sql,
     spec_for_spark_type,
@@ -479,83 +470,6 @@ def cross_join_dfs(dfs: list[ibis.Table]) -> ibis.Table:
 
 
 @track_timing(timer_stats_collector)
-def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = None) -> ibis.Table:
-    """Converts a list of Pydantic models to a table.
-
-    Parameters
-    ----------
-    models : list
-    table_name : str | None
-        If set, a unique ID to use as the cached table name. Return from cache if already stored.
-    """
-    session = get_runtime_session()
-    if table_name is not None and make_runtime_backend().has_table(table_name):
-        return make_runtime_backend().table(table_name)
-
-    assert models
-    cls = type(models[0])
-    rows = []
-    struct_fields = []
-    for i, model in enumerate(models):
-        dct = {}
-        for f in cls.model_fields:
-            val = getattr(model, f)
-            if isinstance(val, enum.Enum):
-                val = val.value
-            if i == 0:
-                if val is None:
-                    python_type = cls.model_fields[f].annotation
-                    origin = get_origin(python_type)
-                    if origin is Union or origin is UnionType:
-                        python_type = get_type_from_union(python_type)
-                        # else: will likely fail below
-                        # Need to add more logic to detect the actual type or add to
-                        # PYTHON_TO_SPARK_TYPES.
-                else:
-                    python_type = type(val)
-                python_type = cast(type[Any], python_type)
-                spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
-                struct_fields.append(StructField(f, spark_type, nullable=True))
-            dct[f] = val
-        rows.append(tuple(dct.values()))
-
-    schema: Any = StructType(struct_fields)
-    df = session.createDataFrame(rows, schema=schema)
-
-    if table_name is not None:
-        make_runtime_backend().create_view(table_name, df)
-
-    return df
-
-
-def get_type_from_union(python_type) -> Type:
-    """Return the Python type from a Union.
-
-    Only works if it is Union of NoneType and something.
-
-    Raises
-    ------
-    NotImplementedError
-        Raised if the code does know how to determine the type.
-    """
-    args = get_args(python_type)
-    if issubclass(args[0], enum.Enum):
-        python_type = type(next(iter(args[0])).value)
-    else:
-        types = [x for x in args if not issubclass(x, type(None))]
-        if not types:
-            msg = f"Unhandled Union type: {python_type=} {args=}"
-            raise NotImplementedError(msg)
-        elif len(types) > 1:
-            msg = f"Unhandled Union type: {types=}"
-            raise NotImplementedError(msg)
-        else:
-            python_type = types[0]
-
-    return python_type
-
-
-@track_timing(timer_stats_collector)
 def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True) -> ibis.Table:
     """Return an Ibis table created from the IDs of dimension_types.
 
@@ -573,51 +487,6 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True) -
         schema.add(dimension_type.value, string_type(), nullable=False)
     df = get_runtime_session().createDataFrame(records, schema=schema)
     return df
-
-
-@track_timing(timer_stats_collector)
-def check_for_nulls(df, exclude_columns=None):
-    """Check if an Ibis table has null values.
-
-    Parameters
-    ----------
-    df : ibis.Table
-    exclude_columns : None or Set
-
-    Raises
-    ------
-    DSGInvalidField
-        Raised if null exists in any column.
-
-    """
-    if exclude_columns is None:
-        exclude_columns = set()
-    cols_to_check = set(df.columns).difference(exclude_columns)
-    if not cols_to_check:
-        return
-    view = create_temp_view(df)
-    cols_str = ", ".join(handle_column_spaces(x) for x in cols_to_check)
-    filter_str = " OR ".join(f"{handle_column_spaces(x)} IS NULL" for x in cols_to_check)
-
-    try:
-        # Avoid iterating with many checks unless we know there is at least one failure.
-        nulls = sql(f"SELECT {cols_str} FROM {view} WHERE {filter_str}")
-        if not is_table_empty(nulls):
-            cols_with_null = set()
-            for col in cols_to_check:
-                quoted_col = handle_column_spaces(col)
-                col_nulls = sql(
-                    f"SELECT {quoted_col} FROM {view} " f"WHERE {quoted_col} IS NULL LIMIT 1"
-                )
-                if not is_table_empty(col_nulls):
-                    cols_with_null.add(col)
-            assert cols_with_null, "Did not find any columns with NULL values"
-
-            msg = f"Ibis table contains NULL value(s) for column(s): {cols_with_null}"
-            raise DSGInvalidField(msg)
-    finally:
-        conn = cast(Any, make_runtime_backend().connection)
-        conn.raw_sql(f"DROP VIEW IF EXISTS {view}")
 
 
 def sql(query: str) -> ibis.Table:

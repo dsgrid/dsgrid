@@ -26,10 +26,11 @@ from dsgrid.ibis.io import (
     _read_natively,
     _write_table,
 )
+from dsgrid.ibis.models import get_type_from_union
+from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.ibis.session import (
     ByteType,
     BooleanType,
-    check_for_nulls,
     create_dataframe,
     create_dataframe_from_dicts,
     create_dataframe_from_dimension_ids,
@@ -43,7 +44,6 @@ from dsgrid.ibis.session import (
     get_active_session,
     get_duckdb_runtime_session,
     get_runtime_session,
-    get_type_from_union,
     IntegerType,
     is_runtime_session_active,
     is_table_stored,

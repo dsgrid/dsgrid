@@ -9,7 +9,7 @@ import json5
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import write_csv
 
-from dsgrid.ibis.session import models_to_dataframe
+from dsgrid.ibis.models import models_to_dataframe
 from dsgrid.ibis.temp import TEMP_TABLE_PREFIX
 
 

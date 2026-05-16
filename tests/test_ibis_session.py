@@ -285,7 +285,11 @@ def test_schema_type_mappings():
         (FloatType(), "float32", "FLOAT"),
         (DoubleType(), "float64", "DOUBLE"),
         (StringType(), "string", "VARCHAR"),
-        (TimestampType(), "timestamp", "TIMESTAMP"),
+        # TimestampType is Spark's TZ-aware instant type; map to DuckDB's
+        # TIMESTAMP WITH TIME ZONE for round-trip parity. The prior code
+        # mapped both Timestamp variants to "TIMESTAMP" and lost the TZ
+        # distinction; TypeSpec separates them.
+        (TimestampType(), "timestamp", "TIMESTAMP WITH TIME ZONE"),
         (TimestampNTZType(), "timestamp", "TIMESTAMP"),
     ]
     for data_type, ibis_type, duckdb_type in expected:

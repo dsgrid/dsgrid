@@ -10,7 +10,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.operations import drop_columns, rename_columns
-from dsgrid.ibis.types import DUCKDB_COLUMN_TYPES, SPARK_COLUMN_TYPES, SUPPORTED_TYPES, use_duckdb
+from dsgrid.ibis.types import SUPPORTED_TYPES, TypeSpec, spec_for_name, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.session import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
@@ -115,8 +115,7 @@ def read_data_file(
             # runtime type override.
             df = read_parquet(path)
         case ".csv":
-            backend_types = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
-            column_schema = _get_column_schema(schema, backend_types)
+            column_schema = _get_column_schema(schema)
             df = read_csv(path, schema=column_schema)
         case ".json":
             # JSON readers infer types from content (DuckDB) or default to
@@ -186,66 +185,22 @@ def _drop_ignored_columns(df: ibis.Table, ignore_columns: list[str]) -> ibis.Tab
     return df
 
 
-def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, str] | None:
+def _get_column_schema(schema: FileSchema) -> dict[str, str] | None:
     column_types = schema.get_data_type_mapping()
     if not column_types:
         return None
 
     mapped_schema: dict[str, str] = {}
     for key, val in column_types.items():
-        col_type = val.upper()
-        if col_type not in backend_mapping:
-            options = " ".join(sorted(backend_mapping.keys()))
-            msg = f"column type = {val} is not supported. {options=}"
-            raise DSGInvalidField(msg)
-        mapped_schema[key] = backend_mapping[col_type]
+        try:
+            spec = spec_for_name(val)
+        except KeyError as exc:
+            raise DSGInvalidField(str(exc)) from exc
+        mapped_schema[key] = spec.duckdb_sql if use_duckdb() else spec.spark_sql
     return mapped_schema
 
 
-# Map the FileSchema data_type vocabulary (see dsgrid.ibis.types.SUPPORTED_TYPES)
-# to Ibis dtype strings accepted by ``Column.cast``. Used to apply declared
-# types after reading JSON, since the JSON readers don't accept a read-time
-# schema argument the way CSV does.
-_USER_TYPE_TO_IBIS_DTYPE = {
-    "BOOLEAN": "bool",
-    "INT": "int32",
-    "INTEGER": "int32",
-    "TINYINT": "int8",
-    "SMALLINT": "int16",
-    "BIGINT": "int64",
-    "FLOAT": "float32",
-    "DOUBLE": "float64",
-    "STRING": "string",
-    "TEXT": "string",
-    "VARCHAR": "string",
-    "TIMESTAMP_NTZ": "timestamp",
-    "TIMESTAMP_TZ": "timestamp('UTC')",
-}
-
-
-def _declared_type_family(declared: str) -> str:
-    """Bucket a user-facing type name into a coarse compatibility family.
-
-    Only casts within the same family are considered safe enough to apply
-    silently. Cross-family declarations (e.g. declared VARCHAR but the data
-    came in as int64) are left alone so existing validators can surface the
-    real error instead of dsgrid silently coercing the data.
-    """
-    if declared in {"BOOLEAN"}:
-        return "bool"
-    if declared in {"INT", "INTEGER", "TINYINT", "SMALLINT", "BIGINT"}:
-        return "integer"
-    if declared in {"FLOAT", "DOUBLE"}:
-        return "floating"
-    if declared in {"STRING", "TEXT", "VARCHAR"}:
-        return "string"
-    if declared in {"TIMESTAMP_NTZ", "TIMESTAMP_TZ"}:
-        return "timestamp"
-    msg = f"Declared data_type={declared!r} has no family mapping."
-    raise DSGInvalidField(msg)
-
-
-def _actual_type_family(dtype) -> str:
+def _actual_type_family(dtype: Any) -> str:
     """Coarse family bucket for an Ibis runtime dtype."""
     if dtype.is_boolean():
         return "bool"
@@ -258,6 +213,31 @@ def _actual_type_family(dtype) -> str:
     if dtype.is_timestamp():
         return "timestamp"
     return "other"
+
+
+def _check_narrowing(spec: TypeSpec, column_name: str, actual_dtype: Any) -> None:
+    """Raise if the declared type would narrow the column's actual width.
+
+    Detects two failure modes: an integer/float declared narrower than the
+    actual width (e.g. declared INT on an int64 column), and a numeric
+    declaration against a non-numeric actual type within the same family
+    (e.g. declared FLOAT on an int column). The latter is intentionally not
+    flagged here because it crosses subtypes within ``floating``/``integer``
+    families that callers may legitimately want to bridge.
+    """
+    if spec.bit_width is None:
+        return
+    actual_bits = actual_dtype.nbytes * 8 if hasattr(actual_dtype, "nbytes") else None
+    if actual_bits is None:
+        return
+    if spec.bit_width < actual_bits:
+        msg = (
+            f"Declared data_type={spec.name!r} ({spec.bit_width}-bit) would narrow "
+            f"column {column_name!r} from its actual {actual_dtype} ({actual_bits}-bit). "
+            f"Use a wider declaration (e.g. BIGINT for 64-bit integers) or remove "
+            f"the declaration if narrowing is intentional."
+        )
+        raise DSGInvalidField(msg)
 
 
 def apply_declared_types(
@@ -311,18 +291,19 @@ def apply_declared_types(
     for col in columns:
         if col.data_type is None or col.name not in schema:
             continue
-        dtype = _USER_TYPE_TO_IBIS_DTYPE.get(col.data_type)
-        if dtype is None:
+        try:
+            spec = spec_for_name(col.data_type)
+        except KeyError as exc:
             msg = (
                 f"Declared data_type={col.data_type!r} for column {col.name!r} "
                 f"has no Ibis dtype mapping."
             )
-            raise DSGInvalidField(msg)
-        if strict_family and _declared_type_family(col.data_type) != _actual_type_family(
-            schema[col.name]
-        ):
+            raise DSGInvalidField(msg) from exc
+        actual_dtype = schema[col.name]
+        if strict_family and spec.family != _actual_type_family(actual_dtype):
             continue
-        casts[col.name] = df[col.name].cast(dtype)
+        _check_narrowing(spec, col.name, actual_dtype)
+        casts[col.name] = df[col.name].cast(spec.ibis_dtype)
     return df.mutate(**casts) if casts else df
 
 

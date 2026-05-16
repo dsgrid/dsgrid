@@ -31,7 +31,13 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
-from dsgrid.ibis.types import is_table_empty, use_duckdb
+from dsgrid.ibis.types import (
+    is_table_empty,
+    spec_for_name,
+    spec_for_spark_sql,
+    spec_for_spark_type,
+    use_duckdb,
+)
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -1260,80 +1266,40 @@ def _schema_types(schema: Any | None, *, ibis_types: bool = True) -> dict[str, s
 
 
 def _duckdb_type_from_spark_type(data_type: Any) -> str:
-    match data_type.__class__.__name__:
-        case "BooleanType":
-            return "BOOLEAN"
-        case "ByteType":
-            return "TINYINT"
-        case "ShortType":
-            return "SMALLINT"
-        case "IntegerType":
-            return "INTEGER"
-        case "LongType":
-            return "BIGINT"
-        case "FloatType":
-            return "FLOAT"
-        case "DoubleType":
-            return "DOUBLE"
-        case "StringType":
-            return "VARCHAR"
-        case "TimestampType" | "TimestampNTZType":
-            return "TIMESTAMP"
-        case _:
-            msg = f"Unsupported schema data type: {data_type}"
-            raise NotImplementedError(msg)
+    try:
+        return spec_for_spark_type(data_type).duckdb_sql
+    except KeyError as exc:
+        raise NotImplementedError(str(exc)) from exc
 
 
 def _merge_spark_csv_schema(
     session: Any, path: str, schema: dict[str, str], kwargs: dict[str, Any]
 ):
-    from pyspark.sql.types import (
-        BooleanType,
-        ByteType,
-        DoubleType,
-        FloatType,
-        IntegerType,
-        LongType,
-        ShortType,
-        StringType,
-        StructField,
-        StructType,
-        TimestampNTZType,
-        TimestampType,
-    )
+    import pyspark.sql.types as pyspark_types
 
     def make_type(dtype: str):
-        match dtype.upper():
-            case "BOOLEAN":
-                return BooleanType()
-            case "TINYINT":
-                return ByteType()
-            case "SMALLINT":
-                return ShortType()
-            case "INT" | "INTEGER":
-                return IntegerType()
-            case "BIGINT":
-                return LongType()
-            case "FLOAT":
-                return FloatType()
-            case "DOUBLE":
-                return DoubleType()
-            case "STRING" | "TEXT" | "VARCHAR":
-                return StringType()
-            case "TIMESTAMP":
-                return TimestampType()
-            case "TIMESTAMP_NTZ":
-                return TimestampNTZType()
-            case _:
+        try:
+            spec = spec_for_spark_sql(dtype)
+        except KeyError as exc:
+            # Fall back to spec_for_name to also accept user-facing aliases
+            # like INTEGER/TEXT/VARCHAR that map to canonical spec_sql values.
+            try:
+                spec = spec_for_name(dtype)
+            except KeyError:
                 msg = f"Unsupported Spark CSV schema data type: {dtype}"
-                raise NotImplementedError(msg)
+                raise NotImplementedError(msg) from exc
+        class_name = spec.spark_type_names[0] if spec.spark_type_names else None
+        if class_name is None:
+            # Alias spec (e.g. INTEGER) — resolve to its canonical sibling.
+            class_name = spec_for_spark_sql(spec.spark_sql).spark_type_names[0]
+        return getattr(pyspark_types, class_name)()
 
     inference_kwargs = dict(kwargs)
     inference_kwargs.pop("schema", None)
     inference_kwargs["inferSchema"] = True
     inferred = session.read.csv(path, **inference_kwargs).schema
     fields = [
-        StructField(
+        pyspark_types.StructField(
             field.name,
             make_type(schema[field.name]) if field.name in schema else field.dataType,
             field.nullable,
@@ -1341,32 +1307,18 @@ def _merge_spark_csv_schema(
         )
         for field in inferred
     ]
-    return StructType(fields)
+    return pyspark_types.StructType(fields)
 
 
 def _ibis_type_from_spark_type(data_type: Any) -> str:
-    match data_type.__class__.__name__:
-        case "BooleanType":
-            return "boolean"
-        case "ByteType":
-            return "int8"
-        case "ShortType":
-            return "int16"
-        case "IntegerType":
-            return "int32"
-        case "LongType":
-            return "int64"
-        case "FloatType":
-            return "float32"
-        case "DoubleType":
-            return "float64"
-        case "StringType":
-            return "string"
-        case "TimestampType" | "TimestampNTZType":
-            return "timestamp"
-        case _:
-            msg = f"Unsupported schema data type: {data_type}"
-            raise NotImplementedError(msg)
+    try:
+        spec = spec_for_spark_type(data_type)
+    except KeyError as exc:
+        raise NotImplementedError(str(exc)) from exc
+    # Strip any tz-info suffix from the dtype string (TIMESTAMP_TZ maps to
+    # "timestamp('UTC')" for declared-cast purposes, but the inferred dtype
+    # for an existing Spark column has no tz attached).
+    return spec.ibis_dtype.split("(", 1)[0]
 
 
 class CsvPartitionWriter:

@@ -12,7 +12,6 @@ from dsgrid.config.file_schema import (
     apply_declared_types,
     read_data_file,
     _actual_type_family,
-    _declared_type_family,
     _drop_ignored_columns,
     _get_column_renames,
     _get_column_schema,
@@ -20,11 +19,7 @@ from dsgrid.config.file_schema import (
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
-from dsgrid.ibis.types import (
-    DUCKDB_COLUMN_TYPES,
-    SPARK_COLUMN_TYPES,
-    SUPPORTED_TYPES,
-)
+from dsgrid.ibis.types import SUPPORTED_TYPES, spec_for_name
 from dsgrid.ibis.session import (
     F,
     SparkSession,
@@ -281,15 +276,16 @@ def test_get_column_renames_no_dimension_type():
     # _get_column_schema tests
 
 
-def test_get_column_schema_duckdb_mapping():
-    """Test column schema mapping for DuckDB."""
+def test_get_column_schema_picks_backend_specific_strings():
+    """Each declared type maps to its DuckDB SQL string (the current default backend)."""
     columns = [
         Column(name="id", data_type="INTEGER"),
         Column(name="name", data_type="STRING"),
         Column(name="ts", data_type="TIMESTAMP_TZ"),
     ]
     schema = FileSchema(path="/path/to/file.csv", columns=columns)
-    result = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
+    result = _get_column_schema(schema)
+    # The CI default backend is DuckDB; this test asserts the DuckDB strings.
     assert result == {
         "id": "INTEGER",
         "name": "VARCHAR",
@@ -297,36 +293,11 @@ def test_get_column_schema_duckdb_mapping():
     }
 
 
-def test_get_column_schema_spark_mapping():
-    """Test column schema mapping for Spark."""
-    columns = [
-        Column(name="id", data_type="INTEGER"),
-        Column(name="name", data_type="STRING"),
-        Column(name="ts", data_type="TIMESTAMP_NTZ"),
-    ]
-    schema = FileSchema(path="/path/to/file.csv", columns=columns)
-    result = _get_column_schema(schema, SPARK_COLUMN_TYPES)
-    assert result == {
-        "id": "INT",
-        "name": "STRING",
-        "ts": "TIMESTAMP_NTZ",
-    }
-
-
 def test_get_column_schema_empty():
-    """Test with no typed columns returns empty dict."""
+    """Test with no typed columns returns None."""
     schema = FileSchema(path="/path/to/file.csv", columns=[])
-    result = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
+    result = _get_column_schema(schema)
     assert not result
-
-
-def test_get_column_schema_invalid_type_raises():
-    """Test that invalid type raises DSGInvalidField."""
-    columns = [Column(name="test", data_type="INTEGER")]
-    schema = FileSchema(path="/path/to/file.csv", columns=columns)
-    invalid_mapping = {"BOGUS": "BOGUS"}
-    with pytest.raises(DSGInvalidField, match="is not supported"):
-        _get_column_schema(schema, invalid_mapping)
 
         # _rename_columns tests
 
@@ -546,30 +517,6 @@ def test_read_data_file_csv_with_fips_codes_and_energy_data(tmp_path, spark):
 
     heating_sum = sum(row.heating for row in _collect(df.select("heating")))
     assert abs(heating_sum - 11.1) < 0.01  # 2.3 + 2.1 + 3.5 + 3.2
-
-    # Type mapping consistency tests
-
-
-def test_duckdb_and_spark_have_same_keys():
-    """Test that DUCKDB and SPARK mappings have the same keys."""
-    assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
-
-
-def test_supported_types_match_mappings():
-    """Test that SUPPORTED_TYPES match the mapping keys."""
-    assert not SUPPORTED_TYPES.difference(DUCKDB_COLUMN_TYPES.keys())
-    assert not SUPPORTED_TYPES.difference(SPARK_COLUMN_TYPES.keys())
-
-
-@pytest.mark.parametrize(
-    "type_name",
-    ["BOOLEAN", "INT", "INTEGER", "FLOAT", "DOUBLE", "STRING", "TEXT", "VARCHAR"],
-)
-def test_common_types_mapped(type_name):
-    """Test that common types are properly mapped in both backends."""
-    assert type_name in DUCKDB_COLUMN_TYPES
-    assert type_name in SPARK_COLUMN_TYPES
-
 
 def test_read_data_file_csv_timestamp_with_timezone(tmp_path, spark):
     """Test reading a CSV file with ISO 8601 timestamps containing time zone offsets.
@@ -799,12 +746,26 @@ def test_apply_declared_types_skips_columns_not_in_table(spark):
     assert apply_declared_types(df, columns).schema() == df.schema()
 
 
-def test_apply_declared_types_strict_same_family_int_width(spark):
-    """Same-family widening (e.g. int → int64) is applied even in strict mode."""
-    df = spark.createDataFrame([(1,)], ["id"])  # Spark createDataFrame → int64
-    columns = [Column(name="id", data_type="INT")]  # INT → int32
+def test_apply_declared_types_strict_same_family_int_widening(spark):
+    """Same-family widening (e.g. int32 → int64) is applied even in strict mode."""
+    # The default createDataFrame path produces int64, so build via an
+    # explicit int32 memtable to exercise the widening path.
+    df = ibis.memtable({"id": [1]}).cast({"id": "int32"})
+    columns = [Column(name="id", data_type="BIGINT")]  # int32 → int64 (widening)
     result = apply_declared_types(df, columns, strict_family=True)
-    assert str(result.schema()["id"]) == "int32"
+    assert str(result.schema()["id"]) == "int64"
+
+
+def test_apply_declared_types_narrowing_raises(spark):
+    """Same-family narrowing (e.g. int64 → int32) raises DSGInvalidField.
+
+    Previously this silently truncated dimension IDs encoded as int64; now
+    callers must declare BIGINT or widen explicitly.
+    """
+    df = spark.createDataFrame([(1,)], ["id"])  # Spark createDataFrame → int64
+    columns = [Column(name="id", data_type="INT")]  # INT → int32 (would narrow)
+    with pytest.raises(DSGInvalidField, match="would narrow"):
+        apply_declared_types(df, columns, strict_family=True)
 
 
 def test_apply_declared_types_strict_cross_family_skipped(spark):
@@ -833,15 +794,15 @@ def test_apply_declared_types_force_cross_family_applied(spark):
 def test_apply_declared_types_partial_declaration_only_casts_declared(spark):
     """Only the declared subset is touched; the rest keeps inferred types."""
     df = spark.createDataFrame([(1, "a", 1.5)], ["id", "name", "value"])
-    columns = [Column(name="id", data_type="INT")]  # only id
+    columns = [Column(name="id", data_type="BIGINT")]  # only id; matches actual int64
     result = apply_declared_types(df, columns, strict_family=True)
     schema = result.schema()
-    assert str(schema["id"]) == "int32"
+    assert str(schema["id"]) == "int64"
     assert str(schema["name"]) == "string"
     assert "float" in str(schema["value"])  # float32 or float64
 
 
-# _declared_type_family / _actual_type_family tests
+# TypeSpec family + _actual_type_family tests
 
 
 @pytest.mark.parametrize(
@@ -863,12 +824,12 @@ def test_apply_declared_types_partial_declaration_only_casts_declared(spark):
     ],
 )
 def test_declared_type_family_covers_all_supported(declared, expected_family):
-    assert _declared_type_family(declared) == expected_family
+    assert spec_for_name(declared).family == expected_family
 
 
 def test_declared_type_family_unknown_raises():
-    with pytest.raises(DSGInvalidField, match="no family mapping"):
-        _declared_type_family("BOGUS")
+    with pytest.raises(KeyError, match="Unsupported dsgrid type"):
+        spec_for_name("BOGUS")
 
 
 def test_actual_type_family_covers_common_dtypes():

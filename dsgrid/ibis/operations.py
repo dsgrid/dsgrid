@@ -181,3 +181,21 @@ def aggregate_single_value(df: ibis.Table, agg_func: str, column: str) -> Any:
 
 def _sql_on_df(df: ibis.Table, query: str) -> ibis.Table:
     return make_runtime_backend().sql(query)
+
+
+def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
+    """Reduce the number of output partitions.
+
+    On DuckDB this is a no-op (single-file output by default). On Spark it
+    coalesces the underlying PySpark DataFrame and re-registers it as an
+    Ibis table so downstream writers produce ``num_partitions`` files.
+    """
+    if use_duckdb():
+        return df
+    view = create_temp_view(df)
+    backend = cast(Any, make_runtime_backend())
+    spark_df = backend.connection._session.sql(f"SELECT * FROM {view}")
+    coalesced = spark_df.coalesce(num_partitions)
+    coalesced_view = make_temp_view_name()
+    coalesced.createOrReplaceTempView(coalesced_view)
+    return backend.connection.table(coalesced_view)

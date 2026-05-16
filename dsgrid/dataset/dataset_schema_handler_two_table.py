@@ -16,13 +16,13 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.ibis.operations import (
+    coalesce,
     drop_columns,
     except_all,
     intersect,
     join_multiple_columns,
     union_all,
 )
-from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.table_utils import table_to_records
 from dsgrid.ibis.types import is_string_column
 from dsgrid.utils.dataset import (

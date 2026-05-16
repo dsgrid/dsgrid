@@ -13,6 +13,7 @@ from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.io import read_csv
 from dsgrid.ibis.operations import (
     aggregate_single_value,
+    coalesce,
     count_distinct_on_group_by,
     create_temp_view,
     cross_join,
@@ -27,7 +28,6 @@ from dsgrid.ibis.operations import (
     sql_from_df,
     unpivot,
 )
-from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.ibis.session import (

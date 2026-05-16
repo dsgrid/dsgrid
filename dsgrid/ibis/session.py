@@ -24,12 +24,12 @@ from dsgrid.exceptions import (
 )
 from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
+    coalesce,
     create_temp_view,
     cross_join,
     handle_column_spaces,
     make_temp_view_name,
 )
-from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.io import read_csv, read_json, read_parquet
 from dsgrid.ibis.types import (
     is_table_empty,

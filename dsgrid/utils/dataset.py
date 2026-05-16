@@ -33,6 +33,7 @@ from dsgrid.exceptions import (
 from dsgrid.ibis.backend import create_chronify_store, make_runtime_backend, read_parquet_expr
 from dsgrid.ibis.io import read_parquet
 from dsgrid.ibis.operations import (
+    coalesce,
     count_distinct_on_group_by,
     create_temp_view,
     cross_join,
@@ -45,7 +46,6 @@ from dsgrid.ibis.operations import (
     rename_columns,
     unpivot,
 )
-from dsgrid.ibis.spark_only import coalesce
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import table_to_records
 from dsgrid.ibis.types import is_table_empty, use_duckdb

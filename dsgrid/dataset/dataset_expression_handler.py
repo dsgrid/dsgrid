@@ -18,15 +18,14 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        orig_self_count = count_rows(self.df)
-        orig_other_count = count_rows(other.df)
-        if orig_self_count != orig_other_count:
-            msg = (
-                f"{op=} requires that the datasets have the same length "
-                f"{orig_self_count=} {orig_other_count=}"
-            )
-            raise DSGInvalidOperation(msg)
-
+        # Previously this method issued 3 count_rows().execute() calls per
+        # invocation (self.df, other.df, joined) to sanity-check that the
+        # inner-join preserved row count. That made even short expression
+        # chains like "(a + b) | (a * b)" issue many round-trips before
+        # returning a lazy result. The post-join check below catches both
+        # the original "mismatched lengths" case AND any silent row drop
+        # from non-overlapping dimension keys in a single count, so the
+        # two pre-join counts are now redundant.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -36,10 +35,11 @@ class DatasetExpressionHandler:
         df = joined.mutate(**mutations).select(*self.df.columns)
 
         joined_count = count_rows(df)
-        if joined_count != orig_self_count:
+        self_count = count_rows(self.df)
+        if joined_count != self_count:
             msg = (
-                f"join for operation {op=} has a different row count than the original. "
-                f"{orig_self_count=} {joined_count=}"
+                f"join for operation {op=} dropped rows; the datasets likely have "
+                f"mismatched dimension keys. {self_count=} {joined_count=}"
             )
             raise DSGInvalidOperation(msg)
 

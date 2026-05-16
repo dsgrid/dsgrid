@@ -95,7 +95,10 @@ def test_dataset_expression_combo(datasets):
 
 def test_invalid_lengths(datasets):
     datasets["dataset3"] = evaluate_expression("dataset1 | dataset2", datasets)
-    with pytest.raises(DSGInvalidOperation, match="datasets have the same length"):
+    # Phase 11 removed the pre-join length pre-check; the same condition
+    # now surfaces from the post-join row-count check as a "dropped rows"
+    # error since the inner join produces fewer rows than the larger input.
+    with pytest.raises(DSGInvalidOperation, match="dropped rows"):
         evaluate_expression("dataset1 * dataset3", datasets)
 
 
@@ -118,7 +121,7 @@ def test_invalid_join():
     dataset1 = DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     dataset2 = DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
-    with pytest.raises(DSGInvalidOperation, match="has a different row count"):
+    with pytest.raises(DSGInvalidOperation, match="dropped rows"):
         evaluate_expression("dataset1 + dataset2", datasets)
 
 

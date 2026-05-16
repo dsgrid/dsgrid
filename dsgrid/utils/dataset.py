@@ -47,7 +47,7 @@ from dsgrid.ibis.operations import (
     unpivot,
 )
 from dsgrid.ibis.temp import make_temp_view_name
-from dsgrid.ibis.table_utils import count_rows, get_unique_values, table_to_records
+from dsgrid.ibis.table_utils import get_unique_values, table_to_records
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, write_dataframe
@@ -396,15 +396,26 @@ def handle_dimension_association_errors(
 
 
 def _look_for_error_contributors(diff: ibis.Table, dataset_table: ibis.Table) -> None:
-    diff_counts = {x: count_rows(diff.select(x).distinct()) for x in diff.columns}
-    for col in diff.columns:
-        dataset_count = count_rows(dataset_table.select(col).distinct())
-        if dataset_count != diff_counts[col]:
+    # Compute COUNT(DISTINCT col) for every column in a single aggregation
+    # query per table. The previous loop issued 2N .execute() calls; this
+    # version issues 2 regardless of column count, which matters because
+    # this runs on the error path against the full dataset table.
+    cols = list(diff.columns)
+    diff_counts = (
+        diff.aggregate(**{col: diff[col].nunique() for col in cols}).execute().iloc[0]
+    )
+    dataset_counts = (
+        dataset_table.aggregate(**{col: dataset_table[col].nunique() for col in cols})
+        .execute()
+        .iloc[0]
+    )
+    for col in cols:
+        if dataset_counts[col] != diff_counts[col]:
             logger.error(
                 "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
                 col,
-                dataset_count,
-                diff_counts[col],
+                int(dataset_counts[col]),
+                int(diff_counts[col]),
             )
 
 

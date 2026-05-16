@@ -1,5 +1,4 @@
 import logging
-from tempfile import NamedTemporaryFile
 from pathlib import Path
 from typing import Any, Self, cast
 
@@ -223,14 +222,25 @@ class DuckDbDataStore(DataStoreInterface):
 def _create_table_from_dataframe(
     backend: IbisBackend, df: ibis.Table, schema: str, table_name: str
 ) -> None:
+    """Materialize a table into the on-disk DuckDB store.
+
+    For ibis.Table inputs that live in a *different* backend (e.g. the
+    runtime in-memory backend), we materialize via PyArrow rather than
+    via a temp Parquet file. PyArrow avoids the parquet write + read
+    round-trip on disk for the typical small/medium-sized payloads
+    (dimension records, lookup tables, association tables) at the cost
+    of buffering the whole table in driver memory. Very large
+    cross-backend transfers should pre-write Parquet themselves and
+    use a different store-write path.
+    """
     if isinstance(df, ibis.Table):
-        with NamedTemporaryFile(suffix=".parquet") as tmp_file:
-            df.to_parquet(tmp_file.name)
-            escaped_path = tmp_file.name.replace("'", "''")
-            backend.execute_sql(
-                f"CREATE TABLE {_quote_identifier(schema)}.{_quote_identifier(table_name)} AS "
-                f"SELECT * FROM read_parquet('{escaped_path}')"
-            )
+        arrow_table = df.to_pyarrow()
+        backend.connection.create_table(
+            table_name,
+            obj=arrow_table,
+            database=schema,
+            overwrite=False,
+        )
         return
 
     backend.connection.create_table(

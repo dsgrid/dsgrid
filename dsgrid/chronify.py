@@ -14,6 +14,7 @@ def create_store(store_file: Path) -> Generator[chronify.Store, None, None]:
     """Create a chronify Store based on the dsgrid runtime configuration."""
     config = dsgrid.runtime_config
     if config.backend_engine == BackendEngine.SPARK:
+        # The active Spark session is fetched implicitly inside make_runtime_backend().
         store = create_chronify_store()
     else:
         store = create_chronify_store(database=str(store_file))

@@ -14,6 +14,7 @@ from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import DatasetQueryModel, ProjectQueryModel
 from dsgrid.query.query_context import QueryContext
 from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.ibis.operations import (
     drop_columns,
     except_all,
@@ -299,13 +300,12 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         if data_id_count != count or ldl_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                diff = except_all(union_all(ld_ids, ldl_ids), intersect(ld_ids, ldl_ids))
                 # Only run the query once (with Spark). Number of rows shouldn't be a problem.
-                _cache(diff)
+                diff = cache(except_all(union_all(ld_ids, ldl_ids), intersect(ld_ids, ldl_ids)))
                 diff_count = _count_rows(diff)
                 limit = 100
                 diff_list = _collect_limited_error_rows(diff.limit(limit))
-                _unpersist(diff)
+                unpersist(diff)
                 logger.error(
                     "load_data and load_data_lookup have %s different IDs. Limited to %s: %s",
                     diff_count,
@@ -318,7 +318,6 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         lookup = self._load_data_lookup
-        _cache(lookup)
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
@@ -326,12 +325,16 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if column in lookup_columns:
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
 
+        # Cache while running one count per trivial dimension; the CachedTable is
+        # garbage-collected after the loop and Ibis releases the cached data.
+        cached_lookup = cache(lookup)
         columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = _count_rows(lookup.select(col).distinct())
+            count = _count_rows(cached_lookup.select(col).distinct())
             assert count == 1, f"{dim}: count"
             columns_to_drop.append(col)
+        del cached_lookup
         lookup = drop_columns(lookup, *columns_to_drop)
 
         lookup2 = coalesce(lookup, 1)
@@ -348,14 +351,6 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         store.replace_table(load_df, self.dataset_id, self._config.model.version)
         logger.info("Rewrote simplified %s", self._config.model.dataset_id)
-
-
-def _cache(df: ibis.Table) -> ibis.Table:
-    return df
-
-
-def _unpersist(df: ibis.Table) -> None:
-    return None
 
 
 def _collect_limited_error_rows(df: ibis.Table) -> list[dict]:

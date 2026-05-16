@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+from warnings import warn
 
 import json5
 from pydantic import model_validator
@@ -14,6 +15,11 @@ from dsgrid.data_models import DSGBaseModel
 
 RC_FILENAME = ".dsgrid.json5"
 DEFAULT_BACKEND = BackendEngine.DUCKDB
+_LEGACY_FIELDS: tuple[str, ...] = (
+    "database_name",
+    "thrift_server_url",
+    "use_hive_metastore",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +47,19 @@ class DsgridRuntimeConfig(DSGBaseModel):
             if env in os.environ:
                 values[field] = os.environ[env]
         return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_legacy_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
+        for field in _LEGACY_FIELDS:
+            if data.pop(field, None) is not None:
+                msg = (
+                    f"The dsgrid runtime config field {field!r} is deprecated and is being "
+                    "ignored. Please remove it from your config file. This will cause an error "
+                    "in a future release."
+                )
+                warn(msg, DeprecationWarning, stacklevel=2)
+        return data
 
     @classmethod
     def load(cls, filename=None) -> "DsgridRuntimeConfig":

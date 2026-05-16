@@ -76,11 +76,27 @@ def aggregate(df: ibis.Table, agg_func: str, column: str, alias: str) -> ibis.Ta
 
 
 def cache(df: ibis.Table) -> ibis.Table:
-    return df
+    """Materialize and cache a table for repeated reads.
+
+    On DuckDB this is a no-op (queries execute against in-memory data
+    already). On Spark, the returned table is an Ibis CachedTable whose
+    cached data lives until ``unpersist`` is called or the reference is
+    garbage collected. Callers must rebind: ``df = cache(df)``.
+    """
+    if use_duckdb():
+        return df
+    return df.cache()
 
 
 def unpersist(df: ibis.Table) -> None:
-    return None
+    """Release a cached table previously returned by :func:`cache`.
+
+    Safe to call on tables that were never cached — the call is a no-op
+    when the input has no ``release`` method (e.g. when running on DuckDB).
+    """
+    release = getattr(df, "release", None)
+    if release is not None:
+        release()
 
 
 def collect_list(df: ibis.Table, column: str) -> list:

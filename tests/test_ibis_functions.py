@@ -58,7 +58,7 @@ def dataframe(spark) -> Generator[ibis.Table, None, None]:
         ],
         ["index", "metric", "value"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
@@ -72,7 +72,7 @@ def geo_dataframe(spark) -> Generator[ibis.Table, None, None]:
         ],
         ["county"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
@@ -89,7 +89,7 @@ def time_dataframe(spark) -> Generator[ibis.Table, None, None]:
         ],
         ["timestamp", "metric", "value"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
@@ -290,3 +290,16 @@ def test_unpivot(spark):
     df2 = unpivot(df, ["cooling", "heating"], "metric", "value")
     assert aggregate_single_value(_filter(df2, "metric = 'cooling'"), "sum", "value") == 4.0
     assert aggregate_single_value(_filter(df2, "metric = 'heating'"), "sum", "value") == 6.0
+
+
+def test_cache_preserves_query_result(dataframe):
+    cached = cache(dataframe)
+    try:
+        assert aggregate_single_value(cached, "sum", "value") == 10.0
+    finally:
+        unpersist(cached)
+
+
+def test_unpersist_is_safe_on_uncached_table(spark):
+    df = spark.createDataFrame([(1,)], ["x"])
+    unpersist(df)

@@ -74,6 +74,7 @@ from dsgrid.utils.dataset import (
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.ibis.session import (
     check_for_nulls,
     create_dataframe_from_product,
@@ -252,11 +253,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     required_assoc, missing_df
                 )
 
-                # Cache both Ibis tables before the per-column loop and the except_all below so
-                # that each of the multiple Spark actions that follow reads from memory rather
-                # than re-scanning and re-joining the source data from disk each time.
-        _cache(required_assoc)
-        _cache(assoc_by_data)
+        # Cache both Ibis tables before the per-column loop and the except_all below so
+        # that each of the multiple Spark actions that follow reads from memory rather
+        # than re-scanning and re-joining the source data from disk each time.
+        required_assoc = cache(required_assoc)
+        assoc_by_data = cache(assoc_by_data)
         try:
             if not expected_dimension_associations:
                 # This first check is redundant with the except_all below. But, it is
@@ -280,8 +281,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         raise DSGInvalidDataset(msg)
 
             cols = sorted(required_assoc.columns)
-            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-            _cache(diff)
+            diff = cache(except_all(required_assoc.select(*cols), assoc_by_data.select(*cols)))
             try:
                 if not is_table_empty(diff):
                     expected_cardinalities = self._get_dimension_cardinalities()
@@ -290,10 +290,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     )
                 logger.info("Successfully checked dataset dimension associations")
             finally:
-                _unpersist(diff)
+                unpersist(diff)
         finally:
-            _unpersist(required_assoc)
-            _unpersist(assoc_by_data)
+            unpersist(required_assoc)
+            unpersist(assoc_by_data)
 
     def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> ibis.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
@@ -896,16 +896,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df,
         value_columns,
         mapping_manager: DatasetMappingManager,
-        agg_func=None,
     ):
         op = mapping_manager.plan.apply_fraction_op
         if "fraction" not in df.columns:
             return df
         if mapping_manager.has_completed_operation(op):
             return df
-        if agg_func is not None:
-            msg = "Custom aggregation functions are not supported in _apply_fraction"
-            raise NotImplementedError(msg)
         gcols = set(df.columns) - value_columns - {"fraction"}
         group_by_cols = ordered_subset_columns(df, gcols)
         value_cols = [y for y in df.columns if y in value_columns]
@@ -1016,10 +1012,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df.select(*allowed_columns)
 
 
-def _cache(df: ibis.Table) -> ibis.Table:
-    return df
-
-
 def _count_distinct_column(df: ibis.Table, column: str) -> int:
     return int(cast(Any, df.select(column).distinct().count().execute()))
 
@@ -1028,10 +1020,6 @@ def _count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:
     if not columns:
         return df.aggregate(count=df.count())
     return df.group_by(*columns).aggregate(count=df.count())
-
-
-def _unpersist(df: ibis.Table) -> None:
-    return None
 
 
 def _apply_fraction_sql(

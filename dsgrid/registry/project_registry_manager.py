@@ -72,7 +72,7 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
     RegistryManagerParams,
 )
-from dsgrid.ibis.functions import write_csv
+from dsgrid.ibis.functions import cache, unpersist, write_csv
 from dsgrid.ibis.operations import except_all
 from dsgrid.ibis.table_utils import get_unique_values, table_column_to_list
 from dsgrid.ibis.types import is_table_empty, use_duckdb
@@ -1341,7 +1341,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 data_store, project_table, scontext
             )
             cols = sorted(project_table.columns)
-            _cache(mapped_dataset_table)
+            mapped_dataset_table = cache(mapped_dataset_table)
             diff: ibis.Table | None = None
 
             try:
@@ -1349,15 +1349,16 @@ class ProjectRegistryManager(RegistryManagerBase):
                 _check_distinct_column_values(project_table, mapped_dataset_table)
                 # This check is long and will produce a full table of differences.
                 # It may require some effort from the user.
-                diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
-                _cache(diff)
+                diff = cache(
+                    except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
+                )
                 if not is_table_empty(diff):
                     dataset_id = dataset_config.model.dataset_id
                     handle_dimension_association_errors(diff, mapped_dataset_table, dataset_id)
             finally:
-                _unpersist(mapped_dataset_table)
+                unpersist(mapped_dataset_table)
                 if diff is not None:
-                    _unpersist(diff)
+                    unpersist(diff)
 
     def _id_base_dimension_names_in_dataset(
         self,
@@ -1617,13 +1618,5 @@ def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_tabl
         raise DSGInvalidDataset(msg)
 
 
-def _cache(df: ibis.Table) -> ibis.Table:
-    return df
-
-
 def _collect_limited_column_values(df: ibis.Table, column: str, limit: int) -> set:
     return set(table_column_to_list(df.select(column).distinct().limit(limit), column))
-
-
-def _unpersist(df: ibis.Table) -> None:
-    return None

@@ -303,3 +303,45 @@ def test_cache_preserves_query_result(dataframe):
 def test_unpersist_is_safe_on_uncached_table(spark):
     df = spark.createDataFrame([(1,)], ["x"])
     unpersist(df)
+
+
+def test_read_csv_with_pipe_delimiter(tmp_path: Path) -> None:
+    """Custom delimiter is passed through on both backends."""
+    filename = tmp_path / "piped.csv"
+    filename.write_text("a|b|c\n1|x|2.5\n2|y|3.5\n")
+    table = read_csv(filename, delimiter="|")
+    assert sorted(table.columns) == ["a", "b", "c"]
+    assert table.count().execute() == 2
+
+
+def test_read_csv_round_trip(tmp_path: Path, dataframe) -> None:
+    """write_csv -> read_csv round-trips on the runtime backend.
+
+    On DuckDB the output is a single file; on Spark it's a directory of
+    part files. read_csv must transparently handle both shapes.
+    """
+    from dsgrid.ibis.functions import write_csv
+    from dsgrid.ibis.io import read_csv as _read_csv
+
+    out = tmp_path / "round_trip.csv"
+    write_csv(dataframe, out, overwrite=True)
+    assert out.exists()
+    round_tripped = _read_csv(out)
+    assert sorted(round_tripped.columns) == sorted(dataframe.columns)
+    assert round_tripped.count().execute() == dataframe.count().execute()
+
+
+def test_read_csv_rejects_non_utf8_on_duckdb(tmp_path: Path) -> None:
+    """DuckDB has no encoding parameter; passing one raises with a clear message."""
+    import pytest as _pytest
+
+    from dsgrid.exceptions import DSGInvalidParameter
+    from dsgrid.ibis.types import use_duckdb as _use_duckdb
+
+    if not _use_duckdb():
+        _pytest.skip("DuckDB-only behavior check")
+
+    csv = tmp_path / "any.csv"
+    csv.write_text("a\n1\n")
+    with _pytest.raises(DSGInvalidParameter, match="UTF-8"):
+        read_csv(csv, encoding="latin-1")

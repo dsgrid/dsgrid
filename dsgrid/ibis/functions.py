@@ -1,15 +1,13 @@
 """Compatibility helpers for table operations during the Ibis migration."""
 
+import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
 import ibis
 
-import dsgrid
-from dsgrid.common import BackendEngine
-from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.io import read_csv
 from dsgrid.ibis.operations import (
     aggregate_single_value,
@@ -141,23 +139,24 @@ def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
     return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
 
 
-def write_csv(
-    df: ibis.Table, path: Path | str, header: bool = True, overwrite: bool = False
-) -> None:
-    path_str = path if isinstance(path, str) else str(path)
-    path_obj = Path(path_str)
+def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None:
+    """Write an Ibis table to CSV.
+
+    The output is the backend's native shape: a single file on DuckDB,
+    a directory of part files on Spark. :func:`read_csv` reads either
+    shape transparently, so write/read round-trips on both backends.
+
+    The header row is always written; dsgrid's column model is name-based
+    and there is no ``header=False`` option.
+    """
+    from dsgrid.ibis.io import _write_table
+
+    path_obj = path if isinstance(path, Path) else Path(path)
     if path_obj.exists():
-        if overwrite:
-            path_obj.unlink()
+        if not overwrite:
+            raise FileExistsError(str(path_obj))
+        if path_obj.is_dir():
+            shutil.rmtree(path_obj)
         else:
-            raise FileExistsError(path_str)
-    if dsgrid.runtime_config.backend_engine == BackendEngine.SPARK:
-        df.to_pandas().to_csv(path_str, index=False, header=header)
-    else:
-        view = create_temp_view(df)
-        escaped_path = path_str.replace("'", "''")
-        header_arg = "true" if header else "false"
-        conn = cast(Any, make_runtime_backend().connection)
-        conn.raw_sql(
-            f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER {header_arg})"
-        )
+            path_obj.unlink()
+    _write_table(df, path_obj.as_posix(), "csv")

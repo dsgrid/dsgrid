@@ -194,16 +194,10 @@ def test_duckdb_runtime_session_shims():
 def test_duckdb_reader_shims(tmp_path):
     session = get_runtime_session()
 
-    csv_no_header = tmp_path / "no_header.csv"
-    csv_no_header.write_text("1,a\n2,b\n")
     schema = StructType().add("id", IntegerType(), nullable=False).add("name", StringType())
-    table = session.read.csv(csv_no_header.as_posix(), header=False, schema=schema)
-    assert list(table.columns) == ["id", "name"]
-    assert table.count().execute() == 2
-
     csv_with_header = tmp_path / "with_header.csv"
     csv_with_header.write_text("id,name\n1,a\n")
-    table = session.read.csv(csv_with_header.as_posix(), header=True, schema=schema)
+    table = session.read.csv(csv_with_header.as_posix(), schema=schema)
     assert table.schema()["id"].is_integer()
 
     json_file = tmp_path / "table.json"

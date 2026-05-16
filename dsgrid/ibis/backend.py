@@ -43,21 +43,6 @@ def create_chronify_store(**kwargs: Any) -> chronify.Store:
     return chronify.Store(backend=make_runtime_backend(**kwargs))
 
 
-def read_csv_expr(path: Path | str, schema: dict[str, str] | None = None) -> ibis.Table:
-    """Read CSV data into an Ibis table expression."""
-    path_str = Path(path).as_posix()
-    if dsgrid.runtime_config.backend_engine == BackendEngine.SPARK:
-        from dsgrid.ibis.session import get_runtime_session
-
-        kwargs: dict[str, Any] = {"header": True}
-        if schema:
-            kwargs["schema"] = schema
-        return get_runtime_session().read.csv(path_str, **kwargs)
-    if schema:
-        return make_runtime_backend().connection.read_csv(path_str, header=True, types=schema)
-    return make_runtime_backend().connection.read_csv(path_str, header=True, all_varchar=True)
-
-
 def read_parquet_expr(path: Path | str) -> ibis.Table:
     """Read Parquet data into an Ibis table expression."""
     path_str = Path(path).as_posix()

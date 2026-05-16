@@ -617,7 +617,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, header=True, overwrite=True)
+            write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
@@ -969,7 +969,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         filename = output_dir / f"table.{context.model.result.output_format}"
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, header=True, overwrite=True)
+            write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
             df = write_dataframe_and_auto_partition(df, filename)
         else:

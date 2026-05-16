@@ -137,23 +137,21 @@ class _DuckDBCatalog:
 
 
 class _DuckDBReader:
-    def csv(
-        self, path: str, header: bool = True, schema: Any | None = None, **kwargs
-    ) -> ibis.Table:
-        if not header:
-            names = _schema_names(schema)
-            table = make_runtime_backend().connection.read_csv(
-                path, header=False, all_varchar=True
-            )
-            return (
-                table.rename({new: old for new, old in zip(names, table.columns)})
-                if names
-                else table
-            )
+    """Adapter so ``session.read.{csv,json,parquet}`` works on DuckDB.
+
+    ``csv()`` always treats the first row as a header; the dsgrid schema
+    model is name-based. Callers that previously passed ``header=False``
+    must rewrite the file with a header.
+    """
+
+    def csv(self, path: str, schema: Any | None = None, **kwargs) -> ibis.Table:
+        # Delegate to the consolidated reader. The schema parameter can be
+        # a dict[str, str] (already in backend SQL strings) or a PySpark
+        # StructType; _schema_types normalizes either to a dict.
+        from dsgrid.ibis.io import read_csv as _read_csv
+
         types = _schema_types(schema, ibis_types=False)
-        if types:
-            return make_runtime_backend().connection.read_csv(path, header=True, types=types)
-        return make_runtime_backend().connection.read_csv(path, header=True, all_varchar=True)
+        return _read_csv(path, schema=types)
 
     def json(self, path: str, **kwargs) -> ibis.Table:
         return make_runtime_backend().connection.read_json(path)
@@ -163,6 +161,8 @@ class _DuckDBReader:
 
 
 class _SparkReader:
+    """Adapter so ``session.read.{csv,json,parquet}`` works on Spark."""
+
     def __init__(self, session: Any):
         self._session = session
 
@@ -171,6 +171,9 @@ class _SparkReader:
         if isinstance(schema, dict):
             kwargs = dict(kwargs)
             kwargs["schema"] = _merge_spark_csv_schema(self._session, path, schema, kwargs)
+        # The consolidated read_csv always passes header=True; this branch
+        # also defaults header to True if not provided.
+        kwargs.setdefault("header", True)
         return _spark_dataframe_to_ibis_table(self._session.read.csv(path, **kwargs))
 
     def json(self, path: str, **kwargs) -> ibis.Table:
@@ -575,15 +578,19 @@ def create_dataframe_from_product(
     string_type = cast(Any, StringType)
     schema = struct_type([struct_field(x, string_type()) for x in columns])
 
-    with CsvPartitionWriter(csv_dir, max_partition_size_mb=max_partition_size_mb) as writer:
+    with CsvPartitionWriter(
+        csv_dir,
+        max_partition_size_mb=max_partition_size_mb,
+        header=tuple(columns),
+    ) as writer:
         for row in itertools.product(*(data.values())):
             writer.add_row(row)
 
     session = get_runtime_session()
     if use_duckdb():
-        df = session.read.csv(f"{csv_dir.as_posix()}/*.csv", header=False, schema=schema)
+        df = session.read.csv(f"{csv_dir.as_posix()}/*.csv", schema=schema)
     else:
-        df = session.read.csv(str(csv_dir), header=False, schema=schema)
+        df = session.read.csv(str(csv_dir), schema=schema)
     return df
 
 
@@ -682,6 +689,19 @@ def _merge_spark_csv_schema(
             class_name = spec_for_spark_sql(spec.spark_sql).spark_type_names[0]
         return getattr(pyspark_types, class_name)()
 
+    # Try the cheap path first: read just the header line and assume the
+    # user provided a type for every column. This avoids a full Spark
+    # inferSchema scan (which previously doubled the read cost on large
+    # files). If any header column is missing from the user schema, fall
+    # back to inferSchema so those columns keep their inferred types.
+    column_names = _read_csv_header_columns(path, kwargs)
+    if column_names is not None and all(name in schema for name in column_names):
+        fields = [
+            pyspark_types.StructField(name, make_type(schema[name]), nullable=True)
+            for name in column_names
+        ]
+        return pyspark_types.StructType(fields)
+
     inference_kwargs = dict(kwargs)
     inference_kwargs.pop("schema", None)
     inference_kwargs["inferSchema"] = True
@@ -696,6 +716,28 @@ def _merge_spark_csv_schema(
         for field in inferred
     ]
     return pyspark_types.StructType(fields)
+
+
+def _read_csv_header_columns(path: str, kwargs: dict[str, Any]) -> list[str] | None:
+    """Return the column names from a CSV file's header line.
+
+    Returns ``None`` for inputs we can't trivially peek at (e.g. a Spark
+    directory of part files or paths with non-default options like a
+    custom quote character); the caller falls back to ``inferSchema``.
+    """
+    file_path = Path(path)
+    if not file_path.is_file():
+        return None
+    encoding = kwargs.get("encoding") or "utf-8"
+    delimiter = kwargs.get("sep") or ","
+    try:
+        with open(file_path, encoding=encoding) as f_in:
+            header_line = f_in.readline()
+    except OSError:
+        return None
+    if not header_line:
+        return None
+    return [name.strip() for name in header_line.rstrip("\r\n").split(delimiter)]
 
 
 def _ibis_type_from_spark_type(data_type: Any) -> str:

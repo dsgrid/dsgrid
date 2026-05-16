@@ -22,7 +22,7 @@ import ibis
 import pandas as pd
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
-from dsgrid.ibis.backend import make_runtime_backend, read_csv_expr
+from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import coalesce, create_temp_view
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.files import delete_if_exists, load_data
@@ -34,11 +34,79 @@ logger = logging.getLogger(__name__)
 MAX_PARTITION_SIZE_MB = 128
 
 
-def read_csv(path: Path | str, schema: dict[str, str] | None = None) -> ibis.Table:
-    """Return an Ibis table from a CSV file."""
+def read_csv(
+    path: Path | str,
+    *,
+    schema: dict[str, str] | None = None,
+    encoding: str = "utf-8",
+    delimiter: str | None = None,
+    null_values: list[str] | None = None,
+) -> ibis.Table:
+    """Return an Ibis table from a CSV file or a directory of CSV files.
+
+    The file's first row is always treated as the header — dsgrid's
+    column model is name-based and cannot work with positional column
+    data. CSVs without a header must be rewritten with one before being
+    read.
+
+    Parameters
+    ----------
+    path : Path or str
+        Path to a single CSV file or to a directory of part files (the
+        usual Spark output shape).
+    schema : dict[str, str], optional
+        Mapping of column name to backend SQL type string. Columns not in
+        the dict are inferred (DuckDB) or read as strings (Spark).
+    encoding : str, optional
+        File encoding. Defaults to ``"utf-8"``.
+    delimiter : str, optional
+        Field delimiter. Passed through to the backend reader; ``None``
+        uses the backend default (typically ``,``).
+    null_values : list[str], optional
+        Strings to interpret as NULL. Spark only honors the first entry;
+        DuckDB accepts the full list.
+
+    Returns
+    -------
+    ibis.Table
+    """
     path = Path(path)
     path_str = path.as_posix() + "/**/*.csv" if path.is_dir() else path.as_posix()
-    return read_csv_expr(path_str, schema=schema)
+
+    if use_duckdb():
+        # DuckDB read_csv does not expose an encoding parameter — it always
+        # reads as UTF-8 (with BOM detection). Callers that need a
+        # different encoding must pre-convert the file.
+        if encoding.lower() not in {"utf-8", "utf8"}:
+            msg = (
+                f"DuckDB backend only supports UTF-8 CSV input; got encoding={encoding!r}. "
+                "Re-encode the file to UTF-8 before reading."
+            )
+            raise DSGInvalidParameter(msg)
+        conn = make_runtime_backend().connection
+        kwargs: dict[str, Any] = {"header": True}
+        if schema:
+            kwargs["types"] = schema
+        else:
+            kwargs["all_varchar"] = True
+        if delimiter is not None:
+            kwargs["delim"] = delimiter
+        if null_values is not None:
+            kwargs["nullstr"] = null_values
+        return conn.read_csv(path_str, **kwargs)
+
+    # Spark: route through the runtime session reader so the dict-schema
+    # branch in _SparkReader.csv can translate to a PySpark StructType.
+    from dsgrid.ibis.session import get_runtime_session
+
+    spark_kwargs: dict[str, Any] = {"header": True, "encoding": encoding}
+    if schema:
+        spark_kwargs["schema"] = schema
+    if delimiter is not None:
+        spark_kwargs["sep"] = delimiter
+    if null_values is not None:
+        spark_kwargs["nullValue"] = null_values[0] if isinstance(null_values, list) else null_values
+    return get_runtime_session().read.csv(path_str, **spark_kwargs)
 
 
 def read_json(path: Path | str) -> ibis.Table:
@@ -439,15 +507,26 @@ def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
 
 
 class CsvPartitionWriter:
-    """Writes dataframe rows to partitioned CSV files."""
+    """Writes dataframe rows to partitioned CSV files.
 
-    def __init__(self, directory: Path, max_partition_size_mb: int = MAX_PARTITION_SIZE_MB):
+    Each part file starts with the optional ``header`` row so the result
+    is readable by :func:`read_csv` (which requires a header — dsgrid's
+    schema model is column-name based).
+    """
+
+    def __init__(
+        self,
+        directory: Path,
+        max_partition_size_mb: int = MAX_PARTITION_SIZE_MB,
+        header: tuple[str, ...] | None = None,
+    ):
         self._directory = directory
         self._directory.mkdir(exist_ok=True)
         self._max_size = max_partition_size_mb * 1024 * 1024
         self._size = 0
         self._index = 1
         self._fp = None
+        self._header = header
 
     def __enter__(self):
         return self
@@ -462,6 +541,9 @@ class CsvPartitionWriter:
         if self._fp is None:
             filename = self._directory / f"part{self._index}.csv"
             self._fp = open(filename, "w", encoding="utf-8")
+            if self._header is not None:
+                self._fp.write(",".join(self._header))
+                self._fp.write("\n")
         self._size += self._fp.write(line)
         self._size += self._fp.write("\n")
         if self._size >= self._max_size:

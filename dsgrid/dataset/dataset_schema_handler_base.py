@@ -75,12 +75,10 @@ from dsgrid.utils.dataset import (
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.functions import cache, unpersist
+from dsgrid.ibis.io import persist_table, read_dataframe, write_dataframe
 from dsgrid.ibis.session import (
     check_for_nulls,
     create_dataframe_from_product,
-    persist_table,
-    read_dataframe,
-    write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager

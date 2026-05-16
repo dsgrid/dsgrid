@@ -12,6 +12,20 @@ from dsgrid.ibis.operations import make_temp_view_name
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.ibis.io import (
+    CsvPartitionWriter,
+    overwrite_dataframe_file,
+    persist_intermediate_query,
+    persist_table,
+    read_dataframe,
+    try_read_dataframe,
+    write_dataframe,
+    write_dataframe_and_auto_partition,
+    _is_duckdb_io_exception,
+    _is_spark_parquet_schema_exception,
+    _read_natively,
+    _write_table,
+)
 from dsgrid.ibis.session import (
     ByteType,
     BooleanType,
@@ -22,7 +36,6 @@ from dsgrid.ibis.session import (
     create_dataframe_from_ids,
     create_dataframe_from_product,
     cross_join_dfs,
-    CsvPartitionWriter,
     custom_runtime_conf,
     DoubleType,
     F,
@@ -37,10 +50,6 @@ from dsgrid.ibis.session import (
     list_tables,
     load_stored_table,
     LongType,
-    overwrite_dataframe_file,
-    persist_intermediate_query,
-    persist_table,
-    read_dataframe,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
     save_table,
@@ -54,19 +63,12 @@ from dsgrid.ibis.session import (
     TimestampType,
     _duckdb_type_from_spark_type,
     _ibis_type_from_spark_type,
-    _is_duckdb_io_exception,
-    _is_spark_parquet_schema_exception,
-    _read_natively,
     _schema_names,
     _schema_types,
-    try_read_dataframe,
     try_load_stored_table,
     union,
     use_duckdb,
-    write_dataframe_and_auto_partition,
-    write_dataframe,
     _create_ibis_table,
-    _write_table,
 )
 from dsgrid.ibis.tz import custom_time_zone, get_current_time_zone, set_current_time_zone
 
@@ -331,7 +333,7 @@ def test_parquet_exception_detection():
 def test_require_unique_raises():
     table = get_runtime_session().createDataFrame([("a",), ("a",)], ["id"])
     with pytest.raises(DSGInvalidField, match="duplicate entries"):
-        from dsgrid.ibis.session import _post_process_dataframe
+        from dsgrid.ibis.io import _post_process_dataframe
 
         _post_process_dataframe(table, require_unique=["id"])
 

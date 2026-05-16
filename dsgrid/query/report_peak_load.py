@@ -12,7 +12,7 @@ from dsgrid.ibis.operations import join_multiple_columns
 from dsgrid.query.models import ProjectQueryModel
 from dsgrid.utils.dataset import ordered_subset_columns
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.ibis.session import read_dataframe, write_dataframe
+from dsgrid.ibis.io import read_dataframe, write_dataframe
 from .query_context import QueryContext
 from .reports_base import ReportsBase
 

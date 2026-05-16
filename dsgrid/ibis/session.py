@@ -3,10 +3,7 @@
 import enum
 import itertools
 import logging
-import math
 import os
-import shutil
-import time
 from contextlib import contextmanager
 from pathlib import Path
 from types import UnionType
@@ -18,7 +15,6 @@ import ibis
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.exceptions import (
     DSGInvalidField,
-    DSGInvalidFile,
     DSGInvalidOperation,
     DSGInvalidParameter,
 )
@@ -30,7 +26,14 @@ from dsgrid.ibis.operations import (
     handle_column_spaces,
     make_temp_view_name,
 )
-from dsgrid.ibis.io import read_csv, read_json, read_parquet
+from dsgrid.ibis.io import (
+    CsvPartitionWriter,
+    MAX_PARTITION_SIZE_MB,
+    _post_process_dataframe,
+    read_csv,
+    read_json,
+    read_parquet,
+)
 from dsgrid.ibis.types import (
     is_table_empty,
     spec_for_name,
@@ -39,9 +42,8 @@ from dsgrid.ibis.types import (
     use_duckdb,
 )
 from dsgrid.loggers import disable_console_logging
-from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
+from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 if not use_duckdb():
     import pyspark.sql.functions as F
@@ -103,8 +105,6 @@ logger = logging.getLogger(__name__)
 # spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
 # Doing so has caused conflicts in tests with the Derby db.
 DSGRID_DB_NAME = "default"
-
-MAX_PARTITION_SIZE_MB = 128
 
 _DUCKDB_RUNTIME_SESSION: Any = None
 
@@ -467,154 +467,6 @@ def create_dataframe_from_dicts(records: list[dict[str, Any]]) -> ibis.Table:
     return get_runtime_session().createDataFrame(data, columns)
 
 
-def try_read_dataframe(filename: Path, delete_if_invalid=True, **kwargs):
-    """Try to read the dataframe.
-
-    Parameters
-    ----------
-    filename : Path
-    delete_if_invalid : bool
-        Delete the file if it cannot be read, defaults to true.
-    kwargs
-        Forwarded to read_dataframe.
-
-    Returns
-    -------
-    ibis.Table | None
-        Returns None if the file does not exist or is invalid.
-
-    """
-    if not filename.exists():
-        return None
-
-    try:
-        return read_dataframe(filename, **kwargs)
-    except DSGInvalidFile:
-        if delete_if_invalid:
-            if filename.is_dir():
-                shutil.rmtree(filename)
-            else:
-                filename.unlink()
-        return None
-
-
-@track_timing(timer_stats_collector)
-def read_dataframe(
-    filename: str | Path,
-    table_name: str | None = None,
-    require_unique: None | bool = None,
-    read_with_runtime: bool = True,
-) -> ibis.Table:
-    """Create a table from a file.
-
-    Supported formats when read_with_runtime=True: .csv, .json, .parquet
-    Supported formats when read_with_runtime=False: .csv, .json
-
-    When reading CSV files on AWS read_with_runtime should be set to False because the
-    files would need to be present on local storage for all workers. The master node
-    will sync the config files from S3, read them with standard filesystem system calls,
-    and then convert the data to Ibis tables.
-
-    Parameters
-    ----------
-    filename : str | Path
-        path to file
-    table_name : str | None
-        If set, cache the Ibis table in memory. Must be unique.
-    require_unique : list
-        list of column names (str) to check for uniqueness
-    read_with_runtime : bool
-        If True, read the file with the active Ibis backend. Otherwise, read the file
-        natively in Python and then convert it to an Ibis table.
-
-    Returns
-    -------
-    ibis.Table
-
-    Raises
-    ------
-    ValueError
-        Raised if a require_unique column has duplicate values.
-    DSGInvalidFile
-        Raised if the file cannot be read. This can happen if a Parquet write operation fails.
-
-    """
-    func = _read_with_runtime if read_with_runtime else _read_natively
-    df = func(str(filename))
-    _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
-    return df
-
-
-def _read_with_runtime(filename):
-    if not os.path.exists(filename):
-        msg = f"{filename} does not exist"
-        raise FileNotFoundError(msg)
-    suffix = Path(filename).suffix
-    if suffix == ".csv":
-        df = read_csv(filename)
-    elif suffix == ".parquet":
-        try:
-            df = read_parquet(filename)
-        except Exception as exc:
-            if _is_spark_parquet_schema_exception(exc) or _is_duckdb_io_exception(exc):
-                logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
-                msg = f"Cannot read {filename=}"
-                raise DSGInvalidFile(msg)
-            else:
-                raise
-
-    elif suffix == ".json":
-        df = read_json(filename)
-    else:
-        msg = f"Unsupported file extension: {filename}"
-        raise NotImplementedError(msg)
-    return df
-
-
-def _is_duckdb_io_exception(exc: Exception) -> bool:
-    cls = exc.__class__
-    return cls.__name__ == "IOException" and cls.__module__.startswith("duckdb")
-
-
-def _is_spark_parquet_schema_exception(exc: Exception) -> bool:
-    message = str(exc)
-    return exc.__class__.__name__ == "AnalysisException" and (
-        "Unable to infer schema for Parquet. It must be specified manually." in message
-        or "PATH_NOT_FOUND" in message
-        or "Path does not exist" in message
-    )
-
-
-def _read_natively(filename):
-    suffix = Path(filename).suffix
-    if suffix == ".csv":
-        # Reading the file is faster with pandas. Converting a list of Row to spark df
-        # is a tiny bit faster. Pandas is likely scales better with bigger files.
-        # Keep the code in case we ever want to revert.
-        # with open(filename, encoding="utf-8-sig") as f_in:
-        #     rows = [Row(**x) for x in csv.DictReader(f_in)]
-        obj = pd.read_csv(filename)
-    elif suffix == ".json":
-        obj = load_data(filename)
-    else:
-        msg = f"Unsupported file extension: {filename}"
-        raise NotImplementedError(msg)
-    return get_runtime_session().createDataFrame(obj)
-
-
-def _post_process_dataframe(df, table_name=None, require_unique=None):
-    if table_name is not None:
-        make_runtime_backend().create_view(table_name, df)
-
-    if require_unique is not None:
-        with Timer(timer_stats_collector, "check_unique"):
-            for column in require_unique:
-                unique = df.select(column).distinct()
-                if _table_count(unique) != _table_count(df):
-                    msg = f"Ibis table has duplicate entries for {column}"
-                    raise DSGInvalidField(msg)
-
-
 def cross_join_dfs(dfs: list[ibis.Table]) -> ibis.Table:
     """Perform a cross join of all tables in dfs."""
     if len(dfs) == 1:
@@ -768,205 +620,6 @@ def check_for_nulls(df, exclude_columns=None):
         conn.raw_sql(f"DROP VIEW IF EXISTS {view}")
 
 
-@track_timing(timer_stats_collector)
-def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table:
-    """Perform an in-place overwrite of a table, accounting for different file types
-    and symlinks.
-
-    Do not attempt to access the original dataframe unless it was fully cached.
-    """
-    path = Path(filename)
-    suffix = path.suffix
-    tmp = str(path) + ".tmp"
-    tmp_posix = Path(tmp).as_posix()
-    if suffix == ".parquet":
-        _write_table(df, tmp_posix, "parquet")
-        read_method = read_parquet
-    elif suffix == ".csv":
-        _write_table(df, tmp_posix, "csv")
-        read_method = read_csv
-    elif suffix == ".json":
-        _write_table(df, tmp_posix, "json")
-        read_method = read_json
-    else:
-        msg = f"Unsupported file suffix: {suffix}"
-        raise NotImplementedError(msg)
-    delete_if_exists(filename)
-    os.rename(tmp, str(path))
-    return read_method(path.as_posix())
-
-
-@track_timing(timer_stats_collector)
-def persist_intermediate_query(
-    df: ibis.Table, scratch_dir_context: ScratchDirContext, auto_partition=False
-) -> ibis.Table:
-    """Persist the current query to files and then read it back and return it.
-
-    This is advised when the query has become too complex or when the query might be evaluated
-    twice.
-
-    Parameters
-    ----------
-    df : Ibis table
-    scratch_dir_context : ScratchDirContext
-    auto_partition : bool
-        If True, call write_dataframe_and_auto_partition.
-
-    Returns
-    -------
-    Ibis table
-    """
-    tmp_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    if auto_partition:
-        return write_dataframe_and_auto_partition(df, tmp_file)
-    _write_table(df, tmp_file.as_posix(), "parquet")
-    return read_parquet(tmp_file.as_posix())
-
-
-@track_timing(timer_stats_collector)
-def write_dataframe_and_auto_partition(
-    df: ibis.Table,
-    filename: Path,
-    partition_size_mb: int = MAX_PARTITION_SIZE_MB,
-    columns: list[str] | None = None,
-    rtol_pct: float = 50,
-    min_num_partitions: int = 36,
-) -> ibis.Table:
-    """Write a dataframe to a Parquet file and then automatically coalesce or repartition it if
-    needed. If the file already exists, it will be overwritten.
-
-    Parameters
-    ----------
-    df : ibis.Table
-    filename : Path
-    partition_size_mb : int
-        Target size in MB for each partition
-    columns : None, list
-        If not None and repartitioning is needed, partition on these columns.
-    rtol_pct : int
-        Don't repartition or coalesce if the relative difference between desired and actual
-        partitions is within this tolerance as a percentage.
-    min_num_partitions : int
-        Minimum number of partitions to create. If the number of partitions is less than this,
-        Do not coalesce/repartition because it will reduce parallelism.
-
-    Raises
-    ------
-    DSGInvalidParameter
-        Raised if a non-Parquet file is passed
-    """
-    suffix = Path(filename).suffix
-    if suffix != ".parquet":
-        msg = "write_dataframe_and_auto_partition only supports Parquet files: {filename=}"
-        raise DSGInvalidParameter(msg)
-
-    start_initial_write = time.time()
-    if filename.exists():
-        df = overwrite_dataframe_file(filename, df)
-    else:
-        _write_table(df, Path(filename).as_posix(), "parquet")
-        df = read_parquet(filename)
-
-    end_initial_write = time.time()
-    duration_first_write = end_initial_write - start_initial_write
-
-    if use_duckdb():
-        logger.debug("write_dataframe_and_auto_partition is not optimized for DuckDB")
-        return df
-
-    num_partitions = len(list(filename.parent.iterdir()))
-    if num_partitions < min_num_partitions:
-        logger.info(
-            "Not coalescing %s because it has only %s partitions, "
-            "which is less than the minimum of %s.",
-            filename,
-            num_partitions,
-            min_num_partitions,
-        )
-        # TODO: consider repartitioning to increase the number of partitions.
-        return df
-
-    partition_size_bytes = partition_size_mb * 1024 * 1024
-    total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
-    desired = math.ceil(total_size / partition_size_bytes)
-    actual = len(list(filename.glob("*.parquet")))
-    if abs(actual - desired) / desired * 100 < rtol_pct:
-        logger.info("No change in number of partitions is needed for %s.", filename)
-    elif actual > desired:
-        df = coalesce(df, desired)
-        df = overwrite_dataframe_file(filename, df)
-        duration_second_write = time.time() - end_initial_write
-        logger.info(
-            "Coalesced %s from partition count %s to %s. "
-            "duration_first_write=%s duration_second_write=%s",
-            filename,
-            actual,
-            desired,
-            duration_first_write,
-            duration_second_write,
-        )
-    else:
-        if columns is None:
-            df = df.repartition(desired)
-        else:
-            df = df.repartition(desired, *columns)
-        df = overwrite_dataframe_file(filename, df)
-        duration_second_write = time.time() - end_initial_write
-        logger.info(
-            "Repartitioned %s from partition count %s to %s. "
-            "duration_first_write=%s duration_second_write=%s",
-            filename,
-            actual,
-            desired,
-            duration_first_write,
-            duration_second_write,
-        )
-
-    logger.info("Wrote dataframe to %s", filename)
-    return df
-
-
-@track_timing(timer_stats_collector)
-def write_dataframe(df: ibis.Table, filename: str | Path, overwrite: bool = False) -> None:
-    """Write a table, accounting for different file types.
-
-    Parameters
-    ----------
-    filename : str
-    df : ibis.Table
-    """
-    path = Path(filename)
-    if overwrite:
-        delete_if_exists(path)
-
-    suffix = path.suffix
-    name = path.as_posix()
-    if suffix == ".parquet":
-        _write_table(df, name, "parquet")
-    elif suffix == ".csv":
-        _write_table(df, name, "csv")
-    elif suffix == ".json":
-        if use_duckdb():
-            new_name = name.replace(".json", ".parquet")
-            _write_table(df, new_name, "parquet")
-        else:
-            _write_table(df, name, "json")
-
-
-@track_timing(timer_stats_collector)
-def persist_table(df: ibis.Table, context: ScratchDirContext, tag=None) -> Path:
-    """Persist a table to the scratch directory. This can be helpful to avoid multiple
-    evaluations of the same query.
-    """
-    # Note: This does not use the Spark warehouse because we are not properly configuring or
-    # managing it across sessions. And, we are already using the scratch dir for our own files.
-    path = context.get_temp_filename(suffix=".parquet")
-    logger.info("Start persist_table %s %s", path, tag or "")
-    write_dataframe(df, path)
-    logger.info("Completed persist_table %s %s", path, tag or "")
-    return path
-
-
 def sql(query: str) -> ibis.Table:
     """Run a SQL query with the active Ibis backend."""
     logger.debug("Run SQL query [%s]", query)
@@ -1107,39 +760,6 @@ def _create_ibis_table(data: Any, schema: Any | None = None) -> ibis.Table:
     )
 
 
-def _table_count(table: ibis.Table) -> int:
-    count = cast(Any, table.count().execute())
-    return int(count)
-
-
-def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
-    view = create_temp_view(df)
-    if not use_duckdb():
-        writer = get_spark_session().table(view).write.mode("overwrite")
-        if file_format == "parquet":
-            writer.parquet(path)
-        elif file_format == "csv":
-            writer.option("header", True).csv(path)
-        elif file_format == "json":
-            writer.json(path)
-        else:
-            msg = f"Unsupported file format: {file_format}"
-            raise NotImplementedError(msg)
-        return
-
-    escaped_path = path.replace("'", "''")
-    conn = cast(Any, make_runtime_backend().connection)
-    if file_format == "parquet":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT PARQUET)")
-    elif file_format == "csv":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER)")
-    elif file_format == "json":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT JSON)")
-    else:
-        msg = f"Unsupported file format: {file_format}"
-        raise NotImplementedError(msg)
-
-
 def _schema_names(schema: Any | None) -> list[str]:
     if schema is None:
         return []
@@ -1232,39 +852,6 @@ def _ibis_type_from_spark_type(data_type: Any) -> str:
     return spec.ibis_dtype.split("(", 1)[0]
 
 
-class CsvPartitionWriter:
-    """Writes dataframe rows to partitioned CSV files."""
-
-    def __init__(self, directory: Path, max_partition_size_mb: int = MAX_PARTITION_SIZE_MB):
-        self._directory = directory
-        self._directory.mkdir(exist_ok=True)
-        self._max_size = max_partition_size_mb * 1024 * 1024
-        self._size = 0
-        self._index = 1
-        self._fp = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        if self._fp is not None:
-            self._fp.close()
-
-    def add_row(self, row: tuple) -> None:
-        """Add a row to the CSV files."""
-        line = ",".join(row)
-        if self._fp is None:
-            filename = self._directory / f"part{self._index}.csv"
-            self._fp = open(filename, "w", encoding="utf-8")
-        self._size += self._fp.write(line)
-        self._size += self._fp.write("\n")
-        if self._size >= self._max_size:
-            self._fp.close()
-            self._fp = None
-            self._size = 0
-            self._index += 1
-
-
 @contextmanager
 def custom_runtime_conf(conf):
     """Apply a custom Spark configuration for the duration of a code block.
@@ -1327,8 +914,6 @@ def restart_runtime_session_with_custom_conf(conf: dict, force=False):
         yield new_spark
     finally:
         restart_runtime_session(name=app_name, spark_conf=orig_settings, force=force)
-
-
 
 
 def union(dfs: list[ibis.Table]) -> ibis.Table:

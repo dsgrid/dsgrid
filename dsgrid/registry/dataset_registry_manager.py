@@ -58,11 +58,8 @@ from dsgrid.utils.dataset import (
     localize_timestamps_if_necessary,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import (
-    get_runtime_session,
-    read_dataframe,
-    write_dataframe,
-)
+from dsgrid.ibis.io import read_dataframe, write_dataframe
+from dsgrid.ibis.session import get_runtime_session
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table, make_unique_key

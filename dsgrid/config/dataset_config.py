@@ -26,7 +26,7 @@ from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, Enum
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import get_unique_values
-from dsgrid.ibis.session import read_dataframe
+from dsgrid.ibis.io import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (

@@ -20,7 +20,7 @@ from dsgrid.utils.dataset import (
     remove_invalid_null_timestamps,
 )
 from dsgrid.ibis.operations import drop_columns, join, rename_columns
-from dsgrid.ibis.session import persist_intermediate_query
+from dsgrid.ibis.io import persist_intermediate_query
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 

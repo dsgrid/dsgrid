@@ -26,7 +26,7 @@ from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
-from dsgrid.ibis.session import read_dataframe
+from dsgrid.ibis.io import read_dataframe
 
 from tests._helpers import collect as _collect, order_by as _order_by
 

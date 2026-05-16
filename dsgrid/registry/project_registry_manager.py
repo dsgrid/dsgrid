@@ -80,11 +80,8 @@ from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import (
-    models_to_dataframe,
-    persist_table,
-    read_dataframe,
-)
+from dsgrid.ibis.io import persist_table, read_dataframe
+from dsgrid.ibis.session import models_to_dataframe
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
 from .common import (

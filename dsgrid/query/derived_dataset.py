@@ -30,7 +30,7 @@ from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import read_dataframe
+from dsgrid.ibis.io import read_dataframe
 
 
 logger = logging.getLogger(__name__)

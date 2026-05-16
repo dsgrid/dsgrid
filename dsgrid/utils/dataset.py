@@ -50,12 +50,11 @@ from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import table_to_records
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.ibis.io import persist_table, write_dataframe
 from dsgrid.ibis.session import (
     check_for_nulls,
     get_spark_session,
     get_runtime_session,
-    persist_table,
-    write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 

@@ -40,12 +40,12 @@ from dsgrid.ibis.functions import write_csv
 from dsgrid.ibis.operations import drop_columns, join, pivot
 
 from dsgrid.project import Project
-from dsgrid.ibis.session import (
+from dsgrid.ibis.io import (
+    persist_table,
     read_dataframe,
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
-    persist_table,
 )
 from dsgrid.ibis.tz import custom_time_zone
 from dsgrid.utils.timing import timer_stats_collector, track_timing

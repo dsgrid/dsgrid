@@ -34,12 +34,12 @@ from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingR
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
 from dsgrid.ibis.types import is_table_empty
-from dsgrid.ibis.session import (
+from dsgrid.ibis.io import (
     read_dataframe,
     try_read_dataframe,
-    restart_runtime_session_with_custom_conf,
     write_dataframe_and_auto_partition,
 )
+from dsgrid.ibis.session import restart_runtime_session_with_custom_conf
 from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
 

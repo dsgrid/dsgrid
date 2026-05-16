@@ -8,11 +8,10 @@ from pydantic import Field, field_validator, model_validator
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
-from dsgrid.ibis.io import read_csv, read_json, read_parquet
+from dsgrid.ibis.io import read_csv, read_json, read_parquet, write_dataframe
 from dsgrid.ibis.operations import drop_columns, rename_columns
 from dsgrid.ibis.types import SUPPORTED_TYPES, TypeSpec, spec_for_name, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import write_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 
 

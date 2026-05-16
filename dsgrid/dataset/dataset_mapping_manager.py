@@ -10,7 +10,7 @@ from dsgrid.query.dataset_mapping_plan import (
 )
 
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.ibis.session import read_dataframe, write_dataframe
+from dsgrid.ibis.io import read_dataframe, write_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)

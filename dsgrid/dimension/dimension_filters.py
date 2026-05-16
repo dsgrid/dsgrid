@@ -44,11 +44,8 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
         values.pop("filter_type", None)
         return values
 
-    def _make_value_str(self, value):
-        return _make_sql_value(value)
-
     def _make_values_str(self, values):
-        return ", ".join((f"{self._make_value_str(x)}" for x in values))
+        return ", ".join((f"{_make_sql_value(x)}" for x in values))
 
 
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
@@ -104,7 +101,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
 
     def where_clause(self, column=None):
         column = column or self.column
-        value = self._make_value_str(self.value)
+        value = _make_sql_value(self.value)
         text = f"({column} {self.operator} {value})"
         return text
 

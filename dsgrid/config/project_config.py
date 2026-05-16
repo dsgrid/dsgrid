@@ -40,7 +40,7 @@ from dsgrid.registry.common import (
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.operations import cross_join_dfs
+from dsgrid.ibis.operations import cross_join_dfs, filter_sql
 from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
@@ -601,7 +601,8 @@ class InputDatasetModel(DSGBaseModel):
         msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment=}."
         raise ValueError(msg)
 
-        #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
+
+# TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
 
 
 class DimensionMappingsModel(DSGBaseModel):
@@ -978,8 +979,6 @@ class ProjectConfig(ConfigBase):
         Excludes rows with NULL to_id values.
         """
         config = self.get_base_to_supplemental_config(base_dim, supp_dim)
-        from dsgrid.ibis.operations import filter_sql
-
         return filter_sql(config.get_records_dataframe(), "to_id is not NULL")
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type) -> bool:

@@ -21,6 +21,7 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.ibis.operations import drop_columns, join, rename_columns
 from dsgrid.ibis.io import persist_intermediate_query
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 
@@ -112,15 +113,8 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
-            exprs = {}
-            for col in df.columns:
-                if col == "fraction":
-                    continue
-                if col in value_columns:
-                    exprs[col] = df[col] * df["fraction"]
-                else:
-                    exprs[col] = df[col]
-            df = df.select(**exprs)
+            multiplied = {c: df[c] * df["fraction"] for c in df.columns if c in value_columns}
+            df = drop_columns(df.mutate(**multiplied), "fraction")
 
         return df
 
@@ -184,8 +178,8 @@ class TableFormatHandlerBase(abc.ABC):
                 records = dim_config.get_records_dataframe().select("id", "name")
                 df = drop_columns(join(df, records, name, "id"), "id", name)
                 df = rename_columns(df, {"name": name})
-        new_count = _count_rows(df)
-        orig_count = _count_rows(orig)
+        new_count = count_rows(df)
+        orig_count = count_rows(orig)
         assert new_count == orig_count, f"counts changed {new_count} {orig_count}"
         return df
 
@@ -268,5 +262,3 @@ class TableFormatHandlerBase(abc.ABC):
         return df
 
 
-def _count_rows(df: ibis.Table) -> int:
-    return int(cast(Any, df.count().execute()))

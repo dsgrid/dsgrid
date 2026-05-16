@@ -4,7 +4,7 @@ from tempfile import NamedTemporaryFile
 
 import ibis
 
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.temp import make_temp_view_name, track_temp_file
 from dsgrid.ibis.types import use_duckdb
 
@@ -25,7 +25,7 @@ def create_temp_view(df: ibis.Table) -> str:
        table/view name from earlier failed attempts before re-creating it.
     """
     view = make_temp_view_name()
-    backend = make_runtime_backend()
+    backend = get_runtime_backend()
     try:
         backend.create_view(view, df)
         return view
@@ -93,7 +93,7 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
         return df1, df2
     if b1 is b2:
         return df1, df2
-    runtime = make_runtime_backend()
+    runtime = get_runtime_backend()
     if b1 is not runtime:
         df1 = runtime.table(create_temp_view(df1))
     if b2 is not runtime:
@@ -180,7 +180,7 @@ def aggregate_single_value(df: ibis.Table, agg_func: str, column: str) -> Any:
 
 
 def _sql_on_df(df: ibis.Table, query: str) -> ibis.Table:
-    return make_runtime_backend().sql(query)
+    return get_runtime_backend().sql(query)
 
 
 def cross_join_dfs(dfs: list[ibis.Table]) -> ibis.Table:
@@ -204,7 +204,7 @@ def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
     if use_duckdb():
         return df
     view = create_temp_view(df)
-    backend = cast(Any, make_runtime_backend())
+    backend = cast(Any, get_runtime_backend())
     spark_df = backend.connection._session.sql(f"SELECT * FROM {view}")
     coalesced = spark_df.coalesce(num_partitions)
     coalesced_view = make_temp_view_name()

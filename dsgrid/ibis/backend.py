@@ -10,7 +10,7 @@ _RUNTIME_BACKEND: IbisBackend | None = None
 _RUNTIME_BACKEND_KEY: tuple[Any, ...] | None = None
 
 
-def make_runtime_backend(**kwargs: Any) -> IbisBackend:
+def get_runtime_backend(**kwargs: Any) -> IbisBackend:
     """Create an Ibis backend from the dsgrid runtime configuration."""
     global _RUNTIME_BACKEND, _RUNTIME_BACKEND_KEY
 
@@ -38,7 +38,20 @@ def make_runtime_backend(**kwargs: Any) -> IbisBackend:
 
 def create_chronify_store(**kwargs: Any) -> chronify.Store:
     """Create a chronify Store backed by the configured Ibis backend."""
-    return chronify.Store(backend=make_runtime_backend(**kwargs))
+    return chronify.Store(backend=get_runtime_backend(**kwargs))
+
+
+def invalidate_runtime_backend_cache() -> None:
+    """Drop the cached Ibis runtime backend.
+
+    Call this after restarting the underlying Spark session so the next
+    ``get_runtime_backend()`` call (which may not receive an explicit
+    ``session=`` kwarg) builds a fresh backend bound to the new session,
+    instead of returning a backend still wired to the stopped session.
+    """
+    global _RUNTIME_BACKEND, _RUNTIME_BACKEND_KEY
+    _RUNTIME_BACKEND = None
+    _RUNTIME_BACKEND_KEY = None
 
 
 def _make_backend_cache_key(

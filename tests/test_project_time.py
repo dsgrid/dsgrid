@@ -13,7 +13,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_database import DatabaseConnection
@@ -284,7 +284,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             view = create_temp_view(time_df)
             table = make_temp_view_name()
             spark = get_runtime_session()
-            make_runtime_backend().connection.raw_sql(
+            get_runtime_backend().connection.raw_sql(
                 f"CREATE TABLE {table} AS SELECT * FROM {view}"
             )
             time_df = spark.sql(f"SELECT * FROM {table}")
@@ -484,9 +484,9 @@ def _distinct_sum_count_by_group(df, groupby_cols):
 
 
 def _sql_ident(column):
-    from dsgrid.ibis.backend import make_runtime_backend
+    from dsgrid.ibis.backend import get_runtime_backend
 
-    if make_runtime_backend().name == "spark":
+    if get_runtime_backend().name == "spark":
         return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'
 

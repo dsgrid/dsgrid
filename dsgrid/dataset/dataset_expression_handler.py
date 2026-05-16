@@ -5,6 +5,7 @@ import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.operations import join_multiple_columns, rename_columns
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.py_expression_eval import Parser
 
 
@@ -17,8 +18,8 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        orig_self_count = _count_rows(self.df)
-        orig_other_count = _count_rows(other.df)
+        orig_self_count = count_rows(self.df)
+        orig_other_count = count_rows(other.df)
         if orig_self_count != orig_other_count:
             msg = (
                 f"{op=} requires that the datasets have the same length "
@@ -34,7 +35,7 @@ class DatasetExpressionHandler:
         }
         df = joined.mutate(**mutations).select(*self.df.columns)
 
-        joined_count = _count_rows(df)
+        joined_count = count_rows(df)
         if joined_count != orig_self_count:
             msg = (
                 f"join for operation {op=} has a different row count than the original. "
@@ -83,6 +84,3 @@ def evaluate_expression(expr: str, dataset_mapping: dict[str, DatasetExpressionH
     return Parser().parse(expr).evaluate(dataset_mapping)
 
 
-def _count_rows(df: ibis.Table) -> int:
-    count = df.count().execute()
-    return int(cast(Any, count))

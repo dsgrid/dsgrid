@@ -31,8 +31,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """Return True if the config can be converted to chronify."""
         return False
 
-        # @abc.abstractmethod
-
     def to_chronify(self) -> chronify.TimeBaseModel:
         """Return the chronify version of the time model."""
         # This is likely temporary until we can use chronify models directly.
@@ -145,8 +143,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     def get_time_zones(self) -> list[str]:
         """Return a list of time zones for this dimension."""
-        time_zone = self.get_time_zone()
-        if time_zone:
+        if time_zone := self.get_time_zone():
             return [time_zone]
         return []
 

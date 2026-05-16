@@ -9,7 +9,7 @@ rewrite easier to scope.
 from typing import Any, cast
 
 from dsgrid.exceptions import DSGInvalidField
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.ibis.types import is_table_empty
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -59,5 +59,5 @@ def check_for_nulls(df, exclude_columns=None) -> None:
             msg = f"Ibis table contains NULL value(s) for column(s): {cols_with_null}"
             raise DSGInvalidField(msg)
     finally:
-        conn = cast(Any, make_runtime_backend().connection)
+        conn = cast(Any, get_runtime_backend().connection)
         conn.raw_sql(f"DROP VIEW IF EXISTS {view}")

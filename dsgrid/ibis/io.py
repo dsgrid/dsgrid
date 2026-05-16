@@ -22,7 +22,7 @@ import ibis
 import pandas as pd
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import coalesce, create_temp_view
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.files import delete_if_exists, load_data
@@ -83,7 +83,7 @@ def read_csv(
                 "Re-encode the file to UTF-8 before reading."
             )
             raise DSGInvalidParameter(msg)
-        conn = make_runtime_backend().connection
+        conn = get_runtime_backend().connection
         kwargs: dict[str, Any] = {"header": True}
         if schema:
             kwargs["types"] = schema
@@ -111,7 +111,7 @@ def read_csv(
 
 def read_json(path: Path | str) -> ibis.Table:
     """Return an Ibis table from a JSON file."""
-    return make_runtime_backend().connection.read_json(str(path))
+    return get_runtime_backend().connection.read_json(str(path))
 
 
 def read_parquet(path: Path | str) -> ibis.Table:
@@ -121,7 +121,7 @@ def read_parquet(path: Path | str) -> ibis.Table:
         if path.is_file() or not use_duckdb()
         else f"{path.as_posix()}/**/*.parquet"
     )
-    return make_runtime_backend().connection.read_parquet(path_str)
+    return get_runtime_backend().connection.read_parquet(path_str)
 
 
 def try_read_dataframe(filename: Path, delete_if_invalid: bool = True, **kwargs):
@@ -261,7 +261,7 @@ def _read_natively(filename: str) -> ibis.Table:
 
 def _post_process_dataframe(df, table_name: str | None = None, require_unique=None) -> None:
     if table_name is not None:
-        make_runtime_backend().create_view(table_name, df)
+        get_runtime_backend().create_view(table_name, df)
 
     if require_unique is not None:
         with Timer(timer_stats_collector, "check_unique"):
@@ -530,7 +530,7 @@ def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
         return
 
     escaped_path = path.replace("'", "''")
-    conn = cast(Any, make_runtime_backend().connection)
+    conn = cast(Any, get_runtime_backend().connection)
     if file_format == "parquet":
         conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT PARQUET)")
     elif file_format == "csv":

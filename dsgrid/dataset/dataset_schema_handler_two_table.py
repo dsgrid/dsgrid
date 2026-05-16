@@ -23,7 +23,7 @@ from dsgrid.ibis.operations import (
     join_multiple_columns,
     union_all,
 )
-from dsgrid.ibis.table_utils import table_to_records
+from dsgrid.ibis.table_utils import count_rows, table_to_records
 from dsgrid.ibis.types import is_string_column
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
@@ -293,18 +293,18 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_for_nulls(self._load_data)
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
-        ldl_id_count = _count_rows(ldl_ids)
-        data_id_count = _count_rows(ld_ids)
+        ldl_id_count = count_rows(ldl_ids)
+        data_id_count = count_rows(ld_ids)
         joined = join_multiple_columns(ld_ids, ldl_ids, ["id"])
-        count = _count_rows(joined)
+        count = count_rows(joined)
 
         if data_id_count != count or ldl_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
                 # Only run the query once (with Spark). Number of rows shouldn't be a problem.
                 diff = cache(except_all(union_all(ld_ids, ldl_ids), intersect(ld_ids, ldl_ids)))
-                diff_count = _count_rows(diff)
+                diff_count = count_rows(diff)
                 limit = 100
-                diff_list = _collect_limited_error_rows(diff.limit(limit))
+                diff_list = table_to_records(diff.limit(limit))
                 unpersist(diff)
                 logger.error(
                     "load_data and load_data_lookup have %s different IDs. Limited to %s: %s",
@@ -331,7 +331,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = _count_rows(cached_lookup.select(col).distinct())
+            count = count_rows(cached_lookup.select(col).distinct())
             assert count == 1, f"{dim}: count"
             columns_to_drop.append(col)
         del cached_lookup
@@ -353,9 +353,5 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         logger.info("Rewrote simplified %s", self._config.model.dataset_id)
 
 
-def _collect_limited_error_rows(df: ibis.Table) -> list[dict]:
-    return table_to_records(df)
 
 
-def _count_rows(df: ibis.Table) -> int:
-    return int(cast(Any, df.count().execute()))

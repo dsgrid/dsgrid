@@ -111,9 +111,9 @@ def _filter(df, predicate):
 
 
 def _sql_ident(column):
-    from dsgrid.ibis.backend import make_runtime_backend
+    from dsgrid.ibis.backend import get_runtime_backend
 
-    if make_runtime_backend().name == "spark":
+    if get_runtime_backend().name == "spark":
         return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'
 

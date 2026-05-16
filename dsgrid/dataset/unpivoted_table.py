@@ -4,7 +4,7 @@ import ibis
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.query.models import (
     AggregationModel,
@@ -138,7 +138,7 @@ def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> 
     if group_cols:
         query += f" GROUP BY {group_cols}"
     if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
+        return get_runtime_backend().sql(query)
     return get_runtime_session().sql(query)
 
 

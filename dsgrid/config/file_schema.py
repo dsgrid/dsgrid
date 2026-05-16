@@ -64,7 +64,7 @@ class FileSchema(DSGBaseModel):
         if len(self.columns) > 1:
             check_uniqueness((x.name for x in self.columns), "column names")
 
-            # Check that ignore_columns don't overlap with columns
+        # Check that ignore_columns don't overlap with columns
         column_names = {x.name for x in self.columns}
         ignore_set = set(self.ignore_columns)
         overlap = column_names & ignore_set

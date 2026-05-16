@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any, Iterable, Literal, cast
 from datetime import tzinfo
 
 import chronify
@@ -30,7 +30,7 @@ from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidOperation,
 )
-from dsgrid.ibis.backend import create_chronify_store, make_runtime_backend
+from dsgrid.ibis.backend import create_chronify_store, get_runtime_backend
 from dsgrid.ibis.io import read_parquet
 from dsgrid.ibis.operations import (
     coalesce,
@@ -47,14 +47,15 @@ from dsgrid.ibis.operations import (
     unpivot,
 )
 from dsgrid.ibis.temp import make_temp_view_name
-from dsgrid.ibis.table_utils import table_to_records
+from dsgrid.ibis.table_utils import count_rows, get_unique_values, table_to_records
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.ibis.session import (
-    get_spark_session,
+    create_dataframe_from_product,
     get_runtime_session,
+    get_spark_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -77,7 +78,12 @@ def _is_ibis_table(df: ibis.Table) -> bool:
     return isinstance(df, ibis.Table)
 
 
-def _create_chronify_source(store: chronify.Store, df: ibis.Table, schema: TableSchema) -> str:
+_ChronifySourceKind = Literal["view", "table"]
+
+
+def _create_chronify_source(
+    store: chronify.Store, df: ibis.Table, schema: TableSchema
+) -> _ChronifySourceKind:
     if _is_ibis_table(df):
         store.create_view(schema, df)
         return "view"
@@ -88,7 +94,9 @@ def _create_chronify_source(store: chronify.Store, df: ibis.Table, schema: Table
     return "table"
 
 
-def _drop_chronify_source(store: chronify.Store, schema: TableSchema, kind: str) -> None:
+def _drop_chronify_source(
+    store: chronify.Store, schema: TableSchema, kind: _ChronifySourceKind
+) -> None:
     if kind == "view":
         store.drop_view(schema.name, if_exists=True)
     else:
@@ -128,7 +136,7 @@ def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
     return df.select(**exprs)
 
 
-def _to_duckdb_sql_type(data_type) -> str:
+def _to_duckdb_sql_type(data_type: ibis.expr.datatypes.DataType) -> str:
     if data_type.is_boolean():
         return "BOOLEAN"
     if data_type.is_int8():
@@ -153,8 +161,6 @@ def _alias_expression(expr, alias: str):
     return expr.name(alias) if isinstance(expr, ir.Value) else expr.alias(alias)
 
 
-def _collect_limited_error_rows(df: ibis.Table) -> list[dict]:
-    return table_to_records(df)
 
 
 def map_stacked_dimension(
@@ -279,7 +285,7 @@ def _apply_scaling_factor_sql(
             ) AS {value_column}
         FROM {view}
     """
-    return make_runtime_backend().sql(query)
+    return get_runtime_backend().sql(query)
 
 
 def check_historical_annual_time_model_year_consistency(
@@ -296,7 +302,7 @@ def check_historical_annual_time_model_year_consistency(
         f"{time_column} != {model_year_column}",
     )
     if not is_table_empty(invalid_df):
-        invalid = _collect_limited_error_rows(invalid_df.limit(100))
+        invalid = table_to_records(invalid_df.limit(100))
         msg = (
             "A historical dataset with annual time must have rows where the time years match the model years. "
             f"{invalid}"
@@ -390,9 +396,9 @@ def handle_dimension_association_errors(
 
 
 def _look_for_error_contributors(diff: ibis.Table, dataset_table: ibis.Table) -> None:
-    diff_counts = {x: _count_rows(diff.select(x).distinct()) for x in diff.columns}
+    diff_counts = {x: count_rows(diff.select(x).distinct()) for x in diff.columns}
     for col in diff.columns:
-        dataset_count = _count_rows(dataset_table.select(col).distinct())
+        dataset_count = count_rows(dataset_table.select(col).distinct())
         if dataset_count != diff_counts[col]:
             logger.error(
                 "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
@@ -402,8 +408,6 @@ def _look_for_error_contributors(diff: ibis.Table, dataset_table: ibis.Table) ->
             )
 
 
-def _count_rows(df: ibis.Table) -> int:
-    return int(cast(Any, df.count().execute()))
 
 
 def is_noop_mapping(records: ibis.Table) -> bool:
@@ -951,9 +955,6 @@ def merge_expected_associations_tables(
     DSGInvalidDataset
         If a dimension column loses records during the merge.
     """
-    from dsgrid.ibis.table_utils import get_unique_values
-    from dsgrid.ibis.session import create_dataframe_from_product
-
     # Step 1: Group by column set; union tables with identical columns.
     groups: dict[frozenset[str], ibis.Table] = {}
     for df in expected_dfs.values():
@@ -1063,7 +1064,7 @@ def filter_out_expected_missing_associations(
         ANTI JOIN {assoc_view}
         ON {join_str}
     """
-    return make_runtime_backend().sql(query)
+    return get_runtime_backend().sql(query)
 
 
 def split_expected_missing_rows(

@@ -13,7 +13,7 @@ from typing import Any, Type, Union, cast, get_args, get_origin
 import ibis
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 
@@ -37,8 +37,8 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
     )
 
     session = get_runtime_session()
-    if table_name is not None and make_runtime_backend().has_table(table_name):
-        return make_runtime_backend().table(table_name)
+    if table_name is not None and get_runtime_backend().has_table(table_name):
+        return get_runtime_backend().table(table_name)
 
     assert models
     cls = type(models[0])
@@ -71,7 +71,7 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
     df = session.createDataFrame(rows, schema=schema)
 
     if table_name is not None:
-        make_runtime_backend().create_view(table_name, df)
+        get_runtime_backend().create_view(table_name, df)
 
     return df
 

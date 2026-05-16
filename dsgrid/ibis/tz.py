@@ -33,7 +33,7 @@ Treat one as deprecated once a consolidation pass lands.
 from contextlib import contextmanager
 from typing import Any, Generator, cast
 
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.types import use_duckdb
 
 
@@ -45,7 +45,7 @@ def get_current_time_zone() -> str:
 
     spark = get_runtime_session()
     if use_duckdb():
-        conn = cast(Any, make_runtime_backend().connection)
+        conn = cast(Any, get_runtime_backend().connection)
         result = conn.raw_sql("SELECT value FROM duckdb_settings() WHERE name = 'TimeZone'")
         row = result.fetchone()
         assert row is not None
@@ -64,7 +64,7 @@ def set_current_time_zone(time_zone: str) -> None:
     if use_duckdb():
         escaped = time_zone.replace("'", "''")
         if isinstance(session, _DuckDBRuntimeSession):
-            conn = cast(Any, make_runtime_backend().connection)
+            conn = cast(Any, get_runtime_backend().connection)
             conn.raw_sql(f"SET TimeZone='{escaped}'")
         else:
             session.sql(f"SET TimeZone='{escaped}'")

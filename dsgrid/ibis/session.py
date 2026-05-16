@@ -11,7 +11,7 @@ import pandas as pd
 import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import (
     coalesce,
     create_temp_view,
@@ -125,14 +125,14 @@ class _DuckDBConf:
 class _DuckDBCatalog:
     def tableExists(self, name: str) -> bool:
         table_name = name.split(".")[-1]
-        return make_runtime_backend().has_table(table_name)
+        return get_runtime_backend().has_table(table_name)
 
     def isCached(self, name: str) -> bool:
         return False
 
     def listTables(self, dbName: str = DSGRID_DB_NAME) -> list[Any]:
         return [
-            type("TableInfo", (), {"name": name}) for name in make_runtime_backend().list_tables()
+            type("TableInfo", (), {"name": name}) for name in get_runtime_backend().list_tables()
         ]
 
 
@@ -154,10 +154,10 @@ class _DuckDBReader:
         return _read_csv(path, schema=types)
 
     def json(self, path: str, **kwargs) -> ibis.Table:
-        return make_runtime_backend().connection.read_json(path)
+        return get_runtime_backend().connection.read_json(path)
 
     def parquet(self, path: str, **kwargs) -> ibis.Table:
-        return make_runtime_backend().connection.read_parquet(path)
+        return get_runtime_backend().connection.read_parquet(path)
 
 
 class _SparkReader:
@@ -201,10 +201,10 @@ class _SparkRuntimeSession:
     def sql(self, query: str, **kwargs) -> ibis.Table:
         if kwargs:
             return _spark_dataframe_to_ibis_table(self._session.sql(query, **kwargs))
-        return make_runtime_backend().sql(query)
+        return get_runtime_backend().sql(query)
 
     def table(self, name: str) -> ibis.Table:
-        return make_runtime_backend().table(name.split(".")[-1])
+        return get_runtime_backend().table(name.split(".")[-1])
 
     def stop(self) -> None:
         self._session.stop()
@@ -223,10 +223,10 @@ class _DuckDBRuntimeSession:
         if kwargs:
             msg = "DuckDB Ibis SQL does not support Spark keyword dataframe bindings"
             raise DSGInvalidOperation(msg)
-        return make_runtime_backend().sql(query)
+        return get_runtime_backend().sql(query)
 
     def table(self, name: str) -> ibis.Table:
-        return make_runtime_backend().table(name.split(".")[-1])
+        return get_runtime_backend().table(name.split(".")[-1])
 
 
 if use_duckdb():
@@ -402,6 +402,11 @@ def restart_runtime_session(*args, force=False, **kwargs) -> Any:
     if needs_restart:
         session.stop()
         logger.info("Stopped the SparkSession so that it can be restarted with a new config.")
+        # Drop the cached Ibis backend; the next get_runtime_backend() call
+        # must build a fresh one bound to the new session below.
+        from dsgrid.ibis.backend import invalidate_runtime_backend_cache
+
+        invalidate_runtime_backend_cache()
         session = _create_spark_session(*args, **kwargs)
         if session.conf.get("spark.sql.session.timeZone") != new_time_zone:
             # We set this value in query_submitter.py and that change will get lost
@@ -597,7 +602,7 @@ def create_dataframe_from_product(
 def _spark_dataframe_to_ibis_table(df: Any) -> ibis.Table:
     view = make_temp_view_name()
     df.createOrReplaceTempView(view)
-    return make_runtime_backend().table(view)
+    return get_runtime_backend().table(view)
 
 
 def _create_ibis_table(data: Any, schema: Any | None = None) -> ibis.Table:
@@ -615,7 +620,7 @@ def _create_ibis_table(data: Any, schema: Any | None = None) -> ibis.Table:
         else:
             pdf = pd.DataFrame(rows)
     ibis_schema = cast(Any, _schema_types(schema))
-    conn = cast(Any, make_runtime_backend().connection)
+    conn = cast(Any, get_runtime_backend().connection)
     return conn.create_table(
         make_temp_view_name(),
         obj=pdf,

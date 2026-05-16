@@ -494,7 +494,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 write_dataframe(df, path)
                 df_filenames[dataset_id] = path
 
-                # All dataset columns need to be in the same order.
+        # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         datasets = self._convert_datasets(context, df_filenames)
         assert isinstance(context.model, ProjectQueryModel) or isinstance(
@@ -896,7 +896,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                             f"dimension version = {to_dim.model.version}"
                         )
                         raise DSGInvalidQuery(msg)
-                        # No mapping is required.
+                    # No mapping is required.
                     continue
                 if to_dim.model.dimension_type != DimensionType.TIME:
                     refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(

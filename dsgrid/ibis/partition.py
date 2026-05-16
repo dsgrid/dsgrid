@@ -1,6 +1,7 @@
 import logging
 import math
 
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import timed_info
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class TablePartition:
             Estimated size of df in memory in MB
 
         """
-        n_rows = _count_rows(df)
+        n_rows = count_rows(df)
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
         return n_rows, n_cols, data_MB
@@ -98,5 +99,3 @@ class TablePartition:
         return output
 
 
-def _count_rows(df) -> int:
-    return df.count().execute()

@@ -7,7 +7,7 @@ import pytest
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation, DSGInvalidParameter
-from dsgrid.ibis.backend import make_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import cross_join_dfs, make_temp_view_name
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
@@ -176,7 +176,7 @@ def test_duckdb_runtime_session_shims():
 
     table_name = make_temp_view_name()
     table = session.createDataFrame([(1, "a")], ["id", "name"])
-    make_runtime_backend().create_view(table_name, table)
+    get_runtime_backend().create_view(table_name, table)
     assert session.catalog.tableExists(f"default.{table_name}")
     assert is_table_stored(table_name)
     assert table_name in list_tables()

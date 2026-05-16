@@ -792,7 +792,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         f"{dim_type} because the project has {len(base_dims)} base dimensions."
                     )
                     raise DSGInvalidDimensionMapping(msg)
-                    # Only one of base and base_missing can be set, and that was already checked.
+            # Only one of base and base_missing can be set, and that was already checked.
             break
 
     @track_timing(timer_stats_collector)
@@ -1160,11 +1160,11 @@ class ProjectRegistryManager(RegistryManagerBase):
                 and dim.dimension_id not in d_dim_from_ids
             ):
                 needs_mapping.append((dim.dimension_id, dim.version))
-                # else:
-                #     This dimension is the same as a project base dimension.
-                #     or
-                #     The dataset may only need to provide a subset of records, and those are
-                #     checked in the dimension association table.
+            # else:
+            #     This dimension is the same as a project base dimension.
+            #     or
+            #     The dataset may only need to provide a subset of records, and those are
+            #     checked in the dimension association table.
 
         if len(needs_mapping) != len(autogen_reverse_supplemental_mappings):
             msg = (

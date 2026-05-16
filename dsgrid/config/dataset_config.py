@@ -88,7 +88,7 @@ def check_load_data_filename(path: str | Path) -> Path:
         if filename.exists():
             return filename
 
-            # Use ValueError because this gets called in Pydantic model validation.
+    # Use ValueError because this gets called in Pydantic model validation.
     msg = f"no load_data file exists in {path_}"
     raise ValueError(msg)
 

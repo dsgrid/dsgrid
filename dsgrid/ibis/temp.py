@@ -48,6 +48,9 @@ def drop_temp_tables_and_views() -> None:
     if dsgrid.runtime_config.backend_engine != BackendEngine.SPARK:
         return
 
+    # Lazy import: dsgrid.ibis.session imports this module transitively at
+    # bootstrap (via io.py -> operations.py -> temp.py), so importing
+    # session.py at module level here would create a circular import.
     from dsgrid.ibis.session import get_spark_session, is_runtime_session_active
 
     if not is_runtime_session_active():

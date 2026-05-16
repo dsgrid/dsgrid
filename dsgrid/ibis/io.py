@@ -281,26 +281,41 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     """Perform an in-place overwrite of a table, accounting for different file types
     and symlinks.
 
+    Writes to a sibling tmp path first, then atomically (or near-atomically on
+    Spark) swaps it into place. Uses :func:`os.replace` for the single-file
+    DuckDB case (POSIX-atomic when src and dst share a filesystem) and
+    :func:`shutil.move` for the Spark directory-of-files case (handles the
+    cross-filesystem ``EXDEV`` fallback that ``os.rename`` cannot).
+
     Do not attempt to access the original dataframe unless it was fully cached.
     """
     path = Path(filename)
     suffix = path.suffix
-    tmp = str(path) + ".tmp"
-    tmp_posix = Path(tmp).as_posix()
+    tmp = path.with_name(path.name + ".tmp")
     if suffix == ".parquet":
-        _write_table(df, tmp_posix, "parquet")
+        _write_table(df, tmp.as_posix(), "parquet")
         read_method = read_parquet
     elif suffix == ".csv":
-        _write_table(df, tmp_posix, "csv")
+        _write_table(df, tmp.as_posix(), "csv")
         read_method = read_csv
     elif suffix == ".json":
-        _write_table(df, tmp_posix, "json")
+        _write_table(df, tmp.as_posix(), "json")
         read_method = read_json
     else:
         msg = f"Unsupported file suffix: {suffix}"
         raise NotImplementedError(msg)
-    delete_if_exists(filename)
-    os.rename(tmp, str(path))
+    delete_if_exists(path)
+    if tmp.is_dir():
+        # Spark distributed write produces a directory of part files.
+        # shutil.move handles cross-filesystem moves where os.rename would
+        # fail with EXDEV. The directory swap is not atomic on POSIX, but
+        # the prior tmp -> path rename via os.rename had the same property;
+        # we keep that semantic and gain EXDEV correctness.
+        shutil.move(str(tmp), str(path))
+    else:
+        # DuckDB single-file output. os.replace is atomic when src and dst
+        # share a filesystem, which is true here because tmp is a sibling.
+        os.replace(str(tmp), str(path))
     return read_method(path.as_posix())
 
 
@@ -342,6 +357,14 @@ def write_dataframe_and_auto_partition(
 ) -> ibis.Table:
     """Write a dataframe to a Parquet file and then automatically coalesce or repartition it if
     needed. If the file already exists, it will be overwritten.
+
+    .. note::
+
+       Partitioning is a Spark-only concept here. On DuckDB the function
+       still performs the initial Parquet write but the partition-count
+       tuning is a no-op (DuckDB writes a single file by default). Callers
+       that rely on a specific on-disk partition layout should expect that
+       layout only when the runtime backend is Spark.
 
     Parameters
     ----------
@@ -476,6 +499,19 @@ def persist_table(df: ibis.Table, context: ScratchDirContext, tag=None) -> Path:
 
 
 def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
+    """Write a table to ``path`` in the backend's native shape.
+
+    On Spark, the output is a directory of part files (Spark's distributed
+    write). On DuckDB, the output is a single file via ``COPY ... TO``.
+    :func:`read_parquet` / :func:`read_csv` / :func:`read_json` transparently
+    read either shape.
+
+    Partitioning (e.g. Hive-style ``PARTITION_BY`` directories) is not
+    handled here — neither backend writes partitioned output through this
+    helper. Spark's ``writer.partitionBy(...)`` and DuckDB's
+    ``COPY ... (FORMAT PARQUET, PARTITION_BY (col))`` are intentionally
+    out of scope; callers that need them should issue the SQL directly.
+    """
     view = create_temp_view(df)
     if not use_duckdb():
         # Lazy import: session.py imports this module during bootstrap.

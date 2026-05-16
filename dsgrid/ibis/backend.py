@@ -1,8 +1,6 @@
-from pathlib import Path
 from typing import Any
 
 import chronify
-import ibis
 from chronify.ibis import IbisBackend, make_backend
 
 import dsgrid
@@ -41,12 +39,6 @@ def make_runtime_backend(**kwargs: Any) -> IbisBackend:
 def create_chronify_store(**kwargs: Any) -> chronify.Store:
     """Create a chronify Store backed by the configured Ibis backend."""
     return chronify.Store(backend=make_runtime_backend(**kwargs))
-
-
-def read_parquet_expr(path: Path | str) -> ibis.Table:
-    """Read Parquet data into an Ibis table expression."""
-    path_str = Path(path).as_posix()
-    return make_runtime_backend().connection.read_parquet(path_str)
 
 
 def _make_backend_cache_key(

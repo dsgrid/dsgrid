@@ -30,7 +30,7 @@ from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidOperation,
 )
-from dsgrid.ibis.backend import create_chronify_store, make_runtime_backend, read_parquet_expr
+from dsgrid.ibis.backend import create_chronify_store, make_runtime_backend
 from dsgrid.ibis.io import read_parquet
 from dsgrid.ibis.operations import (
     coalesce,
@@ -104,7 +104,7 @@ def _get_chronify_result(store: chronify.Store, schema: TableSchema, template: i
 
 
 def _read_chronify_output(df: ibis.Table, output_file: Path) -> ibis.Table:
-    return read_parquet_expr(output_file)
+    return read_parquet(output_file)
 
 
 def _with_literal_column(df: ibis.Table, column: str, value) -> ibis.Table:
@@ -862,7 +862,7 @@ def repartition_if_needed_by_mapping(
         )
         if _is_ibis_table(df):
             df.to_parquet(filename.as_posix())
-            df = drop_columns(read_parquet_expr(filename), salted_column)
+            df = drop_columns(read_parquet(filename), salted_column)
         else:
             df.repartition(salted_column).write.parquet(filename.as_posix())
             df = drop_columns(read_parquet(filename), salted_column)

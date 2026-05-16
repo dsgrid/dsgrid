@@ -270,36 +270,6 @@ def get_runtime_session() -> Any:
     return _SparkRuntimeSession(get_spark_session())
 
 
-def get_current_time_zone() -> str:
-    """Return the current time zone."""
-    spark = get_runtime_session()
-    if use_duckdb():
-        conn = cast(Any, make_runtime_backend().connection)
-        result = conn.raw_sql("SELECT value FROM duckdb_settings() WHERE name = 'TimeZone'")
-        row = result.fetchone()
-        assert row is not None
-        return row[0]
-
-    tz = spark.conf.get("spark.sql.session.timeZone")
-    assert tz is not None
-    return tz
-
-
-def set_current_time_zone(time_zone: str) -> None:
-    """Set the current time zone."""
-    session = get_runtime_session()
-    if use_duckdb():
-        escaped = time_zone.replace("'", "''")
-        if isinstance(session, _DuckDBRuntimeSession):
-            conn = cast(Any, make_runtime_backend().connection)
-            conn.raw_sql(f"SET TimeZone='{escaped}'")
-        else:
-            session.sql(f"SET TimeZone='{escaped}'")
-        return
-
-    session.conf.set("spark.sql.session.timeZone", time_zone)
-
-
 def init_runtime_session(name="dsgrid", check_env=True, spark_conf=None) -> Any:
     """Initialize the runtime session."""
     if use_duckdb():
@@ -1328,19 +1298,6 @@ def custom_runtime_conf(conf):
 
 
 @contextmanager
-def custom_time_zone(time_zone: str):
-    """Apply a custom Spark time zone for the duration of a code block."""
-    orig_time_zone = get_current_time_zone()
-    try:
-        set_current_time_zone(time_zone)
-        yield
-    finally:
-        # Note that the user code could have restarted the session.
-        # This will function will get the current one.
-        set_current_time_zone(orig_time_zone)
-
-
-@contextmanager
 def restart_runtime_session_with_custom_conf(conf: dict, force=False):
     """Restart the SparkSession with a custom configuration for the duration of a code block.
 
@@ -1372,16 +1329,6 @@ def restart_runtime_session_with_custom_conf(conf: dict, force=False):
         restart_runtime_session(name=app_name, spark_conf=orig_settings, force=force)
 
 
-@contextmanager
-def set_session_time_zone(time_zone: str) -> Generator[None, None, None]:
-    """Set the session time zone for execution of a code block."""
-    orig = get_current_time_zone()
-
-    try:
-        set_current_time_zone(time_zone)
-        yield
-    finally:
-        set_current_time_zone(orig)
 
 
 def union(dfs: list[ibis.Table]) -> ibis.Table:

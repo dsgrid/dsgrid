@@ -24,12 +24,10 @@ from dsgrid.ibis.session import (
     cross_join_dfs,
     CsvPartitionWriter,
     custom_runtime_conf,
-    custom_time_zone,
     DoubleType,
     F,
     FloatType,
     get_active_session,
-    get_current_time_zone,
     get_duckdb_runtime_session,
     get_runtime_session,
     get_type_from_union,
@@ -46,7 +44,6 @@ from dsgrid.ibis.session import (
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
     save_table,
-    set_current_time_zone,
     ShortType,
     SparkSession,
     SparkConf,
@@ -71,6 +68,7 @@ from dsgrid.ibis.session import (
     _create_ibis_table,
     _write_table,
 )
+from dsgrid.ibis.tz import custom_time_zone, get_current_time_zone, set_current_time_zone
 
 
 def test_try_read_dataframe_invalid(tmp_path):

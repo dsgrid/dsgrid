@@ -31,11 +31,10 @@ from dsgrid.ibis.operations import (
 from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.ibis.session import (
-    get_current_time_zone,
     init_runtime_session,
     get_runtime_session,
-    set_current_time_zone,
 )
+from dsgrid.ibis.tz import get_current_time_zone, set_current_time_zone
 
 __all__ = [
     "aggregate",

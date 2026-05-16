@@ -24,10 +24,10 @@ from dsgrid.ibis.session import (
     F,
     SparkSession,
     get_runtime_session,
-    set_session_time_zone,
     use_duckdb,
 )
 from dsgrid.ibis.session import write_dataframe
+from dsgrid.ibis.tz import set_session_time_zone
 
 from tests._helpers import collect as _collect, count as _count, order_by as _order_by
 

@@ -16,10 +16,8 @@ from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
 from dsgrid.ibis.operations import cross_join, filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.ibis.session import (
-    get_runtime_session,
-    set_session_time_zone,
-)
+from dsgrid.ibis.session import get_runtime_session
+from dsgrid.ibis.tz import set_session_time_zone
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 

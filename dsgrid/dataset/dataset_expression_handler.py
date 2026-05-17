@@ -5,7 +5,6 @@ import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.operations import join_multiple_columns, rename_columns
-from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.py_expression_eval import Parser
 
 
@@ -18,14 +17,14 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        # Previously this method issued 3 count_rows().execute() calls per
-        # invocation (self.df, other.df, joined) to sanity-check that the
-        # inner-join preserved row count. That made even short expression
-        # chains like "(a + b) | (a * b)" issue many round-trips before
-        # returning a lazy result. The post-join check below catches both
-        # the original "mismatched lengths" case AND any silent row drop
-        # from non-overlapping dimension keys in a single count, so the
-        # two pre-join counts are now redundant.
+        # The inner-join preserves a row count of exactly self.df when the
+        # right side has one row per dimension key; any drift (missing keys
+        # or right-side duplicates) means the math result is wrong. We need
+        # both counts to detect it. Previously that was two separate
+        # count_rows().execute() round-trips; the cross-joined aggregate
+        # collapses them to a single execute, halving the round-trip cost
+        # for the common case and (on Spark) giving the planner a chance
+        # to fuse the two scans.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -34,8 +33,13 @@ class DatasetExpressionHandler:
         }
         df = joined.mutate(**mutations).select(*self.df.columns)
 
-        joined_count = count_rows(df)
-        self_count = count_rows(self.df)
+        counts = (
+            self.df.aggregate(self_count=self.df.count())
+            .cross_join(df.aggregate(joined_count=df.count()))
+            .execute()
+        )
+        self_count = int(counts["self_count"].iloc[0])
+        joined_count = int(counts["joined_count"].iloc[0])
         if joined_count != self_count:
             msg = (
                 f"join for operation {op=} dropped rows; the datasets likely have "

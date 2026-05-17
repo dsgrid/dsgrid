@@ -8,7 +8,7 @@ import pytest
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
-from dsgrid.ibis.operations import cross_join_dfs, make_temp_view_name
+from dsgrid.ibis.operations import cross_join_dfs, make_temp_view_name, union_all
 from dsgrid.time.types import DayType
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -45,13 +45,9 @@ from dsgrid.ibis.session import (
     get_runtime_session,
     IntegerType,
     is_runtime_session_active,
-    is_table_stored,
-    list_tables,
-    load_stored_table,
     LongType,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
-    save_table,
     ShortType,
     SparkSession,
     SparkConf,
@@ -64,8 +60,6 @@ from dsgrid.ibis.session import (
     _ibis_type_from_spark_type,
     _schema_names,
     _schema_types,
-    try_load_stored_table,
-    union,
     use_duckdb,
     _create_ibis_table,
 )
@@ -161,6 +155,11 @@ def test_duckdb_spark_conf_shim():
 
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
 def test_duckdb_runtime_session_shims():
+    """The DuckDB runtime session implements the small RuntimeSession API:
+    createDataFrame, sql, and read.* — the wrapper no longer mirrors
+    PySpark's full session shape (.conf / .catalog / .table / etc.) now
+    that the Spark-warehouse helpers that needed those have been deleted.
+    """
     session = get_runtime_session()
     assert get_duckdb_runtime_session() is session
     assert get_active_session() is session
@@ -170,21 +169,11 @@ def test_duckdb_runtime_session_shims():
     )
     assert is_runtime_session_active()
 
-    session.conf.set("spark.sql.shuffle.partitions", 3)
-    assert session.conf.get("spark.sql.shuffle.partitions") == "3"
-    assert session.conf.get("missing", "fallback") == "fallback"
-
     table_name = make_temp_view_name()
     table = session.createDataFrame([(1, "a")], ["id", "name"])
     get_runtime_backend().create_view(table_name, table)
-    assert session.catalog.tableExists(f"default.{table_name}")
-    assert is_table_stored(table_name)
-    assert table_name in list_tables()
-    assert not session.catalog.isCached(table_name)
-    assert session.table(f"default.{table_name}").count().execute() == 1
-    assert load_stored_table(table_name).count().execute() == 1
-    assert try_load_stored_table(table_name) is not None
-    assert try_load_stored_table(f"{table_name}_missing") is None
+    assert get_runtime_backend().has_table(table_name)
+    assert session.sql(f"SELECT count(*) AS c FROM {table_name}").execute()["c"].iloc[0] == 1
     assert session.sql("SELECT 1 AS value").execute()["value"].iloc[0] == 1
     with pytest.raises(DSGInvalidOperation, match="keyword dataframe bindings"):
         session.sql("SELECT * FROM {table}", table=table)
@@ -207,13 +196,6 @@ def test_duckdb_reader_shims(tmp_path):
     parquet_file = tmp_path / "table.parquet"
     write_dataframe(table, parquet_file)
     assert session.read.parquet(parquet_file.as_posix()).count().execute() == 1
-
-
-@pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
-def test_save_table_duckdb_raises():
-    table = get_runtime_session().createDataFrame([(1,)], ["a"])
-    with pytest.raises(DSGInvalidOperation, match="save_table is not supported"):
-        save_table(table, "not_supported")
 
 
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB compatibility shims only apply to DuckDB")
@@ -397,11 +379,9 @@ def test_check_for_nulls_and_cross_join_union():
     assert cross_join_dfs([table]).columns == table.columns
     other = get_runtime_session().createDataFrame([("x",), ("y",)], ["letter"])
     assert cross_join_dfs([table, other]).count().execute() == 4
-    assert union([table]).count().execute() == 2
-    assert union([table, table]).count().execute() == 4
-    mismatched = get_runtime_session().createDataFrame([(1,)], ["other"])
-    with pytest.raises(Exception, match="columns don't match"):
-        union([table, mismatched])
+    # union_all preserves duplicates (matches Spark UNION ALL); Ibis's
+    # default .union() would dedupe.
+    assert union_all(table, table).count().execute() == 4
 
 
 def test_current_time_zone_contexts():

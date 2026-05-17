@@ -74,7 +74,10 @@ from dsgrid.registry.common import (
 )
 from dsgrid.ibis.functions import cache, unpersist, write_csv
 from dsgrid.ibis.operations import except_all
-from dsgrid.ibis.table_utils import get_unique_values, table_column_to_list
+from dsgrid.ibis.table_utils import (
+    get_unique_values,
+    get_unique_values_per_column,
+)
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
@@ -1590,21 +1593,29 @@ class ProjectRegistryManager(RegistryManagerBase):
 def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_table: ibis.Table):
     """Ensure that the mapped dataset has the same distinct values as the project for all
     columns. This should be called before running a full comparison of the two tables.
+
+    Collects all per-column distinct sets in a single aggregation per side
+    (2 executes total) instead of issuing ``except_all`` + ``is_table_empty``
+    per column (2N executes). The diff is computed in Python because
+    dimension columns are bounded-cardinality (geographies, subsectors,
+    etc.) and the post-mapping comparison is typically a few hundred values
+    per column at most.
     """
+    columns = list(project_table.columns)
+    project_values = get_unique_values_per_column(project_table, columns)
+    mapped_values = get_unique_values_per_column(mapped_dataset_table, columns)
+
     has_mismatch = False
-    for column in project_table.columns:
-        diff = except_all(
-            project_table.select(column).distinct(),
-            mapped_dataset_table.select(column).distinct(),
-        )
-        if not is_table_empty(diff):
-            diff_values = _collect_limited_column_values(diff, column, limit=100)
+    for column in columns:
+        diff = project_values[column].difference(mapped_values[column])
+        if diff:
             has_mismatch = True
+            sample = set(sorted(diff)[:100])
             logger.error(
                 "The mapped dataset has different distinct values than the project "
                 "for column=%s. Showing at most 100 values: diff=%s",
                 column,
-                diff_values,
+                sample,
             )
 
     if has_mismatch:
@@ -1613,7 +1624,3 @@ def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_tabl
             "more columns. Please look in the log file for the exact records."
         )
         raise DSGInvalidDataset(msg)
-
-
-def _collect_limited_column_values(df: ibis.Table, column: str, limit: int) -> set:
-    return set(table_column_to_list(df.select(column).distinct().limit(limit), column))

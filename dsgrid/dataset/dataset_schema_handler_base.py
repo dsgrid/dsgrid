@@ -54,7 +54,11 @@ from dsgrid.ibis.operations import (
     join,
     rename_columns,
 )
-from dsgrid.ibis.table_utils import get_unique_values, table_column_to_list
+from dsgrid.ibis.table_utils import (
+    get_unique_values,
+    get_unique_values_per_column,
+    table_column_to_list,
+)
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.ibis.types import is_table_empty, use_duckdb
@@ -263,9 +267,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # Performed after missing-association subtraction so that a dimension value
                 # that is entirely absent due to declared missing combinations does not
                 # produce a false positive.
+                # Single-execute distinct collection per side replaces a per-column
+                # loop that previously issued 2*N round-trips over the cached
+                # association tables.
+                expected_per_col = get_unique_values_per_column(
+                    required_assoc, required_assoc.columns
+                )
+                actual_per_col = get_unique_values_per_column(
+                    assoc_by_data, required_assoc.columns
+                )
                 for column in required_assoc.columns:
-                    expected = get_unique_values(required_assoc, column)
-                    actual = get_unique_values(assoc_by_data, column)
+                    expected = expected_per_col[column]
+                    actual = actual_per_col[column]
                     if actual != expected:
                         missing = sorted(expected.difference(actual))
                         extra = sorted(actual.difference(expected))
@@ -503,20 +516,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns
         )
-        num_distinct_counts = _count_distinct_column(
-            _count_groups(load_data_df, list(time_cols)),
-            "count",
+        # Combine the two distinct-count checks into a single round-trip. The
+        # prior code issued two two-deep aggregations (group-by + count, then
+        # distinct + count) over the load_data table back-to-back; each pair
+        # forced a full scan. The cross-join here lets the planner share the
+        # underlying scan where the optimizer can, and even when it can't, the
+        # round-trip overhead is halved.
+        time_counts = _count_groups(load_data_df, list(time_cols))
+        array_counts = _count_groups(load_data_df, list(unique_array_cols))
+        combined = (
+            time_counts.aggregate(time=time_counts["count"].nunique())
+            .cross_join(array_counts.aggregate(array=array_counts["count"].nunique()))
+            .execute()
         )
+        num_distinct_counts = int(combined["time"].iloc[0])
+        num_distinct_ta_counts = int(combined["array"].iloc[0])
         if num_distinct_counts != 1:
             msg = (
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {num_distinct_counts}"
             )
             raise DSGInvalidDataset(msg)
-        num_distinct_ta_counts = _count_distinct_column(
-            _count_groups(load_data_df, list(unique_array_cols)),
-            "count",
-        )
         if num_distinct_ta_counts != 1:
             msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
@@ -1006,10 +1026,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _remove_non_dimension_columns(self, df: ibis.Table) -> ibis.Table:
         allowed_columns = self._list_dimension_columns(df)
         return df.select(*allowed_columns)
-
-
-def _count_distinct_column(df: ibis.Table, column: str) -> int:
-    return int(cast(Any, df.select(column).distinct().count().execute()))
 
 
 def _count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:

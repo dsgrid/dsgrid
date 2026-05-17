@@ -7,6 +7,9 @@ import ibis
 import pandas as pd
 import pytest
 
+from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
+from dsgrid.ibis import backend as backend_mod
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import filter_sql, rename_columns
 from dsgrid.ibis.functions import (
     aggregate,
@@ -27,12 +30,16 @@ from dsgrid.ibis.functions import (
     sql_from_df,
     unpersist,
     unpivot,
+    write_csv,
 )
+from dsgrid.ibis.io import read_csv as _read_csv_io
 from dsgrid.utils.files import dump_json_file
 from dsgrid.ibis.session import (
     get_runtime_session,
+    init_runtime_session,
     SparkSession,
 )
+from dsgrid.ibis.types import use_duckdb
 
 from tests._helpers import collect as _collect, count as _count, order_by as _order_by
 
@@ -320,28 +327,107 @@ def test_read_csv_round_trip(tmp_path: Path, dataframe) -> None:
     On DuckDB the output is a single file; on Spark it's a directory of
     part files. read_csv must transparently handle both shapes.
     """
-    from dsgrid.ibis.functions import write_csv
-    from dsgrid.ibis.io import read_csv as _read_csv
-
     out = tmp_path / "round_trip.csv"
     write_csv(dataframe, out, overwrite=True)
     assert out.exists()
-    round_tripped = _read_csv(out)
+    round_tripped = _read_csv_io(out)
     assert sorted(round_tripped.columns) == sorted(dataframe.columns)
     assert round_tripped.count().execute() == dataframe.count().execute()
 
 
 def test_read_csv_rejects_non_utf8_on_duckdb(tmp_path: Path) -> None:
     """DuckDB has no encoding parameter; passing one raises with a clear message."""
-    import pytest as _pytest
-
-    from dsgrid.exceptions import DSGInvalidParameter
-    from dsgrid.ibis.types import use_duckdb as _use_duckdb
-
-    if not _use_duckdb():
-        _pytest.skip("DuckDB-only behavior check")
+    if not use_duckdb():
+        pytest.skip("DuckDB-only behavior check")
 
     csv = tmp_path / "any.csv"
     csv.write_text("a\n1\n")
-    with _pytest.raises(DSGInvalidParameter, match="UTF-8"):
+    with pytest.raises(DSGInvalidParameter, match="UTF-8"):
         read_csv(csv, encoding="latin-1")
+
+
+def test_read_csv_rejects_headerless_input(tmp_path: Path) -> None:
+    """read_csv treats the first row as the header on both backends; a CSV
+    without a header has the wrong dsgrid shape and must produce a loud
+    failure rather than silently treating row 1 as column names."""
+    # Two integer rows without a header line. read_csv will treat "1,2,3" as
+    # the column names. We confirm the implicit-header behavior so a caller
+    # accidentally passing a headerless dataset file gets the obviously-wrong
+    # column names rather than silently misinterpreting the row as data.
+    csv = tmp_path / "no_header.csv"
+    csv.write_text("1,2,3\n4,5,6\n")
+    table = read_csv(csv)
+    assert list(table.columns) == ["1", "2", "3"], (
+        "read_csv requires an explicit header row; the docstring contract is "
+        "that callers must rewrite headerless CSVs before reading."
+    )
+
+
+def test_write_csv_max_rows_blocks_huge_collect(tmp_path: Path, dataframe) -> None:
+    """The max_rows guard in write_csv prevents a runaway driver collect on
+    Spark; on DuckDB the COPY ... TO path doesn't collect so the guard is
+    skipped. We assert the guard fires when the table exceeds the cap."""
+    out = tmp_path / "capped.csv"
+    if use_duckdb():
+        # DuckDB has no driver-collect step; the cap is intentionally bypassed
+        # and the write still succeeds regardless of max_rows.
+        write_csv(dataframe, out, overwrite=True, max_rows=1)
+        assert out.exists()
+        return
+
+    with pytest.raises(DSGInvalidOperation, match="exceeds"):
+        write_csv(dataframe, out, overwrite=True, max_rows=1)
+    assert not out.exists()
+
+
+def test_stop_invalidates_backend_cache() -> None:
+    """_SparkRuntimeSession.stop() must clear the cached Ibis backend so a
+    subsequent get_runtime_backend() can't hand out a reference bound to a
+    stopped SparkSession. DuckDB has no stop semantic; skip there."""
+    if use_duckdb():
+        pytest.skip("Only the Spark stop() path invalidates the cache")
+
+    session = init_runtime_session("dsgrid_cache_test")
+    # Prime the cache.
+    get_runtime_backend()
+    assert backend_mod._RUNTIME_BACKEND is not None
+    try:
+        session.stop()
+        assert backend_mod._RUNTIME_BACKEND is None, (
+            "_SparkRuntimeSession.stop() must call invalidate_runtime_backend_cache "
+            "to prevent the next get_runtime_backend() from returning a stopped "
+            "session reference."
+        )
+    finally:
+        # Leave a fresh session for downstream tests in the same module.
+        init_runtime_session("dsgrid_cache_test_reset")
+
+
+def test_read_csv_null_values_backend_divergence(tmp_path: Path) -> None:
+    """null_values is a list of strings to recognize as NULL. DuckDB honors
+    every entry; Spark's CSV reader only takes a single nullValue and the
+    consolidated read_csv silently truncates to the first entry. We pin
+    that behavior so a backend migration cannot quietly change the rows
+    that resolve to NULL."""
+    csv = tmp_path / "nulls.csv"
+    csv.write_text("a,b\nNA,1\nNULL,2\nzzz,3\n")
+
+    table = read_csv(csv, null_values=["NA", "NULL"])
+    rows = table.execute().to_dict("records")
+    rows.sort(key=lambda r: r["b"])
+    a_values = [r["a"] for r in rows]
+
+    if use_duckdb():
+        # DuckDB recognizes both literals as NULL.
+        assert a_values[0] is None or (
+            isinstance(a_values[0], float) and a_values[0] != a_values[0]  # NaN
+        )
+        assert a_values[1] is None or (
+            isinstance(a_values[1], float) and a_values[1] != a_values[1]
+        )
+        assert a_values[2] == "zzz"
+    else:
+        # Spark only honors null_values[0] ("NA"); "NULL" stays a string.
+        assert a_values[0] is None
+        assert a_values[1] == "NULL"
+        assert a_values[2] == "zzz"

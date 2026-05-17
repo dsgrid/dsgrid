@@ -21,7 +21,8 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.run_command import run_command
-from dsgrid.ibis.session import init_runtime_session, read_parquet
+from dsgrid.ibis.io import read_parquet
+from dsgrid.ibis.session import init_runtime_session
 from .api_manager import ApiManager
 from .models import (
     AsyncTaskStatus,

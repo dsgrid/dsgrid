@@ -83,8 +83,21 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
     """Bring both tables into the runtime backend if they live in different backends.
 
     Native Ibis set ops and joins reject expressions spanning multiple backends.
-    The store backend (e.g. on-disk DuckDB) is distinct from the runtime backend,
-    so cross-backend operands must be registered into the runtime first.
+    The store backend (e.g. on-disk DuckDB) is distinct from the runtime
+    backend, so cross-backend operands must be registered into the runtime
+    first.
+
+    The expected hot path is that both inputs are *already* runtime-bound:
+    :class:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore` ATTACHes its
+    file to the runtime DuckDB connection on init and returns runtime-bound
+    tables from ``_read_table``, so DuckDB↔DuckDB cross-backend references
+    do not survive long enough to reach this fallback. If a cross-backend
+    reference *does* reach here it means either a new store was added
+    without an ATTACH wiring or the runtime is Spark while one side is a
+    DuckDB store (the genuinely heterogeneous case where temp-view
+    serialization is the only option). The warning surfaces both situations
+    so they can be diagnosed instead of paying the parquet round-trip
+    silently.
     """
     try:
         b1 = df1._find_backend(use_default=False)
@@ -95,8 +108,24 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
         return df1, df2
     runtime = get_runtime_backend()
     if b1 is not runtime:
+        logger.warning(
+            "Cross-backend operand detected (source=%s runtime=%s); falling "
+            "back to create_temp_view. If both backends are DuckDB this "
+            "indicates the source store did not ATTACH to the runtime — see "
+            "DuckDbDataStore.__init__ for the established pattern.",
+            getattr(b1, "name", type(b1).__name__),
+            getattr(runtime, "name", type(runtime).__name__),
+        )
         df1 = runtime.table(create_temp_view(df1))
     if b2 is not runtime:
+        logger.warning(
+            "Cross-backend operand detected (source=%s runtime=%s); falling "
+            "back to create_temp_view. If both backends are DuckDB this "
+            "indicates the source store did not ATTACH to the runtime — see "
+            "DuckDbDataStore.__init__ for the established pattern.",
+            getattr(b2, "name", type(b2).__name__),
+            getattr(runtime, "name", type(runtime).__name__),
+        )
         df2 = runtime.table(create_temp_view(df2))
     return df1, df2
 

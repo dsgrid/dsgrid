@@ -5,25 +5,19 @@ import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Iterable, cast
+from typing import Any, Iterable, cast
 
 import pandas as pd
 import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
-from dsgrid.ibis.operations import (
-    coalesce,
-    create_temp_view,
-    make_temp_view_name,
-)
+from dsgrid.ibis.operations import make_temp_view_name
 from dsgrid.ibis.io import (
     CsvPartitionWriter,
     MAX_PARTITION_SIZE_MB,
     _post_process_dataframe,
     read_csv,
-    read_json,
-    read_parquet,
 )
 from dsgrid.ibis.types import (
     spec_for_name,
@@ -91,11 +85,6 @@ else:
 
 logger = logging.getLogger(__name__)
 
-# Consider using our own database. Would need to manage creation with
-# spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
-# Doing so has caused conflicts in tests with the Derby db.
-DSGRID_DB_NAME = "default"
-
 _DUCKDB_RUNTIME_SESSION: Any = None
 
 PYTHON_TO_SPARK_TYPES: dict[type[Any], Any] = {
@@ -104,36 +93,6 @@ PYTHON_TO_SPARK_TYPES: dict[type[Any], Any] = {
     str: StringType,
     bool: BooleanType,
 }
-
-
-class _DuckDBConf:
-    def __init__(self):
-        self._settings = {
-            "spark.app.name": "dsgrid",
-            "spark.rdd.compress": "true",
-            "spark.sql.session.timeZone": "UTC",
-            "spark.sql.shuffle.partitions": "200",
-        }
-
-    def get(self, name: str, default: Any | None = None) -> Any:
-        return self._settings.get(name, default)
-
-    def set(self, name: str, value: Any) -> None:
-        self._settings[name] = str(value)
-
-
-class _DuckDBCatalog:
-    def tableExists(self, name: str) -> bool:
-        table_name = name.split(".")[-1]
-        return get_runtime_backend().has_table(table_name)
-
-    def isCached(self, name: str) -> bool:
-        return False
-
-    def listTables(self, dbName: str = DSGRID_DB_NAME) -> list[Any]:
-        return [
-            type("TableInfo", (), {"name": name}) for name in get_runtime_backend().list_tables()
-        ]
 
 
 class _DuckDBReader:
@@ -148,10 +107,8 @@ class _DuckDBReader:
         # Delegate to the consolidated reader. The schema parameter can be
         # a dict[str, str] (already in backend SQL strings) or a PySpark
         # StructType; _schema_types normalizes either to a dict.
-        from dsgrid.ibis.io import read_csv as _read_csv
-
         types = _schema_types(schema, ibis_types=False)
-        return _read_csv(path, schema=types)
+        return read_csv(path, schema=types)
 
     def json(self, path: str, **kwargs) -> ibis.Table:
         return get_runtime_backend().connection.read_json(path)
@@ -184,12 +141,22 @@ class _SparkReader:
 
 
 class _SparkRuntimeSession:
+    """Backend-specific implementation of the small runtime-session API.
+
+    The public surface that production code actually uses is just
+    ``createDataFrame()``, ``sql()``, and ``read.{csv,json,parquet}()``;
+    the ``.conf`` / ``.catalog`` / ``.sparkContext`` accessors that earlier
+    versions exposed were vestigial PySpark-shape mimicry and have been
+    removed along with the Spark-warehouse helpers that needed them. The
+    ``raw_session`` property remains as the documented escape hatch for
+    Spark-only callers (``_create_spark_session`` post-init checks,
+    ``log_runtime_conf``, ``restart_runtime_session``) that need direct
+    access to the underlying PySpark ``SparkSession``.
+    """
+
     def __init__(self, session: Any):
         self._session = session
-        self.conf = session.conf
-        self.catalog = session.catalog
         self.read = _SparkReader(session)
-        self.sparkContext = session.sparkContext
 
     @property
     def raw_session(self) -> Any:
@@ -203,9 +170,6 @@ class _SparkRuntimeSession:
             return _spark_dataframe_to_ibis_table(self._session.sql(query, **kwargs))
         return get_runtime_backend().sql(query)
 
-    def table(self, name: str) -> ibis.Table:
-        return get_runtime_backend().table(name.split(".")[-1])
-
     def stop(self) -> None:
         # The cached Ibis backend in dsgrid.ibis.backend is bound to this
         # SparkSession; once we stop the session, returning the cached backend
@@ -218,9 +182,13 @@ class _SparkRuntimeSession:
 
 
 class _DuckDBRuntimeSession:
+    """DuckDB-side implementation of the small runtime-session API.
+
+    Mirrors :class:`_SparkRuntimeSession` exactly so callers don't have to
+    branch on backend. See that class's docstring for the public surface.
+    """
+
     def __init__(self):
-        self.conf = _DuckDBConf()
-        self.catalog = _DuckDBCatalog()
         self.read = _DuckDBReader()
 
     def createDataFrame(self, data: Any, schema: Any | None = None) -> ibis.Table:
@@ -231,9 +199,6 @@ class _DuckDBRuntimeSession:
             msg = "DuckDB Ibis SQL does not support Spark keyword dataframe bindings"
             raise DSGInvalidOperation(msg)
         return get_runtime_backend().sql(query)
-
-    def table(self, name: str) -> ibis.Table:
-        return get_runtime_backend().table(name.split(".")[-1])
 
 
 if use_duckdb():
@@ -499,54 +464,6 @@ def sql(query: str) -> ibis.Table:
     return get_runtime_session().sql(query)
 
 
-def load_stored_table(table_name: str) -> ibis.Table:
-    """Return a table stored in the Spark warehouse."""
-    spark = get_runtime_session()
-    return spark.table(table_name)
-
-
-def try_load_stored_table(
-    table_name: str, database: str | None = DSGRID_DB_NAME
-) -> ibis.Table | None:
-    """Return a table if it is stored in the Spark warehouse."""
-    spark = get_runtime_session()
-    full_name = f"{database}.{table_name}"
-    if spark.catalog.tableExists(full_name):
-        return spark.table(table_name)
-    return None
-
-
-def is_table_stored(table_name, database=DSGRID_DB_NAME):
-    spark = get_runtime_session()
-    full_name = f"{database}.{table_name}"
-    return spark.catalog.tableExists(full_name)
-
-
-def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
-    if use_duckdb():
-        msg = "save_table is not supported when using DuckDB"
-        raise DSGInvalidOperation(msg)
-
-    full_name = f"{database}.{table_name}"
-    view = create_temp_view(table)
-    writer = get_spark_session().table(view).write
-    if overwrite:
-        writer.mode("overwrite").saveAsTable(full_name)
-    else:
-        writer.saveAsTable(full_name)
-
-
-def list_tables(database=DSGRID_DB_NAME):
-    spark = get_runtime_session()
-    return [x.name for x in spark.catalog.listTables(dbName=database)]
-
-
-def drop_table(table_name, database=DSGRID_DB_NAME):
-    if is_table_stored(table_name, database=database):
-        get_spark_session().sql(f"DROP TABLE {table_name}")
-        logger.info("Dropped table %s", table_name)
-
-
 @track_timing(timer_stats_collector)
 def create_dataframe_from_product(
     data: dict[str, list[str]],
@@ -774,12 +691,15 @@ def custom_runtime_conf(conf):
         Key-value pairs to set on the spark configuration.
 
     """
-    spark = get_duckdb_runtime_session()
-    if spark is not None:
+    if get_duckdb_runtime_session() is not None:
         yield
         return
 
-    spark = get_runtime_session()
+    # Spark-only: route through the raw SparkSession because the runtime
+    # session wrapper no longer exposes ``.conf``. The wrapper used to mimic
+    # PySpark's surface, but now only Spark-specific lifecycle code needs
+    # the conf API, so we read it directly from the underlying session.
+    spark = get_spark_session()
     orig_settings = {}
 
     try:
@@ -789,9 +709,8 @@ def custom_runtime_conf(conf):
             logger.info("Set %s=%s temporarily", key, val)
         yield
     finally:
-        # Note that the user code could have restarted the session.
-        # Get the current one.
-        spark = get_runtime_session()
+        # User code may have restarted the session; pick up the current one.
+        spark = get_spark_session()
         for key, val in orig_settings.items():
             spark.conf.set(key, val)
 
@@ -808,12 +727,14 @@ def restart_runtime_session_with_custom_conf(conf: dict, force=False):
         If True, restart the session even if the config parameters haven't changed.
         You might want to do this in order to clear cached tables or start Spark fresh.
     """
-    spark = get_duckdb_runtime_session()
-    if spark is not None:
-        yield spark
+    duckdb_session = get_duckdb_runtime_session()
+    if duckdb_session is not None:
+        yield duckdb_session
         return
 
-    spark = get_runtime_session()
+    # Spark-only: route through the raw SparkSession (the runtime session
+    # wrapper no longer mirrors ``.conf``).
+    spark = get_spark_session()
     app_name = spark.conf.get("spark.app.name")
     orig_settings = {}
 
@@ -828,13 +749,3 @@ def restart_runtime_session_with_custom_conf(conf: dict, force=False):
         restart_runtime_session(name=app_name, spark_conf=orig_settings, force=force)
 
 
-def union(dfs: list[ibis.Table]) -> ibis.Table:
-    """Return a union of the tables, ensuring that the columns match."""
-    df = dfs[0]
-    if len(dfs) > 1:
-        for dft in dfs[1:]:
-            if df.columns != dft.columns:
-                msg = f"columns don't match: {df.columns=} {dft.columns=}"
-                raise Exception(msg)
-            df = df.union(dft)
-    return df

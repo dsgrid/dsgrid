@@ -127,6 +127,30 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
 
 
 def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
+    # Fast path: when all group-by entries are bare column references, keep
+    # the chain in native Ibis. The SQL-string branch previously below was
+    # called per-aggregation inside process_stacked_aggregations, and each
+    # call paid the cost of registering a temp view in the backend catalog;
+    # using df.group_by/aggregate keeps the lazy expression tree intact and
+    # lets the planner fuse adjacent aggregations across iterations.
+    bare_cols = [
+        col for col in group_by_cols if _looks_like_bare_column(col, df.columns)
+    ]
+    if len(bare_cols) == len(group_by_cols):
+        ibis_op = "mean" if op_name == "mean" else op_name
+        try:
+            agg_method = getattr(df[VALUE_COLUMN], ibis_op)
+        except AttributeError:
+            # Fall through to the SQL-string path below for ops Ibis doesn't
+            # expose as a column method (rare; current callers use sum/mean/
+            # min/max).
+            pass
+        else:
+            return df.group_by(bare_cols).aggregate(**{VALUE_COLUMN: agg_method()})
+
+    # SQL-string fallback for group-by entries that carry function calls or
+    # aliases (e.g. ``year(timestamp) AS year``); these would require parsing
+    # the SQL fragment back into Ibis exprs, which the SQL round-trip avoids.
     view = create_temp_view(df)
     select_cols = ", ".join(_select_expr(x) for x in group_by_cols)
     group_cols = ", ".join(_group_by_expr(x) for x in group_by_cols)
@@ -140,6 +164,18 @@ def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> 
     if isinstance(df, ibis.Table):
         return get_runtime_backend().sql(query)
     return get_runtime_session().sql(query)
+
+
+def _looks_like_bare_column(expr: str, columns: list[str]) -> bool:
+    """True if ``expr`` is a plain column reference (no function, alias, or
+    quoting) that exists in the table's columns."""
+    if "(" in expr or " AS " in expr:
+        return False
+    if (expr.startswith('"') and expr.endswith('"')) or (
+        expr.startswith("`") and expr.endswith("`")
+    ):
+        return False
+    return expr in columns
 
 
 def _group_by_expr(select_expr: str) -> str:

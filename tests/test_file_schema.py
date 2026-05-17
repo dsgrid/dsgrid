@@ -28,7 +28,7 @@ from dsgrid.ibis.session import (
     get_runtime_session,
     use_duckdb,
 )
-from dsgrid.ibis.io import write_dataframe
+from dsgrid.ibis.io import read_parquet, write_dataframe
 from dsgrid.ibis.tz import custom_time_zone
 
 from tests._helpers import collect as _collect, count as _count, order_by as _order_by
@@ -918,3 +918,52 @@ def test_timestamp_tz_warning_on_spark_utc_is_silent(monkeypatch, spark):
         apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert relevant == []
+
+
+def test_timestamp_tz_parquet_roundtrip_preserves_utc_instants(tmp_path, spark):
+    """A TIMESTAMP_TZ column written by the runtime backend and re-read must
+    preserve UTC instants exactly. On Spark, ``TIMESTAMP`` cannot carry a
+    per-row TZ tag (the Phase 6 docstring contract); the instants survive
+    because ``spark.sql.parquet.outputTimestampType`` is pinned to
+    ``TIMESTAMP_MICROS`` in ``_create_spark_session``. On DuckDB,
+    ``TIMESTAMPTZ`` is written as adjusted UTC. We pin both behaviors so a
+    backend change cannot silently shift instants across the Parquet boundary.
+    """
+    # Four instants chosen to include UTC, UTC-08 (winter PST), and the
+    # spring-forward / fall-back boundary in America/Los_Angeles. Using the
+    # offset-explicit ZoneInfo avoids the ambiguous-local-time pitfall.
+    la = ZoneInfo("America/Los_Angeles")
+    instants = [
+        datetime(2024, 1, 15, 8, 0, 0, tzinfo=ZoneInfo("UTC")),
+        datetime(2024, 1, 15, 0, 0, 0, tzinfo=la),  # 08:00 UTC
+        datetime(2024, 3, 10, 1, 30, 0, tzinfo=la),  # pre-spring-forward
+        datetime(2024, 11, 3, 1, 30, 0, tzinfo=la),  # ambiguous fall-back hr
+    ]
+    df = spark.createDataFrame(
+        [(i, ts) for i, ts in enumerate(instants)], ["idx", "ts"]
+    )
+    parquet_file = tmp_path / "tstz_roundtrip.parquet"
+    write_dataframe(df, parquet_file)
+
+    read_back = read_parquet(parquet_file)
+    rows = sorted(_collect(_order_by(read_back, "idx")), key=lambda r: r.idx)
+    # Normalize each round-tripped timestamp to UTC epoch seconds. Spark
+    # returns tz-naive datetime in the session TZ (UTC, pinned); DuckDB
+    # returns tz-aware. Both convert cleanly to UTC seconds for parity.
+    got_utc_secs = [
+        int(
+            (
+                r.ts.replace(tzinfo=ZoneInfo("UTC")) if r.ts.tzinfo is None else r.ts
+            )
+            .astimezone(ZoneInfo("UTC"))
+            .timestamp()
+        )
+        for r in rows
+    ]
+    expected_utc_secs = [int(ts.astimezone(ZoneInfo("UTC")).timestamp()) for ts in instants]
+    assert got_utc_secs == expected_utc_secs, (
+        "TIMESTAMP_TZ Parquet round-trip must preserve UTC instants on both "
+        "backends. A drift here indicates either Spark's outputTimestampType "
+        "is no longer pinned to TIMESTAMP_MICROS or DuckDB's TIMESTAMPTZ "
+        "serialization changed."
+    )

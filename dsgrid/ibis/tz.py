@@ -17,17 +17,13 @@ same observable semantic when used correctly:
   ``TIMESTAMPTZ`` columns. **Extractions on plain ``TIMESTAMP``
   columns are TZ-naive on DuckDB regardless of the connection TZ.**
 
-So the contract for callers of :func:`custom_time_zone` /
-:func:`set_session_time_zone` is: the columns you extract from inside
-the context must be ``TIMESTAMPTZ`` on DuckDB for the requested TZ to
-take effect. If you read timestamps from a TZ-aware source (chronify,
-declared TIMESTAMP_TZ schemas, ``datetime`` objects with ``tzinfo``),
-this happens automatically. Plain string-parsed timestamps without
-TZ info will silently ignore the context manager on DuckDB.
-
-``custom_time_zone`` and ``set_session_time_zone`` are currently
-identical wrappers; both exist because callers pre-date the rename.
-Treat one as deprecated once a consolidation pass lands.
+So the contract for callers of :func:`custom_time_zone` is: the columns
+you extract from inside the context must be ``TIMESTAMPTZ`` on DuckDB
+for the requested TZ to take effect. If you read timestamps from a
+TZ-aware source (chronify, declared TIMESTAMP_TZ schemas, ``datetime``
+objects with ``tzinfo``), this happens automatically. Plain
+string-parsed timestamps without TZ info will silently ignore the
+context manager on DuckDB.
 """
 
 from contextlib import contextmanager
@@ -81,22 +77,7 @@ def custom_time_zone(time_zone: str) -> Generator[None, None, None]:
         set_current_time_zone(time_zone)
         yield
     finally:
-        # Note that the user code could have restarted the session.
-        # This will function will get the current one.
+        # The user code may have restarted the runtime session; resolve the
+        # current session inside set_current_time_zone rather than capturing
+        # the original reference.
         set_current_time_zone(orig_time_zone)
-
-
-@contextmanager
-def set_session_time_zone(time_zone: str) -> Generator[None, None, None]:
-    """Set the session time zone for execution of a code block.
-
-    Currently identical to :func:`custom_time_zone`; both names exist to
-    bridge call sites that pre-date the rename. Consolidate during the
-    Phase 6 TZ correctness pass.
-    """
-    orig = get_current_time_zone()
-    try:
-        set_current_time_zone(time_zone)
-        yield
-    finally:
-        set_current_time_zone(orig)

@@ -1,14 +1,14 @@
 """Compatibility helpers for table operations during the Ibis migration."""
 
 import shutil
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
-from zoneinfo import ZoneInfo
+from typing import Any
 
 import ibis
 
-from dsgrid.ibis.io import read_csv
+from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.ibis.io import _write_table, read_csv
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.operations import (
     aggregate_single_value,
     coalesce,
@@ -56,7 +56,6 @@ __all__ = [
     "make_temp_view_name",
     "perform_interval_op",
     "pivot",
-    "prepare_timestamps_for_dataframe",
     "read_csv",
     "select_expr",
     "set_current_time_zone",
@@ -118,28 +117,18 @@ def perform_interval_op(
     return get_runtime_session().sql(query)
 
 
-def _get_local_time_zone_name() -> str:
-    path = Path("/etc/localtime").resolve()
-    marker = "zoneinfo/"
-    path_str = path.as_posix()
-    if marker in path_str:
-        return path_str.split(marker, maxsplit=1)[1]
-    return "UTC"
-
-
-def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable[datetime]:
-    if use_duckdb():
-        return [x.astimezone(ZoneInfo("UTC")) for x in timestamps]
-    return timestamps
-
-
 def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
     view = create_temp_view(df)
     cols = ",".join(exprs)
     return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
 
 
-def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None:
+def write_csv(
+    df: ibis.Table,
+    path: Path | str,
+    overwrite: bool = False,
+    max_rows: int | None = None,
+) -> None:
     """Write an Ibis table to a single CSV file on both backends.
 
     dsgrid's CSV callers (dimension records, lookup tables, query
@@ -153,11 +142,24 @@ def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None
     memory issue, callers should write Parquet via
     :func:`dsgrid.ibis.io.write_dataframe` and post-process.
 
+    Parameters
+    ----------
+    df : ibis.Table
+    path : Path or str
+    overwrite : bool, optional
+        If True, replace any existing path. Defaults to False.
+    max_rows : int or None, optional
+        If set and the runtime backend is Spark, the row count is checked
+        before collecting; the function raises ``DSGInvalidOperation`` when
+        the table exceeds this limit so a driver-side ``execute()`` cannot
+        silently OOM. The check is skipped on DuckDB (no driver collect) and
+        skipped when ``max_rows`` is ``None`` (matches the historical
+        behavior). Callers writing potentially-unbounded query results
+        should pass an explicit cap.
+
     The header row is always written; dsgrid's column model is name-based
     and there is no ``header=False`` option.
     """
-    from dsgrid.ibis.io import _write_table
-
     path_obj = path if isinstance(path, Path) else Path(path)
     if path_obj.exists():
         if not overwrite:
@@ -175,5 +177,15 @@ def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None
     # Spark: distributed write produces a directory of part files, which
     # downstream validators (pydantic file checks) and CSV consumers
     # don't accept. Collect to pandas and emit a single file.
+    if max_rows is not None:
+        actual = count_rows(df)
+        if actual > max_rows:
+            msg = (
+                f"Cannot write_csv to {path_obj}: table has {actual:,} rows "
+                f"which exceeds the {max_rows:,}-row driver-collect cap on Spark. "
+                "Write the result as Parquet instead and post-process if a "
+                "single CSV is required."
+            )
+            raise DSGInvalidOperation(msg)
     pandas_df = df.execute() if hasattr(df, "execute") else df.toPandas()
     pandas_df.to_csv(path_obj, index=False, header=True)

@@ -73,6 +73,12 @@ from dsgrid.exceptions import DSGInvalidOperation
 
 logger = logging.getLogger(__name__)
 
+# Cap on the row count we let write_csv collect to the Spark driver. Picked to
+# bound pandas memory at ~0.8 GB for a 10-column 8-byte-per-cell table; query
+# results larger than this should be written as Parquet via
+# write_dataframe_and_auto_partition.
+_CSV_OUTPUT_MAX_ROWS = 10_000_000
+
 
 class QuerySubmitterBase:
     """Handles query submission"""
@@ -617,7 +623,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, overwrite=True)
+            write_csv(df, filename, overwrite=True, max_rows=_CSV_OUTPUT_MAX_ROWS)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
@@ -969,7 +975,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         filename = output_dir / f"table.{context.model.result.output_format}"
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, overwrite=True)
+            write_csv(df, filename, overwrite=True, max_rows=_CSV_OUTPUT_MAX_ROWS)
         elif suffix == ".parquet":
             df = write_dataframe_and_auto_partition(df, filename)
         else:

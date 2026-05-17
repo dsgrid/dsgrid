@@ -29,7 +29,7 @@ from dsgrid.ibis.session import (
     use_duckdb,
 )
 from dsgrid.ibis.io import write_dataframe
-from dsgrid.ibis.tz import set_session_time_zone
+from dsgrid.ibis.tz import custom_time_zone
 
 from tests._helpers import collect as _collect, count as _count, order_by as _order_by
 
@@ -556,7 +556,7 @@ def test_read_data_file_csv_timestamp_with_timezone(tmp_path, spark):
     assert set(df.columns) == {"id", "timestamp", "com_cooling", "com_fans"}
 
     # Collect the timestamps and verify they were parsed correctly
-    with set_session_time_zone("America/New_York"):
+    with custom_time_zone("America/New_York"):
         # Converting to string avoids the complexity of timestamp conversion to the system
         # time zone when calling collect().
         df2 = _with_string_column(df, "timestamp", "timestamp_str")

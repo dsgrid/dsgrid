@@ -45,6 +45,7 @@ from dsgrid.ibis.operations import (
     join,
     join_multiple_columns,
     rename_columns,
+    union_all,
     unpivot,
 )
 from dsgrid.ibis.temp import make_temp_view_name
@@ -247,7 +248,11 @@ def add_null_rows_from_load_data_lookup(df: ibis.Table, lookup: ibis.Table) -> i
         null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
         for col in set(df.columns).difference(null_rows_to_add.columns):
             null_rows_to_add = _with_literal_column(null_rows_to_add, col, None)
-        df = df.union(_align_to_table_schema(null_rows_to_add, df))
+        # union_all (not Ibis default .union) — load_data rows are not unique
+        # per dimension combination, so distinct semantics would silently drop
+        # legitimate duplicates from the original df. Matches the pre-Ibis
+        # Spark .union() semantics this code originally relied on.
+        df = union_all(df, _align_to_table_schema(null_rows_to_add, df))
 
     return df
 
@@ -909,7 +914,11 @@ def unpivot_dataframe(
     new_rows = _align_to_table_schema(new_rows, df)
 
     non_null_rows = filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL")
-    unioned = ibis.union(non_null_rows, new_rows)
+    # union_all preserves the pre-Ibis explicit ``SELECT … UNION ALL SELECT …``
+    # SQL that this function was migrated from; non_null_rows can have legitimate
+    # duplicate value rows (same dimensions, different time slices) and distinct
+    # semantics would silently drop them.
+    unioned = union_all(non_null_rows, new_rows)
     return unioned.select(*ids, variable_column, VALUE_COLUMN)
 
 
@@ -975,7 +984,11 @@ def merge_expected_associations_tables(
     for df in expected_dfs.values():
         key = frozenset(df.columns)
         if key in groups:
-            groups[key] = groups[key].union(df)
+            # union_all matches the pre-Ibis Spark .union() (UNION ALL) used
+            # before this branch was migrated; expected-association tables
+            # with identical column sets are supposed to be appended, and
+            # any dedup happens later via cross-join expansion.
+            groups[key] = union_all(groups[key], df)
         else:
             groups[key] = df
 
@@ -1121,7 +1134,7 @@ def localize_timestamps_if_necessary(
 
     Downstream callers that depend on a specific render TZ must either
     pin ``spark.sql.session.timeZone`` (e.g. via
-    :func:`~dsgrid.ibis.tz.set_session_time_zone`) or cast the column to
+    :func:`~dsgrid.ibis.tz.custom_time_zone`) or cast the column to
     ``timestamp('<tz>')`` before extracting.
     """
     time_dim = config.get_dimension(DimensionType.TIME)

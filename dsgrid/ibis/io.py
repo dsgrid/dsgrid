@@ -287,17 +287,26 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     """Perform an in-place overwrite of a table, accounting for different file types
     and symlinks.
 
-    Writes to a sibling tmp path first, then atomically (or near-atomically on
-    Spark) swaps it into place. Uses :func:`os.replace` for the single-file
-    DuckDB case (POSIX-atomic when src and dst share a filesystem) and
-    :func:`shutil.move` for the Spark directory-of-files case (handles the
-    cross-filesystem ``EXDEV`` fallback that ``os.rename`` cannot).
+    Writes to a sibling ``.tmp`` path first, then swaps it into place via an
+    intermediate ``.stale`` sibling rename so a concurrent reader sees either
+    the old contents (during the write) or the new contents (after the swap) —
+    never a missing path. The pre-fix sequence (``delete_if_exists`` then
+    ``move``) opened a window where ``path`` did not exist, surfacing as
+    ``FileNotFoundError`` to any reader entering at the wrong instant.
+
+    On the single-file DuckDB path we use ``os.replace`` directly because it
+    is POSIX-atomic and avoids the rename dance entirely. On the Spark
+    directory-of-files path, ``shutil.move`` handles the cross-filesystem
+    ``EXDEV`` case (relevant when ``path`` is a symlink targeting another
+    filesystem); the directory swap is not atomic, but ``path`` always
+    references something readable.
 
     Do not attempt to access the original dataframe unless it was fully cached.
     """
     path = Path(filename)
     suffix = path.suffix
     tmp = path.with_name(path.name + ".tmp")
+    stale = path.with_name(path.name + ".stale")
     if suffix == ".parquet":
         _write_table(df, tmp.as_posix(), "parquet")
         read_method = read_parquet
@@ -310,17 +319,27 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     else:
         msg = f"Unsupported file suffix: {suffix}"
         raise NotImplementedError(msg)
-    delete_if_exists(path)
+    # A prior crashed call may have left a .stale sibling lying around; clear
+    # it before the rename so the os.rename below cannot collide.
+    delete_if_exists(stale)
     if tmp.is_dir():
-        # Spark distributed write produces a directory of part files.
-        # shutil.move handles cross-filesystem moves where os.rename would
-        # fail with EXDEV. The directory swap is not atomic on POSIX, but
-        # the prior tmp -> path rename via os.rename had the same property;
-        # we keep that semantic and gain EXDEV correctness.
-        shutil.move(str(tmp), str(path))
+        # Spark distributed write produces a directory of part files. Step
+        # through stale so path is never missing for a concurrent reader.
+        if path.exists():
+            os.rename(str(path), str(stale))
+        try:
+            shutil.move(str(tmp), str(path))
+        except Exception:
+            # Roll the prior contents back into place so a failed swap does
+            # not strand callers with a missing path.
+            if stale.exists() and not path.exists():
+                os.rename(str(stale), str(path))
+            raise
+        delete_if_exists(stale)
     else:
-        # DuckDB single-file output. os.replace is atomic when src and dst
-        # share a filesystem, which is true here because tmp is a sibling.
+        # DuckDB single-file output. os.replace atomically overwrites path in
+        # place when src and dst share a filesystem (tmp is always a sibling
+        # of path), so the readable window is never broken.
         os.replace(str(tmp), str(path))
     return read_method(path.as_posix())
 

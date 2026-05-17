@@ -207,6 +207,13 @@ class _SparkRuntimeSession:
         return get_runtime_backend().table(name.split(".")[-1])
 
     def stop(self) -> None:
+        # The cached Ibis backend in dsgrid.ibis.backend is bound to this
+        # SparkSession; once we stop the session, returning the cached backend
+        # would hand out a stopped reference. Drop it before stopping so the
+        # next get_runtime_backend() call rebuilds against a fresh session.
+        from dsgrid.ibis.backend import invalidate_runtime_backend_cache
+
+        invalidate_runtime_backend_cache()
         self._session.stop()
 
 

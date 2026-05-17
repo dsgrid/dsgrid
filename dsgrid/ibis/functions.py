@@ -140,11 +140,18 @@ def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
 
 
 def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None:
-    """Write an Ibis table to CSV.
+    """Write an Ibis table to a single CSV file on both backends.
 
-    The output is the backend's native shape: a single file on DuckDB,
-    a directory of part files on Spark. :func:`read_csv` reads either
-    shape transparently, so write/read round-trips on both backends.
+    dsgrid's CSV callers (dimension records, lookup tables, query
+    results) consistently want a single file: pydantic validators check
+    that the file path is a file, and human consumers read one CSV.
+    Spark's default distributed-write semantic (a directory of part
+    files) is the wrong shape, so this function explicitly collects on
+    Spark to materialize a single file.
+
+    For very large query results where a driver collect would be a
+    memory issue, callers should write Parquet via
+    :func:`dsgrid.ibis.io.write_dataframe` and post-process.
 
     The header row is always written; dsgrid's column model is name-based
     and there is no ``header=False`` option.
@@ -159,4 +166,14 @@ def write_csv(df: ibis.Table, path: Path | str, overwrite: bool = False) -> None
             shutil.rmtree(path_obj)
         else:
             path_obj.unlink()
-    _write_table(df, path_obj.as_posix(), "csv")
+
+    if use_duckdb():
+        # DuckDB's COPY ... TO produces a single file natively.
+        _write_table(df, path_obj.as_posix(), "csv")
+        return
+
+    # Spark: distributed write produces a directory of part files, which
+    # downstream validators (pydantic file checks) and CSV consumers
+    # don't accept. Collect to pandas and emit a single file.
+    pandas_df = df.execute() if hasattr(df, "execute") else df.toPandas()
+    pandas_df.to_csv(path_obj, index=False, header=True)

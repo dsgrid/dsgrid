@@ -279,7 +279,7 @@ def test_get_column_renames_no_dimension_type():
 
 
 def test_get_column_schema_picks_backend_specific_strings():
-    """Each declared type maps to its DuckDB SQL string (the current default backend)."""
+    """Each declared type maps to its backend-specific SQL string."""
     columns = [
         Column(name="id", data_type="INTEGER"),
         Column(name="name", data_type="STRING"),
@@ -287,12 +287,20 @@ def test_get_column_schema_picks_backend_specific_strings():
     ]
     schema = FileSchema(path="/path/to/file.csv", columns=columns)
     result = _get_column_schema(schema)
-    # The CI default backend is DuckDB; this test asserts the DuckDB strings.
-    assert result == {
-        "id": "INTEGER",
-        "name": "VARCHAR",
-        "ts": "TIMESTAMP WITH TIME ZONE",
-    }
+    if use_duckdb():
+        assert result == {
+            "id": "INTEGER",
+            "name": "VARCHAR",
+            "ts": "TIMESTAMP WITH TIME ZONE",
+        }
+    else:
+        # Spark TIMESTAMP cannot carry a per-row TZ tag — TIMESTAMP_TZ
+        # degrades to plain TIMESTAMP; STRING is the Spark canonical name.
+        assert result == {
+            "id": "INT",
+            "name": "STRING",
+            "ts": "TIMESTAMP",
+        }
 
 
 def test_get_column_schema_empty():

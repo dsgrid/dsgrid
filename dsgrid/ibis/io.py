@@ -71,7 +71,13 @@ def read_csv(
     ibis.Table
     """
     path = Path(path)
-    path_str = path.as_posix() + "/**/*.csv" if path.is_dir() else path.as_posix()
+    # Spark's read.csv handles a directory natively (reads all CSVs in it);
+    # DuckDB's read_csv requires an explicit glob. Match read_parquet's pattern
+    # so write_csv -> read_csv round-trips on both backends.
+    if path.is_dir() and use_duckdb():
+        path_str = path.as_posix() + "/**/*.csv"
+    else:
+        path_str = path.as_posix()
 
     if use_duckdb():
         # DuckDB read_csv does not expose an encoding parameter — it always

@@ -881,7 +881,16 @@ def repartition_if_needed_by_mapping(
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
         spark = get_runtime_session()
-        num_partitions = int(spark.conf.get("spark.sql.shuffle.partitions"))
+        # spark.sql.shuffle.partitions is Spark-specific. On DuckDB the
+        # salting still happens but only as a column-tag for the post-write
+        # read-back; the actual number doesn't drive shuffle behavior, so
+        # any reasonable default works.
+        if use_duckdb():
+            num_partitions = 200
+        else:
+            num_partitions = int(
+                get_spark_session().conf.get("spark.sql.shuffle.partitions")
+            )
         random_func = "random()" if use_duckdb() else "rand()"
         view = create_temp_view(df)
         df = spark.sql(

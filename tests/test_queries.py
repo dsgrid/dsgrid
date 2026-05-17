@@ -63,6 +63,7 @@ from dsgrid.ibis.functions import (
     aggregate_single_value,
     read_csv,
 )
+from dsgrid.ibis.backend import invalidate_runtime_backend_cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import table_to_pandas
@@ -677,6 +678,12 @@ def shutdown_project():
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
         if spark is not None:
+            # Drop the cached Ibis backend first; otherwise it keeps a
+            # reference to the SparkSession we're about to stop and the
+            # next test that calls get_runtime_backend() gets a stopped
+            # session back (PySpark then raises
+            # "'NoneType' has no attribute 'setCallSite'").
+            invalidate_runtime_backend_cache()
             spark.stop()
 
 

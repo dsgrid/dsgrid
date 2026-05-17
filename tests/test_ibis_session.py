@@ -34,6 +34,7 @@ from dsgrid.ibis.session import (
     create_dataframe,
     create_dataframe_from_dicts,
     create_dataframe_from_dimension_ids,
+    get_spark_session,
     create_dataframe_from_ids,
     create_dataframe_from_product,
     custom_runtime_conf,
@@ -85,7 +86,9 @@ def test_try_read_dataframe_valid(tmp_path):
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB")
 def test_restart_runtime_session():
-    spark = get_runtime_session()
+    # The wrapper no longer mirrors .conf — Spark-specific conf reads go
+    # through get_spark_session() (Phase 14 tear-out).
+    spark = get_spark_session()
     cur_partitions = spark.conf.get("spark.sql.shuffle.partitions")
     new_partitions = str(int(cur_partitions) + 1)
     cur_compress = spark.conf.get("spark.rdd.compress")
@@ -100,21 +103,22 @@ def test_restart_runtime_session():
         "spark.sql.shuffle.partitions": new_partitions,
         "spark.rdd.compress": new_compress,
     }
-    with restart_runtime_session_with_custom_conf(conf=conf) as new_spark:
-        assert new_spark.conf.get("spark.sql.shuffle.partitions") == new_partitions
-        assert new_spark.conf.get("spark.rdd.compress") == new_compress
+    with restart_runtime_session_with_custom_conf(conf=conf):
+        spark = get_spark_session()
+        assert spark.conf.get("spark.sql.shuffle.partitions") == new_partitions
+        assert spark.conf.get("spark.rdd.compress") == new_compress
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB")
 def test_custom_runtime_conf():
-    orig_session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    orig_session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     new_session_tz = "Etc/UTC" if orig_session_tz == "UTC" else "UTC"
     conf = {"spark.sql.session.timeZone": new_session_tz}
     with custom_runtime_conf(conf):
-        assert get_runtime_session().conf.get("spark.sql.session.timeZone") == new_session_tz
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == new_session_tz
         restart_runtime_session(force=True)
-        assert get_runtime_session().conf.get("spark.sql.session.timeZone") == new_session_tz
-    assert get_runtime_session().conf.get("spark.sql.session.timeZone") == orig_session_tz
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == new_session_tz
+    assert get_spark_session().conf.get("spark.sql.session.timeZone") == orig_session_tz
 
 
 def test_create_dataframe_from_product(tmp_path):

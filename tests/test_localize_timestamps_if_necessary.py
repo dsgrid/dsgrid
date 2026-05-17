@@ -38,6 +38,7 @@ from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.session import (
     DoubleType,
     get_runtime_session,
+    get_spark_session,
     StringType,
     StructField,
     StructType,
@@ -279,7 +280,7 @@ def test_single_tz_spark_path(spark, tmp_path):
     )
 
     assert changed is True
-    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     res_df2 = _to_pandas(res_df)
 
     tz = time_dim.model.time_zone_format.time_zone
@@ -368,7 +369,7 @@ def test_multi_tz_spark_path(spark, tmp_path):
     )
 
     assert changed is True
-    session_tz = get_runtime_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     res_df2 = _to_pandas(res_df)
 
     tz = "Etc/GMT+5"

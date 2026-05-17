@@ -30,16 +30,12 @@ from contextlib import contextmanager
 from typing import Any, Generator, cast
 
 from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.session import get_spark_session
 from dsgrid.ibis.types import use_duckdb
 
 
 def get_current_time_zone() -> str:
     """Return the current time zone of the runtime session."""
-    # Local import to break the circular dependency: session.py imports
-    # this module's helpers and is imported by callers up the stack.
-    from dsgrid.ibis.session import get_runtime_session
-
-    spark = get_runtime_session()
     if use_duckdb():
         conn = cast(Any, get_runtime_backend().connection)
         result = conn.raw_sql("SELECT value FROM duckdb_settings() WHERE name = 'TimeZone'")
@@ -47,26 +43,24 @@ def get_current_time_zone() -> str:
         assert row is not None
         return row[0]
 
-    tz = spark.conf.get("spark.sql.session.timeZone")
+    # Spark: read directly from the raw SparkSession. The runtime-session
+    # wrapper no longer mirrors ``.conf`` (PySpark-shape vestige removed in
+    # Phase 14); only Spark-specific lifecycle code needs the conf API and
+    # it has always referenced the raw session.
+    tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     assert tz is not None
     return tz
 
 
 def set_current_time_zone(time_zone: str) -> None:
     """Set the current time zone of the runtime session."""
-    from dsgrid.ibis.session import _DuckDBRuntimeSession, get_runtime_session
-
-    session = get_runtime_session()
     if use_duckdb():
         escaped = time_zone.replace("'", "''")
-        if isinstance(session, _DuckDBRuntimeSession):
-            conn = cast(Any, get_runtime_backend().connection)
-            conn.raw_sql(f"SET TimeZone='{escaped}'")
-        else:
-            session.sql(f"SET TimeZone='{escaped}'")
+        conn = cast(Any, get_runtime_backend().connection)
+        conn.raw_sql(f"SET TimeZone='{escaped}'")
         return
 
-    session.conf.set("spark.sql.session.timeZone", time_zone)
+    get_spark_session().conf.set("spark.sql.session.timeZone", time_zone)
 
 
 @contextmanager

@@ -33,20 +33,18 @@ from dsgrid.ibis.functions import (
     is_dataframe_empty,
 )
 from dsgrid.ibis.operations import create_temp_view
+from dsgrid.ibis.io import persist_table, read_dataframe
 from dsgrid.ibis.session import (
     BooleanType,
     ByteType,
     DoubleType,
-    get_current_time_zone,
     get_runtime_session,
-    persist_table,
-    read_dataframe,
-    set_current_time_zone,
     StringType,
     StructType,
     StructField,
     use_duckdb,
 )
+from dsgrid.ibis.tz import get_current_time_zone, set_current_time_zone
 from dsgrid.utils.dataset import (
     map_time_dimension_with_chronify_duckdb,
     map_time_dimension_with_chronify_runtime_path,

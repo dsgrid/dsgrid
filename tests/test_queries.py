@@ -69,13 +69,13 @@ from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.ibis.session import (
     DoubleType,
     F,
-    custom_time_zone,
     SparkSession,
     StructField,
     StringType,
     StructType,
     use_duckdb,
 )
+from dsgrid.ibis.tz import custom_time_zone
 from dsgrid.tests.common import (
     CACHED_TEST_REGISTRY_DB,
     SIMPLE_STANDARD_SCENARIOS,

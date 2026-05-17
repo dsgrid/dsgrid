@@ -5,7 +5,7 @@ the configured runtime backend (DuckDB or Spark). The low-level readers
 (:func:`read_csv`, :func:`read_json`, :func:`read_parquet`) stay free of
 ``dsgrid.ibis.session`` imports so this module can be imported during
 session bootstrap. Higher-level helpers (:func:`read_dataframe`,
-:func:`write_dataframe`, :func:`_write_table`, etc.) lazily import the
+:func:`write_dataframe`, :func:`write_table`, etc.) lazily import the
 small set of runtime-session symbols they need, which avoids a circular
 import with :mod:`dsgrid.ibis.session`.
 """
@@ -28,6 +28,11 @@ from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
+
+# NOTE: ``dsgrid.ibis.session`` imports this module at module top, so
+# ``from dsgrid.ibis.session import ...`` at module top creates an
+# unbreakable circular import. The call sites in this file resolve session
+# symbols lazily inside functions for that reason; do NOT hoist them.
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +108,7 @@ def read_csv(
 
     # Spark: route through the runtime session reader so the dict-schema
     # branch in _SparkReader.csv can translate to a PySpark StructType.
+    # Lazy: session.py imports this module at module top.
     from dsgrid.ibis.session import get_runtime_session
 
     spark_kwargs: dict[str, Any] = {"header": True, "encoding": encoding}
@@ -308,13 +314,13 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     tmp = path.with_name(path.name + ".tmp")
     stale = path.with_name(path.name + ".stale")
     if suffix == ".parquet":
-        _write_table(df, tmp.as_posix(), "parquet")
+        write_table(df, tmp.as_posix(), "parquet")
         read_method = read_parquet
     elif suffix == ".csv":
-        _write_table(df, tmp.as_posix(), "csv")
+        write_table(df, tmp.as_posix(), "csv")
         read_method = read_csv
     elif suffix == ".json":
-        _write_table(df, tmp.as_posix(), "json")
+        write_table(df, tmp.as_posix(), "json")
         read_method = read_json
     else:
         msg = f"Unsupported file suffix: {suffix}"
@@ -367,7 +373,7 @@ def persist_intermediate_query(
     tmp_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     if auto_partition:
         return write_dataframe_and_auto_partition(df, tmp_file)
-    _write_table(df, tmp_file.as_posix(), "parquet")
+    write_table(df, tmp_file.as_posix(), "parquet")
     return read_parquet(tmp_file.as_posix())
 
 
@@ -420,7 +426,7 @@ def write_dataframe_and_auto_partition(
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
-        _write_table(df, Path(filename).as_posix(), "parquet")
+        write_table(df, Path(filename).as_posix(), "parquet")
         df = read_parquet(filename)
 
     end_initial_write = time.time()
@@ -498,15 +504,15 @@ def write_dataframe(df: ibis.Table, filename: str | Path, overwrite: bool = Fals
     suffix = path.suffix
     name = path.as_posix()
     if suffix == ".parquet":
-        _write_table(df, name, "parquet")
+        write_table(df, name, "parquet")
     elif suffix == ".csv":
-        _write_table(df, name, "csv")
+        write_table(df, name, "csv")
     elif suffix == ".json":
         if use_duckdb():
             new_name = name.replace(".json", ".parquet")
-            _write_table(df, new_name, "parquet")
+            write_table(df, new_name, "parquet")
         else:
-            _write_table(df, name, "json")
+            write_table(df, name, "json")
 
 
 @track_timing(timer_stats_collector)
@@ -523,7 +529,7 @@ def persist_table(df: ibis.Table, context: ScratchDirContext, tag=None) -> Path:
     return path
 
 
-def _write_table(df: ibis.Table, path: str, file_format: str) -> None:
+def write_table(df: ibis.Table, path: str, file_format: str) -> None:
     """Write a table to ``path`` in the backend's native shape.
 
     On Spark, the output is a directory of part files (Spark's distributed

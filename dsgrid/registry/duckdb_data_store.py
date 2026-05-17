@@ -32,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 class DuckDbDataStore(DataStoreInterface):
-    """Data store backed by a DuckDB file ATTACHed to the runtime backend.
+    """Data store backed by a DuckDB file attached to the runtime backend.
 
-    The store does not own a separate DuckDB connection — it ATTACHes its
+    The store does not own a separate DuckDB connection — it attaches its
     file (read-write) to the shared runtime DuckDB backend on init, so all
     its tables live in the same Ibis backend that the rest of dsgrid uses.
     Tables read from this store can therefore be joined directly against
@@ -62,7 +62,7 @@ class DuckDbDataStore(DataStoreInterface):
 
     def _resolve_alias(self) -> str:
         """Return the alias under which this store's file is attached to the
-        current runtime DuckDB connection. ATTACHes if needed.
+        current runtime DuckDB connection. Attaches if needed.
 
         The alias is looked up rather than stored on the instance so two
         sources of drift self-heal:
@@ -75,7 +75,7 @@ class DuckDbDataStore(DataStoreInterface):
            alias and we adopt it transparently.
         2. **Runtime backend rotation.** If the runtime backend cache is
            invalidated (e.g. via session restart), the helper's cache is
-           cleared too — the next call re-ATTACHes against the new
+           cleared too — the next call re-attaches against the new
            connection and we pick up the fresh alias.
         """
         alias = get_attached_alias(self._db_file)

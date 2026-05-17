@@ -484,8 +484,6 @@ def _distinct_sum_count_by_group(df, groupby_cols):
 
 
 def _sql_ident(column):
-    from dsgrid.ibis.backend import get_runtime_backend
-
     if get_runtime_backend().name == "spark":
         return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'

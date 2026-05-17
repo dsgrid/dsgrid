@@ -20,6 +20,7 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_names_with_current_ids,
 )
 from dsgrid.utils.files import (
+    dump_data,
     dump_json_file,
     dump_line_delimited_json,
     load_json_file,
@@ -116,8 +117,6 @@ def register_dataset(setup_registry):
             ts["expected_associations"] = [str(dataset_path / "expected_associations")]
         if "missing_associations" in ts and ts["missing_associations"]:
             ts["missing_associations"] = [str(dataset_path / "missing_associations")]
-    from dsgrid.utils.files import dump_data
-
     dump_data(test_config, test_config_file)
 
     # This dict must get filled in by each test.

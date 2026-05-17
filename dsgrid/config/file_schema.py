@@ -11,6 +11,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.ibis.io import read_csv, read_json, read_parquet, write_dataframe
 from dsgrid.ibis.operations import drop_columns, rename_columns
+from dsgrid.ibis.tz import get_current_time_zone
 from dsgrid.ibis.types import SUPPORTED_TYPES, TypeSpec, spec_for_name, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.utilities import check_uniqueness
@@ -320,9 +321,6 @@ def _warn_if_timestamp_tz_lossy_on_spark(spec: "TypeSpec", column_name: str) -> 
     """
     if spec.name != "TIMESTAMP_TZ" or use_duckdb():
         return
-    # Lazy import to avoid pulling Spark dependencies on the DuckDB path.
-    from dsgrid.ibis.tz import get_current_time_zone
-
     try:
         current_tz = get_current_time_zone()
     except Exception:  # noqa: BLE001 - getter can fail mid-bootstrap

@@ -1,6 +1,7 @@
 """Tests for dsgrid.config.file_schema module."""
 
 import json
+import warnings
 from datetime import datetime
 from typing import Generator
 from zoneinfo import ZoneInfo
@@ -8,6 +9,7 @@ from zoneinfo import ZoneInfo
 import ibis
 import pytest
 
+from dsgrid.config import file_schema as _fs
 from dsgrid.config.file_schema import (
     Column,
     FileSchema,
@@ -885,17 +887,14 @@ def test_timestamp_tz_warning_on_spark_non_utc_emits(monkeypatch, spark):
     """When the session TZ is non-UTC on Spark, declaring TIMESTAMP_TZ warns."""
     if use_duckdb():
         pytest.skip("Warning is Spark-only behavior")
-    from dsgrid.config import file_schema as _fs
-
     monkeypatch.setattr(_fs, "use_duckdb", lambda: False)
-    monkeypatch.setattr(
-        "dsgrid.ibis.tz.get_current_time_zone", lambda: "America/Denver"
-    )
+    # file_schema does ``from dsgrid.ibis.tz import get_current_time_zone`` at
+    # module top, so the consumer holds its own reference; patching the source
+    # module wouldn't affect it. Patch the consumer's reference instead.
+    monkeypatch.setattr(_fs, "get_current_time_zone", lambda: "America/Denver")
     df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
-    import warnings as _warnings
-
-    with _warnings.catch_warnings(record=True) as caught:
-        _warnings.simplefilter("always")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert len(relevant) == 1
@@ -906,15 +905,11 @@ def test_timestamp_tz_warning_on_spark_utc_is_silent(monkeypatch, spark):
     """When the session TZ is UTC on Spark, declaring TIMESTAMP_TZ is silent."""
     if use_duckdb():
         pytest.skip("Warning is Spark-only behavior")
-    from dsgrid.config import file_schema as _fs
-
     monkeypatch.setattr(_fs, "use_duckdb", lambda: False)
-    monkeypatch.setattr("dsgrid.ibis.tz.get_current_time_zone", lambda: "UTC")
+    monkeypatch.setattr(_fs, "get_current_time_zone", lambda: "UTC")
     df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
-    import warnings as _warnings
-
-    with _warnings.catch_warnings(record=True) as caught:
-        _warnings.simplefilter("always")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
         apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert relevant == []

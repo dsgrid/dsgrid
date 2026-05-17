@@ -14,6 +14,12 @@ import ibis
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.session import (
+    PYTHON_TO_SPARK_TYPES,
+    StructField,
+    StructType,
+    get_runtime_session,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 
@@ -27,15 +33,6 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
     table_name : str | None
         If set, a unique ID to use as the cached table name. Return from cache if already stored.
     """
-    # Lazy imports break the session<->models circular dependency. The
-    # type-stub vs pyspark fork is owned by session.py.
-    from dsgrid.ibis.session import (
-        PYTHON_TO_SPARK_TYPES,
-        StructField,
-        StructType,
-        get_runtime_session,
-    )
-
     session = get_runtime_session()
     if table_name is not None and get_runtime_backend().has_table(table_name):
         return get_runtime_backend().table(table_name)

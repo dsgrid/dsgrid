@@ -7,7 +7,7 @@ import ibis
 import pandas as pd
 import pytest
 
-from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.ibis import backend as backend_mod
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import filter_sql, rename_columns
@@ -361,23 +361,6 @@ def test_read_csv_rejects_headerless_input(tmp_path: Path) -> None:
         "read_csv requires an explicit header row; the docstring contract is "
         "that callers must rewrite headerless CSVs before reading."
     )
-
-
-def test_write_csv_max_rows_blocks_huge_collect(tmp_path: Path, dataframe) -> None:
-    """The max_rows guard in write_csv prevents a runaway driver collect on
-    Spark; on DuckDB the COPY ... TO path doesn't collect so the guard is
-    skipped. We assert the guard fires when the table exceeds the cap."""
-    out = tmp_path / "capped.csv"
-    if use_duckdb():
-        # DuckDB has no driver-collect step; the cap is intentionally bypassed
-        # and the write still succeeds regardless of max_rows.
-        write_csv(dataframe, out, overwrite=True, max_rows=1)
-        assert out.exists()
-        return
-
-    with pytest.raises(DSGInvalidOperation, match="exceeds"):
-        write_csv(dataframe, out, overwrite=True, max_rows=1)
-    assert not out.exists()
 
 
 def test_stop_invalidates_backend_cache() -> None:

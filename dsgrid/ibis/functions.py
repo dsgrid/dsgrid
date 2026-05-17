@@ -7,7 +7,7 @@ from typing import Any
 import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.ibis.io import _write_table, read_csv
+from dsgrid.ibis.io import write_table, read_csv
 from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.operations import (
     aggregate_single_value,
@@ -127,7 +127,6 @@ def write_csv(
     df: ibis.Table,
     path: Path | str,
     overwrite: bool = False,
-    max_rows: int | None = None,
 ) -> None:
     """Write an Ibis table to a single CSV file on both backends.
 
@@ -148,14 +147,6 @@ def write_csv(
     path : Path or str
     overwrite : bool, optional
         If True, replace any existing path. Defaults to False.
-    max_rows : int or None, optional
-        If set and the runtime backend is Spark, the row count is checked
-        before collecting; the function raises ``DSGInvalidOperation`` when
-        the table exceeds this limit so a driver-side ``execute()`` cannot
-        silently OOM. The check is skipped on DuckDB (no driver collect) and
-        skipped when ``max_rows`` is ``None`` (matches the historical
-        behavior). Callers writing potentially-unbounded query results
-        should pass an explicit cap.
 
     The header row is always written; dsgrid's column model is name-based
     and there is no ``header=False`` option.
@@ -171,21 +162,10 @@ def write_csv(
 
     if use_duckdb():
         # DuckDB's COPY ... TO produces a single file natively.
-        _write_table(df, path_obj.as_posix(), "csv")
+        write_table(df, path_obj.as_posix(), "csv")
         return
 
     # Spark: distributed write produces a directory of part files, which
     # downstream validators (pydantic file checks) and CSV consumers
     # don't accept. Collect to pandas and emit a single file.
-    if max_rows is not None:
-        actual = count_rows(df)
-        if actual > max_rows:
-            msg = (
-                f"Cannot write_csv to {path_obj}: table has {actual:,} rows "
-                f"which exceeds the {max_rows:,}-row driver-collect cap on Spark. "
-                "Write the result as Parquet instead and post-process if a "
-                "single CSV is required."
-            )
-            raise DSGInvalidOperation(msg)
-    pandas_df = df.execute() if hasattr(df, "execute") else df.toPandas()
-    pandas_df.to_csv(path_obj, index=False, header=True)
+    df.execute().to_csv(path_obj, index=False, header=True)

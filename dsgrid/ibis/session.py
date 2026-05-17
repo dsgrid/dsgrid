@@ -11,7 +11,7 @@ import pandas as pd
 import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidParameter
-from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.backend import get_runtime_backend, invalidate_runtime_backend_cache
 from dsgrid.ibis.operations import make_temp_view_name
 from dsgrid.ibis.io import (
     CsvPartitionWriter,
@@ -175,8 +175,6 @@ class _SparkRuntimeSession:
         # SparkSession; once we stop the session, returning the cached backend
         # would hand out a stopped reference. Drop it before stopping so the
         # next get_runtime_backend() call rebuilds against a fresh session.
-        from dsgrid.ibis.backend import invalidate_runtime_backend_cache
-
         invalidate_runtime_backend_cache()
         self._session.stop()
 
@@ -377,8 +375,6 @@ def restart_runtime_session(*args, force=False, **kwargs) -> Any:
         logger.info("Stopped the SparkSession so that it can be restarted with a new config.")
         # Drop the cached Ibis backend; the next get_runtime_backend() call
         # must build a fresh one bound to the new session below.
-        from dsgrid.ibis.backend import invalidate_runtime_backend_cache
-
         invalidate_runtime_backend_cache()
         session = _create_spark_session(*args, **kwargs)
         if session.conf.get("spark.sql.session.timeZone") != new_time_zone:

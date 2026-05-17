@@ -2,16 +2,15 @@
 
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any
 from warnings import warn
 
-import json5
 from pydantic import model_validator
 
 from dsgrid.common import BackendEngine, DEFAULT_DB_PASSWORD, DEFAULT_SCRATCH_DIR
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.files import dump_json_file, load_json_file
 
 RC_FILENAME = ".dsgrid.json5"
 DEFAULT_BACKEND = BackendEngine.DUCKDB
@@ -66,7 +65,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
         """Load the dsgrid runtime config if it exists or one with default values."""
         rc_file = cls.path() if filename is None else Path(filename)
         if rc_file.exists():
-            data = json5.loads(rc_file.read_text(encoding="utf-8-sig"))
+            data = load_json_file(rc_file)
             return cls(**data)
         return cls()
 
@@ -76,9 +75,8 @@ class DsgridRuntimeConfig(DSGBaseModel):
         data = self.model_dump()
         data.pop("database_user")
         data.pop("database_password")
-        with open(path, "w") as f_out:
-            json5.dump(data, f_out, indent=2)
-        print(f"Wrote dsgrid config to {path}", file=sys.stderr)
+        dump_json_file(data, path, indent=2)
+        logger.info("Wrote dsgrid config to %s", path)
 
     @staticmethod
     def path() -> Path:

@@ -7,6 +7,12 @@ from chronify.ibis import IbisBackend, make_backend
 
 import dsgrid
 from dsgrid.common import BackendEngine
+from dsgrid.exceptions import DSGInvalidOperation
+
+# NOTE: ``dsgrid.ibis.session`` imports this module at module top, so importing
+# session here at module top creates an unbreakable circular import. The two
+# call sites below (in ``get_runtime_backend`` and ``build_independent_backend``)
+# resolve ``get_spark_session`` lazily for that reason; do NOT hoist them.
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +78,7 @@ def build_independent_backend(**kwargs: Any) -> IbisBackend:
     if config.backend_engine == BackendEngine.SPARK:
         session = kwargs.pop("session", None)
         if session is None:
+            # Lazy: session.py imports this module at module top.
             from dsgrid.ibis.session import get_spark_session
 
             session = get_spark_session()
@@ -154,8 +161,6 @@ def attach_duckdb_file_to_runtime(
         gate on backend engine before calling this helper).
     """
     if dsgrid.runtime_config.backend_engine != BackendEngine.DUCKDB:
-        from dsgrid.exceptions import DSGInvalidOperation
-
         msg = (
             "attach_duckdb_file_to_runtime is only valid when the runtime "
             "backend is DuckDB."

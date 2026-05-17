@@ -23,8 +23,9 @@ from dsgrid.ibis.io import (
     write_dataframe_and_auto_partition,
     _is_duckdb_io_exception,
     _is_spark_parquet_schema_exception,
+    _post_process_dataframe,
     _read_natively,
-    _write_table,
+    write_table,
 )
 from dsgrid.ibis.models import get_type_from_union
 from dsgrid.ibis.null_checks import check_for_nulls
@@ -312,8 +313,6 @@ def test_parquet_exception_detection():
 def test_require_unique_raises():
     table = get_runtime_session().createDataFrame([("a",), ("a",)], ["id"])
     with pytest.raises(DSGInvalidField, match="duplicate entries"):
-        from dsgrid.ibis.io import _post_process_dataframe
-
         _post_process_dataframe(table, require_unique=["id"])
 
 
@@ -328,7 +327,7 @@ def test_read_dataframe_and_write_error_paths(tmp_path):
 
     table = get_runtime_session().createDataFrame([(1,)], ["a"])
     with pytest.raises(NotImplementedError, match="Unsupported file format"):
-        _write_table(table, (tmp_path / "table.invalid").as_posix(), "invalid")
+        write_table(table, (tmp_path / "table.invalid").as_posix(), "invalid")
 
     with pytest.raises(DSGInvalidParameter, match="only supports Parquet"):
         write_dataframe_and_auto_partition(table, tmp_path / "table.csv")

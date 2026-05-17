@@ -111,7 +111,7 @@ def load_data(filename, **kwargs) -> dict[str, Any]:
 
     """
     mod = _get_module_from_extension(filename, **kwargs)
-    with open(filename) as f_in:
+    with open(filename, encoding="utf-8") as f_in:
         try:
             data = mod.load(f_in)
         except Exception:

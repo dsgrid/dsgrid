@@ -63,7 +63,7 @@ from dsgrid.ibis.functions import (
     aggregate_single_value,
     read_csv,
 )
-from dsgrid.ibis.backend import invalidate_runtime_backend_cache
+from dsgrid.ibis.backend import get_runtime_backend, invalidate_runtime_backend_cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import table_to_pandas
@@ -112,8 +112,6 @@ def _filter(df, predicate):
 
 
 def _sql_ident(column):
-    from dsgrid.ibis.backend import get_runtime_backend
-
     if get_runtime_backend().name == "spark":
         return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'

@@ -16,6 +16,7 @@ from dsgrid.ibis.types import (
     TypeSpec,
     spec_for_name,
     spec_for_spark_sql,
+    spec_for_spark_type,
 )
 
 
@@ -50,8 +51,6 @@ def test_each_spec_has_consistent_ibis_dtype(spec: TypeSpec):
 
 def test_spark_type_names_round_trip():
     """Every spec.spark_type_names entry maps back to the same spec via spec_for_spark_type."""
-    from dsgrid.ibis.types import spec_for_spark_type
-
     for spec in TYPE_SPECS:
         for class_name in spec.spark_type_names:
             # Build a stub object whose __class__.__name__ matches.

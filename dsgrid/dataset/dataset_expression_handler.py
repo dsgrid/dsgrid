@@ -4,6 +4,7 @@ import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.operations import join_multiple_columns, rename_columns
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.py_expression_eval import Parser
 
 
@@ -16,16 +17,29 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        # The inner-join must produce a row count equal to BOTH sides for
-        # the arithmetic to be meaningful: if joined < self, the right side
-        # is missing some of self's keys; if joined < other, the left side
-        # is missing some of other's keys (the prior single-sided check
-        # missed this case and silently dropped extra right-hand rows); if
-        # joined > max(self, other), one side has duplicate keys.
+        # Soundness check: ``joined`` must have exactly the same row count
+        # as BOTH inputs. This catches every failure mode the prior, cheaper
+        # variants missed:
         #
-        # All three counts are issued in one execute via a cross-joined
-        # aggregate so the per-op round-trip cost is constant rather than
-        # scaling with operator count.
+        # - ``joined < self``: the right side is missing some of self's keys.
+        # - ``joined < other``: the left side is missing some of other's keys
+        #   (the variant that only compared joined to self silently dropped
+        #   this case, per the post-Phase-14 Copilot review).
+        # - ``joined > self`` or ``joined > other``: one side has duplicate
+        #   dimension-key rows that multiply the inner join (e.g.
+        #   ``dataset1 * (dataset1 | dataset2)`` — caught by the
+        #   ``test_invalid_lengths`` regression).
+        # - Same row counts on inputs but different key sets: the joined
+        #   count drops below both inputs and trips the check.
+        #
+        # Cost: three counts per binary operator. Each source-table count is
+        # a cheap reduction; the joined count requires evaluating the inner
+        # join (which the caller will evaluate again when consuming ``df``).
+        # For Spark callers concerned about repeated evaluation, wrap the
+        # returned table in :func:`~dsgrid.ibis.functions.cache` before
+        # chaining further operators. DuckDB's planner reuses the scan
+        # across the count and downstream consumers, so the practical cost
+        # there is one scan per source plus one join evaluation per op.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -34,20 +48,14 @@ class DatasetExpressionHandler:
         }
         df = joined.mutate(**mutations).select(*self.df.columns)
 
-        counts = (
-            self.df.aggregate(self_count=self.df.count())
-            .cross_join(other.df.aggregate(other_count=other.df.count()))
-            .cross_join(df.aggregate(joined_count=df.count()))
-            .execute()
-        )
-        self_count = int(counts["self_count"].iloc[0])
-        other_count = int(counts["other_count"].iloc[0])
-        joined_count = int(counts["joined_count"].iloc[0])
+        self_count = count_rows(self.df)
+        other_count = count_rows(other.df)
+        joined_count = count_rows(df)
         if joined_count != self_count or joined_count != other_count:
             msg = (
                 f"join for operation {op=} produced a row count that does not match "
                 f"both inputs; the datasets likely have mismatched dimension keys or "
-                f"duplicates. {self_count=} {other_count=} {joined_count=}"
+                f"duplicate keys on one side. {self_count=} {other_count=} {joined_count=}"
             )
             raise DSGInvalidOperation(msg)
 

@@ -50,7 +50,6 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
-    get_unique_values,
     get_unique_values_per_column,
     table_to_records,
 )

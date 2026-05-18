@@ -1,5 +1,4 @@
 import operator
-from typing import Any, cast
 
 import ibis
 
@@ -17,14 +16,16 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        # The inner-join preserves a row count of exactly self.df when the
-        # right side has one row per dimension key; any drift (missing keys
-        # or right-side duplicates) means the math result is wrong. We need
-        # both counts to detect it. Previously that was two separate
-        # count_rows().execute() round-trips; the cross-joined aggregate
-        # collapses them to a single execute, halving the round-trip cost
-        # for the common case and (on Spark) giving the planner a chance
-        # to fuse the two scans.
+        # The inner-join must produce a row count equal to BOTH sides for
+        # the arithmetic to be meaningful: if joined < self, the right side
+        # is missing some of self's keys; if joined < other, the left side
+        # is missing some of other's keys (the prior single-sided check
+        # missed this case and silently dropped extra right-hand rows); if
+        # joined > max(self, other), one side has duplicate keys.
+        #
+        # All three counts are issued in one execute via a cross-joined
+        # aggregate so the per-op round-trip cost is constant rather than
+        # scaling with operator count.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -35,15 +36,18 @@ class DatasetExpressionHandler:
 
         counts = (
             self.df.aggregate(self_count=self.df.count())
+            .cross_join(other.df.aggregate(other_count=other.df.count()))
             .cross_join(df.aggregate(joined_count=df.count()))
             .execute()
         )
         self_count = int(counts["self_count"].iloc[0])
+        other_count = int(counts["other_count"].iloc[0])
         joined_count = int(counts["joined_count"].iloc[0])
-        if joined_count != self_count:
+        if joined_count != self_count or joined_count != other_count:
             msg = (
-                f"join for operation {op=} dropped rows; the datasets likely have "
-                f"mismatched dimension keys. {self_count=} {joined_count=}"
+                f"join for operation {op=} produced a row count that does not match "
+                f"both inputs; the datasets likely have mismatched dimension keys or "
+                f"duplicates. {self_count=} {other_count=} {joined_count=}"
             )
             raise DSGInvalidOperation(msg)
 

@@ -1,7 +1,7 @@
 import ibis
 import abc
 import logging
-from typing import Any, Iterable, cast
+from typing import Iterable
 
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType

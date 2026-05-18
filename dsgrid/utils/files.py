@@ -111,7 +111,10 @@ def load_data(filename, **kwargs) -> dict[str, Any]:
 
     """
     mod = _get_module_from_extension(filename, **kwargs)
-    with open(filename, encoding="utf-8") as f_in:
+    # utf-8-sig transparently strips a UTF-8 BOM if present, matching the
+    # behavior the .dsgrid.json5 loader relied on before this helper was
+    # introduced (some Windows tools write JSON with a BOM).
+    with open(filename, encoding="utf-8-sig") as f_in:
         try:
             data = mod.load(f_in)
         except Exception:

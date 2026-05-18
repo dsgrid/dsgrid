@@ -6,9 +6,7 @@ from typing import Any
 
 import ibis
 
-from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.io import write_table, read_csv
-from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.operations import (
     aggregate_single_value,
     coalesce,

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import ibis
 import pandas as pd
@@ -10,6 +10,7 @@ from dsgrid.common import BackendEngine
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import (
     attach_duckdb_file_to_runtime,
+    detach_duckdb_file_from_runtime,
     get_attached_alias,
     get_runtime_backend,
 )
@@ -256,18 +257,15 @@ class DuckDbDataStore(DataStoreInterface):
         catalog = self._runtime_alias.replace("'", "''")
         escaped_schema = schema.replace("'", "''")
         escaped_table = table_name.replace("'", "''")
-        count = cast(
-            Any,
-            self._runtime_backend.execute_sql_to_df(
-                f"""
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_catalog = '{catalog}'
-                  AND table_schema = '{escaped_schema}'
-                  AND table_name = '{escaped_table}'
-                """
-            ).iloc[0, 0],
-        )
+        count = self._runtime_backend.execute_sql_to_df(
+            f"""
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_catalog = '{catalog}'
+              AND table_schema = '{escaped_schema}'
+              AND table_name = '{escaped_table}'
+            """
+        ).iloc[0, 0]
         return count > 0
 
     def _replace_table(self, df: ibis.Table, schema: str, table_name: str) -> None:
@@ -308,15 +306,18 @@ class DuckDbDataStore(DataStoreInterface):
         )
 
     def close(self) -> None:
-        # Intentionally no-op. The store's file is attached to the shared
-        # runtime DuckDB connection, possibly under an alias that other
-        # store instances (or future ones) are using too. Issuing DETACH
-        # here would break those siblings. The attach is cleaned up
-        # implicitly when the runtime backend is disposed (process exit
-        # or :func:`~dsgrid.ibis.backend.invalidate_runtime_backend_cache`).
-        # Callers that genuinely need explicit detach can call
-        # :func:`~dsgrid.ibis.backend.detach_duckdb_file_from_runtime`.
-        pass
+        # DETACH the store's file from the shared runtime DuckDB connection
+        # so its file handle is released. Required on Windows, where the
+        # DuckDB ATTACH holds an exclusive lock and a stale lock blocks
+        # the test fixture teardown (`delete_if_exists(registry_data)`) with
+        # `WinError 32: file in use`.
+        #
+        # The "two stores share an attach" scenario the prior no-op was
+        # guarding against does not arise in any real flow: dsgrid creates
+        # one DuckDbDataStore per registry, and tests use a unique tmp_path
+        # per case. Sequential reuse of the same path is safe — a fresh
+        # store re-attaches via :func:`~dsgrid.ibis.backend.attach_duckdb_file_to_runtime`.
+        detach_duckdb_file_from_runtime(self._db_file)
 
     def _create_table_from_dataframe(
         self, df: ibis.Table, schema: str, table_name: str

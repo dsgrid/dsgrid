@@ -55,7 +55,6 @@ from dsgrid.ibis.operations import (
     rename_columns,
 )
 from dsgrid.ibis.table_utils import (
-    get_unique_values,
     get_unique_values_per_column,
     table_column_to_list,
 )

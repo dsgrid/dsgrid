@@ -1,4 +1,5 @@
 import logging
+from typing import Sequence
 
 import ibis
 
@@ -166,7 +167,7 @@ def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> 
     return get_runtime_session().sql(query)
 
 
-def _looks_like_bare_column(expr: str, columns: list[str]) -> bool:
+def _looks_like_bare_column(expr: str, columns: Sequence[str]) -> bool:
     """True if ``expr`` is a plain column reference (no function, alias, or
     quoting) that exists in the table's columns."""
     if "(" in expr or " AS " in expr:

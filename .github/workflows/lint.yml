@@ -29,7 +29,11 @@ jobs:
           source .venv/bin/activate
           pip install --upgrade pip
           pip install maturin
-          pip install -e '.[dev]'
+          # spark extra is required so ty can resolve the conditional
+          # ``import pyspark.sql.*`` statements in dsgrid/ibis/session.py.
+          # Without it, ty fails with unresolved-import on the Spark branch
+          # (which is dead code on DuckDB but ty type-checks both branches).
+          pip install -e '.[dev,spark]'
       - name: Run ty check
         run: |
           source .venv/bin/activate

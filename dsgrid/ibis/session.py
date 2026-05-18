@@ -30,6 +30,10 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 if not use_duckdb():
+    # pyspark is an optional dependency (extras = "spark"). The DuckDB
+    # shims below provide the same symbols when pyspark is absent at
+    # runtime. The ty CI installs the "spark" extra so these imports
+    # resolve during type-checking.
     import pyspark.sql.functions as F
     from pyspark.sql import Row, SparkSession
     from pyspark.sql.types import (
@@ -596,6 +600,7 @@ def _duckdb_type_from_spark_type(data_type: Any) -> str:
 def _merge_spark_csv_schema(
     session: Any, path: str, schema: dict[str, str], kwargs: dict[str, Any]
 ):
+    # Lazy: only the Spark-runtime branch reaches this helper.
     import pyspark.sql.types as pyspark_types
 
     def make_type(dtype: str):

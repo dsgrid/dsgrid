@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import chronify
 from chronify.ibis import IbisBackend, make_backend
@@ -168,7 +168,10 @@ def attach_duckdb_file_to_runtime(
         raise DSGInvalidOperation(msg)
 
     runtime = get_runtime_backend()
-    conn = runtime.connection
+    # cast: chronify's IbisBackend.connection is typed as ibis.BaseBackend,
+    # but the runtime backend is always DuckDB here and we need the raw_sql
+    # method that ibis.backends.duckdb.Backend exposes.
+    conn = cast(Any, runtime.connection)
     abs_path = str(Path(file_path).resolve())
     key = (id(conn), abs_path)
     cached_alias = _ATTACHED_FILES.get(key)
@@ -211,7 +214,8 @@ def detach_duckdb_file_from_runtime(file_path: Path | str) -> None:
         return
     if _RUNTIME_BACKEND is None:
         return
-    conn = _RUNTIME_BACKEND.connection
+    # cast: see attach_duckdb_file_to_runtime above.
+    conn = cast(Any, _RUNTIME_BACKEND.connection)
     abs_path = str(Path(file_path).resolve())
     key = (id(conn), abs_path)
     alias = _ATTACHED_FILES.pop(key, None)

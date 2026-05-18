@@ -55,29 +55,29 @@ class DuckDbDataStore(DataStoreInterface):
             # runtime there is no DuckDB connection to attach to.
             msg = "Spark backend engine is not supported with DuckDbDataStore."
             raise DSGInvalidOperation(msg)
-        # Pre-resolve so the file is attached by the time __init__ returns
-        # and ``DuckDbDataStore.create``'s subsequent CREATE SCHEMA calls
-        # can use the alias. The actual alias is looked up via the helper
-        # cache on every operation, so we don't store it on self.
-        self._resolve_alias()
+        # Attach the file to the runtime connection and acquire one
+        # refcount slot. ``close()`` decrements the same slot; the
+        # underlying SQL ``DETACH`` only runs when the last holder closes,
+        # so sibling stores wrapping the same file all keep working.
+        attach_duckdb_file_to_runtime(
+            self._db_file, alias=f"dsgrid_store_{id(self):x}"
+        )
 
     def _resolve_alias(self) -> str:
         """Return the alias under which this store's file is attached to the
-        current runtime DuckDB connection. Attaches if needed.
-
-        The alias is looked up rather than stored on the instance so two
-        sources of drift self-heal:
+        current runtime DuckDB connection. Self-heals across two drift
+        sources without affecting the refcount:
 
         1. **Multiple stores share an attach.** DuckDB rejects a second
            ``ATTACH '<file>'`` for the same path on the same connection
-           with a "Unique file handle conflict". When several stores wrap
-           the same registry file (test fixtures, lifecycle quirks),
-           ``attach_duckdb_file_to_runtime``'s cache returns the existing
-           alias and we adopt it transparently.
+           with a "Unique file handle conflict". Sibling stores get the
+           cached alias from ``get_attached_alias`` and adopt it.
         2. **Runtime backend rotation.** If the runtime backend cache is
            invalidated (e.g. via session restart), the helper's cache is
-           cleared too — the next call re-attaches against the new
-           connection and we pick up the fresh alias.
+           cleared too — we re-attach against the new connection. This
+           does increment the refcount, but the prior refcount was also
+           wiped by ``invalidate_runtime_backend_cache``; the store keeps
+           one logical reference matched by the close() decrement.
         """
         alias = get_attached_alias(self._db_file)
         if alias is not None:
@@ -306,17 +306,14 @@ class DuckDbDataStore(DataStoreInterface):
         )
 
     def close(self) -> None:
-        # DETACH the store's file from the shared runtime DuckDB connection
-        # so its file handle is released. Required on Windows, where the
-        # DuckDB ATTACH holds an exclusive lock and a stale lock blocks
-        # the test fixture teardown (`delete_if_exists(registry_data)`) with
-        # `WinError 32: file in use`.
-        #
-        # The "two stores share an attach" scenario the prior no-op was
-        # guarding against does not arise in any real flow: dsgrid creates
-        # one DuckDbDataStore per registry, and tests use a unique tmp_path
-        # per case. Sequential reuse of the same path is safe — a fresh
-        # store re-attaches via :func:`~dsgrid.ibis.backend.attach_duckdb_file_to_runtime`.
+        # Drop one refcount slot on the shared ATTACH. The actual SQL
+        # ``DETACH`` only runs when the last holder closes, so sibling
+        # stores wrapping the same file (test fixtures, concurrent
+        # managers) keep their tables addressable. When this IS the last
+        # holder, the SQL ``DETACH`` runs and releases the file handle —
+        # which is required on Windows, where the DuckDB ATTACH holds an
+        # exclusive lock that would otherwise block test-fixture cleanup
+        # (`WinError 32: file in use`).
         detach_duckdb_file_from_runtime(self._db_file)
 
     def _create_table_from_dataframe(

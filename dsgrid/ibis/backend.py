@@ -21,6 +21,12 @@ _RUNTIME_BACKEND_KEY: tuple[Any, ...] | None = None
 # Tracks files attached to the runtime DuckDB connection so we don't issue
 # duplicate ATTACH statements. Keyed by ``(id(connection), absolute path)``.
 _ATTACHED_FILES: dict[tuple[int, str], str] = {}
+# Reference count per attached file. Incremented by attach, decremented by
+# detach. ``DETACH`` only fires when the count returns to zero so multiple
+# callers (e.g. two DuckDbDataStore instances sharing an alias via the
+# cache, or test fixtures that connect/disconnect) don't yank the file
+# out from under each other.
+_ATTACH_REFCOUNT: dict[tuple[int, str], int] = {}
 
 
 def get_runtime_backend(**kwargs: Any) -> IbisBackend:
@@ -118,6 +124,7 @@ def invalidate_runtime_backend_cache() -> None:
     _RUNTIME_BACKEND = None
     _RUNTIME_BACKEND_KEY = None
     _ATTACHED_FILES.clear()
+    _ATTACH_REFCOUNT.clear()
 
 
 def attach_duckdb_file_to_runtime(
@@ -134,6 +141,13 @@ def attach_duckdb_file_to_runtime(
     Idempotent: a second call with the same resolved ``file_path`` returns
     the alias that was used the first time, regardless of the ``alias``
     argument on the second call.
+
+    Reference-counted with :func:`detach_duckdb_file_from_runtime`: each
+    call increments a per-(connection, file) refcount; ``detach`` only
+    runs the SQL ``DETACH`` when the count returns to zero. This lets
+    multiple callers (sibling DuckDbDataStore instances on the same file,
+    test fixtures that load-then-connect, etc.) share an attach without
+    one of them yanking it out from under the others.
 
     Parameters
     ----------
@@ -176,6 +190,7 @@ def attach_duckdb_file_to_runtime(
     key = (id(conn), abs_path)
     cached_alias = _ATTACHED_FILES.get(key)
     if cached_alias is not None:
+        _ATTACH_REFCOUNT[key] = _ATTACH_REFCOUNT.get(key, 0) + 1
         return cached_alias
 
     escaped_path = abs_path.replace("'", "''")
@@ -183,6 +198,7 @@ def attach_duckdb_file_to_runtime(
     mode = " (READ_ONLY)" if read_only else ""
     conn.raw_sql(f"ATTACH '{escaped_path}' AS {quoted_alias}{mode}")
     _ATTACHED_FILES[key] = alias
+    _ATTACH_REFCOUNT[key] = 1
     return alias
 
 
@@ -205,10 +221,15 @@ def get_attached_alias(file_path: Path | str) -> str | None:
 
 
 def detach_duckdb_file_from_runtime(file_path: Path | str) -> None:
-    """DETACH ``file_path`` from the runtime DuckDB backend if attached.
+    """Drop a reference to ``file_path``'s ATTACH on the runtime backend.
 
-    No-op when the file was never attached, the runtime is not DuckDB, or
-    the runtime backend has already been invalidated/replaced.
+    Decrements the per-(connection, file) refcount maintained by
+    :func:`attach_duckdb_file_to_runtime`. Only when the count returns
+    to zero does the actual SQL ``DETACH`` run; earlier calls just
+    decrement so sibling holders of the same attach keep working.
+
+    No-op when the file was never attached, the runtime is not DuckDB,
+    or the runtime backend has already been invalidated/replaced.
     """
     if dsgrid.runtime_config.backend_engine != BackendEngine.DUCKDB:
         return
@@ -218,9 +239,18 @@ def detach_duckdb_file_from_runtime(file_path: Path | str) -> None:
     conn = cast(Any, _RUNTIME_BACKEND.connection)
     abs_path = str(Path(file_path).resolve())
     key = (id(conn), abs_path)
-    alias = _ATTACHED_FILES.pop(key, None)
+    alias = _ATTACHED_FILES.get(key)
     if alias is None:
         return
+
+    refcount = _ATTACH_REFCOUNT.get(key, 0) - 1
+    if refcount > 0:
+        _ATTACH_REFCOUNT[key] = refcount
+        return
+
+    # Last reference — release everything.
+    _ATTACHED_FILES.pop(key, None)
+    _ATTACH_REFCOUNT.pop(key, None)
     quoted_alias = _quote_duckdb_identifier(alias)
     try:
         conn.raw_sql(f"DETACH {quoted_alias}")

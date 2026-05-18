@@ -245,3 +245,30 @@ def coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
     coalesced_view = make_temp_view_name()
     coalesced.createOrReplaceTempView(coalesced_view)
     return backend.connection.table(coalesced_view)
+
+
+def repartition(
+    df: ibis.Table, num_partitions: int, *columns: str
+) -> ibis.Table:
+    """Repartition an Ibis table.
+
+    On DuckDB this is a no-op (single-file output by default; partitioning
+    is a Spark-execution concern that has no DuckDB equivalent through this
+    helper). On Spark it issues PySpark's ``DataFrame.repartition(...)``
+    via the same temp-view dance as :func:`coalesce` and re-registers the
+    result as an Ibis table so downstream writers produce the requested
+    number of output files.
+
+    When ``columns`` is non-empty, ``repartition(num_partitions, *columns)``
+    hash-partitions on those columns; otherwise it's a plain round-robin
+    repartition.
+    """
+    if use_duckdb():
+        return df
+    view = create_temp_view(df)
+    backend = cast(Any, get_runtime_backend())
+    spark_df = backend.connection._session.sql(f"SELECT * FROM {view}")
+    repartitioned = spark_df.repartition(num_partitions, *columns)
+    repartitioned_view = make_temp_view_name()
+    repartitioned.createOrReplaceTempView(repartitioned_view)
+    return backend.connection.table(repartitioned_view)

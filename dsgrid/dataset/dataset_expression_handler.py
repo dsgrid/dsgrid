@@ -18,30 +18,27 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        # Soundness check has two parts: anti-joins for key-set equality,
-        # then ``count(joined) == count(self)`` for duplicate detection.
+        # Soundness check has two parts:
         #
-        # Anti-joins (``a.anti_join(b, keys)`` = rows of a whose keys are
-        # not in b) cover all missing-key cases that pure counts miss. For
-        # example: ``self={A,B}``, ``other={A,A}``. Counts of self, other,
-        # and joined all equal 2, but B was silently dropped. The
-        # ``self.anti_join(other)`` is non-empty for B and catches it.
-        # ``limit(1)`` via ``is_table_empty`` lets the planner short-circuit
-        # on the first non-matching key.
+        # 1. Anti-joins on the dimension columns — both must be empty —
+        #    prove that the key sets match. This catches cases that counts
+        #    alone miss, e.g. ``self={A,B}``, ``other={A,A}``: every count
+        #    is 2 but B is silently dropped; the ``self.anti_join(other)``
+        #    is non-empty for B and triggers the error.
         #
-        # Once we know key sets match, ``count(joined) == count(self)``
-        # implies no duplicate keys on either side (and by transitivity
-        # ``== count(other)``). If self had a duplicate key K, K's row
-        # multiplies in the inner join and ``count(joined) > count(self)``;
-        # same on the other side. This catches the ``test_invalid_lengths``
-        # case where one operand was previously unioned.
+        # 2. ``count(self) == count(other) == count(self.distinct(dim))``
+        #    proves there are no duplicate dimension-key rows on either
+        #    side. Given key sets match (from #1), the distinct key counts
+        #    are equal across sides, so checking distinct against self
+        #    implies the same for other by transitivity. Catches cases like
+        #    ``self={A,A}``, ``other={A}``: counts differ, fails. And
+        #    ``self={A,A}``, ``other={A,A}``: counts equal each other but
+        #    differ from distinct (which is 1), fails.
         #
-        # Cost: 2 anti-joins (cheap, short-circuit) + 2 counts. The joined
-        # count requires evaluating the inner join — which the caller will
-        # evaluate again when consuming ``df`` (Ibis lazy chain). Spark
-        # callers chaining operators should wrap in
-        # :func:`~dsgrid.ibis.functions.cache` to avoid the re-execution;
-        # DuckDB's planner generally reuses the scan.
+        # Cost: 2 anti-joins (short-circuit via ``is_table_empty``) + 3
+        # counts (self, other, self.distinct). None of them evaluates the
+        # inner join, so the caller's downstream consumption of ``df``
+        # pays for the join only once.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -69,13 +66,14 @@ class DatasetExpressionHandler:
             raise DSGInvalidOperation(msg)
 
         self_count = count_rows(self.df)
-        joined_count = count_rows(df)
-        if joined_count != self_count:
+        other_count = count_rows(other.df)
+        self_distinct_count = count_rows(self_keys.distinct())
+        if self_count != other_count or self_count != self_distinct_count:
             msg = (
-                f"join for operation {op=} multiplied rows: {self_count=} but "
-                f"{joined_count=}. One of the inputs has duplicate dimension-key "
-                "rows (often from a prior union of overlapping datasets); "
-                "arithmetic between datasets requires unique keys on each side."
+                f"join for operation {op=} would produce duplicate output rows: "
+                "at least one of the inputs has duplicate dimension-key rows "
+                "(often from a prior union of overlapping datasets). "
+                f"{self_count=} {other_count=} {self_distinct_count=}"
             )
             raise DSGInvalidOperation(msg)
 

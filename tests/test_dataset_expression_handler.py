@@ -100,7 +100,7 @@ def test_invalid_lengths(datasets):
     # row-count check catches as "multiplied rows" (duplicate keys on the
     # right side).
     datasets["dataset3"] = evaluate_expression("dataset1 | dataset2", datasets)
-    with pytest.raises(DSGInvalidOperation, match="multiplied rows"):
+    with pytest.raises(DSGInvalidOperation, match="duplicate output rows"):
         evaluate_expression("dataset1 * dataset3", datasets)
 
 

@@ -23,7 +23,7 @@ import pandas as pd
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
-from dsgrid.ibis.operations import coalesce, create_temp_view
+from dsgrid.ibis.operations import coalesce, create_temp_view, repartition
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -444,7 +444,13 @@ def write_dataframe_and_auto_partition(
         logger.debug("write_dataframe_and_auto_partition is not optimized for DuckDB")
         return df
 
-    num_partitions = len(list(filename.parent.iterdir()))
+    # Count the Parquet part files INSIDE the Spark output directory, not
+    # its siblings. ``filename`` here is e.g.
+    # ``/path/table.parquet/part-00000-….parquet`` (a directory containing
+    # part files). The previous ``filename.parent.iterdir()`` counted other
+    # files in ``/path/`` instead, which is usually 1 and made this branch
+    # always early-return — silently skipping coalescing/repartitioning.
+    num_partitions = len(list(filename.glob("*.parquet")))
     if num_partitions < min_num_partitions:
         logger.info(
             "Not coalescing %s because it has only %s partitions, "
@@ -476,10 +482,11 @@ def write_dataframe_and_auto_partition(
             duration_second_write,
         )
     else:
-        if columns is None:
-            df = df.repartition(desired)
-        else:
-            df = df.repartition(desired, *columns)
+        # ``df`` is an Ibis table, not a PySpark DataFrame, so the
+        # ``repartition`` helper in operations.py runs the temp-view dance
+        # equivalent to ``coalesce``. ``columns or ()`` keeps the call
+        # shape uniform for the no-columns case.
+        df = repartition(df, desired, *(columns or ()))
         df = overwrite_dataframe_file(filename, df)
         duration_second_write = time.time() - end_initial_write
         logger.info(

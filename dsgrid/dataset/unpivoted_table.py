@@ -127,27 +127,31 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
     return metric_column
 
 
+_AGGREGATE_FAST_PATH_OPS = frozenset(
+    {"sum", "mean", "min", "max", "count", "median", "approx_median", "first", "last"}
+)
+
+
 def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
-    # Fast path: when all group-by entries are bare column references, keep
-    # the chain in native Ibis. The SQL-string branch previously below was
-    # called per-aggregation inside process_stacked_aggregations, and each
-    # call paid the cost of registering a temp view in the backend catalog;
-    # using df.group_by/aggregate keeps the lazy expression tree intact and
-    # lets the planner fuse adjacent aggregations across iterations.
+    # Fast path: when all group-by entries are bare column references and
+    # ``op_name`` is a known reduction, dispatch through native Ibis to keep
+    # the chain lazy and let the planner fuse adjacent aggregations.
+    #
+    # We allowlist the reductions explicitly because ``FunctionReference``
+    # accepts any backend SQL identifier (Phase 10 dropped the closed set).
+    # Without the allowlist, names like ``round`` would resolve to Ibis's
+    # scalar column method ``df[col].round`` instead of a reduction, and
+    # ``df.group_by(...).aggregate(c=df[col].round())`` is a non-aggregate
+    # inside an aggregate — which either errors or silently produces wrong
+    # SQL. Anything not in the allowlist falls through to the SQL-string
+    # path below, which forwards the name verbatim to the backend.
+    ibis_op = "mean" if op_name == "mean" else op_name
     bare_cols = [
         col for col in group_by_cols if _looks_like_bare_column(col, df.columns)
     ]
-    if len(bare_cols) == len(group_by_cols):
-        ibis_op = "mean" if op_name == "mean" else op_name
-        try:
-            agg_method = getattr(df[VALUE_COLUMN], ibis_op)
-        except AttributeError:
-            # Fall through to the SQL-string path below for ops Ibis doesn't
-            # expose as a column method (rare; current callers use sum/mean/
-            # min/max).
-            pass
-        else:
-            return df.group_by(bare_cols).aggregate(**{VALUE_COLUMN: agg_method()})
+    if ibis_op in _AGGREGATE_FAST_PATH_OPS and len(bare_cols) == len(group_by_cols):
+        agg_method = getattr(df[VALUE_COLUMN], ibis_op)
+        return df.group_by(bare_cols).aggregate(**{VALUE_COLUMN: agg_method()})
 
     # SQL-string fallback for group-by entries that carry function calls or
     # aliases (e.g. ``year(timestamp) AS year``); these would require parsing

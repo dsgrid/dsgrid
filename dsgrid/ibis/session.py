@@ -108,11 +108,33 @@ class _DuckDBReader:
     """
 
     def csv(self, path: str, schema: Any | None = None, **kwargs) -> ibis.Table:
-        # Delegate to the consolidated reader. The schema parameter can be
-        # a dict[str, str] (already in backend SQL strings) or a PySpark
-        # StructType; _schema_types normalizes either to a dict.
+        # Delegate to the consolidated reader. ``schema`` can be a
+        # dict[str, str] (already in backend SQL strings) or a PySpark
+        # StructType; ``_schema_types`` normalizes either to a dict.
+        #
+        # Spark-style option names are forwarded so callers using the
+        # session-API shape (``session.read.csv(path, sep="|")``) get the
+        # same behavior on both backends. Without this translation
+        # ``delimiter``/``encoding``/``null_values`` were silently dropped
+        # on DuckDB while the Spark adapter honored them.
         types = _schema_types(schema, ibis_types=False)
-        return read_csv(path, schema=types)
+        delimiter = kwargs.get("sep") or kwargs.get("delim") or kwargs.get("delimiter")
+        encoding = kwargs.get("encoding") or "utf-8"
+        null_value = kwargs.get("nullValue") or kwargs.get("null_values")
+        null_values: list[str] | None
+        if null_value is None:
+            null_values = None
+        elif isinstance(null_value, str):
+            null_values = [null_value]
+        else:
+            null_values = list(null_value)
+        return read_csv(
+            path,
+            schema=types,
+            encoding=encoding,
+            delimiter=delimiter,
+            null_values=null_values,
+        )
 
     def json(self, path: str, **kwargs) -> ibis.Table:
         return get_runtime_backend().connection.read_json(path)

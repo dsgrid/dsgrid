@@ -324,17 +324,39 @@ class DuckDbDataStore(DataStoreInterface):
     ) -> None:
         """Materialize ``df`` as a new table in the attached database.
 
-        For ibis.Table inputs that live in a *different* backend, we
-        materialize via PyArrow rather than via a temp Parquet file.
-        PyArrow avoids the parquet write + read round-trip on disk for
-        the typical small/medium-sized payloads (dimension records,
-        lookup tables, association tables) at the cost of buffering the
-        whole table in driver memory. Very large cross-backend transfers
-        should pre-write Parquet and use a different write path.
+        Three write paths, in order of preference:
+
+        1. **Runtime-bound Ibis expression**: pass ``df`` straight through.
+           Ibis compiles ``conn.create_table(name, obj=ibis_table)`` to a
+           ``CREATE TABLE ... AS SELECT ...`` that stays inside the DuckDB
+           process — no data crosses Python. This is the common path now
+           that DuckDbDataStore ATTACHes its file to the runtime backend
+           and reads return runtime-bound tables.
+        2. **Cross-backend Ibis expression** (e.g. a memtable or a table
+           from a foreign backend that wasn't routed through the ATTACH):
+           materialize via PyArrow. Cheap for the small/medium payloads
+           that arrive cross-backend in practice (dimension records,
+           lookup tables, association tables); large cross-backend
+           transfers should pre-write Parquet and skip this path.
+        3. **pandas.DataFrame**: hand to Ibis directly; it handles the
+           in-memory conversion.
+
+        Path 1 is what prevents an OOM on writes of dataset-sized
+        load_data tables, which used to be the previous Parquet-spill
+        path before this rewrite.
         """
         conn = self._runtime_backend.connection
         if isinstance(df, ibis.Table):
-            obj: Any = df.to_pyarrow()
+            try:
+                src_backend = df._find_backend(use_default=False)
+            except Exception:
+                src_backend = None
+            if src_backend is conn:
+                # Runtime-bound: stays in the backend as a CTAS.
+                obj: Any = df
+            else:
+                # Cross-backend: materialize via PyArrow. See path 2 above.
+                obj = df.to_pyarrow()
         elif isinstance(df, pd.DataFrame):
             obj = df
         else:

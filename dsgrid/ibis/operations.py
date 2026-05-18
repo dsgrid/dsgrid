@@ -107,7 +107,13 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
     if b1 is b2:
         return df1, df2
     runtime = get_runtime_backend()
-    if b1 is not runtime:
+    # ``_find_backend`` returns the underlying ibis backend (e.g.
+    # ``ibis.backends.duckdb.Backend``), while ``get_runtime_backend`` returns
+    # chronify's ``IbisBackend`` wrapper. Compare against the wrapper's
+    # ``.connection`` (which IS the inner backend) so runtime-bound tables
+    # don't get unnecessarily round-tripped through ``create_temp_view``.
+    runtime_inner = runtime.connection
+    if b1 is not runtime_inner:
         logger.warning(
             "Cross-backend operand detected (source=%s runtime=%s); falling "
             "back to create_temp_view. If both backends are DuckDB this "
@@ -117,7 +123,7 @@ def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, 
             getattr(runtime, "name", type(runtime).__name__),
         )
         df1 = runtime.table(create_temp_view(df1))
-    if b2 is not runtime:
+    if b2 is not runtime_inner:
         logger.warning(
             "Cross-backend operand detected (source=%s runtime=%s); falling "
             "back to create_temp_view. If both backends are DuckDB this "

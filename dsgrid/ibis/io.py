@@ -102,7 +102,10 @@ def read_csv(
             kwargs["all_varchar"] = True
         if delimiter is not None:
             kwargs["delim"] = delimiter
-        if null_values is not None:
+        if null_values:
+            # Empty list = "no override" — same shape as ``None``. DuckDB's
+            # ``nullstr`` accepts a list; ``[]`` would mean "no string is
+            # NULL" which is not what callers passing an empty list mean.
             kwargs["nullstr"] = null_values
         return conn.read_csv(path_str, **kwargs)
 
@@ -116,8 +119,13 @@ def read_csv(
         spark_kwargs["schema"] = schema
     if delimiter is not None:
         spark_kwargs["sep"] = delimiter
-    if null_values is not None:
-        spark_kwargs["nullValue"] = null_values[0] if isinstance(null_values, list) else null_values
+    if null_values:
+        # Empty list = "no override"; Spark's ``nullValue`` takes a single
+        # string, so we take the first entry only (documented in the
+        # function's null_values param).
+        spark_kwargs["nullValue"] = (
+            null_values[0] if isinstance(null_values, list) else null_values
+        )
     return get_runtime_session().read.csv(path_str, **spark_kwargs)
 
 

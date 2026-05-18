@@ -94,10 +94,13 @@ def test_dataset_expression_combo(datasets):
 
 
 def test_invalid_lengths(datasets):
+    # dataset3 = union of dataset1 and dataset2; both cover the same
+    # dimension keys, so unioning produces duplicate-key rows. Multiplying
+    # by dataset1 then multiplies each dataset1 row, which the post-join
+    # row-count check catches as "multiplied rows" (duplicate keys on the
+    # right side).
     datasets["dataset3"] = evaluate_expression("dataset1 | dataset2", datasets)
-    # Phase 11 removed the pre-join length pre-check; the same condition
-    # now surfaces from the post-join row-count check.
-    with pytest.raises(DSGInvalidOperation, match="row count that does not match"):
+    with pytest.raises(DSGInvalidOperation, match="multiplied rows"):
         evaluate_expression("dataset1 * dataset3", datasets)
 
 
@@ -120,7 +123,9 @@ def test_invalid_join():
     dataset1 = DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     dataset2 = DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
-    with pytest.raises(DSGInvalidOperation, match="row count that does not match"):
+    # dataset1 has Adams (not in dataset2) and dataset2 has Jefferson (not in
+    # dataset1) — anti-joins on both sides catch the mismatched coverage.
+    with pytest.raises(DSGInvalidOperation, match="mismatched dimension coverage"):
         evaluate_expression("dataset1 + dataset2", datasets)
 
 

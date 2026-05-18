@@ -5,6 +5,7 @@ import ibis
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.operations import join_multiple_columns, rename_columns
 from dsgrid.ibis.table_utils import count_rows
+from dsgrid.ibis.types import is_table_empty
 from dsgrid.utils.py_expression_eval import Parser
 
 
@@ -17,29 +18,30 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        # Soundness check: ``joined`` must have exactly the same row count
-        # as BOTH inputs. This catches every failure mode the prior, cheaper
-        # variants missed:
+        # Soundness check has two parts: anti-joins for key-set equality,
+        # then ``count(joined) == count(self)`` for duplicate detection.
         #
-        # - ``joined < self``: the right side is missing some of self's keys.
-        # - ``joined < other``: the left side is missing some of other's keys
-        #   (the variant that only compared joined to self silently dropped
-        #   this case, per the post-Phase-14 Copilot review).
-        # - ``joined > self`` or ``joined > other``: one side has duplicate
-        #   dimension-key rows that multiply the inner join (e.g.
-        #   ``dataset1 * (dataset1 | dataset2)`` — caught by the
-        #   ``test_invalid_lengths`` regression).
-        # - Same row counts on inputs but different key sets: the joined
-        #   count drops below both inputs and trips the check.
+        # Anti-joins (``a.anti_join(b, keys)`` = rows of a whose keys are
+        # not in b) cover all missing-key cases that pure counts miss. For
+        # example: ``self={A,B}``, ``other={A,A}``. Counts of self, other,
+        # and joined all equal 2, but B was silently dropped. The
+        # ``self.anti_join(other)`` is non-empty for B and catches it.
+        # ``limit(1)`` via ``is_table_empty`` lets the planner short-circuit
+        # on the first non-matching key.
         #
-        # Cost: three counts per binary operator. Each source-table count is
-        # a cheap reduction; the joined count requires evaluating the inner
-        # join (which the caller will evaluate again when consuming ``df``).
-        # For Spark callers concerned about repeated evaluation, wrap the
-        # returned table in :func:`~dsgrid.ibis.functions.cache` before
-        # chaining further operators. DuckDB's planner reuses the scan
-        # across the count and downstream consumers, so the practical cost
-        # there is one scan per source plus one join evaluation per op.
+        # Once we know key sets match, ``count(joined) == count(self)``
+        # implies no duplicate keys on either side (and by transitivity
+        # ``== count(other)``). If self had a duplicate key K, K's row
+        # multiplies in the inner join and ``count(joined) > count(self)``;
+        # same on the other side. This catches the ``test_invalid_lengths``
+        # case where one operand was previously unioned.
+        #
+        # Cost: 2 anti-joins (cheap, short-circuit) + 2 counts. The joined
+        # count requires evaluating the inner join — which the caller will
+        # evaluate again when consuming ``df`` (Ibis lazy chain). Spark
+        # callers chaining operators should wrap in
+        # :func:`~dsgrid.ibis.functions.cache` to avoid the re-execution;
+        # DuckDB's planner generally reuses the scan.
         renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
         other_df = rename_columns(other.df, renamed_value_cols)
         joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
@@ -48,14 +50,32 @@ class DatasetExpressionHandler:
         }
         df = joined.mutate(**mutations).select(*self.df.columns)
 
-        self_count = count_rows(self.df)
-        other_count = count_rows(other.df)
-        joined_count = count_rows(df)
-        if joined_count != self_count or joined_count != other_count:
+        self_keys = self.df.select(*self.dimension_columns)
+        other_keys = other.df.select(*self.dimension_columns)
+        left_has_extra = not is_table_empty(
+            self_keys.anti_join(other_keys, self.dimension_columns)
+        )
+        right_has_extra = not is_table_empty(
+            other_keys.anti_join(self_keys, self.dimension_columns)
+        )
+        if left_has_extra or right_has_extra:
             msg = (
-                f"join for operation {op=} produced a row count that does not match "
-                f"both inputs; the datasets likely have mismatched dimension keys or "
-                f"duplicate keys on one side. {self_count=} {other_count=} {joined_count=}"
+                f"join for operation {op=} would drop rows: the datasets have "
+                f"mismatched dimension coverage "
+                f"(left_has_extra={left_has_extra} right_has_extra={right_has_extra}). "
+                "Arithmetic between datasets requires the same set of dimension "
+                "records on both sides."
+            )
+            raise DSGInvalidOperation(msg)
+
+        self_count = count_rows(self.df)
+        joined_count = count_rows(df)
+        if joined_count != self_count:
+            msg = (
+                f"join for operation {op=} multiplied rows: {self_count=} but "
+                f"{joined_count=}. One of the inputs has duplicate dimension-key "
+                "rows (often from a prior union of overlapping datasets); "
+                "arithmetic between datasets requires unique keys on each side."
             )
             raise DSGInvalidOperation(msg)
 

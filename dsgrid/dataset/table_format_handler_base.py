@@ -1,7 +1,7 @@
 import ibis
 import abc
 import logging
-from typing import Any, Iterable, cast
+from typing import Iterable
 
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
@@ -19,8 +19,9 @@ from dsgrid.utils.dataset import (
     map_stacked_dimension,
     remove_invalid_null_timestamps,
 )
-from dsgrid.ibis.operations import create_temp_view, drop_columns, join, rename_columns
-from dsgrid.ibis.session import get_runtime_session, persist_intermediate_query
+from dsgrid.ibis.operations import drop_columns, join, rename_columns
+from dsgrid.ibis.io import persist_intermediate_query
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 
@@ -112,17 +113,8 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
-            view = create_temp_view(df)
-            select_exprs = []
-            for col in df.columns:
-                if col == "fraction":
-                    continue
-                quoted = handle_column_spaces(col)
-                if col in value_columns:
-                    select_exprs.append(f"{quoted} * fraction AS {handle_column_spaces(col)}")
-                else:
-                    select_exprs.append(quoted)
-            df = get_runtime_session().sql(f"SELECT {', '.join(select_exprs)} FROM {view}")
+            multiplied = {c: df[c] * df["fraction"] for c in df.columns if c in value_columns}
+            df = drop_columns(df.mutate(**multiplied), "fraction")
 
         return df
 
@@ -166,7 +158,7 @@ class TableFormatHandlerBase(abc.ABC):
             elif dim_type.value in columns:
                 existing_col = dim_type.value
                 new_cols = context.get_dimension_column_names(dim_type, dataset_id=dataset_id)
-                assert len(new_cols) == 1, f"{dim_type =} {new_cols =}"
+                assert len(new_cols) == 1, f"{dim_type=} {new_cols=}"
                 new_col = next(iter(new_cols))
                 if existing_col != new_col:
                     df = rename_columns(df, {existing_col: new_col})
@@ -186,8 +178,8 @@ class TableFormatHandlerBase(abc.ABC):
                 records = dim_config.get_records_dataframe().select("id", "name")
                 df = drop_columns(join(df, records, name, "id"), "id", name)
                 df = rename_columns(df, {"name": name})
-        new_count = _count_rows(df)
-        orig_count = _count_rows(orig)
+        new_count = count_rows(df)
+        orig_count = count_rows(orig)
         assert new_count == orig_count, f"counts changed {new_count} {orig_count}"
         return df
 
@@ -197,7 +189,7 @@ class TableFormatHandlerBase(abc.ABC):
     ) -> None:
         name = column.get_column_name()
         if name in column_to_dim_type:
-            assert dim_type == column_to_dim_type[name], f"{name =} {column_to_dim_type}"
+            assert dim_type == column_to_dim_type[name], f"{name=} {column_to_dim_type}"
         column_to_dim_type[name] = dim_type
 
     def _build_group_by_columns(
@@ -268,7 +260,3 @@ class TableFormatHandlerBase(abc.ABC):
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
                 logger.debug("Removed any rows with invalid null timestamps")
         return df
-
-
-def _count_rows(df: ibis.Table) -> int:
-    return int(cast(Any, df.count().execute()))

@@ -16,7 +16,8 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import check_for_nulls
+from dsgrid.ibis.null_checks import check_for_nulls
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.operations import drop_columns
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -102,7 +103,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         for column in self._load_data.columns:
             if column not in allowed_columns:
-                msg = f"{column =} is not expected in load_data"
+                msg = f"{column=} is not expected in load_data"
                 raise DSGInvalidDataset(msg)
             if not (
                 column in time_columns or column == VALUE_COLUMN or column == TIME_ZONE_COLUMN
@@ -137,7 +138,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = _count_rows(load_df.select(col).distinct())
+            count = count_rows(load_df.select(col).distinct())
             assert count == 1, f"{dim}: {count}"
             columns_to_drop.append(col)
         load_df = drop_columns(load_df, *columns_to_drop)
@@ -211,10 +212,3 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     to_geo_dim=geography_dimension,
                 )
         return ld_df
-
-
-def _count_rows(df: ibis.Table) -> int:
-    count = df.count()
-    if hasattr(count, "execute"):
-        return int(cast(Any, count.execute()))
-    return int(cast(Any, count))

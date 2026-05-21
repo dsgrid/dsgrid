@@ -21,7 +21,8 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.run_command import run_command
-from dsgrid.ibis.session import init_runtime_session, read_parquet
+from dsgrid.ibis.io import read_parquet
+from dsgrid.ibis.session import init_runtime_session
 from .api_manager import ApiManager
 from .models import (
     AsyncTaskStatus,
@@ -69,7 +70,7 @@ offline_mode = True
 no_prompts = True
 # There could be collisions on the shared runtime session between the main process and
 # subprocesses that run queries.
-# If both processes try to use the Hive metastore, a crash will occur.
+# Keep API worker initialization isolated from query execution state.
 runtime_session = init_runtime_session("dsgrid_api", check_env=False)
 dsgrid_config = DsgridRuntimeConfig.load()
 conn = DatabaseConnection(
@@ -340,8 +341,7 @@ def get_async_task_data(async_task_id: int):
         # compression.
         # We should also check how much data we can read through the Spark driver.
         table = read_parquet(str(task.result.data_file))
-        count = table.count()
-        num_rows = count.execute() if hasattr(count, "execute") else count
+        num_rows = table.count().execute()
         if num_rows > MAX_INLINE_QUERY_DATA_ROWS:
             msg = (
                 f"Query result has {num_rows} rows. Inline JSON responses are limited to "

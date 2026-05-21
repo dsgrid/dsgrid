@@ -15,14 +15,6 @@ from .registry_manager import RegistryManager
 logger = logging.getLogger(__name__)
 
 
-def _metadata_records(df) -> list[dict]:
-    return table_to_records(df)
-
-
-def _metadata_ids(df) -> set:
-    return set(table_column_to_list(df.select("id").distinct(), "id"))
-
-
 class FilterRegistryManager(RegistryManager):
     """Specialized RegistryManager that performs filtering operations."""
 
@@ -60,9 +52,11 @@ class FilterRegistryManager(RegistryManager):
         def handle_dimension(simple_dim, dim):
             records = dim.get_records_dataframe()
             df = records.filter(records.id.isin(simple_dim.record_ids))
-            filtered_records = _metadata_records(df)
+            filtered_records = table_to_records(df)
             modified_dims.add(dim.model.dimension_id)
-            modified_dim_records[dim.model.dimension_id] = _metadata_ids(df)
+            modified_dim_records[dim.model.dimension_id] = set(
+                table_column_to_list(df.select("id").distinct(), "id")
+            )
             return filtered_records
 
         logger.info("Filter project dimensions")
@@ -127,7 +121,7 @@ class FilterRegistryManager(RegistryManager):
 
             # TODO: probably need to remove a dimension mapping if it is empty
             if records is not None and changed and not is_table_empty(records):
-                mapping.model.records = _metadata_records(records)
+                mapping.model.records = table_to_records(records)
                 self.dimension_mapping_manager.db.replace(conn, mapping.model)
                 logger.info(
                     "Filtered dimension mapping records from ID %s", mapping.model.mapping_id

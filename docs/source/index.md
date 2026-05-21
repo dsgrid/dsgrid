@@ -75,7 +75,7 @@ If you're evaluating dsgrid for your organization:
 - **Multi-Dimensional Data**: Organize energy data across scenario, geography, time, sector, subsector, enduse, and custom dimensions
 - **Flexible Mappings**: Map datasets between different dimensional systems with explicit, documented transformations
 - **Powerful Queries**: Aggregate, filter, and transform data across dimensions to create custom views
-- **Big Data Support**: Use the Ibis table API with DuckDB for local work or Apache Spark for distributed workloads
+- **Big Data Support**: Process terabyte-scale datasets using Apache Spark or gigabyte-scale datasets using DuckDB.
 - **Data Integrity**: Validation ensures dataset consistency and project compatibility
 - **Registry System**: Central metadata management for dimensions, datasets, and projects
 

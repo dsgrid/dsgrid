@@ -63,19 +63,20 @@ from dsgrid.ibis.functions import (
     aggregate_single_value,
     read_csv,
 )
+from dsgrid.ibis.backend import get_runtime_backend, invalidate_runtime_backend_cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.ibis.session import (
     DoubleType,
     F,
-    custom_time_zone,
     SparkSession,
     StructField,
     StringType,
     StructType,
     use_duckdb,
 )
+from dsgrid.ibis.tz import custom_time_zone
 from dsgrid.tests.common import (
     CACHED_TEST_REGISTRY_DB,
     SIMPLE_STANDARD_SCENARIOS,
@@ -85,6 +86,13 @@ from dsgrid.tests.common import (
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
+
+from tests._helpers import (
+    collect as _collect,
+    count as _count,
+    order_by as _order_by,
+    row_value as _row_value,
+)
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -99,39 +107,20 @@ DIMENSION_MAPPING_SCHEMA = StructType(
 logger = logging.getLogger(__name__)
 
 
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df):
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
-
-
 def _filter(df, predicate):
     return filter_sql(df, predicate)
+
+
+def _sql_ident(column):
+    if get_runtime_backend().name == "spark":
+        return "`" + column.replace("`", "``") + "`"
+    return '"' + column.replace('"', '""') + '"'
 
 
 def _sum_by_group(df, group_cols):
     if isinstance(df, ibis.Table):
         return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
     return df.groupBy(*group_cols).agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-
-
-def _order_by(df, *columns):
-    if isinstance(df, ibis.Table):
-        return df.order_by(*columns)
-    return df.sort(*columns)
-
-
-def _row_value(row, column):
-    try:
-        return row[column]
-    except TypeError:
-        return getattr(row, column)
 
 
 @pytest.fixture(scope="module")
@@ -164,35 +153,20 @@ def la_expected_electricity_hour_16(tmp_path_factory):
     df = filter_sql(
         read_parquet(str(output_dir / query.name / "table.parquet")), "county == '06037'"
     )
-    end_uses = ["electricity_cooling", "electricity_heating"]
     gcols = [x for x in df.columns if x not in {"end_use", "value"}]
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    if isinstance(df, ibis.Table):
-        df = filter_sql(
-            df,
-            "end_use IN ('electricity_cooling', 'electricity_heating')",
+    df = filter_sql(
+        df,
+        "end_use IN ('electricity_cooling', 'electricity_heating')",
+    )
+    df = df.group_by(gcols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
+    with custom_time_zone(tz):
+        expected_df = (
+            df.mutate(hour=df["time_est"].hour())
+            .group_by(["county", "hour"])
+            .aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].mean()})
         )
-        df = df.group_by(gcols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
-        with custom_time_zone(tz):
-            expected_df = (
-                df.mutate(hour=df["time_est"].hour())
-                .group_by(["county", "hour"])
-                .aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].mean()})
-            )
-            expected = filter_sql(expected_df, "hour == 16").execute()[VALUE_COLUMN].iloc[0]
-    else:
-        df = (
-            df.filter(F.col("end_use").isin(end_uses))
-            .groupBy(*gcols)
-            .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
-        )
-        with custom_time_zone(tz):
-            expected = (
-                df.groupBy("county", F.hour("time_est").alias("hour"))
-                .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
-                .filter("hour == 16")
-                .collect()[0][VALUE_COLUMN]
-            )
+        expected = filter_sql(expected_df, "hour == 16").execute()[VALUE_COLUMN].iloc[0]
     yield {
         "la_electricity_hour_16": expected,
     }
@@ -496,13 +470,14 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     baseline_years_str = [str(x) for x in baseline_years]
     baseline_years_sql = ", ".join(f"'{x}'" for x in baseline_years_str)
     five_year_sum = get_value_sum(
-        _filter(five_year_df, f'"Five Year Intervals" IN ({baseline_years_sql})')
+        _filter(five_year_df, f"{_sql_ident('Five Year Intervals')} IN ({baseline_years_sql})")
     )
     assert math.isclose(five_year_sum, baseline_sum)
 
-    val1 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2020'"))
-    val2 = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2030'"))
-    interpolated_val = get_value_sum(_filter(five_year_df, "\"Five Year Intervals\" = '2025'"))
+    fy_ident = _sql_ident("Five Year Intervals")
+    val1 = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2020'"))
+    val2 = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2030'"))
+    interpolated_val = get_value_sum(_filter(five_year_df, f"{fy_ident} = '2025'"))
     assert math.isclose(interpolated_val, val1 / 2 + val2 / 2)
 
 
@@ -701,6 +676,12 @@ def shutdown_project():
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
         if spark is not None:
+            # Drop the cached Ibis backend first; otherwise it keeps a
+            # reference to the SparkSession we're about to stop and the
+            # next test that calls get_runtime_backend() gets a stopped
+            # session back (PySpark then raises
+            # "'NoneType' has no attribute 'setCallSite'").
+            invalidate_runtime_backend_cache()
             spark.stop()
 
 
@@ -1845,9 +1826,9 @@ class QueryTestUnitMapping(QueryTestBase):
             _filter(
                 df,
                 f"""
-                "ComStock Subsectors EFS" = '{subsector}'
-                AND "US Counties 2010 - ComStock Only" = '{expected_cooling.geography}'
-                AND "Model Years 2010 to 2050" = '2020'
+                {_sql_ident('ComStock Subsectors EFS')} = '{subsector}'
+                AND {_sql_ident('US Counties 2010 - ComStock Only')} = '{expected_cooling.geography}'
+                AND {_sql_ident('Model Years 2010 to 2050')} = '2020'
                 """,
             )
             .order_by("Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total")
@@ -1878,7 +1859,7 @@ def validate_electricity_use_by_county(
 
 
 def validate_electricity_use_by_state(op, results_path: ibis.Table | Path, raw_stats, datasets):
-    if isinstance(results_path, ibis.Table | ibis.Table):
+    if isinstance(results_path, ibis.Table):
         results = results_path
     else:
         results = read_parquet(results_path)

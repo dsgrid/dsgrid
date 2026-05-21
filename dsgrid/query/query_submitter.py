@@ -40,14 +40,14 @@ from dsgrid.ibis.functions import write_csv
 from dsgrid.ibis.operations import drop_columns, join, pivot
 
 from dsgrid.project import Project
-from dsgrid.ibis.session import (
-    custom_time_zone,
+from dsgrid.ibis.io import (
+    persist_table,
     read_dataframe,
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
-    persist_table,
 )
+from dsgrid.ibis.tz import custom_time_zone
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
 from dsgrid.query.models import (
@@ -62,10 +62,8 @@ from dsgrid.query.models import (
 )
 from dsgrid.utils.dataset import (
     add_time_zone,
-    convert_time_zone_with_chronify_runtime_hive,
     convert_time_zone_with_chronify_runtime_path,
     convert_time_zone_with_chronify_duckdb,
-    convert_time_zone_by_column_with_chronify_runtime_hive,
     convert_time_zone_by_column_with_chronify_runtime_path,
     convert_time_zone_by_column_with_chronify_duckdb,
 )
@@ -193,7 +191,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ]
                     msg = (
                         f"Subset dimensions cannot be used in aggregations: "
-                        f"{dimension_name =}. Only base and supplemental dimensions are "
+                        f"{dimension_name=}. Only base and supplemental dimensions are "
                         f"allowed. base={base_names} supplemental={supp_names}"
                     )
                     raise DSGInvalidQuery(msg)
@@ -228,7 +226,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     ),
                 ]
             else:
-                msg = f"Unhandled dataset type: {dataset =}"
+                msg = f"Unhandled dataset type: {dataset=}"
                 raise NotImplementedError(msg)
 
             for dataset_id in src_dataset_ids:
@@ -247,7 +245,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 elif base_dimension_names != names:
                     msg = (
                         "Datasets in a query must have the same base dimension query names: "
-                        f"{dataset =} {base_dimension_names} {names}"
+                        f"{dataset=} {base_dimension_names} {names}"
                     )
                     raise DSGInvalidQuery(msg)
 
@@ -267,7 +265,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     msg = (
                         "The dataset's base_dimension_names value is not set and "
                         f"there are multiple base dimensions of type {dim_type} in the project. "
-                        f"Please re-register the dataset with {dataset_id =}."
+                        f"Please re-register the dataset with {dataset_id=}."
                     )
                     raise DSGInvalidDataset(msg)
                 setattr(names, dim_type.value, dims[0].model.name)
@@ -361,16 +359,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             if time_dim.supports_chronify():
                 tz_name = model.result.time_zone
                 to_time_zone = ZoneInfo(tz_name) if tz_name not in [None, "None", "none"] else None
-                match (config.backend_engine, config.use_hive_metastore):
-                    case (BackendEngine.SPARK, True):
-                        df = convert_time_zone_with_chronify_runtime_hive(
-                            df=df,
-                            from_time_dim=time_dim,
-                            time_zone=to_time_zone,
-                            scratch_dir_context=scratch_dir_context,
-                        )
-
-                    case (BackendEngine.SPARK, False):
+                match config.backend_engine:
+                    case BackendEngine.SPARK:
                         filename = persist_table(
                             df,
                             scratch_dir_context,
@@ -383,7 +373,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             time_zone=to_time_zone,
                             scratch_dir_context=scratch_dir_context,
                         )
-                    case (BackendEngine.DUCKDB, _):
+                    case BackendEngine.DUCKDB:
                         df = convert_time_zone_with_chronify_duckdb(
                             df=df,
                             from_time_dim=time_dim,
@@ -408,15 +398,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
                 # use chronify
-            match (config.backend_engine, config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = convert_time_zone_by_column_with_chronify_runtime_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        scratch_dir_context=scratch_dir_context,
-                        wrap_time_allowed=False,
-                    )
-                case (BackendEngine.SPARK, False):
+            match config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
@@ -429,7 +412,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         scratch_dir_context=scratch_dir_context,
                         wrap_time_allowed=False,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = convert_time_zone_by_column_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,
@@ -437,7 +420,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         wrap_time_allowed=False,
                     )
         else:
-            msg = f"Unknown input {model.result.time_zone =}"
+            msg = f"Unknown input {model.result.time_zone=}"
             raise DSGInvalidParameter(msg)
 
         repartition = not persist_intermediate_table
@@ -511,7 +494,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 write_dataframe(df, path)
                 df_filenames[dataset_id] = path
 
-                # All dataset columns need to be in the same order.
+        # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         datasets = self._convert_datasets(context, df_filenames)
         assert isinstance(context.model, ProjectQueryModel) or isinstance(
@@ -530,7 +513,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = read_dataframe(path)
             unexpected = sorted(set(df.columns).difference(expected_columns))
             if unexpected:
-                msg = f"Unexpected columns are present in {dataset_id =} {unexpected =}"
+                msg = f"Unexpected columns are present in {dataset_id=} {unexpected=}"
                 raise Exception(msg)
             datasets[dataset_id] = DatasetExpressionHandler(
                 df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
@@ -546,7 +529,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
-                msg = f"BUG: unhandled {context.model.result.column_type =}"
+                msg = f"BUG: unhandled {context.model.result.column_type=}"
                 raise NotImplementedError(msg)
 
         return sorted(dim_columns), sorted(time_columns)
@@ -589,7 +572,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         for dim_filter in context.model.result.dimension_filters:
             column_names = context.get_dimension_column_names(dim_filter.dimension_type)
             if len(column_names) > 1:
-                msg = f"Cannot filter {dim_filter} when there are multiple {column_names =}"
+                msg = f"Cannot filter {dim_filter} when there are multiple {column_names=}"
                 raise NotImplementedError(msg)
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 records = dim_filter.get_filtered_records_dataframe(
@@ -634,7 +617,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, header=True, overwrite=True)
+            write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
@@ -913,7 +896,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                             f"dimension version = {to_dim.model.version}"
                         )
                         raise DSGInvalidQuery(msg)
-                        # No mapping is required.
+                    # No mapping is required.
                     continue
                 if to_dim.model.dimension_type != DimensionType.TIME:
                     refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(
@@ -986,7 +969,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         filename = output_dir / f"table.{context.model.result.output_format}"
         suffix = filename.suffix
         if suffix == ".csv":
-            write_csv(df, filename, header=True, overwrite=True)
+            write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
             df = write_dataframe_and_auto_partition(df, filename)
         else:

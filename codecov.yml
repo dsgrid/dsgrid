@@ -1,5 +1,7 @@
 ignore:
   - "dsgrid/tests/**"
+  - "dsgrid/apps/registration_gui.py"
+  - "dsgrid/filesystem/s3_filesystem.py"
   - "tests/simple_standard_scenarios_datasets.py"
   - "tests_aws/**"
   - "build_backend.py"

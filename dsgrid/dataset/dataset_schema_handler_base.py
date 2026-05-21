@@ -48,15 +48,16 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.ibis.backend import make_runtime_backend
 from dsgrid.ibis.operations import (
-    create_temp_view,
     drop_columns,
     except_all,
     join,
     rename_columns,
 )
-from dsgrid.ibis.table_utils import get_unique_values, table_column_to_list
+from dsgrid.ibis.table_utils import (
+    get_unique_values_per_column,
+    table_column_to_list,
+)
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.ibis.types import is_table_empty, use_duckdb
@@ -70,22 +71,16 @@ from dsgrid.utils.dataset import (
     merge_expected_associations_tables,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_runtime_hive,
     map_time_dimension_with_chronify_runtime_path,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import (
-    check_for_nulls,
-    create_dataframe_from_product,
-    get_runtime_session,
-    persist_table,
-    read_dataframe,
-    save_to_warehouse,
-    write_dataframe,
-)
+from dsgrid.ibis.functions import cache, unpersist
+from dsgrid.ibis.io import persist_table, read_dataframe, write_dataframe
+from dsgrid.ibis.null_checks import check_for_nulls
+from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
@@ -257,11 +252,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     required_assoc, missing_df
                 )
 
-                # Cache both Ibis tables before the per-column loop and the except_all below so
-                # that each of the multiple Spark actions that follow reads from memory rather
-                # than re-scanning and re-joining the source data from disk each time.
-        _cache(required_assoc)
-        _cache(assoc_by_data)
+        # Cache both Ibis tables before the per-column loop and the except_all below so
+        # that each of the multiple Spark actions that follow reads from memory rather
+        # than re-scanning and re-joining the source data from disk each time.
+        required_assoc = cache(required_assoc)
+        assoc_by_data = cache(assoc_by_data)
         try:
             if not expected_dimension_associations:
                 # This first check is redundant with the except_all below. But, it is
@@ -271,22 +266,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # Performed after missing-association subtraction so that a dimension value
                 # that is entirely absent due to declared missing combinations does not
                 # produce a false positive.
+                expected_per_col = get_unique_values_per_column(
+                    required_assoc, required_assoc.columns
+                )
+                actual_per_col = get_unique_values_per_column(
+                    assoc_by_data, required_assoc.columns
+                )
                 for column in required_assoc.columns:
-                    expected = get_unique_values(required_assoc, column)
-                    actual = get_unique_values(assoc_by_data, column)
+                    expected = expected_per_col[column]
+                    actual = actual_per_col[column]
                     if actual != expected:
                         missing = sorted(expected.difference(actual))
                         extra = sorted(actual.difference(expected))
                         num_matching = len(actual.intersection(expected))
                         msg = (
                             f"Dataset records for dimension type {column} do not match expected "
-                            f"values. {missing =} {extra =} {num_matching =}"
+                            f"values. {missing=} {extra=} {num_matching=}"
                         )
                         raise DSGInvalidDataset(msg)
 
             cols = sorted(required_assoc.columns)
-            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-            _cache(diff)
+            diff = cache(except_all(required_assoc.select(*cols), assoc_by_data.select(*cols)))
             try:
                 if not is_table_empty(diff):
                     expected_cardinalities = self._get_dimension_cardinalities()
@@ -295,10 +295,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     )
                 logger.info("Successfully checked dataset dimension associations")
             finally:
-                _unpersist(diff)
+                unpersist(diff)
         finally:
-            _unpersist(required_assoc)
-            _unpersist(assoc_by_data)
+            unpersist(required_assoc)
+            unpersist(assoc_by_data)
 
     def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> ibis.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
@@ -512,20 +512,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns
         )
-        num_distinct_counts = _count_distinct_column(
-            _count_groups(load_data_df, list(time_cols)),
-            "count",
+        # Combine the two distinct-count checks into a single round-trip. The
+        # prior code issued two two-deep aggregations (group-by + count, then
+        # distinct + count) over the load_data table back-to-back; each pair
+        # forced a full scan. The cross-join here lets the planner share the
+        # underlying scan where the optimizer can, and even when it can't, the
+        # round-trip overhead is halved.
+        time_counts = _count_groups(load_data_df, list(time_cols))
+        array_counts = _count_groups(load_data_df, list(unique_array_cols))
+        combined = (
+            time_counts.aggregate(time=time_counts["count"].nunique())
+            .cross_join(array_counts.aggregate(array=array_counts["count"].nunique()))
+            .execute()
         )
+        num_distinct_counts = int(combined["time"].iloc[0])
+        num_distinct_ta_counts = int(combined["array"].iloc[0])
         if num_distinct_counts != 1:
             msg = (
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {num_distinct_counts}"
             )
             raise DSGInvalidDataset(msg)
-        num_distinct_ta_counts = _count_distinct_column(
-            _count_groups(load_data_df, list(unique_array_cols)),
-            "count",
-        )
         if num_distinct_ta_counts != 1:
             msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
@@ -552,8 +559,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if mapping_manager.has_completed_operation(op):
             return df
 
-            # Note that a dataset could have the same dimension record IDs as the project,
-            # no mappings, but then still have different units.
+        # Note that a dataset could have the same dimension record IDs as the project,
+        # no mappings, but then still have different units.
         mapping_records = None
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
@@ -769,13 +776,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
             to_dim = project_config.get_dimension(mapping.name)
             if to_dim.model.dimension_type == DimensionType.TIME:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because specification "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because specification "
                     f"of the time dimension is not supported: {mapping.name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
             if to_dim.model.dimension_type in actual_mapping_dims:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because it can only "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it can only "
                     f"support mapping one dimension for a given dimension type. "
                     f"type={to_dim.model.dimension_type} "
                     f"first={actual_mapping_dims[to_dim.model.dimension_type]} "
@@ -800,7 +807,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id =} is invalid because there is no "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
                     f"dataset-to-project-base mapping defined for {to_dim.model.label}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
@@ -901,16 +908,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df,
         value_columns,
         mapping_manager: DatasetMappingManager,
-        agg_func=None,
     ):
         op = mapping_manager.plan.apply_fraction_op
         if "fraction" not in df.columns:
             return df
         if mapping_manager.has_completed_operation(op):
             return df
-        if agg_func is not None:
-            msg = "Custom aggregation functions are not supported in _apply_fraction"
-            raise NotImplementedError(msg)
         gcols = set(df.columns) - value_columns - {"fraction"}
         group_by_cols = ordered_subset_columns(df, gcols)
         value_cols = [y for y in df.columns if y in value_columns]
@@ -969,21 +972,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
             return load_data_df
-        match (config.backend_engine, config.use_hive_metastore):
-            case (BackendEngine.SPARK, True):
-                table_name = make_temp_view_name()
-                load_data_df = map_time_dimension_with_chronify_runtime_hive(
-                    df=save_to_warehouse(load_data_df, table_name),
-                    table_name=table_name,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    value_column=value_column,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
-
-            case (BackendEngine.SPARK, False):
+        match config.backend_engine:
+            case BackendEngine.SPARK:
                 filename = persist_table(
                     load_data_df,
                     mapping_manager.scratch_dir_context,
@@ -999,7 +989,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
-            case (BackendEngine.DUCKDB, _):
+            case BackendEngine.DUCKDB:
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     from_time_dim=time_dim,
@@ -1026,7 +1016,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim = self._config.get_time_dimension()
         if not isinstance(time_dim, IndexTimeDimensionConfig):
             assert time_dim is not None
-            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type =} time type, it applies to INDEX time type only."
+            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: ibis.Table) -> ibis.Table:
@@ -1034,36 +1024,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df.select(*allowed_columns)
 
 
-def _cache(df: ibis.Table) -> ibis.Table:
-    return df
-
-
-def _count_distinct_column(df: ibis.Table, column: str) -> int:
-    return int(cast(Any, df.select(column).distinct().count().execute()))
-
-
 def _count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:
-    view = create_temp_view(df)
     if not columns:
-        query = f"SELECT COUNT(*) AS count FROM {view}"
-        if isinstance(df, ibis.Table):
-            return make_runtime_backend().sql(query)
-        return get_runtime_session().sql(query)
-
-    cols = ", ".join(columns)
-    group_by = cols
-    query = f"""
-        SELECT {cols}, COUNT(*) AS count
-        FROM {view}
-        GROUP BY {group_by}
-    """
-    if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
-
-
-def _unpersist(df: ibis.Table) -> None:
-    return None
+        return df.aggregate(count=df.count())
+    return df.group_by(*columns).aggregate(count=df.count())
 
 
 def _apply_fraction_sql(
@@ -1071,13 +1035,7 @@ def _apply_fraction_sql(
     group_by_columns: list[str],
     value_columns: list[str],
 ) -> ibis.Table:
-    view = create_temp_view(df)
-    group_cols = ", ".join(group_by_columns)
-    value_exprs = ", ".join(f"SUM({x} * fraction) AS {x}" for x in value_columns)
-    select_exprs = ", ".join(x for x in (group_cols, value_exprs) if x)
-    query = f"SELECT {select_exprs} FROM {view}"
-    if group_cols:
-        query += f" GROUP BY {group_cols}"
-    if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+    aggs = {col: (df[col] * df["fraction"]).sum() for col in value_columns}
+    if group_by_columns:
+        return df.group_by(*group_by_columns).aggregate(**aggs)
+    return df.aggregate(**aggs)

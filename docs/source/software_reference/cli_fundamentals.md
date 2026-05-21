@@ -110,12 +110,14 @@ Wrote dsgrid config to /Users/username/.dsgrid.json5
 This creates a configuration file that stores:
 - Database connection URL
 - Default settings
+- The execution backend (`backend_engine`: `duckdb` or `spark`)
 
 **Example `.dsgrid.json5` file:**
 
 ```json5
 {
   database_url: "sqlite:////scratch/username/dsgrid-registry/registry.db",
+  backend_engine: "duckdb",
   connections: {
     "standard-scenarios": {
       database_url: "sqlite:////projects/dsgrid/standard-scenarios/registry.db"
@@ -126,6 +128,21 @@ This creates a configuration file that stores:
   }
 }
 ```
+
+#### Selecting the Execution Backend
+
+dsgrid runs all table operations through [Ibis](https://ibis-project.org/), which
+can execute on either DuckDB (the default) or Apache Spark. You do not call
+Spark directly; choose the backend and dsgrid uses it for every command.
+
+- **`backend_engine` in `.dsgrid.json5`** — set `"duckdb"` (default, no extra
+  setup) or `"spark"` (requires the Spark extra and a configured cluster; see
+  [Apache Spark](../user_guide/apache_spark/index)).
+- **`DSGRID_BACKEND_ENGINE` environment variable** — overrides the config file
+  for a single session, e.g. `DSGRID_BACKEND_ENGINE=spark dsgrid query project run ...`.
+
+DuckDB is recommended for local work and moderate-sized datasets; use Spark for
+large datasets or distributed/HPC workflows.
 
 **Using named connections:**
 
@@ -146,6 +163,7 @@ You can also set these environment variables:
 
 ```bash
 $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///<your-registry-path>
+$ export DSGRID_BACKEND_ENGINE=spark  # or duckdb (default); overrides .dsgrid.json5
 ```
 
 **Priority order** (highest to lowest):

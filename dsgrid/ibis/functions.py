@@ -1,14 +1,12 @@
 """Compatibility helpers for table operations during the Ibis migration."""
 
-from datetime import datetime
+import shutil
 from pathlib import Path
-from typing import Any, Iterable, cast
-from zoneinfo import ZoneInfo
+from typing import Any
 
 import ibis
 
-from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.io import read_csv
+from dsgrid.ibis.io import write_table, read_csv
 from dsgrid.ibis.operations import (
     aggregate_single_value,
     coalesce,
@@ -29,11 +27,10 @@ from dsgrid.ibis.operations import (
 from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.types import is_table_empty, use_duckdb
 from dsgrid.ibis.session import (
-    get_current_time_zone,
     init_runtime_session,
     get_runtime_session,
-    set_current_time_zone,
 )
+from dsgrid.ibis.tz import get_current_time_zone, set_current_time_zone
 
 __all__ = [
     "aggregate",
@@ -57,7 +54,6 @@ __all__ = [
     "make_temp_view_name",
     "perform_interval_op",
     "pivot",
-    "prepare_timestamps_for_dataframe",
     "read_csv",
     "select_expr",
     "set_current_time_zone",
@@ -69,19 +65,32 @@ __all__ = [
 
 
 def aggregate(df: ibis.Table, agg_func: str, column: str, alias: str) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        return get_runtime_session().sql(f'SELECT {agg_func}("{column}") AS "{alias}" FROM {view}')
     value = getattr(df[column], agg_func)()
     return df.aggregate(**{alias: value})
 
 
 def cache(df: ibis.Table) -> ibis.Table:
-    return df
+    """Materialize and cache a table for repeated reads.
+
+    On DuckDB this is a no-op (queries execute against in-memory data
+    already). On Spark, the returned table is an Ibis CachedTable whose
+    cached data lives until ``unpersist`` is called or the reference is
+    garbage collected. Callers must rebind: ``df = cache(df)``.
+    """
+    if use_duckdb():
+        return df
+    return df.cache()
 
 
 def unpersist(df: ibis.Table) -> None:
-    return None
+    """Release a cached table previously returned by :func:`cache`.
+
+    Safe to call on tables that were never cached — the call is a no-op
+    when the input has no ``release`` method (e.g. when running on DuckDB).
+    """
+    release = getattr(df, "release", None)
+    if release is not None:
+        release()
 
 
 def collect_list(df: ibis.Table, column: str) -> list:
@@ -102,25 +111,8 @@ def perform_interval_op(
     cols_str = ",".join([handle_column_spaces(x) for x in cols])
     time_col = handle_column_spaces(time_column)
     expr = f"{time_col} {op} INTERVAL {val} {unit}"
-    if not use_duckdb():
-        expr = f"from_utc_timestamp({expr}, '{_get_local_time_zone_name()}')"
     query = f"SELECT {expr} AS {alias}, {cols_str} from {view}"
     return get_runtime_session().sql(query)
-
-
-def _get_local_time_zone_name() -> str:
-    path = Path("/etc/localtime").resolve()
-    marker = "zoneinfo/"
-    path_str = path.as_posix()
-    if marker in path_str:
-        return path_str.split(marker, maxsplit=1)[1]
-    return "UTC"
-
-
-def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable[datetime]:
-    if use_duckdb():
-        return [x.astimezone(ZoneInfo("UTC")) for x in timestamps]
-    return timestamps
 
 
 def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
@@ -130,19 +122,48 @@ def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
 
 
 def write_csv(
-    df: ibis.Table, path: Path | str, header: bool = True, overwrite: bool = False
+    df: ibis.Table,
+    path: Path | str,
+    overwrite: bool = False,
 ) -> None:
-    path_str = path if isinstance(path, str) else str(path)
-    path_obj = Path(path_str)
+    """Write an Ibis table to a single CSV file on both backends.
+
+    dsgrid's CSV callers (dimension records, lookup tables, query
+    results) consistently want a single file: pydantic validators check
+    that the file path is a file, and human consumers read one CSV.
+    Spark's default distributed-write semantic (a directory of part
+    files) is the wrong shape, so this function explicitly collects on
+    Spark to materialize a single file.
+
+    For very large query results where a driver collect would be a
+    memory issue, callers should write Parquet via
+    :func:`dsgrid.ibis.io.write_dataframe` and post-process.
+
+    Parameters
+    ----------
+    df : ibis.Table
+    path : Path or str
+    overwrite : bool, optional
+        If True, replace any existing path. Defaults to False.
+
+    The header row is always written; dsgrid's column model is name-based
+    and there is no ``header=False`` option.
+    """
+    path_obj = path if isinstance(path, Path) else Path(path)
     if path_obj.exists():
-        if overwrite:
-            path_obj.unlink()
+        if not overwrite:
+            raise FileExistsError(str(path_obj))
+        if path_obj.is_dir():
+            shutil.rmtree(path_obj)
         else:
-            raise FileExistsError(path_str)
-    view = create_temp_view(df)
-    escaped_path = path_str.replace("'", "''")
-    header_arg = "true" if header else "false"
-    conn = cast(Any, make_runtime_backend().connection)
-    conn.raw_sql(
-        f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER {header_arg})"
-    )
+            path_obj.unlink()
+
+    if use_duckdb():
+        # DuckDB's COPY ... TO produces a single file natively.
+        write_table(df, path_obj.as_posix(), "csv")
+        return
+
+    # Spark: distributed write produces a directory of part files, which
+    # downstream validators (pydantic file checks) and CSV consumers
+    # don't accept. Collect to pandas and emit a single file.
+    df.execute().to_csv(path_obj, index=False, header=True)

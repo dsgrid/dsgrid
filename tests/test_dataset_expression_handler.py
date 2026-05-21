@@ -1,11 +1,16 @@
 import pytest
-import ibis
 
-from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
+from dsgrid.dataset.dataset_expression_handler import (
+    DatasetExpressionHandler,
+    evaluate_expression,
+    join_multiple_columns,
+)
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import create_dataframe_from_dicts
+
+from tests._helpers import collect as _collect, count as _count
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -89,8 +94,13 @@ def test_dataset_expression_combo(datasets):
 
 
 def test_invalid_lengths(datasets):
+    # dataset3 = union of dataset1 and dataset2; both cover the same
+    # dimension keys, so unioning produces duplicate-key rows. Multiplying
+    # by dataset1 then multiplies each dataset1 row, which the post-join
+    # row-count check catches as "multiplied rows" (duplicate keys on the
+    # right side).
     datasets["dataset3"] = evaluate_expression("dataset1 | dataset2", datasets)
-    with pytest.raises(DSGInvalidOperation, match="datasets have the same length"):
+    with pytest.raises(DSGInvalidOperation, match="duplicate output rows"):
         evaluate_expression("dataset1 * dataset3", datasets)
 
 
@@ -113,20 +123,10 @@ def test_invalid_join():
     dataset1 = DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     dataset2 = DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
-    with pytest.raises(DSGInvalidOperation, match="has a different row count"):
+    # dataset1 has Adams (not in dataset2) and dataset2 has Jefferson (not in
+    # dataset1) — anti-joins on both sides catch the mismatched coverage.
+    with pytest.raises(DSGInvalidOperation, match="mismatched dimension coverage"):
         evaluate_expression("dataset1 + dataset2", datasets)
-
-
-def _count(df):
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
 
 
 def test_invalid_union():
@@ -150,3 +150,26 @@ def test_invalid_union():
     datasets = {"dataset1": dataset1, "dataset2": dataset2}
     with pytest.raises(DSGInvalidOperation, match=r"Union.* datasets have identical columns"):
         evaluate_expression("dataset1 | dataset2", datasets)
+
+
+def test_join_multiple_columns_direct():
+    df1 = create_dataframe_from_dicts(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_cooling": 2},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 3},
+        ]
+    )
+    df2 = create_dataframe_from_dicts(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_heating": 4},
+            {"county": "Boulder", "model_year": "2030", "elec_heating": 5},
+        ]
+    )
+    joined = join_multiple_columns(df1, df2, STACKED_DIMENSION_COLUMNS)
+    rows = sorted(_collect(joined), key=lambda row: row.county)
+    assert rows[0].county == "Boulder"
+    assert rows[0].elec_cooling == 3
+    assert rows[0].elec_heating == 5
+    assert rows[1].county == "Jefferson"
+    assert rows[1].elec_cooling == 2
+    assert rows[1].elec_heating == 4

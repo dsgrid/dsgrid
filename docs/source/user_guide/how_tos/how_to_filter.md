@@ -2,7 +2,7 @@
 
 dsgrid offers several ways to filter the result of a query. It is important to understand some dsgrid behaviors to get an optimal result. Please refer to [query concepts](../project_queries/query_concepts) for details.
 
-The examples below show how to define the filters in JSON5 or Python as well as the equivalent implementation if you were to filter the dataframe with Spark in Python (pyspark).
+The examples below show how to define the filters in JSON5 or Python, along with the equivalent SQL expression that dsgrid applies through its Ibis-based query backend.
 
 All examples except `DimensionFilterBetweenColumnOperatorModel` assume that the dataframe being filtered is the dimension record table. `DimensionFilterBetweenColumnOperatorModel` assumes that the table is the load data dataframe with time-series information.
 
@@ -51,9 +51,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter("geography == '06037'")
+:::{tab-item} SQL
+```sql
+WHERE geography = '06037'
 ```
 :::
 
@@ -92,9 +92,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter("geography == '06037'")
+:::{tab-item} SQL
+```sql
+WHERE geography = '06037'
 ```
 :::
 
@@ -102,7 +102,7 @@ df.filter("geography == '06037'")
 
 ### 3. Column Operator Filter
 
-Filter a table where the specified column matches the specified value(s) according to the Spark SQL operator. This is useful for cases where you want to match partial strings or use a list of possible values.
+Filter a table where the specified column matches the specified value(s) according to the given SQL operator. This is useful for cases where you want to match partial strings or use a list of possible values.
 
 **Example: Filter by multiple values**
 
@@ -139,9 +139,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(col("geography").isin(["06037", "06073"]))
+:::{tab-item} SQL
+```sql
+WHERE geography IN ('06037', '06073')
 ```
 :::
 
@@ -182,9 +182,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(col("name").like("%County"))
+:::{tab-item} SQL
+```sql
+WHERE name LIKE '%County'
 ```
 :::
 
@@ -268,12 +268,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(
-    (col("timestamp") >= "2012-01-01 00:00:00") &
-    (col("timestamp") <= "2012-01-31 23:59:59")
-)
+:::{tab-item} SQL
+```sql
+WHERE timestamp BETWEEN '2012-01-01 00:00:00' AND '2012-01-31 23:59:59'
 ```
 :::
 

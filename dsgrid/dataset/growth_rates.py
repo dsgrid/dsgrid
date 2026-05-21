@@ -6,10 +6,7 @@ from dsgrid.query.models import ProjectionDatasetModel
 from dsgrid.ibis.operations import (
     cross_join,
     drop_columns,
-    filter_sql,
-    handle_column_spaces,
     join_multiple_columns,
-    sql_from_df,
 )
 from dsgrid.ibis.table_utils import get_unique_values
 
@@ -101,16 +98,13 @@ def apply_annual_multiplier(
 
     dim_columns = set(initial_value_df.columns) - value_columns - time_columns
     df = join_multiple_columns(initial_value_df, growth_rate_df, list(dim_columns))
-    select_exprs = []
+    projections = []
     for column in orig_columns:
-        quoted = handle_column_spaces(column)
         if column in value_columns:
-            gr_column = handle_column_spaces(renamed(column))
-            select_exprs.append(f"{quoted} * {gr_column} AS {handle_column_spaces(column)}")
+            projections.append((df[column] * df[renamed(column)]).name(column))
         else:
-            select_exprs.append(quoted)
-
-    return sql_from_df(df, f"SELECT {', '.join(select_exprs)}")
+            projections.append(df[column])
+    return df.select(*projections)
 
 
 def _process_exponential_growth_rate(
@@ -130,24 +124,23 @@ def _process_exponential_growth_rate(
     gr_df = growth_rate_df
     for column in value_columns:
         gr_col = renamed(column)
-        cols = ",".join([x for x in gr_df.columns if x not in (column, gr_col)])
-        query = f"""
-            SELECT
-                {cols}
-                ,POWER(1 + {column}, CAST({model_year_column} AS INTEGER) - {base_year}) AS {gr_col}
-        """
-        gr_df = sql_from_df(gr_df, query)
+        exponent = gr_df[model_year_column].cast("int") - base_year
+        gr_df = gr_df.mutate(**{gr_col: (1 + gr_df[column]).pow(exponent)}).drop(column)
 
     return initial_value_df, gr_df
 
 
 def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_column):
     iv_years = get_unique_values(initial_value_df, model_year_column)
-    iv_years_sorted = sorted((int(x) for x in iv_years))
+    # Coerce to int set: dataset.base_year is an int (per the pydantic model),
+    # but iv_years comes back as the raw column values which are strings for
+    # the standard string-typed model_year dimension.
+    iv_years_int = {int(x) for x in iv_years}
+    iv_years_sorted = sorted(iv_years_int)
 
     if dataset.base_year is None:
         base_year = iv_years_sorted[0]
-    elif dataset.base_year in iv_years:
+    elif dataset.base_year in iv_years_int:
         base_year = dataset.base_year
     else:
         msg = f"ProjectionDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"
@@ -155,7 +148,9 @@ def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_col
 
     if len(iv_years) > 1:
         # TODO #198: needs test case
-        initial_value_df = filter_sql(initial_value_df, f"{model_year_column} == '{base_year}'")
+        initial_value_df = initial_value_df.filter(
+            initial_value_df[model_year_column] == str(base_year)
+        )
 
     initial_value_df = cross_join(
         drop_columns(initial_value_df, model_year_column),

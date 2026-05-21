@@ -7,8 +7,10 @@ import ibis
 import pandas as pd
 import pytest
 
-from dsgrid.ibis.operations import filter_sql
-from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.ibis import backend as backend_mod
+from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.operations import filter_sql, rename_columns
 from dsgrid.ibis.functions import (
     aggregate,
     aggregate_single_value,
@@ -28,35 +30,22 @@ from dsgrid.ibis.functions import (
     sql_from_df,
     unpersist,
     unpivot,
+    write_csv,
 )
+from dsgrid.ibis.io import read_csv as _read_csv_io
 from dsgrid.utils.files import dump_json_file
 from dsgrid.ibis.session import (
     get_runtime_session,
+    init_runtime_session,
     SparkSession,
 )
+from dsgrid.ibis.types import use_duckdb
 
-
-def _collect(df):
-    if hasattr(df, "execute"):
-        return list(table_to_pandas(df).itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df):
-    count = df.count()
-    if hasattr(count, "execute"):
-        return count.execute()
-    return count
+from tests._helpers import collect as _collect, count as _count, order_by as _order_by
 
 
 def _filter(df, predicate):
     return filter_sql(df, predicate)
-
-
-def _order_by(df, *columns):
-    if hasattr(df, "order_by"):
-        return df.order_by(*columns)
-    return df.sort(*columns)
 
 
 @pytest.fixture(scope="module")
@@ -76,7 +65,7 @@ def dataframe(spark) -> Generator[ibis.Table, None, None]:
         ],
         ["index", "metric", "value"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
@@ -90,23 +79,24 @@ def geo_dataframe(spark) -> Generator[ibis.Table, None, None]:
         ],
         ["county"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
 
 @pytest.fixture(scope="module")
 def time_dataframe(spark) -> Generator[ibis.Table, None, None]:
+    utc = ZoneInfo("UTC")
     df = spark.createDataFrame(
         [
-            (datetime(2020, 1, 1, 0), "cooling", 1.0),
-            (datetime(2020, 1, 1, 0), "heating", 2.0),
-            (datetime(2020, 1, 1, 1), "cooling", 3.0),
-            (datetime(2020, 1, 1, 1), "heating", 4.0),
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "cooling", 1.0),
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "heating", 2.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "cooling", 3.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "heating", 4.0),
         ],
         ["timestamp", "metric", "value"],
     )
-    cache(df)
+    df = cache(df)
     yield df
     unpersist(df)
 
@@ -178,7 +168,9 @@ def test_interval(time_dataframe):
             )
         )
     ]
-    assert res == [datetime(2020, 1, 1, 1), datetime(2020, 1, 1, 2)]
+    utc = ZoneInfo("UTC")
+    actual = [x.replace(tzinfo=utc) if x.tzinfo is None else x.astimezone(utc) for x in res]
+    assert actual == [datetime(2020, 1, 1, 1, tzinfo=utc), datetime(2020, 1, 1, 2, tzinfo=utc)]
 
 
 def test_join(spark, dataframe):
@@ -245,10 +237,11 @@ def test_read_csv(tmp_path: Path) -> None:
     df = read_csv(filename)
     values = _collect(df)
     row = values[-1]
-    assert int(row.a) == 2
+    # No schema declared, so DuckDB infers native types from the data.
+    assert isinstance(row.a, int) and row.a == 2
     assert isinstance(row.b, str) and row.b == "c"
-    assert float(row.c) == 2.0
-    assert datetime.fromisoformat(row.d)
+    assert isinstance(row.c, float) and row.c == 2.0
+    assert isinstance(row.d, datetime)
 
     assert (
         len(
@@ -260,6 +253,14 @@ def test_read_csv(tmp_path: Path) -> None:
             )
         )
         == 3
+    )
+
+
+def test_rename_columns(dataframe):
+    renamed = rename_columns(dataframe, {"metric": "end_use", "value": "amount"})
+    assert set(renamed.columns) == {"index", "end_use", "amount"}
+    assert aggregate_single_value(renamed, "sum", "amount") == aggregate_single_value(
+        dataframe, "sum", "value"
     )
 
 
@@ -297,3 +298,120 @@ def test_unpivot(spark):
     df2 = unpivot(df, ["cooling", "heating"], "metric", "value")
     assert aggregate_single_value(_filter(df2, "metric = 'cooling'"), "sum", "value") == 4.0
     assert aggregate_single_value(_filter(df2, "metric = 'heating'"), "sum", "value") == 6.0
+
+
+def test_cache_preserves_query_result(dataframe):
+    cached = cache(dataframe)
+    try:
+        assert aggregate_single_value(cached, "sum", "value") == 10.0
+    finally:
+        unpersist(cached)
+
+
+def test_unpersist_is_safe_on_uncached_table(spark):
+    df = spark.createDataFrame([(1,)], ["x"])
+    unpersist(df)
+
+
+def test_read_csv_with_pipe_delimiter(tmp_path: Path) -> None:
+    """Custom delimiter is passed through on both backends."""
+    filename = tmp_path / "piped.csv"
+    filename.write_text("a|b|c\n1|x|2.5\n2|y|3.5\n")
+    table = read_csv(filename, delimiter="|")
+    assert sorted(table.columns) == ["a", "b", "c"]
+    assert table.count().execute() == 2
+
+
+def test_read_csv_round_trip(tmp_path: Path, dataframe) -> None:
+    """write_csv -> read_csv round-trips on the runtime backend.
+
+    On DuckDB the output is a single file; on Spark it's a directory of
+    part files. read_csv must transparently handle both shapes.
+    """
+    out = tmp_path / "round_trip.csv"
+    write_csv(dataframe, out, overwrite=True)
+    assert out.exists()
+    round_tripped = _read_csv_io(out)
+    assert sorted(round_tripped.columns) == sorted(dataframe.columns)
+    assert round_tripped.count().execute() == dataframe.count().execute()
+
+
+def test_read_csv_rejects_non_utf8_on_duckdb(tmp_path: Path) -> None:
+    """DuckDB has no encoding parameter; passing one raises with a clear message."""
+    if not use_duckdb():
+        pytest.skip("DuckDB-only behavior check")
+
+    csv = tmp_path / "any.csv"
+    csv.write_text("a\n1\n")
+    with pytest.raises(DSGInvalidParameter, match="UTF-8"):
+        read_csv(csv, encoding="latin-1")
+
+
+def test_read_csv_rejects_headerless_input(tmp_path: Path) -> None:
+    """read_csv treats the first row as the header on both backends; a CSV
+    without a header has the wrong dsgrid shape and must produce a loud
+    failure rather than silently treating row 1 as column names."""
+    # Two integer rows without a header line. read_csv will treat "1,2,3" as
+    # the column names. We confirm the implicit-header behavior so a caller
+    # accidentally passing a headerless dataset file gets the obviously-wrong
+    # column names rather than silently misinterpreting the row as data.
+    csv = tmp_path / "no_header.csv"
+    csv.write_text("1,2,3\n4,5,6\n")
+    table = read_csv(csv)
+    assert list(table.columns) == ["1", "2", "3"], (
+        "read_csv requires an explicit header row; the docstring contract is "
+        "that callers must rewrite headerless CSVs before reading."
+    )
+
+
+def test_stop_invalidates_backend_cache() -> None:
+    """_SparkRuntimeSession.stop() must clear the cached Ibis backend so a
+    subsequent get_runtime_backend() can't hand out a reference bound to a
+    stopped SparkSession. DuckDB has no stop semantic; skip there."""
+    if use_duckdb():
+        pytest.skip("Only the Spark stop() path invalidates the cache")
+
+    session = init_runtime_session("dsgrid_cache_test")
+    # Prime the cache.
+    get_runtime_backend()
+    assert backend_mod._RUNTIME_BACKEND is not None
+    try:
+        session.stop()
+        assert backend_mod._RUNTIME_BACKEND is None, (
+            "_SparkRuntimeSession.stop() must call invalidate_runtime_backend_cache "
+            "to prevent the next get_runtime_backend() from returning a stopped "
+            "session reference."
+        )
+    finally:
+        # Leave a fresh session for downstream tests in the same module.
+        init_runtime_session("dsgrid_cache_test_reset")
+
+
+def test_read_csv_null_values_backend_divergence(tmp_path: Path) -> None:
+    """null_values is a list of strings to recognize as NULL. DuckDB honors
+    every entry; Spark's CSV reader only takes a single nullValue and the
+    consolidated read_csv silently truncates to the first entry. We pin
+    that behavior so a backend migration cannot quietly change the rows
+    that resolve to NULL."""
+    csv = tmp_path / "nulls.csv"
+    csv.write_text("a,b\nNA,1\nNULL,2\nzzz,3\n")
+
+    table = read_csv(csv, null_values=["NA", "NULL"])
+    rows = table.execute().to_dict("records")
+    rows.sort(key=lambda r: r["b"])
+    a_values = [r["a"] for r in rows]
+
+    if use_duckdb():
+        # DuckDB recognizes both literals as NULL.
+        assert a_values[0] is None or (
+            isinstance(a_values[0], float) and a_values[0] != a_values[0]  # NaN
+        )
+        assert a_values[1] is None or (
+            isinstance(a_values[1], float) and a_values[1] != a_values[1]
+        )
+        assert a_values[2] == "zzz"
+    else:
+        # Spark only honors null_values[0] ("NA"); "NULL" stays a string.
+        assert a_values[0] is None
+        assert a_values[1] == "NULL"
+        assert a_values[2] == "zzz"

@@ -44,11 +44,8 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
         values.pop("filter_type", None)
         return values
 
-    def _make_value_str(self, value):
-        return _make_sql_value(value)
-
     def _make_values_str(self, values):
-        return ", ".join((f"{self._make_value_str(x)}" for x in values))
+        return ", ".join((f"{_make_sql_value(x)}" for x in values))
 
 
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
@@ -104,7 +101,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
 
     def where_clause(self, column=None):
         column = column or self.column
-        value = self._make_value_str(self.value)
+        value = _make_sql_value(self.value)
         text = f"({column} {self.operator} {value})"
         return text
 
@@ -155,47 +152,6 @@ def check_operator(operator):
     return operator
 
 
-def _make_column_operator_where_clause(
-    column: str, operator: str, value: Any, negate: bool = False
-) -> str:
-    match operator:
-        case "contains":
-            expr = f"{column} LIKE '%{_escape_like_value(value)}%'"
-        case "endswith":
-            expr = f"{column} LIKE '%{_escape_like_value(value)}'"
-        case "isNotNull":
-            expr = f"{column} IS NOT NULL"
-        case "isNull":
-            expr = f"{column} IS NULL"
-        case "isin":
-            if not isinstance(value, list | tuple | set):
-                msg = f"value must be a list, tuple, or set for {operator =}"
-                raise DSGInvalidField(msg)
-            vals = ", ".join(_make_sql_value(x) for x in value)
-            expr = f"{column} IN ({vals})"
-        case "like":
-            expr = f"{column} LIKE {_make_sql_value(value)}"
-        case "rlike":
-            expr = f"{column} RLIKE {_make_sql_value(value)}"
-        case "startswith":
-            expr = f"{column} LIKE '{_escape_like_value(value)}%'"
-        case _:
-            msg = f"{operator =} is not supported"
-            raise DSGInvalidField(msg)
-    if negate:
-        return f"NOT ({expr})"
-    return expr
-
-
-def _make_between_where_clause(
-    column: str, lower_bound: Any, upper_bound: Any, negate: bool = False
-) -> str:
-    expr = f"{column} BETWEEN {_make_sql_value(lower_bound)} AND {_make_sql_value(upper_bound)}"
-    if negate:
-        return f"NOT ({expr})"
-    return expr
-
-
 def _make_sql_value(value: Any) -> str:
     if isinstance(value, str):
         return "'" + value.replace("'", "''") + "'"
@@ -205,11 +161,45 @@ def _make_sql_value(value: Any) -> str:
     raise DSGInvalidField(msg)
 
 
-def _escape_like_value(value: Any) -> str:
-    if not isinstance(value, str):
-        msg = f"Unsupported type for LIKE value: {type(value)}"
-        raise DSGInvalidField(msg)
-    return value.replace("'", "''")
+def _apply_column_operator(
+    df: ibis.Table, column: str, operator: str, value: Any, negate: bool
+) -> ibis.Table:
+    col = df[column]
+    match operator:
+        case "contains":
+            expr = col.contains(value)
+        case "endswith":
+            expr = col.endswith(value)
+        case "isNotNull":
+            expr = col.notnull()
+        case "isNull":
+            expr = col.isnull()
+        case "isin":
+            if not isinstance(value, list | tuple | set):
+                msg = f"value must be a list, tuple, or set for {operator=}"
+                raise DSGInvalidField(msg)
+            expr = col.isin(list(value))
+        case "like":
+            expr = col.like(value)
+        case "rlike":
+            expr = col.re_search(value)
+        case "startswith":
+            expr = col.startswith(value)
+        case _:
+            msg = f"{operator=} is not supported"
+            raise DSGInvalidField(msg)
+    if negate:
+        expr = ~expr
+    return df.filter(expr)
+
+
+def _apply_between(
+    df: ibis.Table, column: str, lower_bound: Any, upper_bound: Any, negate: bool
+) -> ibis.Table:
+    expr = df[column].between(lower_bound, upper_bound)
+    if negate:
+        expr = ~expr
+    return df.filter(expr)
 
 
 class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
@@ -240,9 +230,7 @@ class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        return filter_sql(
-            df, _make_column_operator_where_clause(column, self.operator, self.value, self.negate)
-        )
+        return _apply_column_operator(df, column, self.operator, self.value, self.negate)
 
 
 class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
@@ -270,9 +258,7 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        return filter_sql(
-            df, _make_between_where_clause(column, self.lower_bound, self.upper_bound, self.negate)
-        )
+        return _apply_between(df, column, self.lower_bound, self.upper_bound, self.negate)
 
 
 class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
@@ -347,6 +333,4 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryN
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        return filter_sql(
-            df, _make_column_operator_where_clause(column, self.operator, self.value, self.negate)
-        )
+        return _apply_column_operator(df, column, self.operator, self.value, self.negate)

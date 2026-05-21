@@ -80,11 +80,11 @@ from dsgrid.dimension.base_models import DimensionType
 
 project = manager.project_manager.load_project("dsgrid_conus_2022")
 geo_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)
-print(geo_dim.get_records_dataframe().limit(5).to_pyarrow())
+geo_dim.get_records_dataframe().head().execute())
 print(geo_dim.get_unique_ids())
 
 # Show the records for a supplemental dimension.
-print(project.config.get_dimension_records("commercial_end_uses").limit(5).to_pyarrow())
+project.config.get_dimension_records("commercial_end_uses").head().execute()
 ```
 
 
@@ -338,7 +338,7 @@ query = ProjectQueryModel(
 )
 
 df = submitter.submit(query)
-print(df.limit(5).to_pyarrow())
+df.head().execute()
 ```
 
 ### Example — Map a dataset to alternate dimensions
@@ -364,5 +364,5 @@ query = make_dataset_query(
 
 submitter = DatasetQuerySubmitter(output_dir=Path("dataset_query_output"))
 df = submitter.submit(query, mgr=manager)
-print(df.limit(5).to_pyarrow())
+df.head().execute()
 ```

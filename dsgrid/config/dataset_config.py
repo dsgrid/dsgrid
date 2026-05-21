@@ -12,7 +12,7 @@ from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
-from dsgrid.config.file_schema import FileSchema
+from dsgrid.config.file_schema import Column, FileSchema, apply_declared_types
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
     TableFormat,
@@ -24,10 +24,9 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.ibis.operations import create_temp_view, drop_columns, join_multiple_columns
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import get_unique_values
-from dsgrid.ibis.types import use_duckdb
-from dsgrid.ibis.session import get_runtime_session, read_dataframe
+from dsgrid.ibis.io import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -89,7 +88,7 @@ def check_load_data_filename(path: str | Path) -> Path:
         if filename.exists():
             return filename
 
-            # Use ValueError because this gets called in Pydantic model validation.
+    # Use ValueError because this gets called in Pydantic model validation.
     msg = f"no load_data file exists in {path_}"
     raise ValueError(msg)
 
@@ -121,7 +120,7 @@ def check_load_data_lookup_filename(path: str | Path) -> Path:
         if filename.exists():
             return filename
 
-            # Use ValueError because this gets called in Pydantic model validation.
+    # Use ValueError because this gets called in Pydantic model validation.
     msg = f"no load_data_lookup file exists in {path_}"
     raise ValueError(msg)
 
@@ -736,7 +735,7 @@ class DatasetConfig(ConfigBase):
             msg = "load_from_user_path requires data_file.path to be set"
             raise DSGInvalidParameter(msg)
 
-            # Resolve data file path
+        # Resolve data file path
         data_path = cls._resolve_path(
             user_layout.data_file.path, data_base_dir, config_file.parent
         )
@@ -762,7 +761,7 @@ class DatasetConfig(ConfigBase):
                 raise DSGInvalidParameter(msg)
             user_layout.lookup_data_file.path = str(lookup_path)
 
-            # Resolve expected associations paths
+        # Resolve expected associations paths
         user_layout.expected_associations = [
             str(cls._resolve_path(p, associations_base_dir, config_file.parent))
             for p in user_layout.expected_associations
@@ -899,14 +898,7 @@ class DatasetConfig(ConfigBase):
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                escaped = val.replace("'", "''")
-                if use_duckdb():
-                    view = create_temp_view(df)
-                    df = get_runtime_session().sql(
-                        f"SELECT *, '{escaped}' AS \"{col}\" FROM {view}"
-                    )
-                else:
-                    df = df.selectExpr("*", f"'{escaped}' AS {col}")
+                df = df.mutate(**{col: ibis.literal(val)})
         return df
 
     def remove_trivial_dimensions(self, df):
@@ -926,15 +918,22 @@ def get_unique_dimension_record_ids(
     table_format: TableFormat,
     pivoted_dimension_type: DimensionType | None,
     time_columns: set[str],
+    load_data_columns: list[Column] | None = None,
+    load_data_lookup_columns: list[Column] | None = None,
 ) -> dict[DimensionType, list[str]]:
-    """Get the unique dimension record IDs from a table."""
+    """Get the unique dimension record IDs from a table.
+
+    The optional ``load_data_columns`` and ``load_data_lookup_columns`` apply
+    user-declared types to the corresponding file after read. Columns omitted
+    from those lists keep whatever type the backend's default reader inferred.
+    """
     if table_format == TableFormat.TWO_TABLE:
-        ld = read_dataframe(check_load_data_filename(path))
-        lk = read_dataframe(check_load_data_lookup_filename(path))
+        ld = _read_and_apply_types(check_load_data_filename(path), load_data_columns)
+        lk = _read_and_apply_types(check_load_data_lookup_filename(path), load_data_lookup_columns)
         df = drop_columns(join_multiple_columns(ld, lk, ["id"]), "id")
     elif table_format == TableFormat.ONE_TABLE:
         ld_path = check_load_data_filename(path)
-        df = read_dataframe(ld_path)
+        df = _read_and_apply_types(ld_path, load_data_columns)
     else:
         msg = f"Unsupported table format: {table_format}"
         raise NotImplementedError(msg)
@@ -947,7 +946,7 @@ def get_unique_dimension_record_ids(
             )
     if pivoted_dimension_type is not None:
         if pivoted_dimension_type.value in df.columns:
-            msg = f"{pivoted_dimension_type =} cannot be in the dataframe columns."
+            msg = f"{pivoted_dimension_type=} cannot be in the dataframe columns."
             raise DSGInvalidParameter(msg)
         dimension_type_columns = {x.value for x in DimensionType}
         dimension_type_columns.update(time_columns)
@@ -956,3 +955,17 @@ def get_unique_dimension_record_ids(
         ids_by_dimension_type[pivoted_dimension_type] = sorted(pivoted_columns)
 
     return ids_by_dimension_type
+
+
+def _read_and_apply_types(filename: Path, columns: list[Column] | None) -> ibis.Table:
+    """Read ``filename`` and cast user-declared columns to their requested type.
+
+    The cast runs after read so the same schema applies uniformly to CSV and
+    JSON and Parquet (which is already self-describing). Passes ``strict_family=False``
+    because the CLI's ``--schema-file`` is an authoritative declaration about
+    raw inputs that have no registered schema yet (e.g. a string column the
+    user knows is an integer id), unlike registered datasets where a
+    cross-family mismatch usually indicates a data error.
+    """
+    df = read_dataframe(filename)
+    return apply_declared_types(df, columns, strict_family=False) if columns else df

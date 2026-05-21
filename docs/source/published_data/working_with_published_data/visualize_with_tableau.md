@@ -2,7 +2,7 @@
 
 [Tableau](https://www.tableau.com/) is a commercial tool for exploring and visualizing tabular data.
 
-In addition to making visualizations, Tableau makes it easy to select, filter, group, and describe your data in tables. This can be easier than the same operations in a Python REPL with `pyspark` or `pandas`.
+In addition to making visualizations, Tableau makes it easy to select, filter, group, and describe your data in tables. This can be easier than the same operations in a Python REPL with `duckdb` or `pandas`.
 
 This page describes various ways to connect Tableau to dsgrid data after you've installed Tableau Desktop on your local computer.
 

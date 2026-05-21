@@ -26,7 +26,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.DatetimeRange:
+    def to_chronify(self) -> chronify.DatetimeRange | chronify.DatetimeRangeWithTZColumn:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1
@@ -48,19 +48,16 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     interval_type=self._model.time_interval_type,
                 )
             case TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME:
-                return cast(
-                    Any,
-                    chronify.DatetimeRangeWithTZColumn(
-                        dtype=cast(Any, col_dtype),
-                        time_column=time_cols[0],
-                        start=start,
-                        length=self.get_lengths()[0],
-                        resolution=self.get_frequency(),
-                        time_zone_column=TIME_ZONE_COLUMN,
-                        time_zones=cast(Any, self.get_chronify_time_zones()),
-                        measurement_type=self._model.measurement_type,
-                        interval_type=self._model.time_interval_type,
-                    ),
+                return chronify.DatetimeRangeWithTZColumn(
+                    dtype=cast(Any, col_dtype),
+                    time_column=time_cols[0],
+                    start=start,
+                    length=self.get_lengths()[0],
+                    resolution=self.get_frequency(),
+                    time_zone_column=TIME_ZONE_COLUMN,
+                    time_zones=cast(Any, self.get_chronify_time_zones()),
+                    measurement_type=self._model.measurement_type,
+                    interval_type=self._model.time_interval_type,
                 )
             case _:
                 msg = f"Unsupported time zone format for chronify: {self.model.time_zone_format.format_type}"

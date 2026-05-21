@@ -2,8 +2,7 @@ import ibis
 import logging
 
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import create_temp_view, drop_columns, except_all, join, rename_columns
+from dsgrid.ibis.operations import drop_columns, except_all, join, rename_columns
 from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.ibis.types import is_table_empty
 from dsgrid.units.constants import (
@@ -25,8 +24,6 @@ from dsgrid.units.constants import (
     TW,
     TWH,
 )
-from dsgrid.ibis.session import get_runtime_session
-
 
 logger = logging.getLogger(__name__)
 
@@ -78,44 +75,40 @@ def convert_units_unpivoted(
 
     units = get_unique_values(to_unit_records, unit_col)
     if units.issubset(ENERGY_UNITS):
-        conversion_expr = _make_conversion_expr(_ENERGY_TO_KWH, "from_unit", "to_unit")
+        unit_to_base = _ENERGY_TO_KWH
     elif units.issubset(POWER_UNITS):
-        conversion_expr = _make_conversion_expr(_POWER_TO_KW, "from_unit", "to_unit")
+        unit_to_base = _POWER_TO_KW
     else:
         msg = f"Unsupported unit conversion: {units}"
         raise ValueError(msg)
 
-    view = create_temp_view(df)
-    cols = ", ".join(x for x in df.columns if x not in {VALUE_COLUMN, "from_unit", "to_unit"})
-    query = f"SELECT {cols}, {conversion_expr} AS {VALUE_COLUMN} FROM {view}"
-    return _sql(df, query)
+    converted = _make_conversion_expr(df, unit_to_base, "from_unit", "to_unit")
+    keep = [c for c in df.columns if c not in ("from_unit", "to_unit", VALUE_COLUMN)]
+    projections = [df[c] for c in keep] + [converted.name(VALUE_COLUMN)]
+    return df.select(*projections)
 
 
 def _alias_column(df: ibis.Table, column: str, alias: str):
-    return df[column].name(alias) if isinstance(df, ibis.Table) else df[column].alias(alias)
+    return df[column].name(alias)
 
 
-def _make_conversion_expr(unit_to_base: dict[str, float], from_unit_col: str, to_unit_col: str):
+def _make_conversion_expr(
+    df: ibis.Table, unit_to_base: dict[str, float], from_unit_col: str, to_unit_col: str
+):
+    from_col = df[from_unit_col]
+    to_col = df[to_unit_col]
+    value_col = df[VALUE_COLUMN]
     cases = [
-        f"WHEN {from_unit_col} = {to_unit_col} THEN {VALUE_COLUMN}",
-        f"WHEN {from_unit_col} = '' THEN {VALUE_COLUMN}",
+        (from_col == to_col, value_col),
+        (from_col == "", value_col),
     ]
     for to_unit, to_factor in unit_to_base.items():
         for from_unit, from_factor in unit_to_base.items():
             if from_unit == to_unit:
                 continue
             factor = from_factor / to_factor
-            cases.append(
-                f"WHEN {to_unit_col} = '{to_unit}' AND {from_unit_col} = '{from_unit}' "
-                f"THEN {VALUE_COLUMN} * {factor}"
-            )
-    return "CASE " + " ".join(cases) + " ELSE NULL END"
-
-
-def _sql(df: ibis.Table, query: str) -> ibis.Table:
-    if isinstance(df, ibis.Table):
-        return make_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+            cases.append(((to_col == to_unit) & (from_col == from_unit), value_col * factor))
+    return ibis.cases(*cases)
 
 
 _ENERGY_TO_KWH = {

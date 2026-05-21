@@ -13,14 +13,11 @@ from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
-from dsgrid.ibis.operations import create_temp_view, filter_sql
+from dsgrid.ibis.operations import cross_join, filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
-from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.ibis.session import (
-    get_runtime_session,
-    set_session_time_zone,
-)
+from dsgrid.ibis.session import get_runtime_session
+from dsgrid.ibis.tz import custom_time_zone
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -159,13 +156,21 @@ def map_annual_time_to_date_time(
 
     # Note that MeasurementType.TOTAL has already been verified, i.e.,
     # each value associated with an annual time represents the total over that year.
-    with set_session_time_zone(dt_dim.model.time_zone_format.time_zone):
+    #
+    # The custom_time_zone context manager makes .year() resolve in the
+    # target TZ on Spark by swapping spark.sql.session.timeZone. On DuckDB it
+    # sets the connection TimeZone, which only affects TIMESTAMPTZ columns —
+    # which dt_df[time_col] is, because chronify's list_timestamps() returns
+    # TZ-aware pandas Timestamps and createDataFrame maps those to
+    # ``timestamp('UTC')`` (TIMESTAMPTZ). See dsgrid.ibis.tz for the broader
+    # cross-backend contract.
+    with custom_time_zone(dt_dim.model.time_zone_format.time_zone):
         years = table_column_to_list(
-            select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"]).distinct(),
+            dt_df.select(year=dt_df[time_col].year()).distinct(),
             "year",
         )
         if len(years) != 1:
-            msg = "DateTime dimension has more than one year: {years=}"
+            msg = f"DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)
         if annual_dim.model.include_leap_day and is_leap_year(years[0]):
             measured_duration = timedelta(days=366)
@@ -175,40 +180,14 @@ def map_annual_time_to_date_time(
     df2 = cross_join(df, dt_df)
     frequency: timedelta = dt_dim.get_frequency()
     value_divisor = measured_duration / frequency
-    select_columns = []
+    exprs: dict[str, ibis.Expr] = {}
     for column in df2.columns:
         if column == annual_col:
             continue
         if column in value_columns:
-            select_columns.append(
-                f"{handle_column_spaces(column)} / {value_divisor} AS {handle_column_spaces(column)}"
-            )
+            exprs[column] = df2[column] / value_divisor
         else:
-            select_columns.append(handle_column_spaces(column))
+            exprs[column] = df2[column]
     if myear_column not in df.columns:
-        select_columns.append(
-            f"CAST({handle_column_spaces(annual_col)} AS VARCHAR) AS {handle_column_spaces(myear_column)}"
-        )
-    return select_expr(df2, select_columns)
-
-
-def cross_join(df1: ibis.Table, df2: ibis.Table) -> ibis.Table:
-    view1 = _create_temp_view(df1)
-    view2 = _create_temp_view(df2)
-    return get_runtime_session().sql(f"SELECT * from {view1} CROSS JOIN {view2}")
-
-
-def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
-    view = _create_temp_view(df)
-    cols = ",".join(exprs)
-    return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
-
-
-def handle_column_spaces(column: str) -> str:
-    if use_duckdb():
-        return f'"{column}"'
-    return f"`{column}`"
-
-
-def _create_temp_view(df: ibis.Table) -> str:
-    return create_temp_view(df)
+        exprs[myear_column] = df2[annual_col].cast("string")
+    return df2.select(**exprs)  # ty: ignore[invalid-argument-type]

@@ -1,6 +1,12 @@
 from typing import Any, Sequence
 
+import ibis
 import pandas as pd
+
+
+def count_rows(table: ibis.Table) -> int:
+    """Return the row count of a table by executing ``table.count()``."""
+    return int(table.count().execute())  # ty: ignore[invalid-argument-type]
 
 
 def table_to_pandas(table: Any) -> pd.DataFrame:
@@ -35,3 +41,35 @@ def get_unique_values(table: Any, columns: Sequence[str] | str) -> set:
     if single_column:
         return {row[column_names[0]] for row in rows}
     return {tuple(row[col] for col in column_names) for row in rows}
+
+
+def get_unique_values_per_column(table: Any, columns: Sequence[str]) -> dict[str, set]:
+    """Return ``{column: set(distinct_values)}`` collected in a single query.
+
+    Each column is reduced to its distinct values via ``collect(distinct=True)``
+    in one aggregation. This replaces an N-column ``for col in columns: ...``
+    loop where each iteration would issue a separate ``DISTINCT col`` execute,
+    a hot-path pattern that dominated cost in the dimension-association
+    validators (one execute per column × two sides of the comparison).
+
+    Empty tables produce ``None`` for a ``collect`` aggregation on both Spark
+    and DuckDB; in that case the corresponding entry is an empty set. NULL
+    values within a column are dropped by ``collect`` (matching the
+    semantics of the per-column ``.distinct()`` loop this replaces).
+    """
+    column_names = list(columns)
+    if not column_names:
+        return {}
+    aggs = {col: table[col].collect(distinct=True) for col in column_names}
+    row = table.aggregate(**aggs).execute().iloc[0]
+    result: dict[str, set] = {}
+    for col in column_names:
+        value = row[col]
+        if value is None:
+            # Empty table: collect returns NULL.
+            result[col] = set()
+        else:
+            # value is a list (DuckDB) or numpy array (Spark/pandas); both are
+            # iterable. Filter NULL entries that an all-NULL column may emit.
+            result[col] = {v for v in value if v is not None}
+    return result

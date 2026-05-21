@@ -13,8 +13,6 @@ import pytest
 from unittest.mock import MagicMock
 from pathlib import Path
 
-import ibis
-
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.config.dimensions import (
     TimeFormatInPartsModel,
@@ -26,6 +24,8 @@ from dsgrid.ibis.functions import (
 )
 from dsgrid.ibis.types import use_duckdb
 import pandas as pd
+
+from tests._helpers import collect as _collect
 
 
 def _utc_ts_str_expr() -> str:
@@ -316,6 +316,59 @@ def test_cast_with_offset_24_numeric_previous_behavior():
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
 
 
+def test_dst_spring_forward_and_fall_back_offset_round_trip():
+    """02:00 does not exist in America/Los_Angeles on 2024-03-10
+    (spring-forward) and 01:00 occurs twice on 2024-11-03 (fall-back).
+    Time-in-parts conversion takes the offset explicitly, so both
+    transitions disambiguate to distinct UTC instants. We pin those
+    instants so backend changes can't silently coalesce them across the
+    DST boundary.
+    """
+    mgr = make_manager()
+    col_format = TimeFormatInPartsModel(
+        year_column="year",
+        month_column="month",
+        day_column="day",
+        hour_column="hour",
+        offset_column="utc_offset_str",
+    )
+    spark = get_runtime_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2024, 2024, 2024, 2024],
+            "month": [3, 3, 11, 11],
+            "day": [10, 10, 3, 3],
+            # The TimeFormatInPartsModel is hour-grained — using the gap
+            # hour 02:00 on spring-forward and the repeated 01:00 on
+            # fall-back to cover both DST transitions.
+            "hour": [2, 2, 1, 1],
+            # Spring-forward: 02:00 with PST(-08) and PDT(-07) offsets.
+            # Fall-back: 01:00 with PDT(-07) and PST(-08) — the ambiguous
+            # repeat. The offset column disambiguates each row.
+            "utc_offset_str": ["-08:00", "-07:00", "-07:00", "-08:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
+    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
+    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
+    rows = _collect(check_df)
+    got = [row.ts_str for row in rows]
+    expected = [
+        "2024-03-10 10:00:00",  # 02:00 - (-08:00) = 10:00 UTC
+        "2024-03-10 09:00:00",  # 02:00 - (-07:00) = 09:00 UTC
+        "2024-11-03 08:00:00",  # 01:00 - (-07:00) = 08:00 UTC (first 01:00, PDT)
+        "2024-11-03 09:00:00",  # 01:00 - (-08:00) = 09:00 UTC (second 01:00, PST)
+    ]
+    assert got == expected, (
+        "DST spring-forward and fall-back round-trip must preserve distinct "
+        "UTC instants; the parts-format converter must not coalesce them."
+    )
+
+
 def test_cast_with_offset_24_string_previous_behavior():
     """Confirm string offset="+24:00" is accepted and yields the correct UTC instant.
 
@@ -350,9 +403,3 @@ def test_cast_with_offset_24_string_previous_behavior():
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
     rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
-
-
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()

@@ -81,8 +81,9 @@ Future workflows may change significantly. We may have a persistent database and
 
 ### Typical HPC Workflow
 
-1. **Start a Spark cluster** on one or more compute nodes
-   - See [Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
+1. **Choose a backend.**
+   - **DuckDB** (default): runs in-process; no cluster setup required. Suitable for small to moderate datasets.
+   - **Spark**: required for large datasets or distributed execution. See [Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel).
 
 2. **Connect to a dsgrid registry database** or start your own
    - Existing registry: Connect via database URL
@@ -91,9 +92,9 @@ Future workflows may change significantly. We may have a persistent database and
 3. **Run dsgrid CLI commands** from a compute node with access to:
    - Registry database
    - Registry data (Parquet files)
-   - Spark compute nodes
+   - The chosen backend (Spark cluster nodes, when applicable)
 
-   When running on an HPC, this compute node is usually the Spark master node.
+   When running on an HPC with Spark, this compute node is usually the Spark master node.
 
 ### Local Development Workflow
 
@@ -121,7 +122,6 @@ Future workflows may change significantly. We may have a persistent database and
 
 ### Data Processing
 
-- **PySpark** - Python interface to Spark backend
 - **Pandas** - Post-processing and analysis for selected small results
 - **PyArrow** - Efficient data interchange
 

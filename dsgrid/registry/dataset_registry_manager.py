@@ -42,7 +42,8 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
-from dsgrid.ibis.operations import create_temp_view, drop_columns, filter_sql
+from dsgrid.ibis.functions import select_expr
+from dsgrid.ibis.operations import drop_columns, filter_sql
 from dsgrid.ibis.types import (
     DUCKDB_COLUMN_TYPES,
     SPARK_COLUMN_TYPES,
@@ -57,11 +58,8 @@ from dsgrid.utils.dataset import (
     localize_timestamps_if_necessary,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import (
-    get_runtime_session,
-    read_dataframe,
-    write_dataframe,
-)
+from dsgrid.ibis.io import read_dataframe, write_dataframe
+from dsgrid.ibis.session import get_runtime_session
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table, make_unique_key
@@ -551,7 +549,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             f"     ELSE FALSE END "
             f"ELSE ABS(CAST({offset_col} AS DOUBLE)) > 24 END AS invalid_offset"
         )
-        check_df = _select_expr(df, [invalid_expr])
+        check_df = select_expr(df, [invalid_expr])
         if not is_table_empty(filter_sql(check_df, "invalid_offset")):
             msg = (
                 "Invalid UTC offset detected. Offsets must be 24 hours or less "
@@ -675,7 +673,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     ) -> ibis.Table:
         """Apply the timestamp transformation to the dataframe."""
         existing_cols = [c for c in df.columns if c not in cols_to_drop]
-        return _select_expr(df, existing_cols + [timestamp_sql])
+        return select_expr(df, existing_cols + [timestamp_sql])
 
     def _update_config_for_timestamp(
         self,
@@ -806,9 +804,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             df = get_runtime_session().createDataFrame(pd.read_csv(path, dtype="string"))
         else:
             df = read_dataframe(path)
-            view = create_temp_view(df)
-            cols = ", ".join(f"CAST({col} AS VARCHAR) AS {col}" for col in df.columns)
-            df = get_runtime_session().sql(f"SELECT {cols} FROM {view}")
+            df = df.cast({col: "string" for col in df.columns})
         return df
 
     def _read_table_from_user_path(
@@ -859,10 +855,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             assert pivoted_dimension_type is not None
             existing_columns = set(df.columns)
             if diff := set(time_columns) - existing_columns:
-                msg = f"Expected time columns are not present in the table: {diff =}"
+                msg = f"Expected time columns are not present in the table: {diff=}"
                 raise DSGInvalidDataset(msg)
             if diff := set(pivoted_columns) - existing_columns:
-                msg = f"Expected pivoted_columns are not present in the table: {diff =}"
+                msg = f"Expected pivoted_columns are not present in the table: {diff=}"
                 raise DSGInvalidDataset(msg)
             df = unpivot_dataframe(df, pivoted_columns, pivoted_dimension_type.value, time_columns)
 
@@ -1217,11 +1213,3 @@ class DatasetRegistryManager(RegistryManagerBase):
                 "Please report this error to the dsgrid team. The registry may need recovery."
             )
             raise
-
-
-def _select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = ",".join(exprs)
-        return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
-    return df.selectExpr(*exprs)

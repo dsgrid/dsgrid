@@ -1,13 +1,12 @@
 import operator
-from typing import Any, cast
 
 import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.ibis.backend import make_runtime_backend
-from dsgrid.ibis.operations import create_temp_view
+from dsgrid.ibis.operations import join_multiple_columns, rename_columns
+from dsgrid.ibis.table_utils import count_rows
+from dsgrid.ibis.types import is_table_empty
 from dsgrid.utils.py_expression_eval import Parser
-from dsgrid.ibis.session import get_runtime_session
 
 
 class DatasetExpressionHandler:
@@ -19,22 +18,84 @@ class DatasetExpressionHandler:
         self.value_columns = value_columns
 
     def _op(self, other, op):
-        orig_self_count = _count_rows(self.df)
-        orig_other_count = _count_rows(other.df)
-        if orig_self_count != orig_other_count:
+        # Fail with a clear domain error (rather than an opaque Ibis
+        # rename/join error) when the operands are not column-compatible.
+        # The join renames other's value columns and joins on the
+        # dimension columns, so both sets must match on each side.
+        # Order is irrelevant: the result is rebuilt via
+        # ``.select(*self.df.columns)`` below, so compare as sets.
+        if (
+            set(self.df.columns) != set(other.df.columns)
+            or set(self.dimension_columns) != set(other.dimension_columns)
+            or set(self.value_columns) != set(other.value_columns)
+        ):
             msg = (
-                f"{op =} requires that the datasets have the same length "
-                f"{orig_self_count =} {orig_other_count =}"
+                f"Arithmetic between datasets requires identical columns: "
+                f"{self.df.columns=} vs {other.df.columns=}, "
+                f"{self.dimension_columns=} vs {other.dimension_columns=}, "
+                f"{self.value_columns=} vs {other.value_columns=}"
             )
             raise DSGInvalidOperation(msg)
 
-        df = _apply_op_with_sql(self.df, other.df, self.dimension_columns, self.value_columns, op)
+        # Soundness check has two parts:
+        #
+        # 1. Anti-joins on the dimension columns — both must be empty —
+        #    prove that the key sets match. This catches cases that counts
+        #    alone miss, e.g. ``self={A,B}``, ``other={A,A}``: every count
+        #    is 2 but B is silently dropped; the ``self.anti_join(other)``
+        #    is non-empty for B and triggers the error.
+        #
+        # 2. ``count(self) == count(other) == count(self.distinct(dim))``
+        #    proves there are no duplicate dimension-key rows on either
+        #    side. Given key sets match (from #1), the distinct key counts
+        #    are equal across sides, so checking distinct against self
+        #    implies the same for other by transitivity. Catches cases like
+        #    ``self={A,A}``, ``other={A}``: counts differ, fails. And
+        #    ``self={A,A}``, ``other={A,A}``: counts equal each other but
+        #    differ from distinct (which is 1), fails.
+        #
+        # Cost: this is not cheap. The two anti-joins are each a full
+        # join over both datasets (the ``is_table_empty`` LIMIT 1 only
+        # short-circuits scanning, not the join), and the three counts
+        # (self, other, self.distinct) are three more full passes over
+        # the inputs. None of the five evaluates the inner join itself,
+        # so the caller's downstream consumption of ``df`` pays for the
+        # join only once.
+        renamed_value_cols = {col: f"{col}__other" for col in self.value_columns}
+        other_df = rename_columns(other.df, renamed_value_cols)
+        joined = join_multiple_columns(self.df, other_df, self.dimension_columns)
+        mutations = {
+            col: op(joined[col], joined[renamed_value_cols[col]]) for col in self.value_columns
+        }
+        df = joined.mutate(**mutations).select(*self.df.columns)
 
-        joined_count = _count_rows(df)
-        if joined_count != orig_self_count:
+        self_keys = self.df.select(*self.dimension_columns)
+        other_keys = other.df.select(*self.dimension_columns)
+        left_has_extra = not is_table_empty(
+            self_keys.anti_join(other_keys, self.dimension_columns)
+        )
+        right_has_extra = not is_table_empty(
+            other_keys.anti_join(self_keys, self.dimension_columns)
+        )
+        if left_has_extra or right_has_extra:
             msg = (
-                f"join for operation {op =} has a different row count than the original. "
-                f"{orig_self_count =} {joined_count =}"
+                f"join for operation {op=} would drop rows: the datasets have "
+                f"mismatched dimension coverage "
+                f"(left_has_extra={left_has_extra} right_has_extra={right_has_extra}). "
+                "Arithmetic between datasets requires the same set of dimension "
+                "records on both sides."
+            )
+            raise DSGInvalidOperation(msg)
+
+        self_count = count_rows(self.df)
+        other_count = count_rows(other.df)
+        self_distinct_count = count_rows(self_keys.distinct())
+        if self_count != other_count or self_count != self_distinct_count:
+            msg = (
+                f"join for operation {op=} would produce duplicate output rows: "
+                "at least one of the inputs has duplicate dimension-key rows "
+                "(often from a prior union of overlapping datasets). "
+                f"{self_count=} {other_count=} {self_distinct_count=}"
             )
             raise DSGInvalidOperation(msg)
 
@@ -53,7 +114,7 @@ class DatasetExpressionHandler:
         if self.df.columns != other.df.columns:
             msg = (
                 "Union is only allowed when datasets have identical columns: "
-                f"{self.df.columns =} vs {other.df.columns =}"
+                f"{self.df.columns=} vs {other.df.columns=}"
             )
             raise DSGInvalidOperation(msg)
         return DatasetExpressionHandler(
@@ -77,67 +138,3 @@ def evaluate_expression(expr: str, dataset_mapping: dict[str, DatasetExpressionH
 
     """
     return Parser().parse(expr).evaluate(dataset_mapping)
-
-
-def join_multiple_columns(df1: ibis.Table, df2: ibis.Table, columns: list[str], how="inner"):
-    view1 = _create_temp_view(df1)
-    view2 = _create_temp_view(df2)
-    view2_columns = ",".join((f'{view2}."{x}"' for x in df2.columns if x not in df1.columns))
-    select_columns = f"{view1}.*"
-    if view2_columns:
-        select_columns += f", {view2_columns}"
-    on_str = " AND ".join((f'{view1}."{x}" = {view2}."{x}"' for x in columns))
-    query = f"""
-        SELECT {select_columns}
-        FROM {view1}
-        {how} JOIN {view2}
-        ON {on_str}
-    """
-    return get_runtime_session().sql(query)
-
-
-def _create_temp_view(df: ibis.Table) -> str:
-    return create_temp_view(df)
-
-
-def _apply_op_with_sql(
-    df1: ibis.Table,
-    df2: ibis.Table,
-    dimension_columns: list[str],
-    value_columns: list[str],
-    op,
-) -> ibis.Table:
-    view1 = _create_temp_view(df1)
-    view2 = _create_temp_view(df2)
-    op_str = _operator_to_sql(op)
-    value_column_set = set(value_columns)
-    select_columns = []
-    for column in df1.columns:
-        if column in value_column_set:
-            select_columns.append(f'{view1}."{column}" {op_str} {view2}."{column}" AS "{column}"')
-        else:
-            select_columns.append(f'{view1}."{column}"')
-    on_str = " AND ".join((f'{view1}."{x}" = {view2}."{x}"' for x in dimension_columns))
-    query = f"""
-        SELECT {", ".join(select_columns)}
-        FROM {view1}
-        INNER JOIN {view2}
-        ON {on_str}
-    """
-    return make_runtime_backend().sql(query)
-
-
-def _operator_to_sql(op) -> str:
-    if op is operator.add:
-        return "+"
-    if op is operator.mul:
-        return "*"
-    if op is operator.sub:
-        return "-"
-    msg = f"Unsupported operator: {op}"
-    raise NotImplementedError(msg)
-
-
-def _count_rows(df: ibis.Table) -> int:
-    count = df.count().execute()
-    return int(cast(Any, count))

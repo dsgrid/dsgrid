@@ -30,7 +30,7 @@ from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import read_dataframe
+from dsgrid.ibis.io import read_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -306,14 +306,14 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
         if diff:
             msg = (
                 f"The derived dataset records do not include some project base dimension "
-                f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff =}"
+                f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
             )
             raise DSGInvalidDataset(msg)
         assert unique_data_records.issuperset(project_record_ids)
         diff = unique_data_records.difference(project_record_ids)
         msg = (
             f"The derived dataset records is a superset of the project base dimension "
-            f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff =}"
+            f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
         )
         raise DSGInvalidDataset(msg)
 
@@ -363,7 +363,7 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
         case ColumnType.DIMENSION_TYPES:
             column = dim_model.dimension_type.value
         case _:
-            msg = f"BUG: unhandled: {column_type =}"
+            msg = f"BUG: unhandled: {column_type=}"
             raise NotImplementedError(msg)
 
     return get_unique_values(df, column)

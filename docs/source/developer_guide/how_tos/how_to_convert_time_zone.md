@@ -196,12 +196,11 @@ Each geography now covers the full 2012 calendar year.
 
 ## Query backend
 
-Each conversion function has three variants that differ only in how they interact with the query backend. You usually do not call these directly; higher-level dsgrid code selects the appropriate one based on `dsgrid.runtime_config`.
+Each conversion function has two variants that differ only in how they interact with the query backend. You usually do not call these directly; higher-level dsgrid code selects the appropriate one based on `dsgrid.runtime_config`.
 
 | Backend | Function suffix |
 |---|---|
 | DuckDB (default, in-memory) | `_with_chronify_duckdb` |
-| Runtime backend + metastore | `_with_chronify_runtime_hive` |
 | Runtime backend + local filesystem | `_with_chronify_runtime_path` |
 
 The DuckDB variants hold everything in memory and are the fastest for moderate-sized datasets. The runtime variants write intermediate Parquet files and suit larger workloads.

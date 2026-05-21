@@ -1,6 +1,7 @@
 import logging
 import math
 
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import timed_info
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class TablePartition:
             Estimated size of df in memory in MB
 
         """
-        n_rows = _count_rows(df)
+        n_rows = count_rows(df)
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
         return n_rows, n_cols, data_MB
@@ -68,9 +69,18 @@ class TablePartition:
         """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
         counts = df.group_by(key).aggregate(count=df.count())
-        n_partitions = counts.count().execute()
-        n_rows_largest_part = counts["count"].max().execute()
-        n_rows_smallest_part = counts["count"].min().execute()
+        # Single aggregation round-trip instead of three (n_partitions / max /
+        # min). Each `.execute()` on the per-key counts re-plans the underlying
+        # group-by; collecting all three reducers in one query is significantly
+        # cheaper on Spark and DuckDB alike.
+        summary = counts.aggregate(
+            n_partitions=counts.count(),
+            max_count=counts["count"].max(),
+            min_count=counts["count"].min(),
+        ).execute()
+        n_partitions = int(summary["n_partitions"].iloc[0])
+        n_rows_largest_part = int(summary["max_count"].iloc[0])
+        n_rows_smallest_part = int(summary["min_count"].iloc[0])
         avg_MB = round(data_MB / n_partitions, 2)
 
         largest_MB = round(data_MB / n_rows * n_rows_largest_part, 2)
@@ -96,7 +106,3 @@ class TablePartition:
         }
 
         return output
-
-
-def _count_rows(df) -> int:
-    return df.count().execute()

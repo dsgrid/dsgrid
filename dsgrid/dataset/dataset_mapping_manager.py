@@ -10,7 +10,7 @@ from dsgrid.query.dataset_mapping_plan import (
 )
 
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.ibis.session import read_dataframe, write_dataframe
+from dsgrid.ibis.io import read_dataframe, write_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,21 @@ class DatasetMappingManager:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args, **kwargs) -> None:
-        # Don't cleanup if an exception occurred.
-        self.cleanup()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is None:
+            self.cleanup()
+            return
+        # Skip cleanup so the persisted intermediate table and checkpoint remain on disk
+        # for postmortem inspection. Log it so the leak is observable.
+        if self._checkpoint_file is not None or self._checkpoint is not None:
+            logger.warning(
+                "DatasetMappingManager skipping cleanup for dataset %s after %s; "
+                "checkpoint file=%s persisted_table=%s",
+                self._dataset_id,
+                exc_type.__name__,
+                self._checkpoint_file,
+                None if self._checkpoint is None else self._checkpoint.persisted_table_filename,
+            )
 
     @property
     def plan(self) -> DatasetMappingPlan:

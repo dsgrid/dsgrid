@@ -21,10 +21,10 @@ from dsgrid.exceptions import (
 )
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.ibis.operations import create_temp_view, filter_sql
+from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
 from dsgrid.ibis.types import is_table_empty
-from dsgrid.ibis.session import get_runtime_session, models_to_dataframe
+from dsgrid.ibis.models import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from .common import (
@@ -229,14 +229,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mapping_records, mapping_name, mapping_type, tolerance, group_by="from_id"
     ):
         mapping_df = models_to_dataframe(mapping_records)
-        mapping_view = create_temp_view(mapping_df)
-        mapping_sum_df = get_runtime_session().sql(
-            f"""
-            SELECT {group_by}, SUM(from_fraction) AS sum_fraction
-            FROM {mapping_view}
-            GROUP BY {group_by}
-            ORDER BY sum_fraction, {group_by}
-            """
+        mapping_sum_df = (
+            mapping_df.group_by(group_by)
+            .aggregate(sum_fraction=mapping_df.from_fraction.sum())
+            .order_by(["sum_fraction", group_by])
         )
         fracs_greater_than_one = (
             filter_sql(mapping_sum_df, f"sum_fraction - 1.0 > {tolerance}")

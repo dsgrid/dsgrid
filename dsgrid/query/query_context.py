@@ -172,7 +172,7 @@ class QueryContext:
                 case (ColumnType.DIMENSION_TYPES, _):
                     column_names = [dim_type.value]
                 case _:
-                    msg = f"Bug: need to support {column_type =} {dim_type =}"
+                    msg = f"Bug: need to support {column_type=} {dim_type=}"
                     raise NotImplementedError(msg)
             self.add_dimension_metadata(
                 dim_type,
@@ -190,7 +190,7 @@ class QueryContext:
             # This is checked in the query model and so this should never happen.
             msg = (
                 "Bug: The pivoted dimension can only have 1 column and 1 name: "
-                f"{columns =} {names =}"
+                f"{columns=} {names=}"
             )
             raise Exception(msg)
         return next(iter(columns))
@@ -226,7 +226,7 @@ class QueryContext:
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
             if metadata.dimension_name == name:
                 return metadata.column_names
-        msg = f"No dimension match: {dimension_type =} {name =}"
+        msg = f"No dimension match: {dimension_type=} {name=}"
         raise Exception(msg)
 
     def get_dimension_metadata(

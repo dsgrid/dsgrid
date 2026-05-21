@@ -1,5 +1,6 @@
 import abc
 import itertools
+import re
 from enum import StrEnum
 from typing import Any, Generator, Union, Literal, Self, TypeAlias, cast
 
@@ -31,9 +32,6 @@ from dsgrid.query.dataset_mapping_plan import (
 )
 from dsgrid.utils.files import compute_hash
 
-SUPPORTED_QUERY_FUNCTIONS = {"hour", "max", "mean", "sum", "year"}
-
-
 DimensionFilters: TypeAlias = Annotated[
     Union[
         DimensionFilterExpressionModel,
@@ -47,12 +45,36 @@ DimensionFilters: TypeAlias = Annotated[
 ]
 
 
+_FUNCTION_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
 class FunctionReference:
-    """Reference a query function without binding to a dataframe backend at model-parse time."""
+    """Reference a query function without binding to a dataframe backend at model-parse time.
+
+    The name is forwarded directly into the SQL the backend executes, e.g.
+    ``MAX(value)`` for an aggregation or ``HOUR(timestamp)`` for a scalar
+    column expression. dsgrid does not maintain its own allowlist; any
+    function the active backend (DuckDB or Spark) accepts will work, and
+    unrecognized names will surface as a backend error at execution time.
+
+    The name MUST match ``[A-Za-z_][A-Za-z0-9_]*`` — a plain SQL identifier.
+    Anything else (punctuation, whitespace, parentheses) would allow SQL
+    fragments to be injected into the interpolated query string the
+    aggregation/column-expression builders produce.
+
+    The special-case name ``"mean"`` is translated to SQL ``AVG`` inside
+    :func:`dsgrid.dataset.unpivoted_table._aggregate_value`. All other
+    names are uppercased and passed through unchanged.
+    """
 
     def __init__(self, name: str):
-        if name not in SUPPORTED_QUERY_FUNCTIONS:
-            msg = f"function={name} is not supported"
+        if not _FUNCTION_NAME_RE.match(name):
+            msg = (
+                f"FunctionReference name {name!r} is not a plain SQL identifier "
+                "(letters, digits, underscores; must start with a letter or "
+                "underscore). dsgrid forwards the name directly into SQL so "
+                "anything else risks injection."
+            )
             raise ValueError(msg)
         self.name = name
         self.__name__ = name

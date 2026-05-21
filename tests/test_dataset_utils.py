@@ -1,7 +1,6 @@
 import logging
 from typing import Any
 
-import ibis
 import pytest
 
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -34,11 +33,14 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
     is_noop_mapping,
+    merge_expected_associations_tables,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+from tests._helpers import collect as _collect, count as _count
 
 
 @pytest.fixture(scope="module")
@@ -431,18 +433,6 @@ def _sorted_rows(df) -> list[Any]:
     return sorted(_collect(df.select(*cols).distinct()), key=lambda r: tuple(r))
 
 
-def _collect(df):
-    if isinstance(df, ibis.Table):
-        return list(df.execute().itertuples(index=False, name="Row"))
-    return df.collect()
-
-
-def _count(df) -> int:
-    if isinstance(df, ibis.Table):
-        return df.count().execute()
-    return df.count()
-
-
 def _first(df):
     rows = _collect(df.limit(1))
     return rows[0]
@@ -453,8 +443,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_single_full_table(self, tmp_path, dim_records):
         """A single table covering all dimensions is returned as-is (minus dups)."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "all": _make_df(
                 [
@@ -473,8 +461,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_identical_columns_union(self, tmp_path, dim_records):
         """Two tables with the same column set are unioned."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "part1": _make_df(
                 [
@@ -497,8 +483,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_disjoint_columns_cross_join(self, tmp_path, dim_records):
         """Disjoint column sets are cross-joined, remaining dims filled in."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         # Each table must include all records for its dimension columns.
         dfs = {
             "geo": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
@@ -513,8 +497,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_overlapping_columns_inner_join(self, tmp_path, dim_records):
         """Overlapping-but-not-identical column sets are inner-joined on shared columns."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -544,8 +526,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_partial_table_fills_remaining_dims(self, tmp_path, dim_records):
         """A single-column table cross-joins with full records of all other dims."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         # Table must have all geography records.
         dfs = {
             "geo_only": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
@@ -558,8 +538,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_fails_on_missing_record(self, tmp_path, dim_records):
         """A table missing a dimension record is caught at entry validation."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -581,8 +559,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_fails_on_missing_shared_value(self, tmp_path, dim_records):
         """A table missing a shared-column value is caught before the inner join."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -605,8 +581,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_on_single_table(self, tmp_path, dim_records):
         """A single full-dim table missing a record is caught (first group)."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "all": _make_df(
                 [
@@ -623,8 +597,6 @@ class TestMergeExpectedAssociationsTables:
     def test_union_partners_complement_each_other(self, tmp_path, dim_records):
         """Two tables with identical columns can individually be incomplete
         as long as their union covers all dimension records."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "part1": _make_df(
                 [
@@ -647,8 +619,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_three_groups_with_remaining_dims(self, tmp_path, dim_records):
         """Two overlapping groups + a remaining uncovered dimension."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -701,8 +671,6 @@ class TestMergeExpectedAssociationsTables:
         Inner join on {sector, subsector} finds no match for (s1, p) or
         (s1, q), so sector=s1 is dropped entirely.
         """
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dim_records = {
             "geography": ["A", "B"],
             "sector": ["s1", "s2"],
@@ -735,8 +703,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_column_not_in_dim_records(self, tmp_path):
         """A table column not in all_dim_records raises DSGFileInputError."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dim_records = {
             "geography": ["A", "B"],
         }

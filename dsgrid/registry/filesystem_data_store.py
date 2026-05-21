@@ -5,7 +5,8 @@ from typing import Self
 
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.ibis.session import read_dataframe, write_dataframe, write_dataframe_and_auto_partition
+from dsgrid.ibis.operations import coalesce
+from dsgrid.ibis.io import read_dataframe, write_dataframe, write_dataframe_and_auto_partition
 
 
 TABLE_FILENAME = "table.parquet"
@@ -95,7 +96,7 @@ class FilesystemDataStore(DataStoreInterface):
     ) -> None:
         filename = self._lookup_table_filename(dataset_id, version)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        write_dataframe(_coalesce(df, 1), filename, overwrite=overwrite)
+        write_dataframe(coalesce(df, 1), filename, overwrite=overwrite)
 
     def write_expected_associations_tables(
         self, dfs: dict[str, ibis.Table], dataset_id: str, version: str, overwrite: bool = False
@@ -181,7 +182,3 @@ class FilesystemDataStore(DataStoreInterface):
         write_dataframe(df, tmp_name)
         delete_if_exists(filename)
         tmp_name.rename(filename)
-
-
-def _coalesce(df: ibis.Table, num_partitions: int) -> ibis.Table:
-    return df

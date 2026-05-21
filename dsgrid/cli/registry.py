@@ -26,7 +26,10 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     VersionUpdateType,
 )
-from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
+from dsgrid.registry.dataset_config_generator import (
+    generate_config_from_dataset,
+    load_generate_config_schemas,
+)
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.project_config_generator import generate_project_config
 from dsgrid.utils.filters import ACCEPTED_OPS
@@ -1696,6 +1699,19 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     show_default=True,
     help="Overwrite files if they exist.",
 )
+@click.option(
+    "--schema-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Optional JSON5 file declaring column types for the input files. "
+        "Shape: {load_data: [{name, data_type}, ...], load_data_lookup: [...]}. "
+        "Use this when readers would otherwise infer mismatched types across CSV "
+        "and JSON inputs (e.g. an integer 'id' column read as VARCHAR from CSV "
+        "but as BIGINT from JSON). Supported data_type values match dsgrid's "
+        "FileSchema vocabulary: BIGINT, INTEGER, VARCHAR, DOUBLE, etc."
+    ),
+)
 @click.pass_obj
 @click.pass_context
 def generate_dataset_config_from_dataset(
@@ -1712,6 +1728,7 @@ def generate_dataset_config_from_dataset(
     project_id: str | None,
     no_prompts: bool,
     overwrite: bool,
+    schema_file: Path | None,
 ):
     """Generate dataset config files from a dataset table.
 
@@ -1720,6 +1737,7 @@ def generate_dataset_config_from_dataset(
     Look for matches for dimensions in the registry. Prompt the user for confirmation unless
     --no-prompts is set. If --no-prompts is set, the first match is automatically accepted.
     """
+    schemas = load_generate_config_schemas(schema_file) if schema_file is not None else None
     res = handle_dsgrid_exception(
         ctx,
         generate_config_from_dataset,
@@ -1735,6 +1753,7 @@ def generate_dataset_config_from_dataset(
         project_id=project_id,
         no_prompts=no_prompts,
         overwrite=overwrite,
+        schemas=schemas,
     )
     if res[1] != 0:
         ctx.exit(res[1])

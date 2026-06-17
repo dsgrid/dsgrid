@@ -40,7 +40,7 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
     assert models
     cls = type(models[0])
     rows = []
-    struct_fields = []
+    struct_fields: list[Any] = []
     for i, model in enumerate(models):
         dct = {}
         for f in cls.model_fields:

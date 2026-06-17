@@ -209,11 +209,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def _register(self, config, context: RegistrationContext) -> list[str]:
         existing_ids = self._replace_duplicates(config, context)
-        registered_dimension_ids = []
+        registered_dimension_ids: list[str] = []
 
         # This function will either register the dimension specified by each model or re-use an
         # existing ID. The returned list must be in the same order as the list of models.
-        final_dimension_ids = []
+        final_dimension_ids: list[str] = []
         for dim in config.model.dimensions:
             if dim.id is None:
                 assert dim.dimension_id is None
@@ -221,6 +221,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 dim.version = "1.0.0"
                 dim = self.db.insert(context.connection, dim, context.registration)
                 assert isinstance(dim, DimensionBaseModel)
+                assert dim.dimension_id is not None
                 final_dimension_ids.append(dim.dimension_id)
                 registered_dimension_ids.append(dim.dimension_id)
                 logger.info(
@@ -235,6 +236,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 if dim.dimension_id not in existing_ids:
                     msg = f"Bug: {dim.dimension_id=} should have been in existing_ids"
                     raise Exception(msg)
+                assert dim.dimension_id is not None
                 final_dimension_ids.append(dim.dimension_id)
 
         logger.info("Registered %s dimensions", len(config.model.dimensions))
@@ -361,7 +363,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table

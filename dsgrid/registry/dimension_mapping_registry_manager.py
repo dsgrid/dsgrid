@@ -589,7 +589,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table

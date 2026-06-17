@@ -14,8 +14,8 @@ def count_rows(table: ibis.Table) -> int:
 def count_distinct(table: ibis.Table, column: str) -> int:
     """Return the number of distinct values in a single column."""
     return int(
-        table.select(column).distinct().count().execute()
-    )  # ty: ignore[invalid-argument-type]
+        table.select(column).distinct().count().execute()  # ty: ignore[invalid-argument-type]
+    )
 
 
 def is_table_empty(table: Any) -> bool:

@@ -177,7 +177,7 @@ def on_list_dimension_records(row_indexes, row_data, url):
     return (
         dash_table.DataTable(
             records,
-            columns,
+            cast(Any, columns),
             id="dimension_records_table",
             editable=False,
             filter_action="native",

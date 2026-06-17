@@ -59,7 +59,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         for trange in self.model.ranges:
             start = datetime.strptime(trange.starting_timestamp, trange.str_format)
             assert start.tzinfo is None
-            start_times.append(start.replace(tzinfo=tz))
+            start_times.append(pd.Timestamp(start.replace(tzinfo=tz)))
         return start_times
 
     def get_lengths(self) -> list[int]:

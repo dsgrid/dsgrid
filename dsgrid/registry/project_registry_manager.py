@@ -30,7 +30,7 @@ from dsgrid.exceptions import (
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimensions import DimensionModel
+from dsgrid.config.dimensions import DimensionModel, DimensionsListModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionReferenceModel,
@@ -470,7 +470,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         conn = context.connection
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            dimensions = []
+            dimensions: DimensionsListModel = []
             subset_refs = {}
             for subset_dimension in subset_dimensions:
                 base_dim = None
@@ -1584,7 +1584,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table

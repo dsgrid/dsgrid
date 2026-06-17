@@ -30,8 +30,6 @@ from dsgrid.ibis.functions import (
 )
 from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
 from dsgrid.ibis.session import (
-    F,
-    FloatType,
     create_dataframe_from_pandas,
     get_runtime_session,
     StructField,
@@ -374,16 +372,13 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     tempo_time = _order_by(load_data.select(time_col).distinct(), time_col)
 
     # QC 1: each timestamp has the same number of occurences
-    if isinstance(load_data, ibis.Table):
-        view = create_temp_view(load_data)
-        freq_count = _collect(
-            get_runtime_session().sql(
-                f"SELECT DISTINCT count FROM (SELECT {time_col}, COUNT(*) AS count "
-                f"FROM {view} GROUP BY {time_col})"
-            )
+    view = create_temp_view(load_data)
+    freq_count = _collect(
+        get_runtime_session().sql(
+            f"SELECT DISTINCT count FROM (SELECT {time_col}, COUNT(*) AS count "
+            f"FROM {view} GROUP BY {time_col})"
         )
-    else:
-        freq_count = load_data.groupBy(time_col).count().select("count").distinct().collect()
+    )
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time
@@ -427,59 +422,47 @@ def _as_timezone(value, tz):
 
 
 def _with_literal_column(df, column, value):
-    if isinstance(df, ibis.Table):
-        view = create_temp_view(df)
-        return get_runtime_session().sql(
-            f"SELECT *, '{_sql_string(value)}' AS {_sql_ident(column)} FROM {view}"
-        )
-    return df.withColumn(column, F.lit(value))
+    view = create_temp_view(df)
+    return get_runtime_session().sql(
+        f"SELECT *, '{_sql_string(value)}' AS {_sql_ident(column)} FROM {view}"
+    )
 
 
 def _count_by_group(df, groupby_cols):
-    if isinstance(df, ibis.Table):
-        view = create_temp_view(df)
-        groups = ", ".join(_sql_ident(x) for x in groupby_cols)
-        return get_runtime_session().sql(
-            f"SELECT {groups}, COUNT(*) AS count FROM {view} GROUP BY {groups}"
-        )
-    return df.groupBy(groupby_cols).count()
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, COUNT(*) AS count FROM {view} GROUP BY {groups}"
+    )
 
 
 def _sum_value_by_group(df, groupby_cols):
-    if isinstance(df, ibis.Table):
-        view = create_temp_view(df)
-        groups = ", ".join(_sql_ident(x) for x in groupby_cols)
-        return get_runtime_session().sql(
-            f"SELECT {groups}, SUM({_sql_ident(VALUE_COLUMN)}) AS {_sql_ident(VALUE_COLUMN)} "
-            f"FROM {view} GROUP BY {groups}"
-        )
-    return df.groupBy(*groupby_cols).agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, SUM({_sql_ident(VALUE_COLUMN)}) AS {_sql_ident(VALUE_COLUMN)} "
+        f"FROM {view} GROUP BY {groups}"
+    )
 
 
 def _sum_value_times_count_by_group(df, groupby_cols):
-    if isinstance(df, ibis.Table):
-        view = create_temp_view(df)
-        groups = ", ".join(_sql_ident(x) for x in groupby_cols)
-        return get_runtime_session().sql(
-            f"SELECT {groups}, "
-            f"SUM({_sql_ident(VALUE_COLUMN)} * CAST({_sql_ident('count')} AS FLOAT)) "
-            f"AS {_sql_ident(VALUE_COLUMN)} FROM {view} GROUP BY {groups}"
-        )
-    return df.groupBy(groupby_cols).agg(
-        F.sum(F.col(VALUE_COLUMN) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, "
+        f"SUM({_sql_ident(VALUE_COLUMN)} * CAST({_sql_ident('count')} AS FLOAT)) "
+        f"AS {_sql_ident(VALUE_COLUMN)} FROM {view} GROUP BY {groups}"
     )
 
 
 def _distinct_sum_count_by_group(df, groupby_cols):
-    if isinstance(df, ibis.Table):
-        view = create_temp_view(df)
-        groups = ", ".join(_sql_ident(x) for x in groupby_cols)
-        return get_runtime_session().sql(
-            f"SELECT DISTINCT count FROM ("
-            f"SELECT {groups}, SUM({_sql_ident('count')}) AS count FROM {view} GROUP BY {groups}"
-            f")"
-        )
-    return df.groupBy(groupby_cols).agg(F.sum("count").alias("count")).select("count").distinct()
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT DISTINCT count FROM ("
+        f"SELECT {groups}, SUM({_sql_ident('count')}) AS count FROM {view} GROUP BY {groups}"
+        f")"
+    )
 
 
 def _sql_ident(column):

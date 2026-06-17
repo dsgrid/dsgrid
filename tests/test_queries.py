@@ -69,7 +69,6 @@ from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 from dsgrid.ibis.table_utils import count_rows, table_to_pandas
 from dsgrid.ibis.session import (
     DoubleType,
-    F,
     SparkSession,
     StructField,
     StringType,
@@ -117,9 +116,7 @@ def _sql_ident(column):
 
 
 def _sum_by_group(df, group_cols):
-    if isinstance(df, ibis.Table):
-        return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
-    return df.groupBy(*group_cols).agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
+    return df.group_by(group_cols).aggregate(**{VALUE_COLUMN: df[VALUE_COLUMN].sum()})
 
 
 @pytest.fixture(scope="module")
@@ -1473,8 +1470,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
         years = _collect(df.select("year").distinct())
         assert len(years) == 1
         assert str(years[0].year) == "2012"
-        if isinstance(df, ibis.Table):
-            df = df.mutate(value=df[VALUE_COLUMN].cast("float64"))
+        df = df.mutate(value=df[VALUE_COLUMN].cast("float64"))
         validate_electricity_use_by_state(
             "sum",
             _sum_by_group(df, ["state", "end_uses_by_fuel_type", "year"]),

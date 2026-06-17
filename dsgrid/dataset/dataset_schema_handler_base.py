@@ -49,6 +49,7 @@ from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.ibis.operations import (
+    count_groups,
     drop_columns,
     except_all,
     join,
@@ -56,11 +57,12 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.table_utils import (
     get_unique_values_per_column,
+    is_table_empty,
     table_column_to_list,
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.ibis.types import is_table_empty, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -518,8 +520,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # forced a full scan. The cross-join here lets the planner share the
         # underlying scan where the optimizer can, and even when it can't, the
         # round-trip overhead is halved.
-        time_counts = _count_groups(load_data_df, list(time_cols))
-        array_counts = _count_groups(load_data_df, list(unique_array_cols))
+        time_counts = count_groups(load_data_df, list(time_cols))
+        array_counts = count_groups(load_data_df, list(unique_array_cols))
         combined = (
             time_counts.aggregate(time=time_counts["count"].nunique())
             .cross_join(array_counts.aggregate(array=array_counts["count"].nunique()))
@@ -1022,12 +1024,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _remove_non_dimension_columns(self, df: ibis.Table) -> ibis.Table:
         allowed_columns = self._list_dimension_columns(df)
         return df.select(*allowed_columns)
-
-
-def _count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:
-    if not columns:
-        return df.aggregate(count=df.count())
-    return df.group_by(*columns).aggregate(count=df.count())
 
 
 def _apply_fraction_sql(

@@ -1,3 +1,5 @@
+"""Lazy table transforms (joins, set ops, aggregations) on Ibis expressions."""
+
 import logging
 from typing import Any, cast
 from tempfile import NamedTemporaryFile
@@ -158,6 +160,21 @@ def count_distinct_on_group_by(
     df: ibis.Table, group_by_columns: list[str], agg_column: str, alias: str
 ) -> ibis.Table:
     return df.group_by(group_by_columns).aggregate(**{alias: df[agg_column].nunique()})
+
+
+def count_groups(df: ibis.Table, columns: list[str]) -> ibis.Table:
+    """Return per-group row counts in a ``count`` column (whole-table count if no columns)."""
+    if not columns:
+        return df.aggregate(count=df.count())
+    return df.group_by(*columns).aggregate(count=df.count())
+
+
+def max_by_group(
+    df: ibis.Table, group_by_columns: list[str], value_columns: list[str]
+) -> ibis.Table:
+    """Return the per-group maximum of each value column."""
+    aggs = {col: df[col].max() for col in value_columns}
+    return df.group_by(*group_by_columns).aggregate(**aggs)
 
 
 def handle_column_spaces(column: str) -> str:

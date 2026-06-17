@@ -41,7 +41,8 @@ from dsgrid.ibis.session import (
 )
 from dsgrid.ibis.types import use_duckdb
 
-from tests._helpers import collect as _collect, count as _count, order_by as _order_by
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect, order_by as _order_by
 
 
 def _filter(df, predicate):
@@ -124,7 +125,7 @@ def test_count_distinct_on_group_by(dataframe):
 
 def test_cross_join(dataframe, geo_dataframe):
     df = cross_join(dataframe, geo_dataframe)
-    assert _count(df) == _count(dataframe) * _count(geo_dataframe)
+    assert count_rows(df) == count_rows(dataframe) * count_rows(geo_dataframe)
     assert (
         aggregate_single_value(
             _filter(df, "county = 'Boulder' and metric = 'cooling'"), "sum", "value"
@@ -319,7 +320,7 @@ def test_read_csv_with_pipe_delimiter(tmp_path: Path) -> None:
     filename.write_text("a|b|c\n1|x|2.5\n2|y|3.5\n")
     table = read_csv(filename, delimiter="|")
     assert sorted(table.columns) == ["a", "b", "c"]
-    assert table.count().execute() == 2
+    assert count_rows(table) == 2
 
 
 def test_read_csv_round_trip(tmp_path: Path, dataframe) -> None:
@@ -333,7 +334,7 @@ def test_read_csv_round_trip(tmp_path: Path, dataframe) -> None:
     assert out.exists()
     round_tripped = _read_csv_io(out)
     assert sorted(round_tripped.columns) == sorted(dataframe.columns)
-    assert round_tripped.count().execute() == dataframe.count().execute()
+    assert count_rows(round_tripped) == count_rows(dataframe)
 
 
 def test_read_csv_rejects_non_utf8_on_duckdb(tmp_path: Path) -> None:

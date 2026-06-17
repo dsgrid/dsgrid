@@ -22,8 +22,7 @@ from dsgrid.exceptions import (
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.ibis.operations import filter_sql
-from dsgrid.ibis.table_utils import table_column_to_list
-from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.table_utils import is_table_empty, table_column_to_list
 from dsgrid.ibis.models import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table

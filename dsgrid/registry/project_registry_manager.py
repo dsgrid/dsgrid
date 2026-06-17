@@ -77,8 +77,9 @@ from dsgrid.ibis.operations import except_all
 from dsgrid.ibis.table_utils import (
     get_unique_values,
     get_unique_values_per_column,
+    is_table_empty,
 )
-from dsgrid.ibis.types import is_table_empty, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters

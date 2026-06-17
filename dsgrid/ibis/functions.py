@@ -24,8 +24,9 @@ from dsgrid.ibis.operations import (
     sql_from_df,
     unpivot,
 )
+from dsgrid.ibis.table_utils import is_table_empty
 from dsgrid.ibis.temp import drop_temp_tables_and_views
-from dsgrid.ibis.types import is_table_empty, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.ibis.session import (
     init_runtime_session,
     get_runtime_session,

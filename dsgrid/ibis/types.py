@@ -213,6 +213,19 @@ def is_string_column(table: Any, column: str) -> bool:
     return is_string_type(data_type)
 
 
-def is_table_empty(table: Any) -> bool:
-    """Return True if a table-like object has no rows."""
-    return table.limit(1).count().execute() == 0
+def _duckdb_type_from_spark_type(data_type: Any) -> str:
+    try:
+        return spec_for_spark_type(data_type).duckdb_sql
+    except KeyError as exc:
+        raise NotImplementedError(str(exc)) from exc
+
+
+def _ibis_type_from_spark_type(data_type: Any) -> str:
+    try:
+        spec = spec_for_spark_type(data_type)
+    except KeyError as exc:
+        raise NotImplementedError(str(exc)) from exc
+    # Strip any tz-info suffix from the dtype string (TIMESTAMP_TZ maps to
+    # "timestamp('UTC')" for declared-cast purposes, but the inferred dtype
+    # for an existing Spark column has no tz attached).
+    return spec.ibis_dtype.split("(", 1)[0]

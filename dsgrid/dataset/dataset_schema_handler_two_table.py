@@ -23,7 +23,7 @@ from dsgrid.ibis.operations import (
     join_multiple_columns,
     union_all,
 )
-from dsgrid.ibis.table_utils import count_rows, table_to_records
+from dsgrid.ibis.table_utils import count_distinct, count_rows, table_to_records
 from dsgrid.ibis.types import is_string_column
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
@@ -331,7 +331,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = count_rows(cached_lookup.select(col).distinct())
+            count = count_distinct(cached_lookup, col)
             assert count == 1, f"{dim}: count"
             columns_to_drop.append(col)
         del cached_lookup

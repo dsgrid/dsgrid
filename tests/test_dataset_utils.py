@@ -40,7 +40,8 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
-from tests._helpers import collect as _collect, count as _count
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect
 
 
 @pytest.fixture(scope="module")
@@ -268,7 +269,7 @@ def test_add_null_rows_from_load_data_lookup():
         ),
     )
     result = add_null_rows_from_load_data_lookup(df, lookup)
-    assert _count(result) == 4
+    assert count_rows(result) == 4
     null_rows = _collect(filter_sql(result, "timestamp is NULL"))
     assert len(null_rows) == 1
     assert null_rows[0].geography == "Boulder"
@@ -327,8 +328,8 @@ def test_remove_invalid_null_timestamps():
     stacked = ["county", "subsector"]
     time_col = "timestamp"
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
-    assert _count(result) == 6
-    assert _count(filter_sql(result, "county == 'Boulder'")) == 2
+    assert count_rows(result) == 6
+    assert count_rows(filter_sql(result, "county == 'Boulder'")) == 2
     assert is_dataframe_empty(filter_sql(result, f"county == 'Boulder' and {time_col} is NULL"))
 
 

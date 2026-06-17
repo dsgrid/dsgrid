@@ -6,8 +6,7 @@ from sqlalchemy import Connection
 from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.ibis.table_utils import table_column_to_list, table_to_records
-from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.table_utils import is_table_empty, table_column_to_list, table_to_records
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from .registry_manager import RegistryManager
 

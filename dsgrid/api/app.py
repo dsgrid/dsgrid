@@ -19,7 +19,7 @@ from dsgrid.loggers import setup_logging
 from dsgrid.query.models import ReportType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.table_utils import count_rows, table_to_pandas
 from dsgrid.utils.run_command import run_command
 from dsgrid.ibis.io import read_parquet
 from dsgrid.ibis.session import init_runtime_session
@@ -341,7 +341,7 @@ def get_async_task_data(async_task_id: int):
         # compression.
         # We should also check how much data we can read through the Spark driver.
         table = read_parquet(str(task.result.data_file))
-        num_rows = table.count().execute()
+        num_rows = count_rows(table)
         if num_rows > MAX_INLINE_QUERY_DATA_ROWS:
             msg = (
                 f"Query result has {num_rows} rows. Inline JSON responses are limited to "

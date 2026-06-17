@@ -45,10 +45,9 @@ from dsgrid.ibis.session import (
     TimestampNTZType,
     use_duckdb,
 )
+from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-
-from tests._helpers import to_pandas as _to_pandas
 
 
 @pytest.fixture(scope="module")
@@ -262,9 +261,9 @@ def test_single_tz_duckdb(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = _to_pandas(sdf)
+    sdf2 = table_to_pandas(sdf)
     tz = time_dim.model.time_zone_format.time_zone
-    res_df2 = _to_pandas(res_df)
+    res_df2 = table_to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -281,10 +280,10 @@ def test_single_tz_spark_path(spark, tmp_path):
 
     assert changed is True
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
-    res_df2 = _to_pandas(res_df)
+    res_df2 = table_to_pandas(res_df)
 
     tz = time_dim.model.time_zone_format.time_zone
-    sdf2 = _to_pandas(sdf)
+    sdf2 = table_to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )
@@ -305,7 +304,7 @@ def test_value_column_first_used(spark, tmp_path):
 
     assert changed is True
     assert set(res_df.columns) >= {"val_a", "val_b", "val_c"}
-    assert _to_pandas(res_df)[TIME_COLUMN].dt.tz is not None
+    assert table_to_pandas(res_df)[TIME_COLUMN].dt.tz is not None
 
 
 @skip_unless_duckdb
@@ -324,8 +323,8 @@ def test_multi_tz_duckdb_adds_tz_column(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = _to_pandas(sdf)
-    res_df2 = _to_pandas(res_df)
+    sdf2 = table_to_pandas(sdf)
+    res_df2 = table_to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -348,8 +347,8 @@ def test_multi_tz_duckdb_existing_tz_column(spark, tmp_path):
     )
 
     assert changed is True
-    sdf2 = _to_pandas(sdf)
-    res_df2 = _to_pandas(res_df)
+    sdf2 = table_to_pandas(sdf)
+    res_df2 = table_to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
 
@@ -370,10 +369,10 @@ def test_multi_tz_spark_path(spark, tmp_path):
 
     assert changed is True
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
-    res_df2 = _to_pandas(res_df)
+    res_df2 = table_to_pandas(res_df)
 
     tz = "Etc/GMT+5"
-    sdf2 = _to_pandas(sdf)
+    sdf2 = table_to_pandas(sdf)
     assert set(res_df2[TIME_COLUMN].dt.tz_localize(session_tz)) == set(
         sdf2[TIME_COLUMN].dt.tz_localize(tz)
     )

@@ -51,9 +51,10 @@ from dsgrid.ibis.operations import (
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
     get_unique_values_per_column,
+    is_table_empty,
     table_to_records,
 )
-from dsgrid.ibis.types import is_table_empty, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls

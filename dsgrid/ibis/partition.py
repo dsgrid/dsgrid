@@ -1,6 +1,9 @@
+"""File-size and partition-count estimation for sharding Ibis tables to disk."""
+
 import logging
 import math
 
+from dsgrid.ibis.operations import count_groups
 from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import timed_info
 
@@ -68,7 +71,7 @@ class TablePartition:
     def file_size_if_partition_by(self, df, key):
         """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
-        counts = df.group_by(key).aggregate(count=df.count())
+        counts = count_groups(df, [key])
         # Single aggregation round-trip instead of three (n_partitions / max /
         # min). Each `.execute()` on the per-key counts re-plans the underlying
         # group-by; collecting all three reducers in one query is significantly

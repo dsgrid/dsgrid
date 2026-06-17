@@ -6,6 +6,7 @@ import pytest
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
@@ -73,9 +74,8 @@ def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> No
             df = drop_columns(
                 join_multiple_columns(load_data_df, load_data_lookup_df, ["id"]), "id"
             )
-            dataset_geos = _collect(df.select("geography").distinct())
-            assert len(dataset_geos) == 1
-            assert dataset_geos[0].geography == COUNTY_ID
+            dataset_geos = get_unique_values(df, "geography")
+            assert dataset_geos == {COUNTY_ID}
 
             base_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)
             records = _collect(base_dim.get_records_dataframe())

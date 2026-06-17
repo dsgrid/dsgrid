@@ -66,7 +66,7 @@ from dsgrid.ibis.functions import (
 from dsgrid.ibis.backend import get_runtime_backend, invalidate_runtime_backend_cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
-from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.table_utils import count_rows, table_to_pandas
 from dsgrid.ibis.session import (
     DoubleType,
     F,
@@ -89,7 +89,6 @@ from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stat
 
 from tests._helpers import (
     collect as _collect,
-    count as _count,
     order_by as _order_by,
     row_value as _row_value,
 )
@@ -1334,7 +1333,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
         county = "06037"
         end_use = "electricity_end_uses"
         assert (
-            _count(
+            count_rows(
                 _filter(df, f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'")
                 .select("hour")
                 .distinct()

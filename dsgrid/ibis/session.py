@@ -4,7 +4,6 @@ import itertools
 import logging
 import os
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any, Iterable, cast
 
 import pandas as pd
@@ -16,13 +15,13 @@ from dsgrid.ibis.operations import make_temp_view_name
 from dsgrid.ibis.io import (
     CsvPartitionWriter,
     MAX_PARTITION_SIZE_MB,
+    _merge_spark_csv_schema,
     _post_process_dataframe,
     read_csv,
 )
 from dsgrid.ibis.types import (
-    spec_for_name,
-    spec_for_spark_sql,
-    spec_for_spark_type,
+    _duckdb_type_from_spark_type,
+    _ibis_type_from_spark_type,
     use_duckdb,
 )
 from dsgrid.loggers import disable_console_logging
@@ -610,98 +609,6 @@ def _schema_types(schema: Any | None, *, ibis_types: bool = True) -> dict[str, s
                 else _duckdb_type_from_spark_type(data_type)
             )
     return types or None
-
-
-def _duckdb_type_from_spark_type(data_type: Any) -> str:
-    try:
-        return spec_for_spark_type(data_type).duckdb_sql
-    except KeyError as exc:
-        raise NotImplementedError(str(exc)) from exc
-
-
-def _merge_spark_csv_schema(
-    session: Any, path: str, schema: dict[str, str], kwargs: dict[str, Any]
-):
-    # Lazy: only the Spark-runtime branch reaches this helper.
-    import pyspark.sql.types as pyspark_types
-
-    def make_type(dtype: str):
-        try:
-            spec = spec_for_spark_sql(dtype)
-        except KeyError as exc:
-            # Fall back to spec_for_name to also accept user-facing aliases
-            # like INTEGER/TEXT/VARCHAR that map to canonical spec_sql values.
-            try:
-                spec = spec_for_name(dtype)
-            except KeyError:
-                msg = f"Unsupported Spark CSV schema data type: {dtype}"
-                raise NotImplementedError(msg) from exc
-        class_name = spec.spark_type_names[0] if spec.spark_type_names else None
-        if class_name is None:
-            # Alias spec (e.g. INTEGER) — resolve to its canonical sibling.
-            class_name = spec_for_spark_sql(spec.spark_sql).spark_type_names[0]
-        return getattr(pyspark_types, class_name)()
-
-    # Try the cheap path first: read just the header line and assume the
-    # user provided a type for every column. This avoids a full Spark
-    # inferSchema scan (which previously doubled the read cost on large
-    # files). If any header column is missing from the user schema, fall
-    # back to inferSchema so those columns keep their inferred types.
-    column_names = _read_csv_header_columns(path, kwargs)
-    if column_names is not None and all(name in schema for name in column_names):
-        fields = [
-            pyspark_types.StructField(name, make_type(schema[name]), nullable=True)
-            for name in column_names
-        ]
-        return pyspark_types.StructType(fields)
-
-    inference_kwargs = dict(kwargs)
-    inference_kwargs.pop("schema", None)
-    inference_kwargs["inferSchema"] = True
-    inferred = session.read.csv(path, **inference_kwargs).schema
-    fields = [
-        pyspark_types.StructField(
-            field.name,
-            make_type(schema[field.name]) if field.name in schema else field.dataType,
-            field.nullable,
-            field.metadata,
-        )
-        for field in inferred
-    ]
-    return pyspark_types.StructType(fields)
-
-
-def _read_csv_header_columns(path: str, kwargs: dict[str, Any]) -> list[str] | None:
-    """Return the column names from a CSV file's header line.
-
-    Returns ``None`` for inputs we can't trivially peek at (e.g. a Spark
-    directory of part files or paths with non-default options like a
-    custom quote character); the caller falls back to ``inferSchema``.
-    """
-    file_path = Path(path)
-    if not file_path.is_file():
-        return None
-    encoding = kwargs.get("encoding") or "utf-8"
-    delimiter = kwargs.get("sep") or ","
-    try:
-        with open(file_path, encoding=encoding) as f_in:
-            header_line = f_in.readline()
-    except OSError:
-        return None
-    if not header_line:
-        return None
-    return [name.strip() for name in header_line.rstrip("\r\n").split(delimiter)]
-
-
-def _ibis_type_from_spark_type(data_type: Any) -> str:
-    try:
-        spec = spec_for_spark_type(data_type)
-    except KeyError as exc:
-        raise NotImplementedError(str(exc)) from exc
-    # Strip any tz-info suffix from the dtype string (TIMESTAMP_TZ maps to
-    # "timestamp('UTC')" for declared-cast purposes, but the inferred dtype
-    # for an existing Spark column has no tz attached).
-    return spec.ibis_dtype.split("(", 1)[0]
 
 
 @contextmanager

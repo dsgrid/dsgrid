@@ -10,7 +10,7 @@ from dsgrid.exceptions import DSGInvalidField, DSGInvalidOperation, DSGInvalidPa
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import cross_join_dfs, make_temp_view_name, union_all
 from dsgrid.time.types import DayType
-from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.table_utils import count_rows, table_to_pandas
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import (
     CsvPartitionWriter,
@@ -58,13 +58,12 @@ from dsgrid.ibis.session import (
     StructType,
     TimestampNTZType,
     TimestampType,
-    _duckdb_type_from_spark_type,
-    _ibis_type_from_spark_type,
     _schema_names,
     _schema_types,
     use_duckdb,
     _create_ibis_table,
 )
+from dsgrid.ibis.types import _duckdb_type_from_spark_type, _ibis_type_from_spark_type
 from dsgrid.ibis.tz import custom_time_zone, get_current_time_zone, set_current_time_zone
 
 
@@ -131,7 +130,7 @@ def test_create_dataframe_from_product(tmp_path):
             "sector": ["com", "ind", "res", "trans"],
         }
         df = create_dataframe_from_product(data, context, max_partition_size_mb=1)
-        assert df.count().execute() == reduce(lambda x, y: x * y, [len(x) for x in data.values()])
+        assert count_rows(df) == reduce(lambda x, y: x * y, [len(x) for x in data.values()])
 
 
 def test_get_type_from_union():
@@ -196,7 +195,7 @@ def test_duckdb_reader_shims(tmp_path):
 
     json_file = tmp_path / "table.json"
     json_file.write_text('[{"id": 1, "name": "a"}]\n')
-    assert session.read.json(json_file.as_posix()).count().execute() == 1
+    assert count_rows(session.read.json(json_file.as_posix())) == 1
 
     parquet_file = tmp_path / "table.parquet"
     write_dataframe(table, parquet_file)

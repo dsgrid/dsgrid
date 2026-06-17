@@ -4,8 +4,7 @@ import ibis
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.operations import join_multiple_columns, rename_columns
-from dsgrid.ibis.table_utils import count_rows
-from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.table_utils import count_rows, is_table_empty
 from dsgrid.utils.py_expression_eval import Parser
 
 

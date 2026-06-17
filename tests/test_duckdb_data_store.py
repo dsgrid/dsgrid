@@ -5,6 +5,7 @@ import pandas as pd
 
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import join_multiple_columns
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.registry.duckdb_data_store import DuckDbDataStore
 
@@ -13,10 +14,6 @@ pytestmark = pytest.mark.skipif(not use_duckdb(), reason="DuckDbDataStore requir
 
 def _make_df():
     return pd.DataFrame([{"id": "a", "value": 1}])
-
-
-def _count_rows(table):
-    return table.count().execute()
 
 
 def test_remove_tables(tmp_path):
@@ -28,8 +25,8 @@ def test_remove_tables(tmp_path):
     store.write_missing_associations_tables({"geo": df}, "ds1", "1.0.0")
 
     # Verify tables exist by reading them.
-    assert _count_rows(store.read_table("ds1", "1.0.0")) == 1
-    assert _count_rows(store.read_lookup_table("ds1", "1.0.0")) == 1
+    assert count_rows(store.read_table("ds1", "1.0.0")) == 1
+    assert count_rows(store.read_lookup_table("ds1", "1.0.0")) == 1
     assert len(store.read_expected_associations_tables("ds1", "1.0.0")) == 1
     assert len(store.read_missing_associations_tables("ds1", "1.0.0")) == 1
 

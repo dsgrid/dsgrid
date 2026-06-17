@@ -1,3 +1,5 @@
+"""Materialize-to-memory helpers for known-small Ibis tables (counts, distinct values, records)."""
+
 from typing import Any, Sequence
 
 import ibis
@@ -7,6 +9,18 @@ import pandas as pd
 def count_rows(table: ibis.Table) -> int:
     """Return the row count of a table by executing ``table.count()``."""
     return int(table.count().execute())  # ty: ignore[invalid-argument-type]
+
+
+def count_distinct(table: ibis.Table, column: str) -> int:
+    """Return the number of distinct values in a single column."""
+    return int(
+        table.select(column).distinct().count().execute()
+    )  # ty: ignore[invalid-argument-type]
+
+
+def is_table_empty(table: Any) -> bool:
+    """Return True if a table-like object has no rows."""
+    return table.limit(1).count().execute() == 0
 
 
 def table_to_pandas(table: Any) -> pd.DataFrame:

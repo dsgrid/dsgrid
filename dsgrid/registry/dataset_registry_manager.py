@@ -44,11 +44,11 @@ from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
 from dsgrid.ibis.functions import select_expr
 from dsgrid.ibis.operations import drop_columns, filter_sql
+from dsgrid.ibis.table_utils import is_table_empty
 from dsgrid.ibis.types import (
     DUCKDB_COLUMN_TYPES,
     SPARK_COLUMN_TYPES,
     get_str_type,
-    is_table_empty,
     use_duckdb,
 )
 

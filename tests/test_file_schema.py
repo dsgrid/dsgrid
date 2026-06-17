@@ -33,7 +33,8 @@ from dsgrid.ibis.session import (
 from dsgrid.ibis.io import read_parquet, write_dataframe
 from dsgrid.ibis.tz import custom_time_zone
 
-from tests._helpers import collect as _collect, count as _count, order_by as _order_by
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect, order_by as _order_by
 
 
 @pytest.fixture(scope="module")
@@ -199,7 +200,7 @@ def test_drop_ignored_columns_basic(spark):
     )
     result = _drop_ignored_columns(df, ["name"])
     assert set(result.columns) == {"id", "value"}
-    assert _count(result) == 2
+    assert count_rows(result) == 2
 
 
 def test_drop_ignored_columns_multiple(spark):
@@ -352,7 +353,7 @@ def test_read_data_file_csv(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert set(df.columns) == {"id", "name", "value"}
     rows = _collect(df)
     assert rows[0].id == 1
@@ -392,7 +393,7 @@ def test_read_data_file_parquet(tmp_path, spark):
     schema = FileSchema(path=str(parquet_file), columns=columns)
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert "id" in df.columns
     assert "name" in df.columns
     assert "value" in df.columns
@@ -411,7 +412,7 @@ def test_read_data_file_json(tmp_path, spark):
     schema = FileSchema(path=str(json_file), columns=columns)
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert "id" in df.columns
     assert "name" in df.columns
 
@@ -463,7 +464,7 @@ def test_read_data_file_csv_inferred_types(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=[])
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert set(df.columns) == {"id", "name", "value"}
 
 
@@ -506,7 +507,7 @@ def test_read_data_file_csv_with_fips_codes_and_energy_data(tmp_path, spark):
     ]
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
-    assert _count(df) == 4
+    assert count_rows(df) == 4
 
     # Verify columns were renamed via dimension_type
     assert "county" not in df.columns
@@ -555,7 +556,7 @@ def test_read_data_file_csv_timestamp_with_timezone(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert _count(df) == 4
+    assert count_rows(df) == 4
     assert set(df.columns) == {"id", "timestamp", "com_cooling", "com_fans"}
 
     # Collect the timestamps and verify they were parsed correctly
@@ -607,7 +608,7 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)
 
-    assert _count(df) == 4
+    assert count_rows(df) == 4
     assert set(df.columns) == {"id", "timestamp", "com_cooling", "com_fans"}
 
     # Collect the timestamps and verify they were parsed correctly
@@ -653,7 +654,7 @@ def test_read_data_file_csv_with_ignore_columns(tmp_path, spark):
     )
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert set(df.columns) == {"id", "name", "value"}
     assert "extra" not in df.columns
 
@@ -725,7 +726,7 @@ def test_read_data_file_parquet_with_ignore_columns(tmp_path, spark):
     )
     df = read_data_file(schema)
 
-    assert _count(df) == 2
+    assert count_rows(df) == 2
     assert set(df.columns) == {"id", "name", "value"}
     assert "to_ignore" not in df.columns
 

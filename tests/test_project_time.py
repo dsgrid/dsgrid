@@ -28,7 +28,7 @@ from dsgrid.ibis.functions import (
     set_current_time_zone,
     perform_interval_op,
 )
-from dsgrid.ibis.table_utils import get_unique_values
+from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
 from dsgrid.ibis.session import (
     F,
     FloatType,
@@ -48,7 +48,6 @@ from tests._helpers import (
     collect as _collect,
     order_by as _order_by,
     row_value as _row_value,
-    to_pandas as _to_pandas,
 )
 
 
@@ -179,7 +178,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     # get sum from converted_data
     groupby_cols = [col for col in converted_data.columns if col not in [ptime_col, VALUE_COLUMN]]
     converted_sum = _sum_value_by_group(converted_data, groupby_cols)
-    pdf = _to_pandas(converted_sum)
+    pdf = table_to_pandas(converted_sum)
     pdf[VALUE_COLUMN] = pdf[VALUE_COLUMN].round(3)
     converted_sum_df = pdf.set_index(groupby_cols).sort_index()
 
@@ -233,7 +232,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         .to_frame()
     )
     other_cols = [col for col in raw_data.columns if col != VALUE_COLUMN]
-    raw_data_df = _to_pandas(raw_data.select(other_cols + [VALUE_COLUMN])).join(
+    raw_data_df = table_to_pandas(raw_data.select(other_cols + [VALUE_COLUMN])).join(
         model_time_map, on=["time_zone"] + time_cols, how="left"
     )
     raw_data_df[VALUE_COLUMN] = raw_data_df[VALUE_COLUMN].round(3)
@@ -289,7 +288,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             )
             time_df = spark.sql(f"SELECT * FROM {table}")
         else:
-            time_df_pdf = _to_pandas(time_df)
+            time_df_pdf = table_to_pandas(time_df)
             time_df = create_dataframe_from_pandas(time_df_pdf)
     finally:
         # reset session time_zone
@@ -306,11 +305,11 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     )
 
     raw_sum_df2 = _sum_value_times_count_by_group(raw_data_df2, groupby_cols)
-    raw_sum_df2 = _to_pandas(raw_sum_df2).set_index(groupby_cols).sort_index()
+    raw_sum_df2 = table_to_pandas(raw_sum_df2).set_index(groupby_cols).sort_index()
     raw_sum_df2[VALUE_COLUMN] = raw_sum_df2[VALUE_COLUMN].round(3)
 
     # check 1: that mapping df are the same for both spark and pandas
-    time_df2 = _to_pandas(time_df)
+    time_df2 = table_to_pandas(time_df)
     if not use_duckdb():
         time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
             session_tz, ambiguous="infer"
@@ -329,7 +328,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     assert list(n_ts) == [
         len(model_time)
     ], f"Mismatch in number of timestamps for pandas: {n_ts} vs. {len(model_time)}"
-    n_ts2 = _to_pandas(_distinct_sum_count_by_group(raw_data_df2, groupby_cols))
+    n_ts2 = table_to_pandas(_distinct_sum_count_by_group(raw_data_df2, groupby_cols))
     assert n_ts2["count"].to_list() == [
         len(model_time)
     ], f"Mismatch in number of timestamps for spark: {n_ts2} vs. {len(model_time)}"

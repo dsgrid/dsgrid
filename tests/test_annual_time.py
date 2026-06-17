@@ -21,7 +21,8 @@ from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
 from dsgrid.ibis.session import F, create_dataframe_from_dicts, use_duckdb
 
-from tests._helpers import collect as _collect, count as _count
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect
 
 
 def _count_timestamps_per_model_year(df, time_col: str):
@@ -69,7 +70,7 @@ def annual_dataframe():
     df = create_dataframe_from_dicts(data)
     if not use_duckdb():
         df.cache()
-        _count(df)
+        count_rows(df)
     yield df
 
 
@@ -188,9 +189,9 @@ def test_map_annual_time_total_to_datetime(
     expected_by_year = {
         x.time_year: x.electricity_sales / (366 * 24) for x in _collect(annual_dataframe)
     }
-    num_rows = _count(annual_dataframe)
+    num_rows = count_rows(annual_dataframe)
     num_timestamps = 24 * 7
-    assert _count(df) == num_rows * num_timestamps
+    assert count_rows(df) == num_rows * num_timestamps
     values = _collect(df.select("model_year", "electricity_sales").distinct())
     assert len(values) == num_rows
     by_year = {x.model_year: x.electricity_sales for x in values}

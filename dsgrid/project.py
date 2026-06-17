@@ -33,7 +33,7 @@ from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
-from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.table_utils import is_table_empty
 from dsgrid.ibis.io import (
     read_dataframe,
     try_read_dataframe,

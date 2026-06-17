@@ -1,3 +1,5 @@
+"""Runtime backend lifecycle: the chronify/Ibis backend singleton and DuckDB file attachment."""
+
 import logging
 from pathlib import Path
 from typing import Any, cast

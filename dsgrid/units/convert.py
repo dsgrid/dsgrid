@@ -3,8 +3,7 @@ import logging
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.ibis.operations import drop_columns, except_all, join, rename_columns
-from dsgrid.ibis.table_utils import get_unique_values
-from dsgrid.ibis.types import is_table_empty
+from dsgrid.ibis.table_utils import get_unique_values, is_table_empty
 from dsgrid.units.constants import (
     ENERGY_UNITS,
     POWER_UNITS,

@@ -1,14 +1,12 @@
 import logging
 from pathlib import Path
 
-import ibis
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidQuery
-from dsgrid.ibis.operations import join_multiple_columns
+from dsgrid.ibis.operations import join_multiple_columns, max_by_group
 from dsgrid.query.models import ProjectQueryModel
 from dsgrid.utils.dataset import ordered_subset_columns
 from dsgrid.utils.files import delete_if_exists
@@ -52,7 +50,7 @@ class PeakLoadReport(ReportsBase):
             group_by_columns.append(metric_column)
 
         df = read_dataframe(filename)
-        peak_load = _max_by_group(df, group_by_columns, value_columns)
+        peak_load = max_by_group(df, group_by_columns, value_columns)
         join_cols = group_by_columns + value_columns
         time_columns = context.get_dimension_column_names(DimensionType.TIME)
         diff = time_columns.difference(df.columns)
@@ -67,10 +65,3 @@ class PeakLoadReport(ReportsBase):
         write_dataframe(with_time, output_file)
         logger.info("Wrote Peak Load Report to %s", output_file)
         return output_file
-
-
-def _max_by_group(
-    df: ibis.Table, group_by_columns: list[str], value_columns: list[str]
-) -> ibis.Table:
-    aggs = {col: df[col].max() for col in value_columns}
-    return df.group_by(*group_by_columns).aggregate(**aggs)

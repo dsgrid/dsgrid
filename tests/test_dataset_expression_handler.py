@@ -10,7 +10,8 @@ from dsgrid.ibis.functions import cache
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import create_dataframe_from_dicts
 
-from tests._helpers import collect as _collect, count as _count
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -40,7 +41,7 @@ def datasets():
 def test_dataset_expression_add(datasets):
     df = evaluate_expression("dataset1 + dataset2", datasets).df
     cache(df)
-    assert _count(df) == 3
+    assert count_rows(df) == 3
     assert _collect(filter_sql(df, "county == 'Jefferson'"))[0].elec_cooling == 11
     assert _collect(filter_sql(df, "county == 'Boulder'"))[0].elec_cooling == 13
     assert _collect(filter_sql(df, "county == 'Denver'"))[0].elec_heating == 18
@@ -50,7 +51,7 @@ def test_dataset_expression_add(datasets):
 def test_dataset_expression_mul(datasets):
     df = evaluate_expression("dataset1 * dataset2", datasets).df
     cache(df)
-    assert _count(df) == 3
+    assert count_rows(df) == 3
     assert _collect(filter_sql(df, "county == 'Jefferson'"))[0].elec_cooling == 18
     assert _collect(filter_sql(df, "county == 'Boulder'"))[0].elec_cooling == 30
     assert _collect(filter_sql(df, "county == 'Denver'"))[0].elec_heating == 72
@@ -60,7 +61,7 @@ def test_dataset_expression_mul(datasets):
 def test_dataset_expression_sub(datasets):
     df = evaluate_expression("dataset2 - dataset1", datasets).df
     cache(df)
-    assert _count(df) == 3
+    assert count_rows(df) == 3
     assert _collect(filter_sql(df, "county == 'Jefferson'"))[0].elec_cooling == 7
     assert _collect(filter_sql(df, "county == 'Boulder'"))[0].elec_cooling == 7
     assert _collect(filter_sql(df, "county == 'Denver'"))[0].elec_heating == 6
@@ -70,25 +71,25 @@ def test_dataset_expression_sub(datasets):
 def test_dataset_expression_union(datasets):
     df = evaluate_expression("dataset1 | dataset2", datasets).df
     cache(df)
-    assert _count(df) == 6
-    assert _count(filter_sql(df, "county == 'Jefferson'")) == 2
-    assert _count(filter_sql(df, "county == 'Boulder'")) == 2
-    assert _count(filter_sql(df, "county == 'Denver'")) == 2
+    assert count_rows(df) == 6
+    assert count_rows(filter_sql(df, "county == 'Jefferson'")) == 2
+    assert count_rows(filter_sql(df, "county == 'Boulder'")) == 2
+    assert count_rows(filter_sql(df, "county == 'Denver'")) == 2
     assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_combo(datasets):
     df = evaluate_expression("(dataset1 + dataset2) | (dataset1 * dataset2)", datasets).df
     cache(df)
-    assert _count(df) == 6
+    assert count_rows(df) == 6
     jefferson = filter_sql(df, "county == 'Jefferson'")
-    assert _count(jefferson) == 2
+    assert count_rows(jefferson) == 2
     assert sorted(x.elec_cooling for x in _collect(jefferson)) == [11, 18]
     boulder = filter_sql(df, "county == 'Boulder'")
-    assert _count(boulder) == 2
+    assert count_rows(boulder) == 2
     assert sorted(x.elec_cooling for x in _collect(boulder)) == [13, 30]
     denver = filter_sql(df, "county == 'Denver'")
-    assert _count(denver) == 2
+    assert count_rows(denver) == 2
     assert sorted(x.elec_heating for x in _collect(denver)) == [18, 72]
     assert df.columns == datasets["dataset1"].df.columns
 

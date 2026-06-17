@@ -1,3 +1,5 @@
+"""Naming, tracking, and cleanup of temporary tables, views, and files."""
+
 import atexit
 import logging
 import shutil

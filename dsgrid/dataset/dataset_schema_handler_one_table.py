@@ -17,7 +17,7 @@ from dsgrid.utils.dataset import (
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.null_checks import check_for_nulls
-from dsgrid.ibis.table_utils import count_rows
+from dsgrid.ibis.table_utils import count_distinct
 from dsgrid.ibis.operations import drop_columns
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -138,7 +138,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = count_rows(load_df.select(col).distinct())
+            count = count_distinct(load_df, col)
             assert count == 1, f"{dim}: {count}"
             columns_to_drop.append(col)
         load_df = drop_columns(load_df, *columns_to_drop)

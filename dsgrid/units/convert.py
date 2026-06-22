@@ -97,17 +97,18 @@ def _make_conversion_expr(
     from_col = df[from_unit_col]
     to_col = df[to_unit_col]
     value_col = df[VALUE_COLUMN]
-    cases = [
-        (from_col == to_col, value_col),
-        (from_col == "", value_col),
-    ]
-    for to_unit, to_factor in unit_to_base.items():
-        for from_unit, from_factor in unit_to_base.items():
-            if from_unit == to_unit:
-                continue
-            factor = from_factor / to_factor
-            cases.append(((to_col == to_unit) & (from_col == from_unit), value_col * factor))
-    return ibis.cases(*cases)
+    # Factor of each known unit relative to the family base unit. An unknown
+    # (non-empty) unit matches no branch, so ibis.cases emits NULL for it; the
+    # NULL then propagates through the division below (guarded else).
+    from_factor = ibis.cases(
+        *[(from_col == unit, factor) for unit, factor in unit_to_base.items()]
+    )
+    to_factor = ibis.cases(*[(to_col == unit, factor) for unit, factor in unit_to_base.items()])
+    return ibis.cases(
+        (from_col == to_col, value_col),  # same unit (incl. unitless == unitless) -> passthrough
+        (from_col == "", value_col),  # unitless source -> passthrough
+        else_=value_col * (from_factor / to_factor),  # ty: ignore[unsupported-operator]
+    )
 
 
 _ENERGY_TO_KWH = {

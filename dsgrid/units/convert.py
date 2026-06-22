@@ -96,7 +96,12 @@ def _make_conversion_expr(
 ):
     from_col = df[from_unit_col]
     to_col = df[to_unit_col]
-    value_col = df[VALUE_COLUMN]
+    # Cast to double up front for two reasons: (1) the output dtype is then
+    # deterministically float64 regardless of the source column's width (a
+    # float32 value column otherwise yields a float32 result on some DuckDB
+    # versions, breaking dtype-sensitive comparisons); (2) it keeps a double
+    # operand leading the arithmetic below.
+    value_col = df[VALUE_COLUMN].cast("float64")
     # Factor of each known unit relative to the family base unit. An unknown
     # (non-empty) unit matches no branch, so ibis.cases emits NULL for it; the
     # NULL then propagates through the division below (guarded else).
@@ -105,9 +110,9 @@ def _make_conversion_expr(
     )
     to_factor = ibis.cases(*[(to_col == unit, factor) for unit, factor in unit_to_base.items()])
     # Thread the (double) value column through both operations so every backend
-    # keeps the arithmetic in double precision. Do NOT move the
-    # ``value_col * (from_factor / to_factor)`` logic to the ``else_`` kwarg: that divides two
-    # decimal literals (CASE / CASE) which causes Spark to lose precision.
+    # keeps the arithmetic in double precision. Do NOT rewrite as
+    # ``value_col * (from_factor / to_factor)``: that divides two decimal literals
+    # (CASE / CASE) which causes Spark to lose precision.
     converted = value_col * from_factor / to_factor
     return ibis.cases(
         (from_col == to_col, value_col),  # same unit (incl. unitless == unitless) -> passthrough

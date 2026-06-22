@@ -96,26 +96,27 @@ def _make_conversion_expr(
 ):
     from_col = df[from_unit_col]
     to_col = df[to_unit_col]
-    # Cast to double up front for two reasons: (1) the output dtype is then
-    # deterministically float64 regardless of the source column's width (a
-    # float32 value column otherwise yields a float32 result on some DuckDB
-    # versions, breaking dtype-sensitive comparisons); (2) it keeps a double
-    # operand leading the arithmetic below.
+    # Cast to double so the result dtype is deterministically float64 (a float32
+    # source otherwise yields float32 on some DuckDB versions) and a real double
+    # operand leads the arithmetic below.
     value_col = df[VALUE_COLUMN].cast("float64")
-    # Factor of each known unit relative to the family base unit. An unknown
-    # (non-empty) unit matches no branch, so ibis.cases emits NULL for it; the
-    # NULL then propagates through the division below (guarded else).
-    from_factor = ibis.cases(
-        *[(from_col == unit, factor) for unit, factor in unit_to_base.items()]
+    # Map each unit to its factor relative to the family base unit. An unknown
+    # (non-empty) unit matches no branch, so ibis.cases emits NULL, which
+    # propagates to the result (preserving "unknown unit -> NULL").
+    from_factor = ibis.cases(*[(from_col == unit, f) for unit, f in unit_to_base.items()]).cast(
+        "float64"
     )
-    to_factor = ibis.cases(*[(to_col == unit, factor) for unit, factor in unit_to_base.items()])
-    # Thread the (double) value column through both operations so every backend
-    # keeps the arithmetic in double precision. Do NOT rewrite as
-    # ``value_col * (from_factor / to_factor)``: that divides two decimal literals
-    # (CASE / CASE) which causes Spark to lose precision.
+    to_factor = ibis.cases(*[(to_col == unit, f) for unit, f in unit_to_base.items()]).cast(
+        "float64"
+    )
+    # Group as ``value * from / to`` (i.e. (value*from)/to), NOT ``value*(from/to)``:
+    # the latter divides two float64 literals, which Spark compiles to a
+    # decimal/decimal division and truncates the scale (~6 sig figs for small
+    # ratios like therm -> TWh). Keeping value (a double) in each operation forces
+    # double arithmetic on every backend.
     converted = value_col * from_factor / to_factor
     return ibis.cases(
-        (from_col == to_col, value_col),  # same unit (incl. unitless == unitless) -> passthrough
+        (from_col == to_col, value_col),  # same unit (incl. unitless) -> passthrough
         (from_col == "", value_col),  # unitless source -> passthrough
         else_=converted,
     )

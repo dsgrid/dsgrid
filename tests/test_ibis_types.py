@@ -8,6 +8,18 @@ four stay consistent as new types are added.
 import ibis.expr.datatypes as dt
 import pytest
 
+from dsgrid.ibis.session import (
+    BooleanType,
+    ByteType,
+    DoubleType,
+    FloatType,
+    IntegerType,
+    LongType,
+    ShortType,
+    StringType,
+    TimestampNTZType,
+    TimestampType,
+)
 from dsgrid.ibis.types import (
     DUCKDB_COLUMN_TYPES,
     SPARK_COLUMN_TYPES,
@@ -17,6 +29,8 @@ from dsgrid.ibis.types import (
     spec_for_name,
     spec_for_spark_sql,
     spec_for_spark_type,
+    _duckdb_type_from_spark_type,
+    _ibis_type_from_spark_type,
 )
 
 
@@ -93,3 +107,41 @@ def test_int_int32_bit_width():
     assert spec_for_name("INT").bit_width == 32
     assert spec_for_name("INTEGER").bit_width == 32
     assert spec_for_name("BIGINT").bit_width == 64
+
+
+def test_schema_type_mappings():
+    expected = [
+        (BooleanType(), "boolean", "BOOLEAN"),
+        (ByteType(), "int8", "TINYINT"),
+        (ShortType(), "int16", "SMALLINT"),
+        (IntegerType(), "int32", "INTEGER"),
+        (LongType(), "int64", "BIGINT"),
+        (FloatType(), "float32", "FLOAT"),
+        (DoubleType(), "float64", "DOUBLE"),
+        (StringType(), "string", "VARCHAR"),
+        # TimestampType is Spark's TZ-aware instant type; map to DuckDB's
+        # TIMESTAMP WITH TIME ZONE for round-trip parity. The prior code
+        # mapped both Timestamp variants to "TIMESTAMP" and lost the TZ
+        # distinction; TypeSpec separates them.
+        (TimestampType(), "timestamp", "TIMESTAMP WITH TIME ZONE"),
+        (TimestampNTZType(), "timestamp", "TIMESTAMP"),
+    ]
+    for data_type, ibis_type, duckdb_type in expected:
+        assert _ibis_type_from_spark_type(data_type) == ibis_type
+        assert _duckdb_type_from_spark_type(data_type) == duckdb_type
+
+
+def test_schema_type_invalid():
+    class UnsupportedType:
+        pass
+
+    with pytest.raises(NotImplementedError, match="Unsupported schema data type"):
+        _ibis_type_from_spark_type(UnsupportedType())
+
+
+def test_duckdb_type_from_spark_type_invalid():
+    class UnsupportedType:
+        pass
+
+    with pytest.raises(NotImplementedError, match="Unsupported schema data type"):
+        _duckdb_type_from_spark_type(UnsupportedType())

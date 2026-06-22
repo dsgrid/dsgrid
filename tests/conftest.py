@@ -3,10 +3,13 @@ import os
 import re
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Optional
+from typing import Generator, Optional
+from zoneinfo import ZoneInfo
 
+import ibis
 import pytest
 from click.testing import CliRunner
 
@@ -14,15 +17,17 @@ from dsgrid.cli.dsgrid import cli
 from dsgrid.registry.common import DataStoreType, DatabaseConnection, make_sqlite_url
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.ibis.functions import (
+    cache,
     drop_temp_tables_and_views,
     get_current_time_zone,
     set_current_time_zone,
+    unpersist,
 )
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.ibis.session import init_runtime_session
+from dsgrid.ibis.session import SparkSession, get_runtime_session, init_runtime_session
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
@@ -289,3 +294,60 @@ def spark_time_zone(request):
 def scratch_dir_context(tmp_path):
     with ScratchDirContext(tmp_path) as context:
         yield context
+
+
+# --- Shared Ibis dataframe fixtures ------------------------------------------
+# Used by tests/test_ibis_{functions,operations,io}.py, which exercise functions
+# defined across the dsgrid.ibis subpackage against a common set of small tables.
+
+
+@pytest.fixture(scope="module")
+def spark() -> Generator[SparkSession, None, None]:
+    yield get_runtime_session()
+
+
+@pytest.fixture(scope="module")
+def dataframe(spark) -> Generator[ibis.Table, None, None]:
+    df = spark.createDataFrame(
+        [
+            (0, "cooling", 1.0),
+            (0, "heating", 2.0),
+            (1, "cooling", 3.0),
+            (1, "heating", 4.0),
+        ],
+        ["index", "metric", "value"],
+    )
+    df = cache(df)
+    yield df
+    unpersist(df)
+
+
+@pytest.fixture(scope="module")
+def geo_dataframe(spark) -> Generator[ibis.Table, None, None]:
+    df = spark.createDataFrame(
+        [
+            ("Boulder",),
+            ("Jefferson",),
+        ],
+        ["county"],
+    )
+    df = cache(df)
+    yield df
+    unpersist(df)
+
+
+@pytest.fixture(scope="module")
+def time_dataframe(spark) -> Generator[ibis.Table, None, None]:
+    utc = ZoneInfo("UTC")
+    df = spark.createDataFrame(
+        [
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "cooling", 1.0),
+            (datetime(2020, 1, 1, 0, tzinfo=utc), "heating", 2.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "cooling", 3.0),
+            (datetime(2020, 1, 1, 1, tzinfo=utc), "heating", 4.0),
+        ],
+        ["timestamp", "metric", "value"],
+    )
+    df = cache(df)
+    yield df
+    unpersist(df)

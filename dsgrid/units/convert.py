@@ -104,10 +104,16 @@ def _make_conversion_expr(
         *[(from_col == unit, factor) for unit, factor in unit_to_base.items()]
     )
     to_factor = ibis.cases(*[(to_col == unit, factor) for unit, factor in unit_to_base.items()])
+    # Thread the (double) value column through both operations so every backend
+    # keeps the arithmetic in double precision. Do NOT rewrite as
+    # ``value_col * (from_factor / to_factor)``: that divides two decimal literals
+    # (CASE / CASE) which Spark evaluates in truncated-scale decimal and loses
+    # precision, while an unknown unit still yields NULL (guarded else). See PR #414.
+    converted = value_col * from_factor / to_factor
     return ibis.cases(
         (from_col == to_col, value_col),  # same unit (incl. unitless == unitless) -> passthrough
         (from_col == "", value_col),  # unitless source -> passthrough
-        else_=value_col * (from_factor / to_factor),  # ty: ignore[unsupported-operator]
+        else_=converted,
     )
 
 

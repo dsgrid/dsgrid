@@ -28,7 +28,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.dataset_config_generator import (
     generate_config_from_dataset,
-    load_generate_config_schemas,
+    load_data_file_columns,
 )
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.project_config_generator import generate_project_config
@@ -1708,7 +1708,7 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
         "readers don't infer mismatched types across csv and json inputs (e.g. an "
         "integer 'id' read as a string from csv but a 64-bit integer from json). "
         "Maps each file role to a list of column definitions: "
-        "{load_data: [...], load_data_lookup: [...]}. See the GenerateConfigSchemas "
+        "{load_data: [...], load_data_lookup: [...]}. See the DataFileColumns "
         "and Column data models in the dsgrid documentation for the field shape and "
         "supported data_type values."
     ),
@@ -1738,7 +1738,7 @@ def generate_dataset_config_from_dataset(
     Look for matches for dimensions in the registry. Prompt the user for confirmation unless
     --no-prompts is set. If --no-prompts is set, the first match is automatically accepted.
     """
-    schemas = load_generate_config_schemas(schema_file) if schema_file is not None else None
+    data_file_columns = load_data_file_columns(schema_file) if schema_file is not None else None
     res = handle_dsgrid_exception(
         ctx,
         generate_config_from_dataset,
@@ -1754,7 +1754,7 @@ def generate_dataset_config_from_dataset(
         project_id=project_id,
         no_prompts=no_prompts,
         overwrite=overwrite,
-        schemas=schemas,
+        data_file_columns=data_file_columns,
     )
     if res[1] != 0:
         ctx.exit(res[1])

@@ -34,7 +34,7 @@ MODELS = [
             # CLI ``generate-config --schema-file`` input. Not nested under
             # DatasetConfigModel, but its ``Column`` entries are (via FileSchema),
             # so documenting it here lets those link instead of duplicating.
-            "dsgrid.registry.dataset_config_generator.GenerateConfigSchemas",
+            "dsgrid.registry.dataset_config_generator.DataFileColumns",
         ],
     ),
     (

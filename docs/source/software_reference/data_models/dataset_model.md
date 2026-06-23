@@ -226,14 +226,14 @@ User-defined data layout for dataset registration.
 
 ---
 
-## GenerateConfigSchemas
+## DataFileColumns
 
-*dsgrid.registry.dataset_config_generator.GenerateConfigSchemas*
+*dsgrid.registry.dataset_config_generator.DataFileColumns*
 
-User-declared column types for files scanned by ``generate-config``.
+User-declared columns for the data files scanned by ``generate-config``.
 
 The CLI reads raw on-disk files before a dataset config exists, so dsgrid
-cannot derive column types from a registered schema. Users declare types
+cannot derive column types from a registered schema. Users declare columns
 here per file role to give the readers an authoritative schema.
 
 - ``one_table`` layouts only need ``load_data``.
@@ -249,7 +249,7 @@ so the same schema applies uniformly to CSV, JSON, and Parquet inputs.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `load_data` | list[[Column](dataset_model.md#column)] | `[]` | Column types for the load_data file. |
-| `load_data_lookup` | list[[Column](dataset_model.md#column)] | `[]` | Column types for the load_data_lookup file (two_table only). |
+| `load_data` | list[[Column](dataset_model.md#column)] | `[]` | Columns for the load_data file. |
+| `load_data_lookup` | list[[Column](dataset_model.md#column)] | `[]` | Columns for the load_data_lookup file (two_table only). |
 
 </div>

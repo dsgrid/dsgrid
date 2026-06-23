@@ -26,11 +26,11 @@ from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 logger = logging.getLogger(__name__)
 
 
-class GenerateConfigSchemas(DSGBaseModel):
-    """User-declared column types for files scanned by ``generate-config``.
+class DataFileColumns(DSGBaseModel):
+    """User-declared columns for the data files scanned by ``generate-config``.
 
     The CLI reads raw on-disk files before a dataset config exists, so dsgrid
-    cannot derive column types from a registered schema. Users declare types
+    cannot derive column types from a registered schema. Users declare columns
     here per file role to give the readers an authoritative schema.
 
     - ``one_table`` layouts only need ``load_data``.
@@ -43,16 +43,16 @@ class GenerateConfigSchemas(DSGBaseModel):
 
     load_data: list[Column] = Field(
         default_factory=list,
-        description="Column types for the load_data file.",
+        description="Columns for the load_data file.",
     )
     load_data_lookup: list[Column] = Field(
         default_factory=list,
-        description="Column types for the load_data_lookup file (two_table only).",
+        description="Columns for the load_data_lookup file (two_table only).",
     )
 
 
-def load_generate_config_schemas(path: Path) -> GenerateConfigSchemas:
-    """Load a ``--schema-file`` JSON5 document into a :class:`GenerateConfigSchemas`.
+def load_data_file_columns(path: Path) -> DataFileColumns:
+    """Load a ``--schema-file`` JSON5 document into a :class:`DataFileColumns`.
 
     Parameters
     ----------
@@ -62,15 +62,15 @@ def load_generate_config_schemas(path: Path) -> GenerateConfigSchemas:
 
     Returns
     -------
-    GenerateConfigSchemas
+    DataFileColumns
 
     Raises
     ------
     DSGInvalidParameter
-        If the file cannot be parsed into the schemas model.
+        If the file cannot be parsed into the model.
     """
     try:
-        return GenerateConfigSchemas.model_validate(load_data(path))
+        return DataFileColumns.model_validate(load_data(path))
     except Exception as exc:
         msg = f"Failed to parse schema file {path}: {exc}"
         raise DSGInvalidParameter(msg) from exc
@@ -89,7 +89,7 @@ def generate_config_from_dataset(
     project_id: str | None = None,
     overwrite: bool = False,
     no_prompts: bool = False,
-    schemas: GenerateConfigSchemas | None = None,
+    data_file_columns: DataFileColumns | None = None,
 ):
     """Generate dataset config files from a dataset table.
 
@@ -101,9 +101,9 @@ def generate_config_from_dataset(
 
     Parameters
     ----------
-    schemas : GenerateConfigSchemas | None
-        Optional user-declared column types for the input files. See
-        :class:`GenerateConfigSchemas`. When omitted, dsgrid relies on each
+    data_file_columns : DataFileColumns | None
+        Optional user-declared columns for the input files. See
+        :class:`DataFileColumns`. When omitted, dsgrid relies on each
         backend's default reader, which can disagree across CSV and JSON (e.g.
         DuckDB's CSV reader returns all columns as VARCHAR while its JSON
         reader infers types). Pass this when the input files include a shared
@@ -120,8 +120,12 @@ def generate_config_from_dataset(
     dataset_file = output_dir / "dataset.json5"
     time_cols = time_columns or {"timestamp"}
 
-    load_data_columns = list(schemas.load_data) if schemas is not None else None
-    load_data_lookup_columns = list(schemas.load_data_lookup) if schemas is not None else None
+    load_data_columns = (
+        list(data_file_columns.load_data) if data_file_columns is not None else None
+    )
+    load_data_lookup_columns = (
+        list(data_file_columns.load_data_lookup) if data_file_columns is not None else None
+    )
 
     dimension_references: list[DimensionReferenceModel] = []
     for dim_type, ids in get_unique_dimension_record_ids(

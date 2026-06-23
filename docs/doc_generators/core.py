@@ -12,6 +12,7 @@ from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefined
 
 
 def get_type_string(field_type: Any, documented_models: dict = None) -> str:
@@ -101,6 +102,15 @@ def get_default_string(field_info: FieldInfo) -> str:
         return "*(required)*"
 
     default = field_info.default
+    if default is PydanticUndefined and field_info.default_factory is not None:
+        # Fields using ``default_factory`` (e.g. ``default_factory=list``) leave
+        # ``default`` as the sentinel; call the factory to show the real default.
+        try:
+            default = field_info.default_factory()  # ty: ignore[missing-argument]
+        except TypeError:
+            # Factory needs validated data (pydantic passes it for some
+            # factories); fall back rather than guessing a value.
+            return "*(computed)*"
     if default is None:
         return "`None`"
     elif isinstance(default, str):

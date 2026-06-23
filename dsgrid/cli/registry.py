@@ -1704,12 +1704,13 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help=(
-        "Optional JSON5 file declaring column types for the input files. "
-        "Shape: {load_data: [{name, data_type}, ...], load_data_lookup: [...]}. "
-        "Use this when readers would otherwise infer mismatched types across CSV "
-        "and JSON inputs (e.g. an integer 'id' column read as VARCHAR from CSV "
-        "but as BIGINT from JSON). Supported data_type values match dsgrid's "
-        "FileSchema vocabulary: BIGINT, INTEGER, VARCHAR, DOUBLE, etc."
+        "Optional json5 file declaring column types for the input files, so the "
+        "readers don't infer mismatched types across csv and json inputs (e.g. an "
+        "integer 'id' read as a string from csv but a 64-bit integer from json). "
+        "Maps each file role to a list of column definitions: "
+        "{load_data: [...], load_data_lookup: [...]}. See the GenerateConfigSchemas "
+        "and Column data models in the dsgrid documentation for the field shape and "
+        "supported data_type values."
     ),
 )
 @click.pass_obj

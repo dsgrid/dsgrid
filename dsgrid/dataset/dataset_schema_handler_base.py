@@ -288,6 +288,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         raise DSGInvalidDataset(msg)
 
             cols = sorted(required_assoc.columns)
+            # diff is read twice below — the emptiness check and, if non-empty,
+            # the error handler — so cache the except_all to compute it once.
             diff = cache(except_all(required_assoc.select(*cols), assoc_by_data.select(*cols)))
             try:
                 if not is_table_empty(diff):

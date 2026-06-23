@@ -26,7 +26,6 @@ from dsgrid.ibis.functions import (
     get_current_time_zone,
     select_expr,
     set_current_time_zone,
-    perform_interval_op,
 )
 from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
 from dsgrid.ibis.session import (
@@ -45,6 +44,7 @@ from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 from tests._helpers import (
     collect as _collect,
     order_by as _order_by,
+    perform_interval_op,
     row_value as _row_value,
 )
 

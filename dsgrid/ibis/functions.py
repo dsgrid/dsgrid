@@ -2,7 +2,6 @@
 
 import shutil
 from pathlib import Path
-from typing import Any
 
 import ibis
 
@@ -53,7 +52,6 @@ __all__ = [
     "join",
     "join_multiple_columns",
     "make_temp_view_name",
-    "perform_interval_op",
     "pivot",
     "read_csv",
     "select_expr",
@@ -100,20 +98,6 @@ def collect_list(df: ibis.Table, column: str) -> list:
 
 def is_dataframe_empty(df: ibis.Table) -> bool:
     return is_table_empty(df)
-
-
-def perform_interval_op(
-    df: ibis.Table, time_column: str, op: str, val: Any, unit: str, alias: str
-) -> ibis.Table:
-    view = create_temp_view(df)
-    cols = df.columns[:]
-    if alias == time_column:
-        cols.remove(time_column)
-    cols_str = ",".join([handle_column_spaces(x) for x in cols])
-    time_col = handle_column_spaces(time_column)
-    expr = f"{time_col} {op} INTERVAL {val} {unit}"
-    query = f"SELECT {expr} AS {alias}, {cols_str} from {view}"
-    return get_runtime_session().sql(query)
 
 
 def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:

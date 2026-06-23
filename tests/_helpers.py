@@ -12,6 +12,40 @@ pandas conversion, call ``dsgrid.ibis.table_utils`` (``count_rows`` /
 
 from typing import Any
 
+import ibis
+
+
+def perform_interval_op(
+    df: ibis.Table, time_column: str, op: str, val: Any, unit: str, alias: str
+) -> ibis.Table:
+    """Shift ``time_column`` by an interval, returning ``df`` with the result as ``alias``.
+
+    Test-only helper for building expected timestamps — e.g. converting between
+    ``PERIOD_BEGINNING`` and ``PERIOD_ENDING`` by shifting one time step. When
+    ``alias`` equals ``time_column`` the column is shifted in place (keeping its
+    position); otherwise the shifted values are added as a new column.
+
+    Parameters
+    ----------
+    df : ibis.Table
+    time_column : str
+        Name of the timestamp column to shift.
+    op : str
+        ``"+"`` or ``"-"``.
+    val : Any
+        Magnitude of the interval.
+    unit : str
+        Interval unit understood by :func:`ibis.interval` (e.g. ``"SECONDS"``).
+    alias : str
+        Output column name.
+    """
+    if op not in ("+", "-"):
+        msg = f"Unsupported interval op: {op!r}"
+        raise ValueError(msg)
+    delta = ibis.interval(**{unit.lower(): val})
+    shifted = df[time_column] + delta if op == "+" else df[time_column] - delta
+    return df.mutate(**{alias: shifted})
+
 
 def collect(df) -> list[Any]:
     """Materialize ``df`` into a list of named-tuple rows.

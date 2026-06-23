@@ -231,20 +231,34 @@ def read_parquet(path: Path | str) -> ibis.Table:
 
 
 def try_read_dataframe(filename: Path, delete_if_invalid: bool = True, **kwargs):
-    """Try to read the dataframe.
+    """Read a regenerable cache file, returning None on a miss instead of raising.
+
+    Intended for dsgrid's on-disk caches — hash-keyed cached datasets (see
+    ``Project``'s dataset caching) and intermediate query tables (the query
+    submitter's cache). Callers treat a ``None`` return as a cache miss and
+    regenerate the file, so a missing file and an unreadable (corrupt or
+    partially written) file are handled the same way.
+
+    ``delete_if_invalid`` defaults to True because an invalid cache file is
+    almost always a partial or corrupt write (e.g. an interrupted Spark job);
+    deleting it lets the caller rebuild a clean copy instead of failing on the
+    same bad file forever. Because of this side effect, point this function only
+    at regenerable cache files, not user-supplied source data — pass
+    ``delete_if_invalid=False`` to read without the delete.
 
     Parameters
     ----------
     filename : Path
-    delete_if_invalid : bool
-        Delete the file if it cannot be read, defaults to true.
+        Path to a cache file (or directory of part files).
+    delete_if_invalid : bool, optional
+        Delete ``filename`` when it exists but cannot be read. Defaults to True.
     kwargs
-        Forwarded to read_dataframe.
+        Forwarded to :func:`read_dataframe`.
 
     Returns
     -------
     ibis.Table | None
-        Returns None if the file does not exist or is invalid.
+        The table, or ``None`` if ``filename`` does not exist or is invalid.
     """
     if not filename.exists():
         return None

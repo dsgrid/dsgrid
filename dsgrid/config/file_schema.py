@@ -217,14 +217,15 @@ def _actual_type_family(dtype: Any) -> str:
 
 
 def _check_narrowing(spec: TypeSpec, column_name: str, actual_dtype: Any) -> None:
-    """Raise if the declared type would narrow the column's actual width.
+    """Raise if the declared type is too narrow to hold the column's actual values.
 
-    Detects two failure modes: an integer/float declared narrower than the
-    actual width (e.g. declared INT on an int64 column), and a numeric
-    declaration against a non-numeric actual type within the same family
-    (e.g. declared FLOAT on an int column). The latter is intentionally not
-    flagged here because it crosses subtypes within ``floating``/``integer``
-    families that callers may legitimately want to bridge.
+    Compares declared vs. actual bit width and rejects a declaration that would
+    drop bits — e.g. ``INT`` (32-bit) declared on an int64 column, or ``FLOAT``
+    (32-bit) declared on a float64 column. Equal-or-wider declarations pass,
+    including widening casts that bridge type families (e.g. int32 -> float64).
+
+    Only width is checked here. Whether a cross-family cast is permitted at all
+    is decided by the caller via ``strict_family`` in :func:`apply_declared_types`.
     """
     if spec.bit_width is None:
         return

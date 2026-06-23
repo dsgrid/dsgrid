@@ -778,7 +778,7 @@ def test_apply_declared_types_narrowing_raises(spark):
     """
     df = spark.createDataFrame([(1,)], ["id"])  # Spark createDataFrame → int64
     columns = [Column(name="id", data_type="INT")]  # INT → int32 (would narrow)
-    with pytest.raises(DSGInvalidField, match="would narrow"):
+    with pytest.raises(DSGInvalidField, match="is narrower than"):
         apply_declared_types(df, columns, strict_family=True)
 
 

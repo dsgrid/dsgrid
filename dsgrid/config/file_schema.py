@@ -234,10 +234,10 @@ def _check_narrowing(spec: TypeSpec, column_name: str, actual_dtype: Any) -> Non
         return
     if spec.bit_width < actual_bits:
         msg = (
-            f"Declared data_type={spec.name!r} ({spec.bit_width}-bit) would narrow "
-            f"column {column_name!r} from its actual {actual_dtype} ({actual_bits}-bit). "
-            f"Use a wider declaration (e.g. BIGINT for 64-bit integers) or remove "
-            f"the declaration if narrowing is intentional."
+            f"Declared data_type={spec.name!r} ({spec.bit_width}-bit) is narrower than "
+            f"column {column_name!r}'s actual {actual_dtype} ({actual_bits}-bit) and would "
+            f"drop data. Declare a type at least as wide (e.g. BIGINT for 64-bit integers), "
+            f"or remove the declaration to keep the column's actual type."
         )
         raise DSGInvalidField(msg)
 

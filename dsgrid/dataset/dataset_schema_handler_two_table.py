@@ -300,7 +300,8 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         if data_id_count != count or ldl_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                # Only run the query once (with Spark). Number of rows shouldn't be a problem.
+                # Cache so the diff is computed once and reused by the count and
+                # sample below. The number of rows shouldn't be a problem.
                 diff = cache(except_all(union_all(ld_ids, ldl_ids), intersect(ld_ids, ldl_ids)))
                 diff_count = count_rows(diff)
                 limit = 100

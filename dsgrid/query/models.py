@@ -2,7 +2,7 @@ import abc
 import itertools
 import re
 from enum import StrEnum
-from typing import Any, Generator, Union, Literal, Self, TypeAlias, cast
+from typing import Any, Generator, Union, Literal, Self, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
@@ -12,7 +12,6 @@ from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
-    PivotedTableFormatModel,
     TableFormatModel,
     StackedTableFormatModel,
     ValueFormat,
@@ -563,7 +562,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     @model_validator(mode="after")
     def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
         if self.table_format.format_type == ValueFormat.PIVOTED:
-            table_format = cast(PivotedTableFormatModel, self.table_format)
+            table_format = self.table_format
             pivoted_dim_type = table_format.pivoted_dimension_type
             for agg in self.aggregations:
                 names = getattr(agg.dimensions, pivoted_dim_type.value)

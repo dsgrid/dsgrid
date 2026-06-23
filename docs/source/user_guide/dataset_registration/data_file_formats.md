@@ -369,9 +369,8 @@ Both `expected_associations` and `missing_associations` accept absolute or relat
 ### CSV Files
 
 While not generally recommended, dsgrid does support CSV data files. By default,
-dsgrid lets the active Ibis backend infer the schema of the file (DuckDB unless
-Spark is configured). Inference differs by backend: DuckDB infers column types
-from the data, while Spark reads every column as a string. Inferred types can
+dsgrid lets the active Ibis backend infer the schema from the data -- DuckDB
+natively, and Spark by setting `inferSchema` to `True`. Inferred types can
 also be wrong or ambiguous — for example, a leading-zero FIPS-style ID sniffed
 as an integer (dropping the leading zero), integer vs float, or timestamps with
 time zones. dsgrid provides two ways to declare column data types explicitly:

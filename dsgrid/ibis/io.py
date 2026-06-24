@@ -421,16 +421,20 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
 
 
 @track_timing(timer_stats_collector)
-def persist_intermediate_table(
+def persist_and_reload_table(
     df: ibis.Table, scratch_dir_context: ScratchDirContext, auto_partition: bool = False
 ) -> ibis.Table:
-    """Materialize a table to files and read it back, returning a fresh table.
+    """Persist a table to a scratch file and reload it, returning the re-read table.
 
-    The returned table reads from the persisted parquet, so it no longer carries
-    the upstream lazy lineage. Use this to checkpoint a table whose backing query
-    has grown too complex or would otherwise be evaluated more than once (e.g.
-    during query execution). Unlike :func:`persist_table`, which returns the
-    written path, this returns the re-read table.
+    The reloaded table reads from the scratch parquet, so it no longer carries the
+    upstream lazy lineage — use it to checkpoint a table that has grown too complex
+    or would otherwise be evaluated more than once (e.g. during query execution).
+
+    Unlike :func:`persist_table` (persist only, returns the path) this returns the
+    table. Unlike :func:`write_dataframe_and_auto_partition` (which it builds on) the
+    caller doesn't manage the filename — it goes to a scratch temp path — and unlike
+    the query cache (``_persist_intermediate_result``) the file is ephemeral, not a
+    hash-addressed cross-run cache.
 
     Parameters
     ----------

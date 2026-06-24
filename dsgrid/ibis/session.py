@@ -413,7 +413,9 @@ def restart_runtime_session(*args, force=False, **kwargs) -> Any:
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe(records, table_name=None, require_unique=None) -> ibis.Table:
+def create_dataframe(
+    records, table_name: str | None = None, require_unique: list[str] | None = None
+) -> ibis.Table:
     """Create a table from a list of records.
 
     Parameters
@@ -422,8 +424,9 @@ def create_dataframe(records, table_name=None, require_unique=None) -> ibis.Tabl
         list of row-like objects
     table_name : str | None
         If set, cache the Ibis table in memory with this name. Must be unique.
-    require_unique : list
-        list of column names (str) to check for uniqueness
+    require_unique : list[str] | None
+        Column names to check for uniqueness; a duplicate value in any of them
+        raises. None (the default) skips the check.
     """
     df = get_runtime_session().createDataFrame(records)
     _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)

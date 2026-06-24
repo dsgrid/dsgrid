@@ -421,13 +421,16 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
 
 
 @track_timing(timer_stats_collector)
-def persist_intermediate_query(
+def persist_intermediate_table(
     df: ibis.Table, scratch_dir_context: ScratchDirContext, auto_partition: bool = False
 ) -> ibis.Table:
-    """Persist the current query to files and then read it back and return it.
+    """Materialize a table to files and read it back, returning a fresh table.
 
-    This is advised when the query has become too complex or when the query might be evaluated
-    twice.
+    The returned table reads from the persisted parquet, so it no longer carries
+    the upstream lazy lineage. Use this to checkpoint a table whose backing query
+    has grown too complex or would otherwise be evaluated more than once (e.g.
+    during query execution). Unlike :func:`persist_table`, which returns the
+    written path, this returns the re-read table.
 
     Parameters
     ----------

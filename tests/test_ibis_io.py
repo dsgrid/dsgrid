@@ -11,7 +11,7 @@ from dsgrid.ibis.functions import write_csv
 from dsgrid.ibis.io import (
     CsvPartitionWriter,
     overwrite_dataframe_file,
-    persist_intermediate_query,
+    persist_intermediate_table,
     persist_table,
     read_csv,
     read_dataframe,
@@ -121,9 +121,9 @@ def test_persist_and_overwrite_file_helpers(tmp_path):
     with ScratchDirContext(tmp_path / "scratch") as context:
         path = persist_table(table, context, tag="test")
         assert path.exists()
-        persisted = persist_intermediate_query(table, context)
+        persisted = persist_intermediate_table(table, context)
         assert persisted.count().execute() == 1
-        persisted_auto = persist_intermediate_query(table, context, auto_partition=True)
+        persisted_auto = persist_intermediate_table(table, context, auto_partition=True)
         assert persisted_auto.count().execute() == 1
 
 

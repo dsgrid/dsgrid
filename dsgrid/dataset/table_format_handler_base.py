@@ -20,7 +20,7 @@ from dsgrid.utils.dataset import (
     remove_invalid_null_timestamps,
 )
 from dsgrid.ibis.operations import drop_columns, join, rename_columns
-from dsgrid.ibis.io import persist_intermediate_query
+from dsgrid.ibis.io import persist_intermediate_table
 from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
@@ -255,7 +255,7 @@ class TableFormatHandlerBase(abc.ABC):
             )
             if time_columns:
                 # Persist the query up to this point to avoid multiple evaluations.
-                df = persist_intermediate_query(df, context.scratch_dir_context)
+                df = persist_intermediate_table(df, context.scratch_dir_context)
                 stacked_columns = set(df.columns) - value_columns.union(time_columns)
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
                 logger.debug("Removed any rows with invalid null timestamps")

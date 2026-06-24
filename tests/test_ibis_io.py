@@ -22,7 +22,6 @@ from dsgrid.ibis.io import (
     _is_duckdb_io_exception,
     _is_spark_parquet_schema_exception,
     _post_process_dataframe,
-    _read_natively,
 )
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import get_runtime_session, _create_ibis_table
@@ -53,13 +52,6 @@ def test_try_read_dataframe_valid(tmp_path):
     df = try_read_dataframe(filename)
     assert isinstance(df, ibis.Table)
     assert table_to_pandas(df)["a"].iloc[0] == 1
-
-
-def test_read_natively_unsupported_extension(tmp_path):
-    filename = tmp_path / "table.txt"
-    filename.write_text("a\n1\n")
-    with pytest.raises(NotImplementedError, match="Unsupported file extension"):
-        _read_natively(filename)
 
 
 def test_parquet_exception_detection():

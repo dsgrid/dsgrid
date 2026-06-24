@@ -19,14 +19,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import ibis
-import pandas as pd
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import coalesce, create_temp_view, repartition
 from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.types import spec_for_name, spec_for_spark_sql, use_duckdb
-from dsgrid.utils.files import delete_if_exists, load_data
+from dsgrid.utils.files import delete_if_exists
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -274,17 +273,10 @@ def read_dataframe(
     filename: str | Path,
     table_name: str | None = None,
     require_unique: list[str] | None = None,
-    read_with_runtime: bool = True,
 ) -> ibis.Table:
     """Create a table from a file.
 
-    Supported formats when read_with_runtime=True: .csv, .json, .parquet
-    Supported formats when read_with_runtime=False: .csv, .json
-
-    When reading CSV files on AWS read_with_runtime should be set to False because the
-    files would need to be present on local storage for all workers. The master node
-    will sync the config files from S3, read them with standard filesystem system calls,
-    and then convert the data to Ibis tables.
+    Supported formats: .csv, .json, .parquet.
 
     Parameters
     ----------
@@ -295,9 +287,6 @@ def read_dataframe(
     require_unique : list[str] | None
         Column names to check for uniqueness; a duplicate value in any of them
         raises. None (the default) skips the check.
-    read_with_runtime : bool
-        If True, read the file with the active Ibis backend. Otherwise, read the file
-        natively in Python and then convert it to an Ibis table.
 
     Returns
     -------
@@ -310,8 +299,7 @@ def read_dataframe(
     DSGInvalidFile
         Raised if the file cannot be read. This can happen if a Parquet write operation fails.
     """
-    func = _read_with_runtime if read_with_runtime else _read_natively
-    df = func(str(filename))
+    df = _read_with_runtime(str(filename))
     _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
     return df
 
@@ -353,26 +341,6 @@ def _is_spark_parquet_schema_exception(exc: Exception) -> bool:
         or "PATH_NOT_FOUND" in message
         or "Path does not exist" in message
     )
-
-
-def _read_natively(filename: str) -> ibis.Table:
-    suffix = Path(filename).suffix
-    if suffix == ".csv":
-        # Reading the file is faster with pandas. Converting a list of Row to spark df
-        # is a tiny bit faster. Pandas is likely scales better with bigger files.
-        # Keep the code in case we ever want to revert.
-        # with open(filename, encoding="utf-8-sig") as f_in:
-        #     rows = [Row(**x) for x in csv.DictReader(f_in)]
-        obj = pd.read_csv(filename)
-    elif suffix == ".json":
-        obj = load_data(filename)
-    else:
-        msg = f"Unsupported file extension: {filename}"
-        raise NotImplementedError(msg)
-    # Lazy import: session.py imports this module during bootstrap.
-    from dsgrid.ibis.session import get_runtime_session
-
-    return get_runtime_session().createDataFrame(obj)
 
 
 def _post_process_dataframe(

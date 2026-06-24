@@ -273,7 +273,7 @@ def try_read_dataframe(filename: Path, delete_if_invalid: bool = True, **kwargs)
 def read_dataframe(
     filename: str | Path,
     table_name: str | None = None,
-    require_unique: None | bool = None,
+    require_unique: list[str] | None = None,
     read_with_runtime: bool = True,
 ) -> ibis.Table:
     """Create a table from a file.
@@ -292,8 +292,9 @@ def read_dataframe(
         path to file
     table_name : str | None
         If set, cache the Ibis table in memory. Must be unique.
-    require_unique : list
-        list of column names (str) to check for uniqueness
+    require_unique : list[str] | None
+        Column names to check for uniqueness; a duplicate value in any of them
+        raises. None (the default) skips the check.
     read_with_runtime : bool
         If True, read the file with the active Ibis backend. Otherwise, read the file
         natively in Python and then convert it to an Ibis table.
@@ -374,7 +375,9 @@ def _read_natively(filename: str) -> ibis.Table:
     return get_runtime_session().createDataFrame(obj)
 
 
-def _post_process_dataframe(df, table_name: str | None = None, require_unique=None) -> None:
+def _post_process_dataframe(
+    df, table_name: str | None = None, require_unique: list[str] | None = None
+) -> None:
     if table_name is not None:
         get_runtime_backend().create_view(table_name, df)
 

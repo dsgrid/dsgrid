@@ -71,10 +71,10 @@ def custom_time_zone(
 ) -> Generator[None, None, None]:
     """Apply a custom time zone for the duration of a code block.
 
-    Any columns passed in ``tz_aware_columns`` are validated up front: on DuckDB a naive
-    ``TIMESTAMP`` silently ignores the time zone on ``.year()`` / ``.hour()`` extractions,
-    so any column extracted inside the block must be TZ-aware. The check is a no-op on
-    Spark.
+    Any columns passed in ``tz_aware_columns`` are validated up front to be timezone aware
+    (not timezone naive) when using DuckDB. On DuckDB a naive ``TIMESTAMP`` silently ignores
+    the time zone on ``.year()`` / ``.hour()`` extractions, so any column extracted inside
+    the block must be TZ-aware. The check is a no-op on Spark (see module docstring).
 
     Raises
     ------

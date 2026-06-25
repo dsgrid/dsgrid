@@ -2,9 +2,15 @@ from datetime import datetime, timezone
 
 import pytest
 
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.session import get_runtime_session
 from dsgrid.ibis.table_utils import table_column_to_list
-from dsgrid.ibis.tz import custom_time_zone, get_current_time_zone, set_current_time_zone
+from dsgrid.ibis.tz import (
+    assert_tz_aware_extraction,
+    custom_time_zone,
+    get_current_time_zone,
+    set_current_time_zone,
+)
 from dsgrid.ibis.types import use_duckdb
 
 
@@ -67,3 +73,24 @@ def test_custom_time_zone_ignored_on_naive_duckdb_timestamp():
     # Same wall-clock year under any zone -- the connection TZ is ignored.
     assert _years_under_tz(naive, "UTC") == [2021]
     assert _years_under_tz(naive, "America/Los_Angeles") == [2021]
+
+
+def test_assert_tz_aware_extraction_allows_tz_aware_column():
+    """The guard is a no-op for a TZ-aware column (DuckDB) and for any column on Spark."""
+    sess = get_runtime_session()
+    if use_duckdb():
+        aware = sess.sql("SELECT TIMESTAMPTZ '2021-01-01 04:00:00+00' AS ts")
+    else:
+        aware = sess.createDataFrame(
+            [(datetime(2021, 1, 1, 4, 0, tzinfo=timezone.utc),)], schema=["ts"]
+        )
+    assert_tz_aware_extraction(aware["ts"])  # must not raise
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="naive vs TZ-aware split is DuckDB-specific")
+def test_assert_tz_aware_extraction_rejects_naive_duckdb_column():
+    """On DuckDB the guard fails loudly on a naive TIMESTAMP before a TZ-sensitive extraction."""
+    sess = get_runtime_session()
+    naive = sess.sql("SELECT TIMESTAMP '2021-01-01 04:00:00' AS ts")
+    with pytest.raises(DSGInvalidOperation, match="TZ-aware timestamp is required"):
+        assert_tz_aware_extraction(naive["ts"])

@@ -17,7 +17,7 @@ from dsgrid.ibis.operations import cross_join, filter_sql
 from dsgrid.ibis.table_utils import table_column_to_list
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.ibis.session import get_runtime_session
-from dsgrid.ibis.tz import custom_time_zone
+from dsgrid.ibis.tz import assert_tz_aware_extraction, custom_time_zone
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -165,6 +165,10 @@ def map_annual_time_to_date_time(
     # ``timestamp('UTC')`` (TIMESTAMPTZ). See dsgrid.ibis.tz for the broader
     # cross-backend contract.
     with custom_time_zone(dt_dim.model.time_zone_format.time_zone):
+        # Guard the load-bearing assumption: on DuckDB, .year() honors the connection
+        # TimeZone only for TZ-aware columns, so a regression to a naive timestamp would
+        # silently resolve the year in UTC. Fail loudly instead.
+        assert_tz_aware_extraction(dt_df[time_col])
         years = table_column_to_list(
             dt_df.select(year=dt_df[time_col].year()).distinct(),
             "year",

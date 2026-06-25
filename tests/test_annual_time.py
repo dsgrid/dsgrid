@@ -28,6 +28,7 @@ from dsgrid.ibis.session import (
 )
 
 from dsgrid.ibis.table_utils import count_rows
+from dsgrid.ibis.types import is_tz_aware_timestamp
 from tests._helpers import collect as _collect
 
 
@@ -300,10 +301,13 @@ def test_datetime_chronify_timestamps_are_tz_aware(date_time_dimension_year_boun
     dt_df = get_runtime_session().createDataFrame(
         [(x.to_pydatetime(),) for x in timestamps], schema=[time_col]
     )
+    dtype = dt_df.schema()[time_col]
     if use_duckdb():
-        assert str(dt_df.schema()[time_col]).startswith("timestamp('UTC'")
+        assert is_tz_aware_timestamp(dtype)
     else:
-        assert str(dt_df.schema()[time_col]).startswith("timestamp")
+        # Spark timestamps are instant-based and report as tz-naive but render via the
+        # session TZ, which is what the map relies on.
+        assert dtype.is_timestamp()
 
 
 def test_map_annual_time_leap_year_tz_boundary(

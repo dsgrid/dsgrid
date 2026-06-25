@@ -30,46 +30,11 @@ from contextlib import contextmanager
 from typing import Any, Generator, cast
 
 import ibis
-from ibis.expr.datatypes import Timestamp
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.session import get_spark_session
-from dsgrid.ibis.types import use_duckdb
-
-
-def assert_tz_aware_extraction(column: ibis.Column) -> None:
-    """Fail loudly if ``column`` would extract TZ-naively under :func:`custom_time_zone`.
-
-    On DuckDB, ``.year()`` / ``.hour()`` honor the connection ``TimeZone`` only for
-    ``TIMESTAMP WITH TIME ZONE`` columns; a naive ``TIMESTAMP`` is extracted TZ-naively
-    and silently ignores :func:`custom_time_zone`. Call this immediately before a
-    TZ-sensitive extraction so that feeding it a naive column fails loudly instead of
-    producing wrong results.
-
-    This is a no-op on Spark, whose ``TIMESTAMP`` carries no naive/aware distinction and
-    always renders extractions via the session time zone.
-
-    Parameters
-    ----------
-    column : ibis.Column
-        The timestamp column about to be extracted from inside a ``custom_time_zone`` block.
-
-    Raises
-    ------
-    DSGInvalidOperation
-        On DuckDB, if ``column`` is not a TZ-aware timestamp.
-    """
-    if not use_duckdb():
-        return
-    dtype = column.type()
-    if not isinstance(dtype, Timestamp) or dtype.timezone is None:
-        msg = (
-            f"Column {column.get_name()!r} has type {dtype}, but a TZ-aware timestamp is "
-            "required: extractions like .year()/.hour() on a naive DuckDB TIMESTAMP silently "
-            "ignore custom_time_zone. Cast to timestamp('<tz>') or read from a TZ-aware source."
-        )
-        raise DSGInvalidOperation(msg)
+from dsgrid.ibis.types import is_tz_aware_timestamp, use_duckdb
 
 
 def get_current_time_zone() -> str:
@@ -101,8 +66,31 @@ def set_current_time_zone(time_zone: str) -> None:
 
 
 @contextmanager
-def custom_time_zone(time_zone: str) -> Generator[None, None, None]:
-    """Apply a custom time zone for the duration of a code block."""
+def custom_time_zone(
+    time_zone: str, *tz_aware_columns: ibis.Column
+) -> Generator[None, None, None]:
+    """Apply a custom time zone for the duration of a code block.
+
+    Any columns passed in ``tz_aware_columns`` are validated up front: on DuckDB a naive
+    ``TIMESTAMP`` silently ignores the time zone on ``.year()`` / ``.hour()`` extractions,
+    so any column extracted inside the block must be TZ-aware. The check is a no-op on
+    Spark.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        On DuckDB, if any column in ``tz_aware_columns`` is not a TZ-aware timestamp.
+    """
+    if use_duckdb():
+        for column in tz_aware_columns:
+            if not is_tz_aware_timestamp(column.type()):
+                msg = (
+                    f"Column {column.get_name()!r} has type {column.type()}, but a TZ-aware "
+                    "timestamp is required inside custom_time_zone: .year()/.hour() on a naive "
+                    "DuckDB TIMESTAMP silently ignore the time zone. Cast to timestamp('<tz>') "
+                    "or read from a TZ-aware source."
+                )
+                raise DSGInvalidOperation(msg)
     orig_time_zone = get_current_time_zone()
     try:
         set_current_time_zone(time_zone)

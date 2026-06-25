@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 
 from typing import Any
 
+from ibis.expr.datatypes import Timestamp
+
 import dsgrid
 from dsgrid.common import BackendEngine
 
@@ -193,6 +195,17 @@ def get_str_type() -> str:
     """Return the SQL string type used by the current database system."""
     spec = spec_for_name("STRING")
     return spec.duckdb_sql if use_duckdb() else spec.spark_sql
+
+
+def is_tz_aware_timestamp(dtype: Any) -> bool:
+    """Return True if an Ibis dtype is a timestamp carrying a time zone.
+
+    On DuckDB this distinguishes ``TIMESTAMP WITH TIME ZONE`` (tz-aware) from a naive
+    ``TIMESTAMP``; only the former honors the connection time zone on extractions such as
+    ``.year()``. Spark timestamps are instant-based and report as tz-naive here even
+    though they render via the session time zone.
+    """
+    return isinstance(dtype, Timestamp) and dtype.timezone is not None
 
 
 def is_string_type(data_type: Any) -> bool:

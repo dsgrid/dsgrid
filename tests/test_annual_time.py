@@ -1,5 +1,6 @@
 import ibis
 import pytest
+from chronify.time_range_generator_factory import make_time_range_generator
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.annual_time_dimension_config import (
@@ -19,7 +20,12 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
-from dsgrid.ibis.session import F, create_dataframe_from_dicts, use_duckdb
+from dsgrid.ibis.session import (
+    F,
+    create_dataframe_from_dicts,
+    get_runtime_session,
+    use_duckdb,
+)
 
 from dsgrid.ibis.table_utils import count_rows
 from tests._helpers import collect as _collect
@@ -242,6 +248,94 @@ def test_map_annual_time_total_to_datetime_with_existing_model_year(
     expected_divisor = 366 * 24  # leap day enabled in this fixture
     assert by_model_year["2030"] == pytest.approx(602872.1 / expected_divisor)
     assert by_model_year["2031"] == pytest.approx(702872.1 / expected_divisor)
+
+
+@pytest.fixture
+def date_time_dimension_year_boundary():
+    """A DateTime dimension whose hours straddle the UTC New-Year boundary.
+
+    ``America/Los_Angeles`` local ``2020-12-31 14:00..23:00`` is ``2020-12-31 22:00
+    UTC .. 2021-01-01 07:00 UTC``: it spans UTC years ``{2020, 2021}`` but a single
+    local year 2020 (a leap year). The annual->datetime map must resolve ``.year()`` in
+    the dimension's own TZ; if it ever regresses to extracting in UTC (e.g. naive DuckDB
+    timestamps), it sees two years and raises, or picks the non-leap divisor.
+    """
+    yield DateTimeDimensionConfig(
+        DateTimeDimensionModel(
+            dimension_type=DimensionType.TIME,
+            class_name="Time",
+            module="dsgrid.dimension.standard",
+            time_zone_format=AlignedTimeSingleTimeZone(
+                format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
+                time_zone="America/Los_Angeles",
+            ),
+            name="datetime",
+            description="year-boundary straddle",
+            ranges=[
+                TimeRangeModel(
+                    start="2020-12-31 14:00:00",
+                    end="2020-12-31 23:00:00",
+                    frequency="P0DT1H",
+                    str_format="%Y-%m-%d %H:%M:%S",
+                ),
+            ],
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+            measurement_type=MeasurementType.TOTAL,
+        )
+    )
+
+
+def test_datetime_chronify_timestamps_are_tz_aware(date_time_dimension_year_boundary):
+    """Pin the dtype the annual->datetime map relies on.
+
+    ``map_annual_time_to_date_time`` builds its DateTime dataframe from chronify's
+    ``list_timestamps()`` and extracts ``.year()`` under ``custom_time_zone``. On DuckDB
+    that only works if the column is TZ-aware (``timestamp with time zone``); a regression
+    to a naive ``TIMESTAMP`` would silently ignore the time zone. On Spark the type carries
+    no naive/aware distinction but is always rendered via the session TZ.
+    """
+    dt_dim = date_time_dimension_year_boundary
+    timestamps = make_time_range_generator(dt_dim.to_chronify()).list_timestamps()
+    time_col = dt_dim.get_load_data_time_columns()[0]
+    dt_df = get_runtime_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=[time_col]
+    )
+    if use_duckdb():
+        assert str(dt_df.schema()[time_col]).startswith("timestamp('UTC'")
+    else:
+        assert str(dt_df.schema()[time_col]).startswith("timestamp")
+
+
+def test_map_annual_time_leap_year_tz_boundary(
+    annual_dataframe, annual_time_dimension, date_time_dimension_year_boundary
+):
+    """Regression test for time-zone resolution in the annual->datetime map on both backends.
+
+    The DateTime dimension's hours span two UTC years but one local (leap) year. The map
+    must (1) not raise "more than one year" and (2) divide annual totals by the leap-year
+    divisor ``366 * 24`` -- both of which are only correct if ``.year()`` resolved in
+    ``America/Los_Angeles`` rather than UTC.
+    """
+    annual_time_dimension.model.include_leap_day = True
+    value_columns = {"electricity_sales"}
+    df = map_annual_time_to_date_time(
+        annual_dataframe,
+        annual_time_dimension,
+        date_time_dimension_year_boundary,
+        value_columns,
+    )
+    num_timestamps = 10  # 2020-12-31 14:00..23:00, hourly and inclusive
+    leap_divisor = 366 * 24
+    expected_by_year = {
+        str(x.time_year): x.electricity_sales / leap_divisor for x in _collect(annual_dataframe)
+    }
+    num_rows = count_rows(annual_dataframe)
+    assert count_rows(df) == num_rows * num_timestamps
+    values = _collect(df.select("model_year", "electricity_sales").distinct())
+    by_year = {x.model_year: x.electricity_sales for x in values}
+    assert set(by_year) == set(expected_by_year)
+    for year, value in by_year.items():
+        assert value == pytest.approx(expected_by_year[year])
 
 
 def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):

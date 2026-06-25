@@ -282,11 +282,15 @@ def _make_multi_tz_dataframe(
     spark,
     time_zones: tuple[str, ...] = ("Etc/GMT+5", "Etc/GMT+8"),
 ) -> ibis.Table:
-    """Create an Ibis table with TIME_ZONE_COLUMN for multi-timezone localization tests."""
+    """Create an Ibis table with TIME_ZONE_COLUMN for multi-timezone localization tests.
+
+    Each distinct time zone rides on its own geography (``g1``, ``g2``, ...), mirroring
+    real datasets where the per-row time zone is derived from the geography.
+    """
     timestamps = [pd.Timestamp("2018-01-01 00:00:00"), pd.Timestamp("2018-01-01 01:00:00")]
     rows = [
-        {TIME_COLUMN: ts, "geography": "g1", VALUE_COLUMN: 1.0, TIME_ZONE_COLUMN: tz}
-        for tz in time_zones
+        {TIME_COLUMN: ts, "geography": f"g{i + 1}", VALUE_COLUMN: 1.0, TIME_ZONE_COLUMN: tz}
+        for i, tz in enumerate(time_zones)
         for ts in timestamps
     ]
     schema = StructType(

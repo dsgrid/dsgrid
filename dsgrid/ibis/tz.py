@@ -29,9 +29,12 @@ context manager on DuckDB.
 from contextlib import contextmanager
 from typing import Any, Generator, cast
 
+import ibis
+
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.session import get_spark_session
-from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.types import is_tz_aware_timestamp, use_duckdb
 
 
 def get_current_time_zone() -> str:
@@ -63,8 +66,31 @@ def set_current_time_zone(time_zone: str) -> None:
 
 
 @contextmanager
-def custom_time_zone(time_zone: str) -> Generator[None, None, None]:
-    """Apply a custom time zone for the duration of a code block."""
+def custom_time_zone(
+    time_zone: str, *tz_aware_columns: ibis.Column
+) -> Generator[None, None, None]:
+    """Apply a custom time zone for the duration of a code block.
+
+    Any columns passed in ``tz_aware_columns`` are validated up front to be timezone aware
+    (not timezone naive) when using DuckDB. On DuckDB a naive ``TIMESTAMP`` silently ignores
+    the time zone on ``.year()`` / ``.hour()`` extractions, so any column extracted inside
+    the block must be TZ-aware. The check is a no-op on Spark (see module docstring).
+
+    Raises
+    ------
+    DSGInvalidOperation
+        On DuckDB, if any column in ``tz_aware_columns`` is not a TZ-aware timestamp.
+    """
+    if use_duckdb():
+        for column in tz_aware_columns:
+            if not is_tz_aware_timestamp(column.type()):
+                msg = (
+                    f"Column {column.get_name()!r} has type {column.type()}, but a TZ-aware "
+                    "timestamp is required inside custom_time_zone: .year()/.hour() on a naive "
+                    "DuckDB TIMESTAMP silently ignore the time zone. Cast to timestamp('<tz>') "
+                    "or read from a TZ-aware source."
+                )
+                raise DSGInvalidOperation(msg)
     orig_time_zone = get_current_time_zone()
     try:
         set_current_time_zone(time_zone)

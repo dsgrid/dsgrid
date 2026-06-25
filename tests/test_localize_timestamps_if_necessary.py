@@ -17,6 +17,7 @@ All tests run real chronify localization processes end-to-end without patching h
 import ibis
 import pytest
 import pandas as pd
+from pydantic import ValidationError
 
 from dsgrid.common import TIME_ZONE_COLUMN, TIME_COLUMN, VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
@@ -161,6 +162,69 @@ def make_datetime_config_single_aligned_no_tz_ntz():
     return DateTimeDimensionConfig.load_from_model(model)
 
 
+def test_datetime_model_rejects_dst_zone_for_naive_localization():
+    """A tz-naive (NTZ) dimension localizing to a DST-observing zone must be rejected.
+
+    DST transitions make naive wall-clock times ambiguous (fall-back) or nonexistent
+    (spring-forward), so only fixed-offset zones (e.g. ``Etc/GMT+5``) are allowed when
+    localizing tz-naive timestamps. This pins the ``_check_standard_time_only`` guard.
+    """
+    with pytest.raises(ValidationError, match="observes daylight saving time"):
+        DateTimeDimensionModel(
+            name="time",
+            type=DimensionType.TIME,
+            module="dsgrid.dimension.standard",
+            class_name="Time",
+            column_format=TimeFormatDateTimeNTZModel(),
+            time_zone_format=AlignedTimeSingleTimeZone(
+                format_type=TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME,
+                time_zone="America/New_York",
+            ),
+            measurement_type=MeasurementType.TOTAL,
+            ranges=[
+                TimeRangeModel(
+                    start="2018-01-01 00:00:00",
+                    end="2018-01-01 01:00:00",
+                    frequency=pd.Timedelta(hours=1),
+                )
+            ],
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+        )
+
+
+def test_datetime_model_rejects_dst_zone_in_multi_tz_naive_localization():
+    """The DST restriction applies to every zone in a multi-tz naive dimension, so a mix
+    of a fixed-offset zone and a DST-observing zone is still rejected."""
+    with pytest.raises(ValidationError, match="observes daylight saving time"):
+        DateTimeDimensionModel(
+            name="time",
+            type=DimensionType.TIME,
+            module="dsgrid.dimension.standard",
+            class_name="Time",
+            column_format=TimeFormatDateTimeNTZModel(),
+            time_zone_format=LocalTimeMultipleTimeZones(
+                format_type=TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME,
+                time_zones=["Etc/GMT+5", "America/Los_Angeles"],
+            ),
+            measurement_type=MeasurementType.TOTAL,
+            ranges=[
+                TimeRangeModel(
+                    start="2018-01-01 00:00:00",
+                    end="2018-01-01 01:00:00",
+                    frequency=pd.Timedelta(hours=1),
+                )
+            ],
+            time_interval_type=TimeIntervalType.PERIOD_BEGINNING,
+        )
+
+
+def test_datetime_model_allows_dst_zone_when_tz_aware():
+    """The DST-zone restriction applies only to naive localization: a tz-aware (TIMESTAMP_TZ)
+    dimension may legitimately use a DST-observing zone like ``America/New_York``."""
+    config = make_datetime_config_tz_aware()  # America/New_York, TZ-aware column format
+    assert config.get_time_zone() == "America/New_York"
+
+
 class DummyDatasetConfig:
     def __init__(self, time_dim, value_columns=None, geography_dim=None):
         self._time_dim = time_dim
@@ -218,11 +282,15 @@ def _make_multi_tz_dataframe(
     spark,
     time_zones: tuple[str, ...] = ("Etc/GMT+5", "Etc/GMT+8"),
 ) -> ibis.Table:
-    """Create an Ibis table with TIME_ZONE_COLUMN for multi-timezone localization tests."""
+    """Create an Ibis table with TIME_ZONE_COLUMN for multi-timezone localization tests.
+
+    Each distinct time zone rides on its own geography (``g1``, ``g2``, ...), mirroring
+    real datasets where the per-row time zone is derived from the geography.
+    """
     timestamps = [pd.Timestamp("2018-01-01 00:00:00"), pd.Timestamp("2018-01-01 01:00:00")]
     rows = [
-        {TIME_COLUMN: ts, "geography": "g1", VALUE_COLUMN: 1.0, TIME_ZONE_COLUMN: tz}
-        for tz in time_zones
+        {TIME_COLUMN: ts, "geography": f"g{i + 1}", VALUE_COLUMN: 1.0, TIME_ZONE_COLUMN: tz}
+        for i, tz in enumerate(time_zones)
         for ts in timestamps
     ]
     schema = StructType(
@@ -351,6 +419,38 @@ def test_multi_tz_duckdb_existing_tz_column(spark, tmp_path):
     res_df2 = table_to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
+
+
+@skip_unless_duckdb
+def test_multi_tz_duckdb_distinct_zones(spark, tmp_path):
+    """Two distinct zones in the time_zone column must localize per row, not with one
+    shared zone. The same naive wall-clock 2018-01-01 00:00 yields 05:00 UTC under
+    Etc/GMT+5 but 08:00 UTC under Etc/GMT+8, so the four rows must produce four distinct
+    UTC instants. A regression that localized every row with a single zone would collapse
+    these to two.
+    """
+    zones = ("Etc/GMT+5", "Etc/GMT+8")
+    time_dim = make_datetime_config_multi_tz_ntz(time_zones=list(zones))
+    config = DummyDatasetConfig(time_dim, geography_dim=None)
+
+    sdf = _make_multi_tz_dataframe(spark, time_zones=zones)
+    assert TIME_ZONE_COLUMN in sdf.columns
+
+    res_df, changed = localize_timestamps_if_necessary(
+        sdf, config, scratch_dir_context=ScratchDirContext(tmp_path)
+    )
+
+    assert changed is True
+    src = table_to_pandas(sdf)
+    out = table_to_pandas(res_df)
+    assert out[TIME_COLUMN].dt.tz is not None
+    expected_utc = {
+        pd.Timestamp(row[TIME_COLUMN]).tz_localize(row[TIME_ZONE_COLUMN]).tz_convert("UTC")
+        for _, row in src.iterrows()
+    }
+    got_utc = {pd.Timestamp(t).tz_convert("UTC") for t in out[TIME_COLUMN]}
+    assert len(expected_utc) == 4  # 4 rows, 2 zones -> 4 distinct instants
+    assert got_utc == expected_utc
 
 
 @skip_unless_spark

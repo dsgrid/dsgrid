@@ -164,7 +164,9 @@ def map_annual_time_to_date_time(
     # TZ-aware pandas Timestamps and createDataFrame maps those to
     # ``timestamp('UTC')`` (TIMESTAMPTZ). See dsgrid.ibis.tz for the broader
     # cross-backend contract.
-    with custom_time_zone(dt_dim.model.time_zone_format.time_zone):
+    # Pass dt_df[time_col] so custom_time_zone fails loudly if it is ever a naive DuckDB
+    # timestamp: .year() would otherwise silently resolve in UTC and pick the wrong divisor.
+    with custom_time_zone(dt_dim.model.time_zone_format.time_zone, dt_df[time_col]):
         years = table_column_to_list(
             dt_df.select(year=dt_df[time_col].year()).distinct(),
             "year",

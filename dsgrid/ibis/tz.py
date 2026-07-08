@@ -1,29 +1,24 @@
 """Time-zone helpers for the runtime session.
 
-Wraps PySpark's ``spark.sql.session.timeZone`` (Spark backend) and
-DuckDB's connection ``TimeZone`` setting (DuckDB backend) under a
-single render-TZ API.
+Wraps PySpark's ``spark.sql.session.timeZone`` (Spark backend) and DuckDB's connection
+``TimeZone`` setting (DuckDB backend) under a single render-TZ API.
 
-The two implementations are not symmetric, but they converge on the
-same observable semantic when used correctly:
+The two implementations are not symmetric, but they converge on the same observable
+semantic when used correctly:
 
-- **Spark** stores ``TIMESTAMP`` values as UTC microseconds and
-  re-renders them through the session TZ on column extractions like
-  ``.year()`` / ``.hour()``. Setting the session TZ via this module
-  always affects those extractions.
-- **DuckDB** distinguishes between TZ-naive ``TIMESTAMP`` and
-  TZ-aware ``TIMESTAMP WITH TIME ZONE`` (``TIMESTAMPTZ``). The
-  connection ``TimeZone`` setting only affects extractions on
-  ``TIMESTAMPTZ`` columns. **Extractions on plain ``TIMESTAMP``
-  columns are TZ-naive on DuckDB regardless of the connection TZ.**
+- **Spark** stores ``TIMESTAMP`` values as UTC microseconds and re-renders them through
+  the session TZ on column extractions like ``.year()`` / ``.hour()``. Setting the
+  session TZ via this module always affects those extractions.
+- **DuckDB** distinguishes between TZ-naive ``TIMESTAMP`` and TZ-aware ``TIMESTAMP WITH
+  TIME ZONE`` (``TIMESTAMPTZ``). The connection ``TimeZone`` setting only affects
+  extractions on ``TIMESTAMPTZ`` columns. **Extractions on plain ``TIMESTAMP`` columns
+  are TZ-naive on DuckDB regardless of the connection TZ.**
 
-So the contract for callers of :func:`custom_time_zone` is: the columns
-you extract from inside the context must be ``TIMESTAMPTZ`` on DuckDB
-for the requested TZ to take effect. If you read timestamps from a
-TZ-aware source (chronify, declared TIMESTAMP_TZ schemas, ``datetime``
-objects with ``tzinfo``), this happens automatically. Plain
-string-parsed timestamps without TZ info will silently ignore the
-context manager on DuckDB.
+So the contract for callers of :func:`custom_time_zone` is: the columns you extract from
+inside the context must be ``TIMESTAMPTZ`` on DuckDB for the requested TZ to take effect.
+If you read timestamps from a TZ-aware source (chronify, declared TIMESTAMP_TZ schemas,
+``datetime`` objects with ``tzinfo``), this happens automatically. Plain string-parsed
+timestamps without TZ info will silently ignore the context manager on DuckDB.
 """
 
 from contextlib import contextmanager

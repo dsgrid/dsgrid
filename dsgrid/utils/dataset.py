@@ -177,7 +177,7 @@ def map_stacked_dimension(
     to_column_ = to_column or column
     if "fraction" not in df.columns:
         df = _with_literal_column(df, "fraction", 1.0)
-        # map and consolidate from_fraction only
+    # map and consolidate from_fraction only
     records = filter_sql(records, "to_id IS NOT NULL")
     df = drop_columns(join(df, records, column, "from_id", how="inner"), "from_id")
     if drop_column:

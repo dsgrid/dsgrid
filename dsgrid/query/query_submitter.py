@@ -397,7 +397,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 geo_dim = cast(DimensionBaseConfigWithFiles, geo_dim)
                 df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
-                # use chronify
+            # use chronify
             match config.backend_engine:
                 case BackendEngine.SPARK:
                     filename = persist_table(

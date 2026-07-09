@@ -1,7 +1,10 @@
+from typing import Any
+
 import ibis
 import pytest
 from chronify.time_range_generator_factory import make_time_range_generator
 
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
@@ -109,6 +112,28 @@ def annual_dataframe_with_model_year_values():
             "electricity_sales": 902872.1,
         },
     ]
+
+
+@pytest.fixture
+def time_array_rows() -> list[dict[str, Any]]:
+    """Two geographies, each covering the same two years: aligned time arrays."""
+    return [
+        {"time_year": 2020, "geography": "CO", "electricity_sales": 602872.1},
+        {"time_year": 2021, "geography": "CO", "electricity_sales": 702872.1},
+        {"time_year": 2020, "geography": "NM", "electricity_sales": 802872.1},
+        {"time_year": 2021, "geography": "NM", "electricity_sales": 902872.1},
+    ]
+
+
+def _make_time_array_df(rows: list[dict[str, Any]]) -> ibis.Table:
+    df = create_dataframe_from_dicts(rows)
+    if not use_duckdb():
+        df.cache()
+    return df
+
+
+def _check_time_arrays(df: ibis.Table) -> None:
+    DatasetSchemaHandlerBase._check_dataset_time_consistency_by_time_array(["time_year"], df)
 
 
 @pytest.fixture
@@ -353,3 +378,48 @@ def test_historical_annual_model_year_consistency_invalid(
     df, time_col, model_year_col = annual_dataframe_with_model_year_invalid
     with pytest.raises(DSGInvalidDataset):
         check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
+
+
+def test_time_array_consistency_valid(time_array_rows):
+    """Both geographies cover both years, so the time arrays are aligned."""
+    _check_time_arrays(_make_time_array_df(time_array_rows))
+
+
+def test_time_array_consistency_uneven_timestamp_repeats(time_array_rows):
+    """Dropping NM's 2021 row leaves 2020 repeated twice and 2021 only once."""
+    rows = [x for x in time_array_rows if not (x["geography"] == "NM" and x["time_year"] == 2021)]
+    with pytest.raises(DSGInvalidDataset, match="unique timestamp repeats = 2"):
+        _check_time_arrays(_make_time_array_df(rows))
+
+
+def test_time_array_consistency_ragged_time_arrays(time_array_rows):
+    """Reassigning NM's 2021 row to UT leaves every timestamp repeated exactly twice,
+    but CO now has a two-year array while NM and UT each have a one-year array.
+
+    The timestamp-repeat check cannot see this, which is why the time-array-length
+    check exists as a separate condition.
+    """
+    rows = [dict(x) for x in time_array_rows]
+    for row in rows:
+        if row["geography"] == "NM" and row["time_year"] == 2021:
+            row["geography"] = "UT"
+    with pytest.raises(DSGInvalidDataset, match="unique time array lengths = 2"):
+        _check_time_arrays(_make_time_array_df(rows))
+
+
+def test_time_array_consistency_empty_table(time_array_rows):
+    """An empty table has zero distinct timestamp repeat counts, not one."""
+    df = _make_time_array_df(time_array_rows)
+    with pytest.raises(DSGInvalidDataset, match="unique timestamp repeats = 0"):
+        _check_time_arrays(df.filter(df["time_year"] == 9999))
+
+
+def test_time_array_consistency_no_dimension_columns(time_array_rows):
+    """With no dimension columns the time array is the whole table, which is always
+    self-consistent."""
+    rows = [
+        {"time_year": x["time_year"], "electricity_sales": x["electricity_sales"]}
+        for x in time_array_rows
+        if x["geography"] == "CO"
+    ]
+    _check_time_arrays(_make_time_array_df(rows))

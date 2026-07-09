@@ -509,9 +509,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 df, annual_col, DimensionType.MODEL_YEAR.value
             )
 
+    @staticmethod
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
-        """Check that each unique time array has the same timestamps."""
+    def _check_dataset_time_consistency_by_time_array(
+        time_cols: list[str], load_data_df: ibis.Table
+    ) -> None:
+        """Check that each unique time array has the same timestamps.
+
+        Two independent conditions must hold. Every timestamp must be repeated the same
+        number of times, and every combination of non-time dimensions must have the same
+        time array length. Neither implies the other: time arrays can be ragged while
+        each timestamp still repeats an equal number of times.
+        """
         logger.info("Check dataset time consistency by time array.")
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns

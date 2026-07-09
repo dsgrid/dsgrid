@@ -6,11 +6,16 @@ from tempfile import NamedTemporaryFile
 
 import ibis
 
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.temp import make_temp_view_name, track_temp_file
 from dsgrid.ibis.types import use_duckdb
 
 logger = logging.getLogger(__name__)
+
+# Semi/anti joins project only the left table's columns, so df2 name collisions are
+# harmless and there is nothing to reorder.
+_LEFT_ONLY_JOINS = frozenset({"semi", "anti"})
 
 
 def create_temp_view(df: ibis.Table) -> str:
@@ -186,28 +191,63 @@ def handle_column_spaces(column: str) -> str:
 def join(df1: ibis.Table, df2: ibis.Table, column1: str, column2: str, how="inner") -> ibis.Table:
     """Join two tables on a single column from each side.
 
-    Drops df2 columns whose names overlap with df1 (matching the prior SQL
-    semantics) and projects df1's columns followed by df2's remaining columns.
-    Join key types must match exactly; cast the inputs before calling if they
-    don't (e.g. ``df = df.mutate(id=df.id.cast("int64"))``).
+    Projects df1's columns followed by df2's, so no df2 column name may collide
+    with a df1 column name -- including ``column2`` itself, which is retained for
+    the caller to drop. Rename the colliding columns before calling. Join key
+    types must match exactly; cast the inputs before calling if they don't
+    (e.g. ``df = df.mutate(id=df.id.cast("int64"))``).
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If any df2 column name also appears in df1.
     """
     df1, df2 = _ensure_same_backend(df1, df2)
-    overlap = [c for c in df2.columns if c in df1.columns]
-    df2_pruned = df2.drop(*overlap) if overlap else df2
-    joined = df1.join(df2_pruned, df1[column1] == df2[column2], how=how)
-    return joined.select(*df1.columns, *df2_pruned.columns)
+    if how in _LEFT_ONLY_JOINS:
+        return df1.join(df2, df1[column1] == df2[column2], how=how)
+    _check_no_overlap(df1, df2, [])
+    joined = df1.join(df2, df1[column1] == df2[column2], how=how)
+    return joined.select(*df1.columns, *df2.columns)
 
 
 def join_multiple_columns(
     df1: ibis.Table, df2: ibis.Table, columns: list[str], how="inner"
 ) -> ibis.Table:
-    """Equi-join on the named columns. Join keys are deduplicated; other
-    overlapping df2 columns are dropped. Join key types must match exactly
-    on both sides; cast the inputs before calling if they don't."""
+    """Equi-join on the named columns.
+
+    Join keys are deduplicated: the equi-join guarantees df1 and df2 hold the same
+    value for each key, so only one copy is kept. Any *other* df2 column whose name
+    collides with df1 carries independent data that a join cannot reconcile, so it
+    is rejected rather than silently dropped; rename it before calling. Join key
+    types must match exactly on both sides; cast the inputs before calling if they
+    don't.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If a df2 column name that is not a join key also appears in df1.
+    """
     df1, df2 = _ensure_same_backend(df1, df2)
-    extra_overlap = [c for c in df2.columns if c in df1.columns and c not in columns]
-    df2_pruned = df2.drop(*extra_overlap) if extra_overlap else df2
-    return df1.join(df2_pruned, columns, how=how)
+    if how not in _LEFT_ONLY_JOINS:
+        _check_no_overlap(df1, df2, columns)
+    return df1.join(df2, columns, how=how)
+
+
+def _check_no_overlap(df1: ibis.Table, df2: ibis.Table, deduplicated: list[str]) -> None:
+    """Reject df2 column names that collide with df1 and are not deduplicated join keys.
+
+    ``deduplicated`` names the join keys the join itself collapses to one column.
+    Everything else that collides holds independent data the join cannot reconcile.
+    """
+    overlap = [c for c in df2.columns if c in df1.columns and c not in deduplicated]
+    if overlap:
+        msg = (
+            f"Cannot join: df2 columns {overlap} collide with df1 column names. A join "
+            "cannot reconcile two same-named columns holding independent data. Rename "
+            "them first, as callers do with prefixes/suffixes like 'from_'/'to_' or "
+            "'__other'."
+        )
+        raise DSGInvalidOperation(msg)
 
 
 def sql_from_df(df: ibis.Table, query: str) -> ibis.Table:

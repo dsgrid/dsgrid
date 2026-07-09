@@ -1,3 +1,6 @@
+import pytest
+
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.functions import is_dataframe_empty
 from dsgrid.ibis.operations import (
     aggregate_single_value,
@@ -86,6 +89,45 @@ def test_join_multiple_columns(spark, dataframe):
     assert not is_dataframe_empty(_filter(df3, "county = 'Boulder'"))
     assert is_dataframe_empty(_filter(df3, "county = 'Jefferson'"))
     assert aggregate_single_value(df3, "sum", "value") == 1.0
+
+
+def test_join_rejects_overlapping_columns(spark, dataframe):
+    """df2 columns that collide with df1 must be rejected, not silently dropped."""
+    df2 = spark.createDataFrame([("cooling", 0)], ["metric", "index2"])
+    with pytest.raises(DSGInvalidOperation, match="metric"):
+        join(dataframe, df2, "index", "index2")
+
+
+def test_join_rejects_overlapping_join_key(spark, dataframe):
+    """column2 is retained for the caller to drop, so it may not collide either."""
+    df2 = spark.createDataFrame([(0, "Boulder")], ["index", "county"])
+    with pytest.raises(DSGInvalidOperation, match="index"):
+        join(dataframe, df2, "index", "index")
+
+
+def test_join_semi_anti_ignores_overlap(spark, dataframe):
+    """Semi/anti joins project only df1's columns, so collisions are harmless."""
+    df2 = spark.createDataFrame([(0, "cooling")], ["index", "metric"])
+    semi = join(dataframe, df2, "index", "index", how="semi")
+    assert semi.columns == dataframe.columns
+    assert aggregate_single_value(semi, "sum", "value") == 1.0 + 2.0
+    anti = join(dataframe, df2, "index", "index", how="anti")
+    assert anti.columns == dataframe.columns
+    assert aggregate_single_value(anti, "sum", "value") == 3.0 + 4.0
+
+
+def test_join_multiple_columns_rejects_non_key_overlap(spark, dataframe):
+    """Non-key collisions hold independent data and cannot be reconciled by a join."""
+    df2 = spark.createDataFrame([(0, "cooling", 9.0)], ["index", "metric", "value"])
+    with pytest.raises(DSGInvalidOperation, match="value"):
+        join_multiple_columns(dataframe, df2, ["index", "metric"])
+
+
+def test_join_multiple_columns_deduplicates_join_keys(spark, dataframe):
+    """The equi-join guarantees the keys match, so one copy is kept."""
+    df2 = spark.createDataFrame([(0, "cooling", "Boulder")], ["index", "metric", "county"])
+    df3 = join_multiple_columns(dataframe, df2, ["index", "metric"])
+    assert df3.columns == ("index", "metric", "value", "county")
 
 
 def test_rename_columns(dataframe):

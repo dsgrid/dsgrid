@@ -1,8 +1,13 @@
+import ibis
+import pandas as pd
 import pytest
 
 from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.functions import is_dataframe_empty
 from dsgrid.ibis.operations import (
+    _ensure_same_backend,
+    _sole_backend,
     aggregate_single_value,
     count_distinct_on_group_by,
     cross_join,
@@ -21,6 +26,7 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.session import get_runtime_session
 from dsgrid.ibis.table_utils import count_rows
+from dsgrid.ibis.types import use_duckdb
 
 from tests._helpers import collect as _collect
 
@@ -152,6 +158,85 @@ def test_max_by_group_multiple_value_columns(spark):
     res = _collect(max_by_group(df, ["metric"], ["value", "other"]))
     assert len(res) == 1
     assert (res[0].value, res[0].other) == (3.0, 10.0)
+
+
+# create_temp_view's parquet fallback issues DuckDB-only SQL, so relocating a foreign
+# table cannot work under a Spark runtime. dsgrid never hits that combination:
+# DuckDbDataStore refuses to construct when the backend engine is Spark.
+_needs_duckdb = pytest.mark.skipif(
+    not use_duckdb(), reason="relocating a foreign table requires a DuckDB runtime"
+)
+
+
+@pytest.fixture
+def foreign_table():
+    """A table in a separate DuckDB connection, i.e. a store that never ATTACHed."""
+    connection = ibis.duckdb.connect()
+    return connection.create_table("foreign", pd.DataFrame({"index2": [0, 1], "y": [1.0, 2.0]}))
+
+
+def test_sole_backend_reports_runtime_and_unbound(dataframe):
+    assert _sole_backend(dataframe) is get_runtime_backend().connection
+    assert _sole_backend(ibis.memtable({"index": [0]})) is None
+
+
+def test_sole_backend_rejects_table_spanning_backends(foreign_table):
+    """An operand already spanning two backends cannot be repaired by relocating it."""
+    other = ibis.sqlite.connect()
+    sqlite_table = other.create_table("s", pd.DataFrame({"index2": [0], "z": [5.0]}))
+    spanning = foreign_table.join(sqlite_table, "index2")
+    with pytest.raises(DSGInvalidOperation, match="spans multiple backends"):
+        _sole_backend(spanning)
+
+
+def test_ensure_same_backend_leaves_runtime_bound_tables_alone(dataframe):
+    df1, df2 = _ensure_same_backend(dataframe, dataframe)
+    assert df1 is dataframe
+    assert df2 is dataframe
+
+
+def test_ensure_same_backend_leaves_unbound_tables_alone():
+    """Neither operand carries a backend, so there is nothing to relocate."""
+    memtable = ibis.memtable({"index": [0]})
+    df1, df2 = _ensure_same_backend(memtable, memtable)
+    assert df1 is memtable
+    assert df2 is memtable
+
+
+@_needs_duckdb
+def test_ensure_same_backend_relocates_foreign_table(dataframe, foreign_table):
+    df1, df2 = _ensure_same_backend(dataframe, foreign_table)
+    assert df1 is dataframe
+    assert _sole_backend(df2) is get_runtime_backend().connection
+
+
+@_needs_duckdb
+def test_ensure_same_backend_relocates_foreign_table_beside_unbound_table(foreign_table):
+    """An unbound df1 must not suppress the check on df2.
+
+    Both operands used to be resolved inside one try block, so a memtable on the
+    left returned the foreign table on the right untouched, and the query then ran
+    against the foreign connection instead of the runtime.
+    """
+    memtable = ibis.memtable({"index2": [0, 1], "z": [7.0, 6.0]})
+    df1, df2 = _ensure_same_backend(memtable, foreign_table)
+    assert df1 is memtable
+    assert _sole_backend(df2) is get_runtime_backend().connection
+
+
+@_needs_duckdb
+def test_ensure_same_backend_relocates_foreign_table_on_the_left(dataframe, foreign_table):
+    df1, df2 = _ensure_same_backend(foreign_table, dataframe)
+    assert _sole_backend(df1) is get_runtime_backend().connection
+    assert df2 is dataframe
+
+
+@_needs_duckdb
+def test_join_across_backends_executes_on_the_runtime(dataframe, foreign_table):
+    """End to end: a join against a non-ATTACHed store still produces correct rows."""
+    joined = join(dataframe, foreign_table, "index", "index2")
+    assert _sole_backend(joined) is get_runtime_backend().connection
+    assert aggregate_single_value(joined, "sum", "y") == 1.0 + 1.0 + 2.0 + 2.0
 
 
 def test_rename_columns(dataframe):

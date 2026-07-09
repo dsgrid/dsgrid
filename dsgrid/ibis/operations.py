@@ -28,8 +28,13 @@ def create_temp_view(df: ibis.Table) -> str:
     1. ``backend.create_view`` — works for tables already in the runtime backend.
     2. ``conn.create_table(..., temp=True)`` — materializes via duckdb when the
        table can be executed cross-backend.
-    3. Round-trip through parquet — definitive fallback. Drops any leaked
-       table/view name from earlier failed attempts before re-creating it.
+    3. Round-trip through parquet — last resort. Drops any leaked table/view name
+       from earlier failed attempts before re-creating it.
+
+    Step 3 issues DuckDB-only SQL (``CREATE TEMP VIEW ... read_parquet(...)``) and
+    fails under a Spark runtime. That is survivable only because the sole
+    heterogeneous configuration, a DuckDB store beneath a Spark runtime, is rejected
+    by :meth:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore.__init__`.
     """
     view = make_temp_view_name()
     backend = get_runtime_backend()
@@ -86,61 +91,81 @@ def drop_columns(df: ibis.Table, *columns: str) -> ibis.Table:
     return df.select(*(col for col in df.columns if col not in to_drop))
 
 
+def _sole_backend(df: ibis.Table) -> Any | None:
+    """Return the one ibis backend ``df`` is bound to, or None if it is bound to none.
+
+    None means the expression carries no backend of its own -- a memtable, a
+    literal, or an unbound table -- so there is nothing to relocate and Ibis will
+    bind it at execution time.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If ``df`` already spans more than one backend, which no amount of
+        re-registering here can repair.
+    """
+    backends, _ = df._find_backends()
+    if not backends:
+        return None
+    if len(backends) > 1:
+        names = sorted(getattr(b, "name", type(b).__name__) for b in backends)
+        msg = (
+            f"Table already spans multiple backends {names}; it cannot be executed or "
+            "registered into a single backend. Build each operand from tables in one "
+            "backend before combining them."
+        )
+        raise DSGInvalidOperation(msg)
+    return backends[0]
+
+
 def _ensure_same_backend(df1: ibis.Table, df2: ibis.Table) -> tuple[ibis.Table, ibis.Table]:
     """Bring both tables into the runtime backend if they live in different backends.
 
-    Native Ibis set ops and joins reject expressions spanning multiple backends.
-    The store backend (e.g. on-disk DuckDB) is distinct from the runtime
-    backend, so cross-backend operands must be registered into the runtime
-    first.
+    Native Ibis set ops and joins reject expressions spanning multiple backends, so
+    an operand bound to some other backend must be registered into the runtime first.
 
-    The expected hot path is that both inputs are *already* runtime-bound:
-    :class:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore` ATTACHes its
-    file to the runtime DuckDB connection on init and returns runtime-bound
-    tables from ``_read_table``, so DuckDB↔DuckDB cross-backend references
-    do not survive long enough to reach this fallback. If a cross-backend
-    reference *does* reach here it means either a new store was added
-    without an ATTACH wiring or the runtime is Spark while one side is a
-    DuckDB store (the genuinely heterogeneous case where temp-view
-    serialization is the only option). The warning surfaces both situations
-    so they can be diagnosed instead of paying the parquet round-trip
-    silently.
+    This should not fire in practice.
+    :class:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore` ATTACHes its file to
+    the runtime DuckDB connection and returns runtime-bound tables, and it refuses to
+    construct at all under a Spark runtime. Reaching the fallback therefore means a
+    store was added without the ATTACH wiring. The warning says so rather than paying
+    the ``create_temp_view`` round-trip silently.
+
+    Backends are compared by identity, never by equality: two *distinct* DuckDB
+    connections compare equal and hash equal, so ``b1 == b2`` would call a genuine
+    cross-connection reference same-backend and let it through. For the same reason
+    Ibis collapses them into a single entry, so ``_sole_backend`` only ever sees more
+    than one backend when their classes differ (e.g. DuckDB and Spark).
     """
-    try:
-        b1 = df1._find_backend(use_default=False)
-        b2 = df2._find_backend(use_default=False)
-    except Exception:
-        return df1, df2
+    b1 = _sole_backend(df1)
+    b2 = _sole_backend(df2)
     if b1 is b2:
+        # Same backend, or neither is bound to one. Nothing to do either way.
         return df1, df2
     runtime = get_runtime_backend()
-    # ``_find_backend`` returns the underlying ibis backend (e.g.
+    # ``_find_backends`` returns underlying ibis backends (e.g.
     # ``ibis.backends.duckdb.Backend``), while ``get_runtime_backend`` returns
     # chronify's ``IbisBackend`` wrapper. Compare against the wrapper's
     # ``.connection`` (which IS the inner backend) so runtime-bound tables
     # don't get unnecessarily round-tripped through ``create_temp_view``.
     runtime_inner = runtime.connection
-    if b1 is not runtime_inner:
-        logger.warning(
-            "Cross-backend operand detected (source=%s runtime=%s); falling "
-            "back to create_temp_view. If both backends are DuckDB this "
-            "indicates the source store did not ATTACH to the runtime — see "
-            "DuckDbDataStore.__init__ for the established pattern.",
-            getattr(b1, "name", type(b1).__name__),
-            getattr(runtime, "name", type(runtime).__name__),
-        )
-        df1 = runtime.table(create_temp_view(df1))
-    if b2 is not runtime_inner:
-        logger.warning(
-            "Cross-backend operand detected (source=%s runtime=%s); falling "
-            "back to create_temp_view. If both backends are DuckDB this "
-            "indicates the source store did not ATTACH to the runtime — see "
-            "DuckDbDataStore.__init__ for the established pattern.",
-            getattr(b2, "name", type(b2).__name__),
-            getattr(runtime, "name", type(runtime).__name__),
-        )
-        df2 = runtime.table(create_temp_view(df2))
+    if b1 is not None and b1 is not runtime_inner:
+        df1 = _register_in_runtime(df1, b1, runtime)
+    if b2 is not None and b2 is not runtime_inner:
+        df2 = _register_in_runtime(df2, b2, runtime)
     return df1, df2
+
+
+def _register_in_runtime(df: ibis.Table, source: Any, runtime: Any) -> ibis.Table:
+    logger.warning(
+        "Cross-backend operand detected (source=%s runtime=%s); falling "
+        "back to create_temp_view. If both backends are DuckDB this "
+        "indicates the source store did not ATTACH to the runtime — see "
+        "DuckDbDataStore.__init__ for the established pattern.",
+        getattr(source, "name", type(source).__name__),
+        getattr(runtime, "name", type(runtime).__name__),
+    )
+    return runtime.table(create_temp_view(df))
 
 
 def except_all(df1: ibis.Table, df2: ibis.Table) -> ibis.Table:

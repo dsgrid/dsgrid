@@ -76,25 +76,29 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
 def get_type_from_union(python_type) -> Type:
     """Return the Python type from a Union.
 
-    Only works if it is Union of NoneType and something.
+    Only works if it is a Union of NoneType and exactly one other type. If that
+    type is an Enum, return the type of its values, which is what gets stored in
+    the table.
+
+    Python does not normalize the order of Union arguments -- ``Optional[Color]``
+    yields ``(Color, NoneType)`` but ``None | Color`` yields ``(NoneType, Color)``
+    -- so discard NoneType before inspecting anything positionally.
 
     Raises
     ------
     NotImplementedError
-        Raised if the code does know how to determine the type.
+        Raised if the code does not know how to determine the type.
     """
     args = get_args(python_type)
-    if issubclass(args[0], enum.Enum):
-        python_type = type(next(iter(args[0])).value)
-    else:
-        types = [x for x in args if not issubclass(x, type(None))]
-        if not types:
-            msg = f"Unhandled Union type: {python_type=} {args=}"
-            raise NotImplementedError(msg)
-        elif len(types) > 1:
-            msg = f"Unhandled Union type: {types=}"
-            raise NotImplementedError(msg)
-        else:
-            python_type = types[0]
+    types = [x for x in args if x is not type(None)]
+    if not types:
+        msg = f"Unhandled Union type: {python_type=} {args=}"
+        raise NotImplementedError(msg)
+    if len(types) > 1:
+        msg = f"Unhandled Union type: {types=}"
+        raise NotImplementedError(msg)
 
-    return python_type
+    resolved = types[0]
+    if isinstance(resolved, type) and issubclass(resolved, enum.Enum):
+        resolved = type(next(iter(resolved)).value)
+    return resolved

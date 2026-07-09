@@ -56,6 +56,9 @@ class TypeSpec:
     spark_type_names: tuple[str, ...] = field(default_factory=tuple)
 
 
+# The first value of each TypeSpec listed below is the user-facing name to use in :class:`Column`.
+# The rest of the values provide synonyms and related information for use in various backend
+# and query contexts.
 TYPE_SPECS: tuple[TypeSpec, ...] = (
     TypeSpec(
         "BOOLEAN", "BOOLEAN", "BOOLEAN", "boolean", "bool", spark_type_names=("BooleanType",)

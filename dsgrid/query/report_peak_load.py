@@ -23,7 +23,13 @@ class PeakLoadInputModel(DSGBaseModel):
 
 
 class PeakLoadReport(ReportsBase):
-    """Find peak load in a derived dataset."""
+    """Find peak load in a derived dataset.
+
+    Each row of the report gives a group's peak value and the time step at which it
+    occurs. The time step is recovered by joining the per-group maximum back onto the
+    source table on the value column, so a group whose peak value occurs at more than
+    one time step contributes one row per tied time step.
+    """
 
     REPORT_FILENAME = "peak_load.parquet"
 

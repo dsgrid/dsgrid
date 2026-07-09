@@ -1555,8 +1555,31 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
             )
 
         expected = aggregate_single_value(df.filter(make_expr(df)), "max", VALUE_COLUMN)
-        actual = _row_value(_collect(peak_load.filter(make_expr(peak_load)))[0], VALUE_COLUMN)
+        rows = _collect(peak_load.filter(make_expr(peak_load)))
+        # The peak value is unique within this group, so the report must not fan out.
+        assert len(rows) == 1
+        actual = _row_value(rows[0], VALUE_COLUMN)
         assert math.isclose(actual, expected)
+
+        # The report exists to say *when* the peak occurs. Confirm the reported time
+        # step is one at which the source table actually holds the peak value.
+        group_columns = {
+            "state",
+            "subsector",
+            "scenario",
+            "model_year",
+            "end_uses_by_fuel_type",
+            VALUE_COLUMN,
+        }
+        time_columns = [x for x in peak_load.columns if x not in group_columns]
+        assert time_columns, f"no time column in peak load report: {peak_load.columns}"
+        expr = make_expr(df)
+        for column in time_columns:
+            expr = expr & (df[column] == _row_value(rows[0], column))
+        assert math.isclose(
+            aggregate_single_value(df.filter(expr), "max", VALUE_COLUMN),
+            expected,
+        )
         return True
 
 

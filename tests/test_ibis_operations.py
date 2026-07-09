@@ -12,6 +12,7 @@ from dsgrid.ibis.operations import (
     intersect,
     join,
     join_multiple_columns,
+    max_by_group,
     pivot,
     rename_columns,
     sql_from_df,
@@ -128,6 +129,29 @@ def test_join_multiple_columns_deduplicates_join_keys(spark, dataframe):
     df2 = spark.createDataFrame([(0, "cooling", "Boulder")], ["index", "metric", "county"])
     df3 = join_multiple_columns(dataframe, df2, ["index", "metric"])
     assert df3.columns == ("index", "metric", "value", "county")
+
+
+def test_max_by_group(dataframe):
+    """cooling is max(1.0, 3.0); heating is max(2.0, 4.0)."""
+    df = max_by_group(dataframe, ["metric"], ["value"])
+    assert set(df.columns) == {"metric", "value"}
+    assert {(row.metric, row.value) for row in _collect(df)} == {
+        ("cooling", 3.0),
+        ("heating", 4.0),
+    }
+
+
+def test_max_by_group_multiple_value_columns(spark):
+    df = spark.createDataFrame(
+        [
+            ("cooling", 1.0, 10.0),
+            ("cooling", 3.0, 5.0),
+        ],
+        ["metric", "value", "other"],
+    )
+    res = _collect(max_by_group(df, ["metric"], ["value", "other"]))
+    assert len(res) == 1
+    assert (res[0].value, res[0].other) == (3.0, 10.0)
 
 
 def test_rename_columns(dataframe):

@@ -195,7 +195,7 @@ def join(df1: ibis.Table, df2: ibis.Table, column1: str, column2: str, how="inne
     with a df1 column name -- including ``column2`` itself, which is retained for
     the caller to drop. Rename the colliding columns before calling. Join key
     types must match exactly; cast the inputs before calling if they don't
-    (e.g. ``df = df.mutate(id=df.id.cast("int64"))``).
+    (e.g. ``df = df.cast({"id": "int64"})``).
 
     Raises
     ------
@@ -220,7 +220,7 @@ def join_multiple_columns(
     collides with df1 carries independent data that a join cannot reconcile, so it
     is rejected rather than silently dropped; rename it before calling. Join key
     types must match exactly on both sides; cast the inputs before calling if they
-    don't.
+    don't (e.g. ``df = df.cast({"id": "int64"})``).
 
     Raises
     ------
@@ -233,13 +233,15 @@ def join_multiple_columns(
     return df1.join(df2, columns, how=how)
 
 
-def _check_no_overlap(df1: ibis.Table, df2: ibis.Table, deduplicated: list[str]) -> None:
+def _check_no_overlap(df1: ibis.Table, df2: ibis.Table, deduplicated_join_keys: list[str]) -> None:
     """Reject df2 column names that collide with df1 and are not deduplicated join keys.
 
-    ``deduplicated`` names the join keys the join itself collapses to one column.
-    Everything else that collides holds independent data the join cannot reconcile.
+    ``deduplicated_join_keys`` names only the join keys the join itself collapses to a
+    single column. Everything else that collides -- including a join key the join does
+    *not* collapse, such as ``join``'s ``column2`` -- holds data the join cannot
+    reconcile into one column.
     """
-    overlap = [c for c in df2.columns if c in df1.columns and c not in deduplicated]
+    overlap = [c for c in df2.columns if c in df1.columns and c not in deduplicated_join_keys]
     if overlap:
         msg = (
             f"Cannot join: df2 columns {overlap} collide with df1 column names. A join "

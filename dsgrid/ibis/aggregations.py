@@ -78,24 +78,6 @@ def find_aggregation_spec(name: str) -> AggregationSpec | None:
     return _BY_NAME.get(name)
 
 
-def spec_for_aggregation(name: str) -> AggregationSpec:
-    """Look up an :class:`AggregationSpec` by user-facing name.
-
-    Raises
-    ------
-    KeyError
-        If ``name`` is not a registered dsgrid aggregation function.
-    """
-    spec = find_aggregation_spec(name)
-    if spec is None:
-        msg = (
-            f"Unregistered dsgrid aggregation function {name!r}; "
-            f"registered: {sorted(SUPPORTED_AGGREGATIONS)}"
-        )
-        raise KeyError(msg)
-    return spec
-
-
 def sql_aggregate_expression(op_name: str, column: str) -> str:
     """Build the SQL aggregation expression for ``op_name`` over ``column``.
 

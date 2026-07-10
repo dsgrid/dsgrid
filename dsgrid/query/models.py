@@ -95,17 +95,24 @@ class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
     dimension_name: str
-    function: Any = Field(default=None, description="Function or name of an aggregation function.")
+    function: Any = Field(
+        default=None,
+        description="Name of a SQL function to apply to the column (e.g. 'hour'), or a "
+        "FunctionReference.",
+    )
     alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
     def handle_function(cls, function_name):
-        if function_name is None:
+        if function_name is None or isinstance(function_name, FunctionReference):
             return function_name
         if not isinstance(function_name, str):
-            return function_name
-
+            msg = (
+                "function must be a function name (str), a FunctionReference, or None; "
+                f"got {type(function_name).__name__}"
+            )
+            raise ValueError(msg)
         return FunctionReference(function_name)
 
     @field_validator("alias")
@@ -180,20 +187,26 @@ class AggregationModel(DSGBaseModel):
     @field_validator("aggregation_function")
     @classmethod
     def check_aggregation_function(cls, aggregation_function):
-        if isinstance(aggregation_function, str):
-            if aggregation_function not in SUPPORTED_AGGREGATIONS:
-                logger.warning(
-                    "aggregation_function=%r is not a registered dsgrid aggregation; it will "
-                    "be uppercased and forwarded to the backend, which may reject it. "
-                    "Registered: %s",
-                    aggregation_function,
-                    sorted(SUPPORTED_AGGREGATIONS),
-                )
-            aggregation_function = FunctionReference(aggregation_function)
-        elif aggregation_function is None:
+        if aggregation_function is None:
             msg = "aggregation_function cannot be None"
             raise ValueError(msg)
-        return aggregation_function
+        if isinstance(aggregation_function, FunctionReference):
+            return aggregation_function
+        if not isinstance(aggregation_function, str):
+            msg = (
+                "aggregation_function must be a function name (str) or a FunctionReference; "
+                f"got {type(aggregation_function).__name__}"
+            )
+            raise ValueError(msg)
+        if aggregation_function not in SUPPORTED_AGGREGATIONS:
+            logger.warning(
+                "aggregation_function=%r is not a registered dsgrid aggregation; it will "
+                "be uppercased and forwarded to the backend, which may reject it. "
+                "Registered: %s",
+                aggregation_function,
+                sorted(SUPPORTED_AGGREGATIONS),
+            )
+        return FunctionReference(aggregation_function)
 
     @field_validator("dimensions")
     @classmethod

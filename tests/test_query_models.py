@@ -54,6 +54,36 @@ def test_column_model_accepts_scalar_extractions(name: str):
     assert col.alias == f"{name}__timestamp"
 
 
+def test_aggregation_model_accepts_function_reference(caplog):
+    """A pre-built FunctionReference passes through unwrapped and unwarned."""
+    ref = FunctionReference("sum")
+    with caplog.at_level(logging.WARNING, logger="dsgrid.query.models"):
+        model = _aggregation_model(ref)
+    assert model.aggregation_function is ref
+    assert not caplog.records
+
+
+@pytest.mark.parametrize("value", [123, sum, ["sum"]])
+def test_aggregation_model_rejects_other_types(value):
+    """Anything but a name or FunctionReference used to fall through untouched
+    and die later with an AttributeError on ``.name``; now it fails at
+    validation with a clear message."""
+    with pytest.raises(ValueError, match="must be a function name"):
+        _aggregation_model(value)
+
+
+def test_column_model_accepts_function_reference():
+    ref = FunctionReference("hour")
+    col = ColumnModel(dimension_name="timestamp", function=ref)
+    assert col.function is ref
+
+
+@pytest.mark.parametrize("value", [123, sum, ["hour"]])
+def test_column_model_rejects_other_types(value):
+    with pytest.raises(ValueError, match="must be a function name"):
+        ColumnModel(dimension_name="timestamp", function=value)
+
+
 def test_aggregation_model_still_rejects_none():
     """None remains explicitly disallowed."""
     with pytest.raises(ValueError, match="aggregation_function cannot be None"):

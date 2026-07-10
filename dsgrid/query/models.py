@@ -184,7 +184,8 @@ class AggregationModel(DSGBaseModel):
             if aggregation_function not in SUPPORTED_AGGREGATIONS:
                 logger.warning(
                     "aggregation_function=%r is not a registered dsgrid aggregation; it will "
-                    "be forwarded verbatim to the backend, which may reject it. Registered: %s",
+                    "be uppercased and forwarded to the backend, which may reject it. "
+                    "Registered: %s",
                     aggregation_function,
                     sorted(SUPPORTED_AGGREGATIONS),
                 )

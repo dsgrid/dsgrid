@@ -129,18 +129,12 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
 
 
 def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
-    # Fast path: when all group-by entries are bare column references and
-    # ``op_name`` is a registered reduction, dispatch through native Ibis to
-    # keep the chain lazy and let the planner fuse adjacent aggregations.
-    #
-    # Only registered names take this path because ``FunctionReference``
-    # accepts any backend SQL identifier. Without that restriction, names
-    # like ``round`` would resolve to Ibis's scalar column method
-    # ``df[col].round`` instead of a reduction, and
-    # ``df.group_by(...).aggregate(c=df[col].round())`` is a non-aggregate
-    # inside an aggregate — which either errors or silently produces wrong
-    # SQL. Unregistered names fall through to the SQL-string path below,
-    # which forwards them verbatim to the backend.
+    # Fast path: registered reductions over bare group-by columns dispatch
+    # through native Ibis, keeping the chain lazy. Everything else takes the
+    # SQL path below. Unregistered names must not reach the fast path:
+    # resolving an arbitrary identifier against the Ibis column API could
+    # pick a scalar method (e.g. ``round``), which is invalid inside
+    # ``aggregate()``.
     spec = find_aggregation_spec(op_name)
     bare_cols = [col for col in group_by_cols if _looks_like_bare_column(col, df.columns)]
     if spec is not None and len(bare_cols) == len(group_by_cols):

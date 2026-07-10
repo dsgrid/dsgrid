@@ -8,7 +8,7 @@ from pydantic import field_validator, model_validator, Field
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.filter_operators import (
+from dsgrid.ibis.filter_operators import (
     FILTER_OPERATOR_NAMES,
     apply_filter_operator,
 )
@@ -137,7 +137,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
         return text
 
 
-# Derived from the registry in dsgrid.dimension.filter_operators; kept under
+# Derived from the registry in dsgrid.ibis.filter_operators; kept under
 # its historical name for backward compatibility.
 DIMENSION_COLUMN_FILTER_OPERATORS = FILTER_OPERATOR_NAMES
 

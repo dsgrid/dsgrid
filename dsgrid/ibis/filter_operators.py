@@ -1,7 +1,8 @@
-"""Filter-operator definitions for dsgrid dimension filters.
+"""Filter-operator definitions for the dsgrid Ibis abstraction layer.
 
 This module is the single source of truth for the column-filter operator
-vocabulary that may appear in a dimension filter's ``operator`` field. Every
+vocabulary that may appear in a dimension filter's ``operator`` field
+(see :mod:`dsgrid.dimension.dimension_filters`). Every
 per-operator representation (the Ibis expression it builds, the shape of
 value it expects, its family bucket) lives on a :class:`FilterOperatorSpec`,
 and the operator set, the pydantic validator, and the dispatch all derive

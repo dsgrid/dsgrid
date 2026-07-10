@@ -8,7 +8,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
     _make_sql_value,
 )
-from dsgrid.dimension.filter_operators import FILTER_OPERATOR_NAMES, apply_filter_operator
+from dsgrid.ibis.filter_operators import FILTER_OPERATOR_NAMES, apply_filter_operator
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.ibis.session import create_dataframe_from_dicts
 

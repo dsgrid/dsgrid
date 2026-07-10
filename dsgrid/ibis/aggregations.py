@@ -9,8 +9,10 @@ Spark SQL expressions for the raw-SQL fallback) lives on an
 
 dsgrid deliberately does not reject unregistered names: any plain SQL
 identifier accepted by :class:`~dsgrid.query.models.FunctionReference` is
-forwarded verbatim to the backend, which may reject it at execution time.
-Registered names get the native fast path and backend-correct SQL spellings;
+uppercased and forwarded to the backend, which may reject it at execution
+time. (SQL function names are case-insensitive on both backends, so the
+uppercasing does not change which function runs.) Registered names get the
+native fast path and backend-correct SQL spellings;
 :func:`sql_aggregate_expression` implements both rules in one place.
 """
 
@@ -98,9 +100,9 @@ def sql_aggregate_expression(op_name: str, column: str) -> str:
     """Build the SQL aggregation expression for ``op_name`` over ``column``.
 
     Registered names use their per-backend template. Unregistered names are
-    uppercased and forwarded verbatim, preserving dsgrid's passthrough
-    contract for any backend function a user cares to name; the backend
-    rejects names it does not know at execution time.
+    uppercased and forwarded otherwise unchanged, preserving dsgrid's
+    passthrough contract for any backend function a user cares to name; the
+    backend rejects names it does not know at execution time.
 
     Parameters
     ----------

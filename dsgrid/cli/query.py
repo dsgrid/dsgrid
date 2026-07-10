@@ -127,7 +127,7 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     show_default=True,
     help="Aggregation function for any included default aggregations. "
     f"Registered: {', '.join(sorted(SUPPORTED_AGGREGATIONS))}. Other names are "
-    "forwarded to the backend as-is.",
+    "uppercased and forwarded to the backend.",
 )
 @click.option(
     "-f",

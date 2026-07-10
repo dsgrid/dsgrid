@@ -8,6 +8,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
     _make_sql_value,
 )
+from dsgrid.dimension.filter_operators import FILTER_OPERATOR_NAMES, apply_filter_operator
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.ibis.session import create_dataframe_from_dicts
 
@@ -154,6 +155,61 @@ def test_supplemental_column_operator_defaults(name_table):
 def test_unknown_operator_rejected():
     with pytest.raises(ValidationError, match="is not supported"):
         _model("cont", "lph")
+
+
+@pytest.fixture
+def year_table():
+    return create_dataframe_from_dicts(
+        [
+            {"id": "a", "year": 2019},
+            {"id": "b", "year": 2020},
+            {"id": "c", "year": 2021},
+        ]
+    )
+
+
+def test_between_via_column_operator(year_table):
+    """The column-operator model accepts the two-element form its ``value``
+    field description has always promised."""
+    model = _model("between", [2020, 2021], column="year")
+    assert _filter_ids(model, year_table) == ["b", "c"]
+
+
+def test_between_via_column_operator_negate(year_table):
+    model = _model("between", [2020, 2021], negate=True, column="year")
+    assert _filter_ids(model, year_table) == ["a"]
+
+
+@pytest.mark.parametrize("value", [2020, [2020], [2019, 2020, 2021]])
+def test_between_value_arity_error(year_table, value):
+    with pytest.raises(DSGInvalidField, match="two-element"):
+        _filter_ids(_model("between", value, column="year"), year_table)
+
+
+# One (value, expected ids) sample per registered operator, evaluated against
+# name_table. Paired with test_every_operator_has_a_dispatch_case, this makes
+# it impossible to register an operator without a working applier.
+DISPATCH_CASES = [
+    ("contains", "lph", ["a"]),
+    ("startswith", "Be", ["b"]),
+    ("endswith", "ta", ["b", "c"]),
+    ("like", "A%", ["a"]),
+    ("rlike", "^B", ["b"]),
+    ("isNull", None, ["d"]),
+    ("isNotNull", None, ["a", "b", "c"]),
+    ("isin", ["Alpha", "Delta"], ["a", "c"]),
+    ("between", ["A", "C"], ["a", "b"]),
+]
+
+
+def test_every_operator_has_a_dispatch_case():
+    assert {case[0] for case in DISPATCH_CASES} == set(FILTER_OPERATOR_NAMES)
+
+
+@pytest.mark.parametrize("operator,value,expected", DISPATCH_CASES)
+def test_registry_drives_dispatch(name_table, operator, value, expected):
+    df = apply_filter_operator(name_table, "name", operator, value, negate=False)
+    assert [row.id for row in df.execute().itertuples()] == expected
 
 
 def test_make_sql_value():

@@ -1,9 +1,11 @@
 import pytest
+from pydantic import ValidationError
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterBetweenColumnOperatorModel,
     DimensionFilterColumnOperatorModel,
+    SupplementalDimensionFilterColumnOperatorModel,
     _make_sql_value,
 )
 from dsgrid.exceptions import DSGInvalidField
@@ -126,6 +128,32 @@ def test_between_negate():
         negate=True,
     )
     assert _filter_ids(model, table) == ["a"]
+
+
+def test_supplemental_column_operator_apply_filter(name_table):
+    model = SupplementalDimensionFilterColumnOperatorModel(
+        dimension_type=DimensionType.GEOGRAPHY,
+        dimension_name="county",
+        column="name",
+        operator="startswith",
+        value="B",
+    )
+    assert _filter_ids(model, name_table) == ["b"]
+
+
+def test_supplemental_column_operator_defaults(name_table):
+    """The default filter (``like "%"``) matches every non-null record."""
+    model = SupplementalDimensionFilterColumnOperatorModel(
+        dimension_type=DimensionType.GEOGRAPHY,
+        dimension_name="county",
+        column="name",
+    )
+    assert _filter_ids(model, name_table) == ["a", "b", "c"]
+
+
+def test_unknown_operator_rejected():
+    with pytest.raises(ValidationError, match="is not supported"):
+        _model("cont", "lph")
 
 
 def test_make_sql_value():

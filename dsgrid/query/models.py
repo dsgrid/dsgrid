@@ -1,5 +1,6 @@
 import abc
 import itertools
+import logging
 import re
 from enum import StrEnum
 from typing import Any, Generator, Union, Literal, Self, TypeAlias
@@ -26,10 +27,13 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
+from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
 )
 from dsgrid.utils.files import compute_hash
+
+logger = logging.getLogger(__name__)
 
 DimensionFilters: TypeAlias = Annotated[
     Union[
@@ -61,8 +65,9 @@ class FunctionReference:
     fragments to be injected into the interpolated query string the
     aggregation/column-expression builders produce.
 
-    The special-case name ``"mean"`` is translated to SQL ``AVG`` inside
-    :func:`dsgrid.dataset.unpivoted_table._aggregate_value`. All other
+    Names registered in :data:`dsgrid.ibis.aggregations.AGGREGATION_SPECS`
+    (see :data:`~dsgrid.ibis.aggregations.SUPPORTED_AGGREGATIONS`) carry
+    backend-correct SQL spellings and a native Ibis fast path. All other
     names are uppercased and passed through unchanged.
     """
 
@@ -176,6 +181,13 @@ class AggregationModel(DSGBaseModel):
     @classmethod
     def check_aggregation_function(cls, aggregation_function):
         if isinstance(aggregation_function, str):
+            if aggregation_function not in SUPPORTED_AGGREGATIONS:
+                logger.warning(
+                    "aggregation_function=%r is not a registered dsgrid aggregation; it will "
+                    "be forwarded verbatim to the backend, which may reject it. Registered: %s",
+                    aggregation_function,
+                    sorted(SUPPORTED_AGGREGATIONS),
+                )
             aggregation_function = FunctionReference(aggregation_function)
         elif aggregation_function is None:
             msg = "aggregation_function cannot be None"

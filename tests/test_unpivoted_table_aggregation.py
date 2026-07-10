@@ -25,6 +25,8 @@ import pytest
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.unpivoted_table import _aggregate_value
+from dsgrid.ibis import aggregations
+from dsgrid.ibis.aggregations import AggregationSpec
 from dsgrid.ibis.session import create_dataframe_from_dicts
 
 from tests._helpers import collect as _collect
@@ -79,12 +81,14 @@ def test_sql_fallback_pinned_results(load_table, op):
         assert math.isclose(result[geography], expected), (op, geography)
 
 
-@pytest.mark.parametrize("op", sorted(EXPECTED))
+@pytest.mark.parametrize("op", [*sorted(EXPECTED), "approx_median"])
 def test_paths_agree(load_table, op):
     """The same logical query must not change its answer with the engine.
 
     A group-by column that carries an alias or function takes the raw-SQL
     fallback instead of the native-Ibis fast path; the results must match.
+    approx_median qualifies because both paths now use the same approximate
+    function, and the approximation is exact on a table this small.
     """
     fast = _by_group(_aggregate_value(load_table, ["geography"], op))
     fallback = _by_group(_aggregate_value(load_table, FORCED_SQL_GROUP_BY, op))
@@ -114,12 +118,17 @@ def test_approx_median_fast_path(load_table):
     assert 5.0 <= result["NM"] <= 7.0
 
 
-def test_approx_median_sql_fallback_broken(load_table):
-    """Known bug: the SQL fallback interpolates ``APPROX_MEDIAN(value)``, a
-    function that exists on neither backend (DuckDB spells it
-    ``approx_quantile(x, 0.5)``; Spark SQL ``percentile_approx(x, 0.5)``)."""
-    with pytest.raises(Exception, match="(?i)approx_median"):
-        _collect(_aggregate_value(load_table, FORCED_SQL_GROUP_BY, "approx_median"))
+def test_approx_median_sql_fallback(load_table):
+    """The registry supplies backend-correct spellings for approx_median.
+
+    Before the registry, this path uppercased the name into
+    ``APPROX_MEDIAN(value)``, a function that exists on neither backend
+    (DuckDB spells it ``approx_quantile(x, 0.5)``; Spark SQL
+    ``percentile_approx(x, 0.5)``), so this query always raised.
+    """
+    result = _by_group(_aggregate_value(load_table, FORCED_SQL_GROUP_BY, "approx_median"))
+    assert 1.0 <= result["CO"] <= 6.0
+    assert 5.0 <= result["NM"] <= 7.0
 
 
 def test_group_by_expression_fallback(load_table):
@@ -135,3 +144,20 @@ def test_unregistered_op_passes_through(load_table):
     result = _by_group(_aggregate_value(load_table, ["geography"], "stddev"))
     assert math.isclose(result["CO"], math.sqrt(7.0))  # sample stddev of {1, 2, 6}
     assert math.isclose(result["NM"], math.sqrt(2.0))  # sample stddev of {5, 7}
+
+
+def test_registry_drives_both_paths(load_table, monkeypatch):
+    """Both execution paths must read the registry, not private tables.
+
+    Redefine ``sum`` to compute a max; if either path stops consulting the
+    registry (say, a hard-coded allowlist or ``.upper()`` passthrough comes
+    back), it keeps summing and this test fails.
+    """
+    monkeypatch.setitem(
+        aggregations._BY_NAME,
+        "sum",
+        AggregationSpec("sum", "max", "MAX({column})", "MAX({column})"),
+    )
+    for group_by in (["geography"], FORCED_SQL_GROUP_BY):
+        result = _by_group(_aggregate_value(load_table, group_by, "sum"))
+        assert result == EXPECTED["max"], group_by

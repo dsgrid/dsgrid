@@ -63,7 +63,7 @@ There is a CLI command that can generate a query file for your project. Refer to
               "2040",
               "2050",
             ],
-            "filter_type": "DimensionFilterColumnOperatorModel"
+            "filter_type": "column_operator"
           }
         ],
       }
@@ -142,7 +142,7 @@ If you only care about a limited number of fuel types, you could add this filter
             ],
             "operator": "isin",
             "negate": false,
-            "filter_type": "SupplementalDimensionFilterColumnOperatorModel"
+            "filter_type": "supplemental_column_operator"
           }
         ],
       }

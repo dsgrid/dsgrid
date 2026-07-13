@@ -5,6 +5,7 @@ import ibis
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.aggregations import find_aggregation_spec, sql_aggregate_expression
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.query.models import (
@@ -127,28 +128,17 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
     return metric_column
 
 
-_AGGREGATE_FAST_PATH_OPS = frozenset(
-    {"sum", "mean", "min", "max", "count", "median", "approx_median", "first", "last"}
-)
-
-
 def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
-    # Fast path: when all group-by entries are bare column references and
-    # ``op_name`` is a known reduction, dispatch through native Ibis to keep
-    # the chain lazy and let the planner fuse adjacent aggregations.
-    #
-    # We allowlist the reductions explicitly because ``FunctionReference``
-    # accepts any backend SQL identifier.
-    # Without the allowlist, names like ``round`` would resolve to Ibis's
-    # scalar column method ``df[col].round`` instead of a reduction, and
-    # ``df.group_by(...).aggregate(c=df[col].round())`` is a non-aggregate
-    # inside an aggregate — which either errors or silently produces wrong
-    # SQL. Anything not in the allowlist falls through to the SQL-string
-    # path below, which forwards the name verbatim to the backend.
-    ibis_op = "mean" if op_name == "mean" else op_name
+    # Fast path: registered reductions over bare group-by columns dispatch
+    # through native Ibis, keeping the chain lazy. Everything else takes the
+    # SQL path below. Unregistered names must not reach the fast path:
+    # resolving an arbitrary identifier against the Ibis column API could
+    # pick a scalar method (e.g. ``round``), which is invalid inside
+    # ``aggregate()``.
+    spec = find_aggregation_spec(op_name)
     bare_cols = [col for col in group_by_cols if _looks_like_bare_column(col, df.columns)]
-    if ibis_op in _AGGREGATE_FAST_PATH_OPS and len(bare_cols) == len(group_by_cols):
-        agg_method = getattr(df[VALUE_COLUMN], ibis_op)
+    if spec is not None and len(bare_cols) == len(group_by_cols):
+        agg_method = getattr(df[VALUE_COLUMN], spec.ibis_method)
         return df.group_by(bare_cols).aggregate(**{VALUE_COLUMN: agg_method()})
 
     # SQL-string fallback for group-by entries that carry function calls or
@@ -157,10 +147,9 @@ def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> 
     view = create_temp_view(df)
     select_cols = ", ".join(_select_expr(x) for x in group_by_cols)
     group_cols = ", ".join(_group_by_expr(x) for x in group_by_cols)
-    agg_func = "AVG" if op_name == "mean" else op_name.upper()
+    agg_expr = sql_aggregate_expression(op_name, handle_column_spaces(VALUE_COLUMN))
     query = (
-        f"SELECT {select_cols}, {agg_func}({handle_column_spaces(VALUE_COLUMN)}) "
-        f"AS {handle_column_spaces(VALUE_COLUMN)} FROM {view}"
+        f"SELECT {select_cols}, {agg_expr} " f"AS {handle_column_spaces(VALUE_COLUMN)} FROM {view}"
     )
     if group_cols:
         query += f" GROUP BY {group_cols}"

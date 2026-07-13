@@ -231,7 +231,7 @@ dimension_filters=[
 
 ### 5. Time-Based Filter
 
-Filter data between two time columns. This is useful for selecting data within specific time ranges.
+Filter data between two bounds of a time column, inclusive. This is useful for selecting data within specific time ranges.
 
 ::::{tab-set}
 
@@ -241,10 +241,9 @@ dimension_filters: [
   {
     dimension_type: "time",
     dimension_name: "time_est",
-    column1: "timestamp",
-    column2: "timestamp",
-    operator: "between",
-    value: ["2012-01-01 00:00:00", "2012-01-31 23:59:59"],
+    column: "timestamp",
+    lower_bound: "2012-01-01 00:00:00",
+    upper_bound: "2012-01-31 23:59:59",
     filter_type: "between_column_operator",
     negate: false,
   },
@@ -258,10 +257,9 @@ dimension_filters=[
     DimensionFilterBetweenColumnOperatorModel(
         dimension_type=DimensionType.TIME,
         dimension_name="time_est",
-        column1="timestamp",
-        column2="timestamp",
-        operator="between",
-        value=["2012-01-01 00:00:00", "2012-01-31 23:59:59"],
+        column="timestamp",
+        lower_bound="2012-01-01 00:00:00",
+        upper_bound="2012-01-31 23:59:59",
         negate=False,
     ),
 ]
@@ -278,18 +276,23 @@ WHERE timestamp BETWEEN '2012-01-01 00:00:00' AND '2012-01-31 23:59:59'
 
 ## Common Operators
 
+Filters with `filter_type: "column_operator"` (and `"supplemental_column_operator"`) accept
+exactly these operators:
+
 | Operator | Description | Example Value |
 |----------|-------------|---------------|
-| `==` | Equals | `"06037"` |
-| `!=` | Not equals | `"06037"` |
-| `>` | Greater than | `"2020"` |
-| `>=` | Greater than or equal | `"2020"` |
-| `<` | Less than | `"2050"` |
-| `<=` | Less than or equal | `"2050"` |
-| `isin` | In list | `["06037", "06073"]` |
-| `like` | Pattern match | `"%County"` |
+| `contains` | Substring match | `"County"` |
+| `startswith` | Prefix match | `"06"` |
+| `endswith` | Suffix match | `"037"` |
+| `like` | SQL pattern match | `"%County"` |
 | `rlike` | Regex match | `"^06.*"` |
-| `between` | Between two values | `["2020", "2050"]` |
+| `isin` | In list | `["06037", "06073"]` |
+| `isNull` | Value is null | (value is ignored) |
+| `isNotNull` | Value is not null | (value is ignored) |
+| `between` | Between two values, inclusive | `["2020", "2050"]` |
+
+Filters with `filter_type: "expression"` interpolate their operator into SQL, so comparison
+operators such as `==`, `!=`, `>`, `>=`, `<`, and `<=` are written there instead.
 
 ## Negating Filters
 

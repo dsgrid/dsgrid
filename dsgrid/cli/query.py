@@ -26,6 +26,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -124,7 +125,9 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     "--aggregation-function",
     default="sum",
     show_default=True,
-    help="Aggregation function for any included default aggregations.",
+    help="Aggregation function for any included default aggregations. "
+    f"Registered: {', '.join(sorted(SUPPORTED_AGGREGATIONS))}. Other names are "
+    "uppercased and forwarded to the backend.",
 )
 @click.option(
     "-f",

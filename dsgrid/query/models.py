@@ -1,5 +1,6 @@
 import abc
 import itertools
+import logging
 import re
 from enum import StrEnum
 from typing import Any, Generator, Union, Literal, Self, TypeAlias
@@ -26,10 +27,13 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
+from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
 )
 from dsgrid.utils.files import compute_hash
+
+logger = logging.getLogger(__name__)
 
 DimensionFilters: TypeAlias = Annotated[
     Union[
@@ -61,8 +65,9 @@ class FunctionReference:
     fragments to be injected into the interpolated query string the
     aggregation/column-expression builders produce.
 
-    The special-case name ``"mean"`` is translated to SQL ``AVG`` inside
-    :func:`dsgrid.dataset.unpivoted_table._aggregate_value`. All other
+    Names registered in :data:`dsgrid.ibis.aggregations.AGGREGATION_SPECS`
+    (see :data:`~dsgrid.ibis.aggregations.SUPPORTED_AGGREGATIONS`) carry
+    backend-correct SQL spellings and a native Ibis fast path. All other
     names are uppercased and passed through unchanged.
     """
 
@@ -90,17 +95,24 @@ class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
     dimension_name: str
-    function: Any = Field(default=None, description="Function or name of an aggregation function.")
+    function: Any = Field(
+        default=None,
+        description="Name of a SQL function to apply to the column (e.g. 'hour'), or a "
+        "FunctionReference.",
+    )
     alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
     def handle_function(cls, function_name):
-        if function_name is None:
+        if function_name is None or isinstance(function_name, FunctionReference):
             return function_name
         if not isinstance(function_name, str):
-            return function_name
-
+            msg = (
+                "function must be a function name (str), a FunctionReference, or None; "
+                f"got {type(function_name).__name__}"
+            )
+            raise ValueError(msg)
         return FunctionReference(function_name)
 
     @field_validator("alias")
@@ -175,12 +187,26 @@ class AggregationModel(DSGBaseModel):
     @field_validator("aggregation_function")
     @classmethod
     def check_aggregation_function(cls, aggregation_function):
-        if isinstance(aggregation_function, str):
-            aggregation_function = FunctionReference(aggregation_function)
-        elif aggregation_function is None:
+        if aggregation_function is None:
             msg = "aggregation_function cannot be None"
             raise ValueError(msg)
-        return aggregation_function
+        if isinstance(aggregation_function, FunctionReference):
+            return aggregation_function
+        if not isinstance(aggregation_function, str):
+            msg = (
+                "aggregation_function must be a function name (str) or a FunctionReference; "
+                f"got {type(aggregation_function).__name__}"
+            )
+            raise ValueError(msg)
+        if aggregation_function not in SUPPORTED_AGGREGATIONS:
+            logger.warning(
+                "aggregation_function=%r is not a registered dsgrid aggregation; it will "
+                "be uppercased and forwarded to the backend, which may reject it. "
+                "Registered: %s",
+                aggregation_function,
+                sorted(SUPPORTED_AGGREGATIONS),
+            )
+        return FunctionReference(aggregation_function)
 
     @field_validator("dimensions")
     @classmethod

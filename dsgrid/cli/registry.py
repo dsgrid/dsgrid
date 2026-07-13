@@ -1616,11 +1616,18 @@ def update_dataset(
 
 _generate_dataset_config_from_dataset_epilog = """
 Examples:\n
-$ dsgrid registry datasets generate-config-from-dataset \\ \n
+$ dsgrid registry datasets generate-config \\ \n
     -o "./my-dataset-dir" \\ \n
     -P my-project-id \\ \n
     my-dataset-id \\ \n
     /path/to/table.parquet\n
+\n
+$ dsgrid registry datasets generate-config \\ \n
+    -o "./my-dataset-dir" \\ \n
+    -P my-project-id \\ \n
+    -S schema.json5 \\ \n
+    my-dataset-id \\ \n
+    /path/to/load_data.csv\n
 """
 
 
@@ -1628,7 +1635,7 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
 @click.argument("dataset-id")
 @click.argument("dataset-path")
 @click.option(
-    "-s",
+    "-F",
     "--table-format",
     type=click.Choice([x.value for x in TableFormat]),
     default=TableFormat.ONE_TABLE.value,
@@ -1700,6 +1707,7 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     help="Overwrite files if they exist.",
 )
 @click.option(
+    "-S",
     "--schema-file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,

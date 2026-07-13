@@ -28,6 +28,7 @@ def _write_id_bigint_schema_file(tmp_path) -> str:
 
 
 def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
+    """Exercises the short option names. The other tests use the long names."""
     conn = cached_registry
     runner = CliRunner()
     dataset_id = "comstock"
@@ -41,22 +42,22 @@ def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
         "generate-config",
         dataset_id,
         f"dsgrid-test-data/datasets/test_efs_{dataset_id}",
-        "--project-id",
+        "-P",
         "test_efs",
-        "--table-format",
+        "-F",
         "two_table",
-        "--metric-type",
+        "-m",
         "EnergyEndUse",
-        "--pivoted-dimension-type",
+        "-p",
         "metric",
-        "--time-type",
+        "-t",
         TimeDimensionType.DATETIME.value,
-        "--time-columns",
+        "-T",
         "timestamp",
-        "--output",
+        "-o",
         str(tmp_path),
-        "--no-prompts",
-        "--schema-file",
+        "-n",
+        "-S",
         _write_id_bigint_schema_file(tmp_path),
     ]
     result = runner.invoke(cli, cmd)

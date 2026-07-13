@@ -23,7 +23,7 @@ Currently, there is no way to skip caching of the dataset. If it is not performe
 
 3. **Combine datasets** - Combine the datasets as specified by the `expression` in the dataset data model of the query. The default is to take a union of all datasets.
 
-4. **Persist intermediate table** - If the option `--persist-intermediate-table` is `true` (which is the default) then dsgrid will evaluate the Ibis query from the previous step by writing the table to the filesystem in the directory `query_output/cached_tables`. This can be disabled by setting `--no-persist-intermediate-table`.
+4. **Persist intermediate table** - If the option `--persist-intermediate-table` is `true` (which is the default) then dsgrid will evaluate the query from the previous step by writing the table to the filesystem in the directory `query_output/cached_tables`. This can be disabled by setting `--no-persist-intermediate-table`.
 
 5. **Apply result filters** - Apply any dimension_filters defined in the `result` data model of the query.
 

@@ -14,7 +14,7 @@ dsgrid offers a CLI command to perform the mapping operation. This is its simple
 dsgrid query project map-dataset my-project-id my-dataset-id
 ```
 
-By default, this will attempt to map all dimensions in three Ibis query phases:
+By default, this will attempt to map all dimensions in three query phases:
 
 1. Map all dimensions other than time that do not already match the project. Apply scaling factors if assigned and automatically convert units if applicable. Persist the result to the filesystem.
 2. Map the time dimension. Persist the result to the filesystem.

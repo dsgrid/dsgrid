@@ -13,7 +13,7 @@ dsgrid performs the following steps:
    - Pre-filter dataset according to the `dimension_filters` in the dataset data model of the query.
    - Map dataset dimensions to the project.
    - Convert units.
-   - Evaluate the Ibis query by writing the table to the filesystem in the directory `query_output/cached_project_mapped_datasets`.
+   - Evaluate the query by writing the table to the filesystem in the directory `query_output/cached_project_mapped_datasets`.
      - dsgrid restarts the runtime session for this query. If custom runtime configuration parameters are defined in the `runtime_conf_per_dataset` data model of the query for this dataset, dsgrid will apply them in the new session.
      - If the backend is Spark, the value `spark.sql.shuffle.partitions` may need to be increased for very large datasets.
 
@@ -33,7 +33,7 @@ Currently, there is no way to skip caching of the dataset. If it is not performe
 
 8. **Sort columns** - If the field `sort_columns` in the `result` data model is `true`, sort the table by those columns.
 
-9. **Write output** - Evaluate the Ibis query for the previous steps by writing the table to the filesystem in the directory `query_output/<query-name>`.
+9. **Write output** - Evaluate the query for the previous steps by writing the table to the filesystem in the directory `query_output/<query-name>`.
 
 10. **Run reports** - Run any `reports` defined in the `result` data model of the query.
 

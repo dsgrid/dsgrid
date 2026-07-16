@@ -75,16 +75,24 @@ stored in the registry.
 
 ### Example — Inspect project dimensions
 
+Dimension records and query results come back as `ibis.Table` expressions.
+Setting `ibis.options.interactive = True` makes `.head()` print a preview, as
+in the REPL session below; in a script, call `.execute()` on the expression to
+get a pandas DataFrame instead.
+
 ```python
+import ibis
 from dsgrid.dimension.base_models import DimensionType
+
+ibis.options.interactive = True
 
 project = manager.project_manager.load_project("dsgrid_conus_2022")
 geo_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)
-geo_dim.get_records_dataframe().head().execute())
+geo_dim.get_records_dataframe().head()
 print(geo_dim.get_unique_ids())
 
 # Show the records for a supplemental dimension.
-project.config.get_dimension_records("commercial_end_uses").head().execute()
+project.config.get_dimension_records("commercial_end_uses").head()
 ```
 
 
@@ -338,7 +346,7 @@ query = ProjectQueryModel(
 )
 
 df = submitter.submit(query)
-df.head().execute()
+df.head()
 ```
 
 ### Example — Map a dataset to alternate dimensions
@@ -364,5 +372,5 @@ query = make_dataset_query(
 
 submitter = DatasetQuerySubmitter(output_dir=Path("dataset_query_output"))
 df = submitter.submit(query, mgr=manager)
-df.head().execute()
+df.head()
 ```

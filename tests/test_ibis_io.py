@@ -28,7 +28,7 @@ from dsgrid.ibis.io import (
 from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import get_runtime_session, _create_ibis_table
 from dsgrid.ibis.table_utils import count_rows, table_to_pandas
-from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.types import spec_for_name, use_duckdb
 from dsgrid.utils.files import dump_json_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
@@ -256,6 +256,77 @@ def test_read_csv(tmp_path: Path) -> None:
         )
         == 3
     )
+
+
+def _string_sql() -> str:
+    """The backend SQL type string for a string column, as read_csv expects."""
+    spec = spec_for_name("string")
+    return spec.duckdb_sql if use_duckdb() else spec.spark_sql
+
+
+def test_read_csv_declared_string_preserves_leading_zeros(tmp_path: Path) -> None:
+    """A declared string schema preserves leading-zero IDs (e.g. FIPS "08031").
+
+    This is the guarantee dsgrid relies on for typed columns: dataset data files
+    are read through a FileSchema, and the --schema-file / DataFileColumns
+    mechanism exists specifically to pin ID columns as strings so a numeric-looking
+    code is not read back as an integer. (Dimension records never reach this
+    reader -- they load via csv.DictReader into str-typed Pydantic models -- so
+    this pins the primitive the dataset path depends on.)
+    """
+    filename = tmp_path / "geo.csv"
+    filename.write_text("geoid,pop\n08031,100\n12000,200\n")
+
+    typed = _collect(read_csv(filename, schema={"geoid": _string_sql()}))
+    assert sorted(r.geoid for r in typed) == ["08031", "12000"]
+
+
+@pytest.mark.skipif(not use_duckdb(), reason="pins DuckDB CSV type-inference behavior")
+def test_read_csv_schemaless_leading_zero_duckdb_sample_window(tmp_path: Path) -> None:
+    """Characterize DuckDB's schemaless leading-zero inference: safe within the
+    type-detection sample, corrupted beyond it.
+
+    DuckDB samples the first ~20480 rows to infer column types. A leading-zero ID
+    seen within that window keeps the column a string (zero preserved); if every
+    sampled value is a plain integer and the first leading-zero value appears only
+    *beyond* the window, the column is typed integer and the zero is silently lost.
+    Either way the lesson is the same: an ID column that must survive as a string
+    has to be declared (see test_read_csv_declared_string_preserves_leading_zeros),
+    not inferred.
+    """
+    # Within the sample window: DuckDB sees the leading zero and keeps it a string.
+    early = tmp_path / "early.csv"
+    early.write_text("geoid,pop\n08031,100\n12000,200\n")
+    early_tbl = read_csv(early)
+    assert early_tbl.schema()["geoid"].is_string()
+    assert sorted(r.geoid for r in _collect(early_tbl)) == ["08031", "12000"]
+
+    # Beyond the sample window: the late leading-zero row is typed away to an int.
+    late = tmp_path / "late.csv"
+    lines = ["geoid,pop"] + [f"{12000 + i},{i}" for i in range(30000)] + ["08031,999999"]
+    late.write_text("\n".join(lines) + "\n")
+    late_tbl = read_csv(late)
+    assert late_tbl.schema()["geoid"].is_integer()
+    late_rows = _collect(_filter(late_tbl, "pop = 999999"))
+    assert len(late_rows) == 1
+    assert late_rows[0].geoid == 8031  # leading zero lost -- the hazard being pinned
+
+
+@pytest.mark.skipif(use_duckdb(), reason="pins Spark CSV inferSchema behavior")
+def test_read_csv_schemaless_leading_zeros_lost_on_spark(tmp_path: Path) -> None:
+    """Characterize Spark's schemaless leading-zero inference: always lost.
+
+    Unlike DuckDB (which preserves a leading-zero value seen within its sample
+    window), Spark's inferSchema does a full pass and picks the most-specific
+    parseable type, so a "08031" column is typed integer and the zero is dropped
+    even when the value is the very first row. Declaring the column as string is
+    mandatory for leading-zero IDs on Spark.
+    """
+    filename = tmp_path / "early.csv"
+    filename.write_text("geoid,pop\n08031,100\n12000,200\n")
+    table = read_csv(filename)
+    assert table.schema()["geoid"].is_integer()
+    assert sorted(r.geoid for r in _collect(table)) == [8031, 12000]
 
 
 def test_read_csv_with_pipe_delimiter(tmp_path: Path) -> None:

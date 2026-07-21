@@ -1,3 +1,5 @@
+import logging
+
 import ibis
 import pandas as pd
 import pytest
@@ -243,7 +245,7 @@ def test_join_across_backends_executes_on_the_runtime(dataframe, foreign_table):
 
 
 @_needs_duckdb
-def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_table):
+def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_table, caplog):
     """The parquet round-trip (strategy 3) must round-trip data correctly and its
     materialized file must be tracked and removed by drop_temp_tables_and_views.
 
@@ -253,7 +255,12 @@ def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_ta
     join) and pins both halves of the reviewer's ask: correctness + cleanup.
     """
     before = set(ibis_temp._tracked_temp_files)
-    view = create_temp_view(foreign_table)
+    with caplog.at_level(logging.WARNING, logger="dsgrid.ibis.operations"):
+        view = create_temp_view(foreign_table)
+
+    # The warning is emitted only from the parquet-fallback branch, so its presence
+    # asserts strategy 3 (not create_view or create_table) actually ran.
+    assert "fell back to parquet round-trip" in caplog.text
 
     new_tracked = set(ibis_temp._tracked_temp_files) - before
     assert len(new_tracked) == 1, "parquet fallback should track exactly one temp file"

@@ -135,7 +135,8 @@ def pivoted_dataframe_with_time():
             },
         ]
     )
-    yield cache(df), ["time_index"], ["cooling", "heating"]
+    df = cache(df)
+    yield df, ["time_index"], ["cooling", "heating"]
     unpersist(df)
 
 

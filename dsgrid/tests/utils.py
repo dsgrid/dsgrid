@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.functions import cache
 from dsgrid.ibis.session import get_runtime_session
 from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.table_utils import count_rows
 
 
 def read_parquet(filename: Path):
@@ -11,10 +12,9 @@ def read_parquet(filename: Path):
     to inspect the dataframe.
     """
     spark = get_runtime_session()
-    df = spark.read.parquet(Path(filename).as_posix())
-    if not use_duckdb():
-        df.cache()
-        df.count()
+    df = cache(spark.read.parquet(Path(filename).as_posix()))
+    # Force materialization so the cached data survives deletion of the source file.
+    count_rows(df)
     return df
 
 

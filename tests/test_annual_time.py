@@ -23,6 +23,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
+from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.ibis.session import (
     F,
     create_dataframe_from_dicts,
@@ -77,11 +78,9 @@ def annual_dataframe():
         },
     ]
 
-    df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
-        count_rows(df)
+    df = cache(create_dataframe_from_dicts(data))
     yield df
+    unpersist(df)
 
 
 @pytest.fixture
@@ -126,10 +125,9 @@ def time_array_rows() -> list[dict[str, Any]]:
 
 
 def _make_time_array_df(rows: list[dict[str, Any]]) -> ibis.Table:
-    df = create_dataframe_from_dicts(rows)
-    if not use_duckdb():
-        df.cache()
-    return df
+    # No cache(): each caller reads the result exactly once, so caching would add
+    # a materialization with nothing to amortize it against.
+    return create_dataframe_from_dicts(rows)
 
 
 def _check_time_arrays(df: ibis.Table) -> None:
@@ -139,10 +137,9 @@ def _check_time_arrays(df: ibis.Table) -> None:
 @pytest.fixture
 def annual_dataframe_with_model_year_valid(annual_dataframe_with_model_year_values):
     data = annual_dataframe_with_model_year_values
-    df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
+    df = cache(create_dataframe_from_dicts(data))
     yield df, "time_year", "model_year"
+    unpersist(df)
 
 
 @pytest.fixture
@@ -156,10 +153,9 @@ def annual_dataframe_with_model_year_invalid(annual_dataframe_with_model_year_va
             "electricity_sales": 702872.1,
         },
     )
-    df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
+    df = cache(create_dataframe_from_dicts(data))
     yield df, "time_year", "model_year"
+    unpersist(df)
 
 
 @pytest.fixture
@@ -258,8 +254,6 @@ def test_map_annual_time_total_to_datetime_with_existing_model_year(
         },
     ]
     df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
     value_columns = {"electricity_sales"}
     out = map_annual_time_to_date_time(
         df, annual_time_dimension, date_time_dimension, value_columns

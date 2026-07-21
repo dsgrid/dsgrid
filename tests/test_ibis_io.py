@@ -15,12 +15,14 @@ from dsgrid.ibis.io import (
     persist_table,
     read_csv,
     read_dataframe,
+    read_parquet,
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
     write_table,
-    _is_duckdb_io_exception,
-    _is_spark_parquet_schema_exception,
+    _is_corrupt_file_error,
+    _is_duckdb_corrupt_parquet_error,
+    _is_spark_corrupt_parquet_error,
     _post_process_dataframe,
 )
 from dsgrid.ibis.operations import filter_sql
@@ -44,6 +46,48 @@ def test_try_read_dataframe_invalid(tmp_path):
     assert not invalid.exists()
 
 
+# Corruption modes a partial or bad Parquet write can produce. Each must be
+# classified as a corrupt-file error (not a transient failure) so a regenerable
+# cache self-heals.
+_CORRUPT_PARQUET_BYTES = {
+    "garbage": b"this is not a parquet file\n" * 8,
+    "empty": b"",
+    "bad_magic_prefix": b"PAR1" + b"\x00" * 64,
+}
+
+
+@pytest.mark.parametrize("label", sorted(_CORRUPT_PARQUET_BYTES))
+def test_corrupt_parquet_is_classified(tmp_path, label):
+    """Characterization test: a real corrupt-Parquet read is recognized as a
+    corrupt-file error.
+
+    The assertion runs against whichever backend is active — DuckDB locally and
+    in the non-Spark CI job, Spark in the Spark CI job — so the backend-specific
+    signatures in ``_is_corrupt_file_error`` stay honest. If a backend upgrade
+    changes its error class or message, this fails loudly and the matcher must be
+    updated (the failure message reports the unrecognized exception).
+    """
+    path = tmp_path / "corrupt.parquet"
+    path.write_bytes(_CORRUPT_PARQUET_BYTES[label])
+    with pytest.raises(Exception) as exc_info:
+        read_parquet(path)
+    exc = exc_info.value
+    assert _is_corrupt_file_error(exc), (
+        "Reading a corrupt Parquet file raised an exception that "
+        "_is_corrupt_file_error did not recognize; the backend may have changed "
+        f"its signature: {type(exc).__module__}.{type(exc).__name__}: {exc}"
+    )
+
+
+def test_try_read_dataframe_deletes_corrupt_file(tmp_path):
+    """A corrupt (not merely empty-directory) cache file is treated as a miss and
+    deleted so the caller regenerates it."""
+    path = tmp_path / "table.parquet"
+    path.write_bytes(b"this is not a parquet file\n" * 8)
+    assert try_read_dataframe(path) is None
+    assert not path.exists()
+
+
 def test_try_read_dataframe_valid(tmp_path):
     spark = get_runtime_session()
     df = spark.createDataFrame([(1,)], ["a"])
@@ -58,17 +102,38 @@ def test_parquet_exception_detection():
     class AnalysisException(Exception):
         pass
 
+    class SparkException(Exception):
+        pass
+
     class IOException(Exception):
         __module__ = "duckdb.fake"
 
-    assert _is_spark_parquet_schema_exception(
+    class InvalidInputException(Exception):
+        __module__ = "duckdb.fake"
+
+    # Spark corruption signatures, matched on the message regardless of class.
+    assert _is_spark_corrupt_parquet_error(
         AnalysisException("Unable to infer schema for Parquet. It must be specified manually.")
     )
-    assert _is_spark_parquet_schema_exception(AnalysisException("PATH_NOT_FOUND"))
-    assert _is_spark_parquet_schema_exception(AnalysisException("Path does not exist"))
-    assert not _is_spark_parquet_schema_exception(AnalysisException("other"))
-    assert _is_duckdb_io_exception(IOException("bad parquet"))
-    assert not _is_duckdb_io_exception(ValueError("bad parquet"))
+    assert _is_spark_corrupt_parquet_error(AnalysisException("PATH_NOT_FOUND"))
+    assert _is_spark_corrupt_parquet_error(AnalysisException("Path does not exist"))
+    assert _is_spark_corrupt_parquet_error(
+        SparkException("file:/x/part.parquet is not a Parquet file")
+    )
+    assert not _is_spark_corrupt_parquet_error(AnalysisException("other"))
+
+    # DuckDB corruption is matched on the exception class within the duckdb module.
+    assert _is_duckdb_corrupt_parquet_error(IOException("bad parquet"))
+    assert _is_duckdb_corrupt_parquet_error(InvalidInputException("No magic bytes found"))
+    assert not _is_duckdb_corrupt_parquet_error(ValueError("bad parquet"))
+
+    # The combined classifier accepts either backend's corruption signature and
+    # rejects transient/unrelated errors so they propagate instead of deleting a
+    # cache file.
+    assert _is_corrupt_file_error(IOException("bad parquet"))
+    assert _is_corrupt_file_error(SparkException("part.parquet is not a Parquet file"))
+    assert not _is_corrupt_file_error(MemoryError("out of memory"))
+    assert not _is_corrupt_file_error(ConnectionError("spark master unreachable"))
 
 
 def test_require_unique_raises():

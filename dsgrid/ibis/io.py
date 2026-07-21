@@ -20,7 +20,7 @@ from typing import Any, cast
 
 import ibis
 
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.operations import coalesce, create_temp_view, repartition
 from dsgrid.ibis.table_utils import count_rows
@@ -234,11 +234,13 @@ def try_read_dataframe(filename: Path, delete_if_invalid: bool = True, **kwargs)
 
     Used for dsgrid's hash-keyed on-disk caches (cached datasets, intermediate
     query tables): callers treat ``None`` as a cache miss and regenerate, so a
-    missing and an unreadable file are handled the same way. ``delete_if_invalid``
-    defaults to True because an invalid cache file is almost always a partial or
-    corrupt write; deleting it lets the caller rebuild cleanly. Point this only at
-    regenerable caches, not source data — pass ``delete_if_invalid=False`` to skip
-    the delete.
+    missing and an unreadable file are handled the same way. Only *corrupt-file*
+    read errors (a partial or malformed Parquet write) trigger this; transient
+    failures such as out-of-memory or a lost backend connection are re-raised so a
+    good cache is never deleted to mask an environmental problem.
+    ``delete_if_invalid`` defaults to True because a corrupt cache file should be
+    discarded so the caller can rebuild cleanly. Point this only at regenerable
+    caches, not source data — pass ``delete_if_invalid=False`` to skip the delete.
 
     Parameters
     ----------
@@ -259,7 +261,13 @@ def try_read_dataframe(filename: Path, delete_if_invalid: bool = True, **kwargs)
 
     try:
         return read_dataframe(filename, **kwargs)
-    except DSGInvalidFile:
+    except Exception as exc:
+        if not _is_corrupt_file_error(exc):
+            # Transient/environmental failure (out-of-memory, lost backend
+            # connection, permission error, ...) rather than a bad file. Surface
+            # it instead of silently deleting a good cache and masking the cause.
+            raise
+        logger.warning("Discarding unreadable cache file %s: %s", filename, exc)
         if delete_if_invalid:
             if filename.is_dir():
                 shutil.rmtree(filename)
@@ -296,8 +304,6 @@ def read_dataframe(
     ------
     ValueError
         Raised if a require_unique column has duplicate values.
-    DSGInvalidFile
-        Raised if the file cannot be read. This can happen if a Parquet write operation fails.
     """
     df = _read_with_runtime(str(filename))
     _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
@@ -312,15 +318,7 @@ def _read_with_runtime(filename: str) -> ibis.Table:
     if suffix == ".csv":
         df = read_csv(filename)
     elif suffix == ".parquet":
-        try:
-            df = read_parquet(filename)
-        except Exception as exc:
-            if _is_spark_parquet_schema_exception(exc) or _is_duckdb_io_exception(exc):
-                logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
-                msg = f"Cannot read {filename=}"
-                raise DSGInvalidFile(msg)
-            else:
-                raise
+        df = read_parquet(filename)
     elif suffix == ".json":
         df = read_json(filename)
     else:
@@ -329,17 +327,41 @@ def _read_with_runtime(filename: str) -> ibis.Table:
     return df
 
 
-def _is_duckdb_io_exception(exc: Exception) -> bool:
+def _is_corrupt_file_error(exc: Exception) -> bool:
+    """Return True if ``exc`` signals an unreadable or corrupt Parquet file.
+
+    Used by :func:`try_read_dataframe` to decide whether an unreadable cache file
+    should be discarded and regenerated. It matches the signatures each backend
+    raises for a truncated, partially written, or otherwise malformed Parquet
+    file. Anything else (out-of-memory, lost connection, permission errors) is
+    treated as a transient failure and left to propagate.
+    """
+    return _is_duckdb_corrupt_parquet_error(exc) or _is_spark_corrupt_parquet_error(exc)
+
+
+def _is_duckdb_corrupt_parquet_error(exc: Exception) -> bool:
+    # DuckDB raises IOException for read failures and InvalidInputException for
+    # malformed Parquet content (bad magic bytes, truncated footer, ...).
     cls = exc.__class__
-    return cls.__name__ == "IOException" and cls.__module__.startswith("duckdb")
+    return cls.__module__.startswith("duckdb") and cls.__name__ in {
+        "IOException",
+        "InvalidInputException",
+    }
 
 
-def _is_spark_parquet_schema_exception(exc: Exception) -> bool:
+def _is_spark_corrupt_parquet_error(exc: Exception) -> bool:
+    # Spark surfaces corruption through several exception types (AnalysisException,
+    # SparkException, Py4JJavaError), so match on the message signatures.
     message = str(exc)
-    return exc.__class__.__name__ == "AnalysisException" and (
-        "Unable to infer schema for Parquet. It must be specified manually." in message
-        or "PATH_NOT_FOUND" in message
-        or "Path does not exist" in message
+    return any(
+        signature in message
+        for signature in (
+            "Unable to infer schema for Parquet. It must be specified manually.",
+            "PATH_NOT_FOUND",
+            "Path does not exist",
+            "is not a Parquet file",
+            "Could not read footer",
+        )
     )
 
 

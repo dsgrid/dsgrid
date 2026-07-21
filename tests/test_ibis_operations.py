@@ -289,6 +289,11 @@ def test_pivot(dataframe):
     df = pivot(dataframe, "metric", "value")
     assert "cooling" in df.columns
     assert "heating" in df.columns
+    # names_sort=True gives a stable, alphabetical pivot-column order (cooling before
+    # heating) rather than DuckDB's unspecified scan order, so user-facing CSV/parquet
+    # output is deterministic run-to-run.
+    metric_columns = [c for c in df.columns if c in {"cooling", "heating"}]
+    assert metric_columns == ["cooling", "heating"]
     assert aggregate_single_value(df, "sum", "cooling") == 4.0
     assert aggregate_single_value(df, "sum", "heating") == 6.0
 

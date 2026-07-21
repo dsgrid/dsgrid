@@ -283,10 +283,20 @@ def sql_from_df(df: ibis.Table, query: str) -> ibis.Table:
 
 
 def pivot(df: ibis.Table, name_column: str, value_column: str) -> ibis.Table:
+    """Pivot ``name_column`` into columns, summing ``value_column`` per cell.
+
+    ``names_sort=True`` gives a stable, alphabetical pivot-column order. Spark's
+    ``.pivot()`` produced sorted columns and DuckDB's default scan order is
+    unspecified, so without this the output column order would vary run-to-run.
+    The pivot result is written directly to user-facing CSV/parquet output, where
+    non-deterministic column order would churn diffs and break golden-file
+    comparisons.
+    """
     return df.pivot_wider(
         names_from=name_column,
         values_from=value_column,
         values_agg="sum",
+        names_sort=True,
     )
 
 

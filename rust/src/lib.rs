@@ -71,7 +71,10 @@ fn get_string_value(arr: &dyn Array, idx: usize) -> Result<String> {
 }
 
 /// A pattern discovered in the data
-#[pyclass]
+///
+/// Only ever returned to Python (never extracted from a Python object), so the
+/// `FromPyObject` derive is skipped.
+#[pyclass(skip_from_py_object)]
 #[derive(Clone)]
 pub struct Pattern {
     #[pyo3(get)]
@@ -118,7 +121,10 @@ impl EncodedDataset {
 }
 
 /// Configuration for pattern finding
-#[pyclass]
+///
+/// Passed from Python into `find_minimal_patterns` as an argument, so it opts
+/// into the `FromPyObject` derive.
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct PatternConfig {
     #[pyo3(get, set)]

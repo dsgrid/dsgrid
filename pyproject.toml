@@ -96,7 +96,6 @@ dev = [
     "pre-commit",
     "devtools",
     "flake8",
-    "mypy",
     "ty",
     "pandas-stubs",
     "pyarrow",
@@ -136,9 +135,6 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 omit = ["dsgrid/tests/*", "tests/*", "tests_aws/*", "build_backend.py"]
-
-[tool.mypy]
-plugins = "pydantic.mypy"
 
 [tool.ty.src]
 include = ["dsgrid"]

@@ -17,12 +17,12 @@ dsgrid builds a Rust library and so to run all tests, you must have Cargo instal
 Refer to these [instructions](https://rust-lang.org/tools/install/)
 
 ```
-pip install -e .[tests]
+pip install -e .[dev] # what is needed for running tests and code development (DuckDB backend only)
 
 # or
 
-pip install -e .[dev,spark] # includes what is needed for tests and code development
-(Leave off `spark` and `pyhive` if you don't need/want to use spark.)
+pip install -e .[dev,spark] # dev plus Apache Spark support
+(Leave off `spark` if you don't need/want to use spark.)
 
 # or
 
@@ -30,14 +30,14 @@ pip install -e .[dev,doc] # dev plus what is needed for creating documentation a
 ```
 
 **Java**
-Spark requires Java. Most people already have Java installed on their personal computers, so this
-is typically only a problem on an HPC or the cloud. Check if you have it. Both of these commands
-must work.
+Spark requires Java. dsgrid pins `pyspark==4.0.0`, which requires Java 17 or newer (CI runs on
+Java 21). Most people already have Java installed on their personal computers, so this is typically
+only a problem on an HPC or the cloud. Check if you have it. Both of these commands must work.
 ```
 $ java --version
-openjdk 11.0.12 2021-07-20
+openjdk 17.0.12 2024-07-16
 $ echo $JAVA_HOME
-/Users/dthom/brew/Cellar/openjdk@11/11.0.12
+/Users/dthom/brew/Cellar/openjdk@17/17.0.12
 ```
 If you don't have java installed:
 ```
@@ -56,28 +56,36 @@ $ brew install openjdk
 pre-commit install
 ```
 
+The hooks include `ty check`, which runs against your installed environment (matching CI), so make
+sure you have installed one of the `[dev...]` extras above before committing.
+
 **Additional software required for publishing documentation:**
 
 - [Pandoc](https://pandoc.org/installing.html)
 
 ## Spark
 You need to have some familiarity with Spark in order to run non-trivial tasks in dsgrid.
-This [page](https://dsgrid.github.io/dsgrid/spark_overview.html) provides an overview and explains
-various ways to use Spark in dsgrid.
+This [page](https://dsgrid.github.io/dsgrid/user_guide/apache_spark/overview.html) provides an
+overview and explains various ways to use Spark in dsgrid.
 
 If you test dsgrid with Spark, you'll need to download Apache Thrift Server, which is included
 with the Spark installation. Chronify uses Spark through a Thrift Server to run SQL queries.
 
+Download the Spark version that matches the `pyspark` pin in `pyproject.toml` (currently 4.0.0);
+the major, minor, and patch versions must match. On NLR's Kestrel HPC a prebuilt copy is available
+at `/datasets/images/apache_spark/spark-4.0.0-bin-hadoop3` (with `JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7`),
+so you can skip the download there.
+
 You can extract this package anywhere on your filesystem. Start the server before running tests
 and shut it down afterwards.
 ```
-$ wget https://dlcdn.apache.org/spark/spark-3.5.4/spark-3.5.4-bin-hadoop3.tgz
-$ tar -xzf spark-3.5.4-bin-hadoop3.tgz
+$ wget https://dlcdn.apache.org/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
+$ tar -xzf spark-4.0.0-bin-hadoop3.tgz
 ```
 
 ```
-$ <your-base-path>/spark-3.5.4-bin-hadoop3/sbin/start-thrift-server.sh
-$ <your-base-path>/spark-3.5.4-bin-hadoop3/sbin/stop-thrift-server.sh
+$ <your-base-path>/spark-4.0.0-bin-hadoop3/sbin/start-thrift-server.sh
+$ <your-base-path>/spark-4.0.0-bin-hadoop3/sbin/stop-thrift-server.sh
 ```
 
 Refer to .github/workflows/pull_request_tests.yml to see exactly how CI is run with both DuckDB

@@ -2,6 +2,7 @@ import ibis
 import pandas as pd
 import pytest
 
+import dsgrid.ibis.temp as ibis_temp
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.ibis.backend import get_runtime_backend
 from dsgrid.ibis.functions import is_dataframe_empty
@@ -10,6 +11,7 @@ from dsgrid.ibis.operations import (
     _sole_backend,
     aggregate_single_value,
     count_distinct_on_group_by,
+    create_temp_view,
     cross_join,
     cross_join_dfs,
     except_all,
@@ -24,6 +26,7 @@ from dsgrid.ibis.operations import (
     union_all,
     unpivot,
 )
+from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.session import get_runtime_session
 from dsgrid.ibis.table_utils import count_rows
 from dsgrid.ibis.types import use_duckdb
@@ -237,6 +240,34 @@ def test_join_across_backends_executes_on_the_runtime(dataframe, foreign_table):
     joined = join(dataframe, foreign_table, "index", "index2")
     assert _sole_backend(joined) is get_runtime_backend().connection
     assert aggregate_single_value(joined, "sum", "y") == 1.0 + 1.0 + 2.0 + 2.0
+
+
+@_needs_duckdb
+def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_table):
+    """The parquet round-trip (strategy 3) must round-trip data correctly and its
+    materialized file must be tracked and removed by drop_temp_tables_and_views.
+
+    A table from a separate DuckDB connection cannot be reached by create_view or
+    a cross-backend create_table, so create_temp_view falls through to the parquet
+    round-trip. This forces that branch directly (rather than transitively via a
+    join) and pins both halves of the reviewer's ask: correctness + cleanup.
+    """
+    before = set(ibis_temp._tracked_temp_files)
+    view = create_temp_view(foreign_table)
+
+    new_tracked = set(ibis_temp._tracked_temp_files) - before
+    assert len(new_tracked) == 1, "parquet fallback should track exactly one temp file"
+    tracked_file = next(iter(new_tracked))
+    assert tracked_file.exists(), "the fallback must have materialized the table to disk"
+
+    # The view round-trips the foreign data with no rows lost or altered.
+    result = get_runtime_backend().table(view).execute().sort_values(by="index2")
+    assert list(result["y"]) == [1.0, 2.0]
+
+    # Cleanup removes the materialized parquet file and forgets it.
+    drop_temp_tables_and_views()
+    assert not tracked_file.exists(), "cleanup must delete the tracked parquet file"
+    assert tracked_file not in ibis_temp._tracked_temp_files
 
 
 def test_rename_columns(dataframe):

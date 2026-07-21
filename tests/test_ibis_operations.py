@@ -275,6 +275,28 @@ def test_unpivot(spark):
     assert aggregate_single_value(_filter(df2, "metric = 'heating'"), "sum", "value") == 6.0
 
 
+def test_unpivot_preserves_null_rows(spark):
+    # Regression guard: the raw unpivot primitive must keep rows whose value is NULL
+    # (Spark's ``df.unpivot`` and the old ``UNPIVOT INCLUDE NULLS`` SQL both did). If a
+    # future Ibis default drops them, sparse pivoted load data would silently lose rows
+    # and every downstream aggregation would change. ``unpivot_dataframe`` also relies on
+    # these NULL rows surviving so it can collapse them into per-id null-time rows.
+    df = spark.createDataFrame(
+        [
+            (0, 1.0, None),
+            (1, 3.0, 4.0),
+        ],
+        ["index", "cooling", "heating"],
+    )
+    df2 = unpivot(df, ["cooling", "heating"], "metric", "value")
+    # 2 rows * 2 pivoted columns; none dropped despite the NULL heating value.
+    assert count_rows(df2) == 4
+    null_rows = _collect(_filter(df2, "value IS NULL"))
+    assert len(null_rows) == 1
+    assert null_rows[0].metric == "heating"
+    assert null_rows[0].index == 0
+
+
 def test_cross_join_dfs_and_union_all():
     table = get_runtime_session().createDataFrame([(1, "a"), (2, "b")], ["id", "name"])
     assert cross_join_dfs([table]).columns == table.columns

@@ -291,6 +291,31 @@ def pivot(df: ibis.Table, name_column: str, value_column: str) -> ibis.Table:
 
 
 def unpivot(df: ibis.Table, pivoted_columns, name_column: str, value_column: str) -> ibis.Table:
+    """Unpivot ``pivoted_columns`` into ``name_column``/``value_column`` pairs.
+
+    NULL values are preserved: a row whose pivoted cell is NULL still yields a
+    row with a NULL ``value_column`` (matching Spark's ``df.unpivot`` and the
+    old ``UNPIVOT INCLUDE NULLS`` SQL). Callers such as
+    :func:`dsgrid.utils.dataset.unpivot_dataframe` depend on this to detect and
+    collapse the NULL rows themselves; dropping them here would silently change
+    row counts and every downstream aggregation. See
+    ``tests/test_ibis_operations.py::test_unpivot_preserves_null_rows``.
+
+    Parameters
+    ----------
+    df : ibis.Table
+        Table to unpivot.
+    pivoted_columns
+        Columns to collapse into the ``name_column``/``value_column`` pair.
+    name_column : str
+        Name of the output column holding the former column names.
+    value_column : str
+        Name of the output column holding the former cell values.
+
+    Returns
+    -------
+    ibis.Table
+    """
     return df.pivot_longer(pivoted_columns, names_to=name_column, values_to=value_column)
 
 

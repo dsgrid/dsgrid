@@ -14,6 +14,26 @@ from typing import Any
 
 import ibis
 
+from dsgrid.ibis.session import get_runtime_session
+
+
+def make_table(columns: list[str], *rows: tuple) -> ibis.Table:
+    """Build an Ibis table from a column header and one tuple per row.
+
+    The pandas-like way to define small test tables so the data reads like a
+    table (columns on top, one row per line) instead of a list of per-row dicts::
+
+        df = make_table(
+            ["county", "sector", "value"],
+            ("Jefferson", "com", 2.1),
+            ("Boulder", "com", 3.5),
+        )
+
+    Column types are inferred from the row values (``None`` for NULLs), matching
+    ``get_runtime_session().createDataFrame`` on both backends.
+    """
+    return get_runtime_session().createDataFrame(list(rows), columns)
+
 
 def perform_interval_op(
     df: ibis.Table, time_column: str, op: str, val: Any, unit: str, alias: str

@@ -91,6 +91,16 @@ def drop_columns(df: ibis.Table, *columns: str) -> ibis.Table:
     return df.select(*(col for col in df.columns if col not in to_drop))
 
 
+def with_literal_column(df: ibis.Table, column: str, value: Any) -> ibis.Table:
+    """Add (or replace) ``column`` with a constant ``value`` on every row.
+
+    ``value`` of ``None`` becomes a typed SQL NULL; any other value becomes a
+    literal of the inferred type.
+    """
+    expr = ibis.null() if value is None else ibis.literal(value)
+    return df.mutate(**{column: expr})
+
+
 def _sole_backend(df: ibis.Table) -> Any | None:
     """Return the one ibis backend ``df`` is bound to, or None if it is bound to none.
 

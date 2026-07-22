@@ -27,6 +27,7 @@ from dsgrid.ibis.operations import (
     sql_from_df,
     union_all,
     unpivot,
+    with_literal_column,
 )
 from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.session import get_runtime_session
@@ -275,6 +276,18 @@ def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_ta
     drop_temp_tables_and_views()
     assert not tracked_file.exists(), "cleanup must delete the tracked parquet file"
     assert tracked_file not in ibis_temp._tracked_temp_files
+
+
+def test_with_literal_column(dataframe):
+    """A constant value is broadcast to every row; None becomes a SQL NULL."""
+    valued = with_literal_column(dataframe, "flag", "x")
+    assert "flag" in valued.columns
+    assert count_rows(valued) == count_rows(dataframe)
+    assert all(row.flag == "x" for row in _collect(valued))
+
+    nulled = with_literal_column(dataframe, "maybe", None)
+    assert count_rows(nulled) == count_rows(dataframe)
+    assert is_dataframe_empty(_filter(nulled, "maybe IS NOT NULL"))
 
 
 def test_rename_columns(dataframe):

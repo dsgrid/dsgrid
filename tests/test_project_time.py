@@ -14,7 +14,7 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.backend import get_runtime_backend
-from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns, with_literal_column
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -257,7 +257,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             weekday_func = "WEEKDAY"
             weekday_modifier = ""
         for tz_name in geo_tz_names:
-            local_time_df = _with_literal_column(project_time_df, "time_zone", tz_name)
+            local_time_df = with_literal_column(project_time_df, "time_zone", tz_name)
             local_time_df = to_utc_timestamp(local_time_df, "map_time", session_tz, "UTC")
             local_time_df = from_utc_timestamp(local_time_df, "UTC", tz_name, "local_time")
             select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
@@ -421,13 +421,6 @@ def _as_timezone(value, tz):
     return value.astimezone(tz)
 
 
-def _with_literal_column(df, column, value):
-    view = create_temp_view(df)
-    return get_runtime_session().sql(
-        f"SELECT *, '{_sql_string(value)}' AS {_sql_ident(column)} FROM {view}"
-    )
-
-
 def _count_by_group(df, groupby_cols):
     view = create_temp_view(df)
     groups = ", ".join(_sql_ident(x) for x in groupby_cols)
@@ -469,10 +462,6 @@ def _sql_ident(column):
     if get_runtime_backend().name == "spark":
         return "`" + column.replace("`", "``") + "`"
     return '"' + column.replace('"', '""') + '"'
-
-
-def _sql_string(value):
-    return str(value).replace("'", "''")
 
 
 # The DuckDB implementations of from_utc_timestamp / to_utc_timestamp may not be fully

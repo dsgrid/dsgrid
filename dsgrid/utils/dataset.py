@@ -47,6 +47,7 @@ from dsgrid.ibis.operations import (
     rename_columns,
     union_all,
     unpivot,
+    with_literal_column,
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
@@ -121,15 +122,6 @@ def _read_chronify_output(df: ibis.Table, output_file: Path) -> ibis.Table:
     return read_parquet(output_file)
 
 
-def _with_literal_column(df: ibis.Table, column: str, value) -> ibis.Table:
-    expr = ibis.null() if value is None else ibis.literal(value)
-    return df.mutate(**{column: expr})
-
-
-def _rename_column(df: ibis.Table, old: str, new: str) -> ibis.Table:
-    return rename_columns(df, {old: new})
-
-
 def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
     schema = template.schema()
     exprs = {}
@@ -174,15 +166,60 @@ def map_stacked_dimension(
     drop_column: bool = True,
     to_column: str | None = None,
 ) -> ibis.Table:
+    """Map a stacked (long-format) dimension column through a mapping table.
+
+    Inner-joins ``df`` to ``records`` on ``df[column] == records.from_id``: a df row
+    whose ``column`` value has no ``from_id`` is dropped, and a ``from_id`` that fans
+    out to several ``to_id`` rows splits the df row into one per ``to_id``. Records
+    whose ``to_id`` is NULL are removed first, dropping the df rows that map to them.
+
+    Fractions: ``records`` always carries ``from_fraction`` (default 1.0); ``df``
+    carries a running ``fraction`` that accumulates across chained mappings,
+    initialized to 1.0 when absent. Output ``fraction = fraction * from_fraction``.
+
+    Parameters
+    ----------
+    df : ibis.Table
+        Long-format table being mapped; contains ``column`` and may already carry
+        a ``fraction`` column from a prior mapping.
+    records : ibis.Table
+        Mapping records with ``from_id``, nullable ``to_id``, and ``from_fraction``.
+    column : str
+        The df column to map (matched against ``from_id``).
+    drop_column : bool, optional
+        Drop the source ``column`` after mapping (map in place). Pass False to keep
+        it alongside the mapped ``to_column``. False is only allowed when there is
+        a distinct ``to_column``.
+    to_column : str | None, optional
+        Name of the mapped (``to_id``) column; defaults to ``column`` (map in place).
+
+    Returns
+    -------
+    ibis.Table
+        ``df`` with ``column`` mapped and ``fraction`` updated; the ``from_id`` /
+        ``from_fraction`` join columns do not leak into the output.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If ``drop_column`` is False while ``to_column`` resolves to ``column``: the
+        mapped column would collide with the preserved source column.
+    """
     to_column_ = to_column or column
+    if not drop_column and to_column_ == column:
+        msg = (
+            f"map_stacked_dimension cannot keep the source column {column!r} "
+            "(drop_column=False) while mapping it in place; pass a distinct to_column."
+        )
+        raise DSGInvalidOperation(msg)
     if "fraction" not in df.columns:
-        df = _with_literal_column(df, "fraction", 1.0)
+        df = with_literal_column(df, "fraction", 1.0)
     # map and consolidate from_fraction only
     records = filter_sql(records, "to_id IS NOT NULL")
     df = drop_columns(join(df, records, column, "from_id", how="inner"), "from_id")
     if drop_column:
         df = drop_columns(df, column)
-    df = _rename_column(df, "to_id", to_column_)
+    df = rename_columns(df, {"to_id": to_column_})
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.select(
         *nonfraction_cols,
@@ -249,7 +286,7 @@ def add_null_rows_from_load_data_lookup(df: ibis.Table, lookup: ibis.Table) -> i
         intersect_cols = set(lookup.columns).intersection(df.columns)
         null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
         for col in set(df.columns).difference(null_rows_to_add.columns):
-            null_rows_to_add = _with_literal_column(null_rows_to_add, col, None)
+            null_rows_to_add = with_literal_column(null_rows_to_add, col, None)
         # union_all (not Ibis default .union) — load_data rows are not unique
         # per dimension combination, so distinct semantics would silently drop
         # legitimate duplicates from the original df. Matches the pre-Ibis
@@ -921,7 +958,7 @@ def unpivot_dataframe(
     cols = set(df.columns).difference(time_columns)
     new_rows = filter_sql(df, f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:
-        new_rows = _with_literal_column(new_rows, col, None)
+        new_rows = with_literal_column(new_rows, col, None)
     new_rows = _align_to_table_schema(new_rows, df)
 
     non_null_rows = filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL")

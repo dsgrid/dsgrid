@@ -24,7 +24,7 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns, with_literal_column
 from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.ibis.io import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
@@ -898,7 +898,7 @@ class DatasetConfig(ConfigBase):
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                df = df.mutate(**{col: ibis.literal(val)})
+                df = with_literal_column(df, col, val)
         return df
 
     def remove_trivial_dimensions(self, df):

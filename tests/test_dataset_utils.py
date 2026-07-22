@@ -7,7 +7,7 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset
+from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset, DSGInvalidOperation
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.ibis.functions import (
     aggregate_single_value,
@@ -33,6 +33,7 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
     is_noop_mapping,
+    map_stacked_dimension,
     merge_expected_associations_tables,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
@@ -41,53 +42,23 @@ from dsgrid.utils.dataset import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 from dsgrid.ibis.table_utils import count_rows
-from tests._helpers import collect as _collect
+from tests._helpers import collect as _collect, make_table
 
 
 @pytest.fixture(scope="module")
 def tables():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "county": "Jefferson",
-                "sector": "com",
-                "com_elec": 2.1,
-                "res_elec": None,
-                "common_elec": 7.8,
-            },
-            {
-                "county": "Boulder",
-                "sector": "com",
-                "com_elec": 3.5,
-                "res_elec": None,
-                "common_elec": 6.8,
-            },
-            {
-                "county": "Denver",
-                "sector": "res",
-                "com_elec": None,
-                "res_elec": 4.2,
-                "common_elec": 5.8,
-            },
-            {
-                "county": "Adams",
-                "sector": "res",
-                "com_elec": None,
-                "res_elec": 1.3,
-                "common_elec": 4.8,
-            },
-        ]
+    df = make_table(
+        ["county", "sector", "com_elec", "res_elec", "common_elec"],
+        ("Jefferson", "com", 2.1, None, 7.8),
+        ("Boulder", "com", 3.5, None, 6.8),
+        ("Denver", "res", None, 4.2, 5.8),
+        ("Adams", "res", None, 1.3, 4.8),
     )
-    records = create_dataframe_from_dicts(
-        [
-            {"from_id": "res_elec", "to_id": "all_electricity", "from_fraction": 1.0},
-            {"from_id": "com_elec", "to_id": "all_electricity", "from_fraction": 1.0},
-            {
-                "from_id": "common_elec",
-                "to_id": "all_electricity",
-                "from_fraction": 1.0,
-            },
-        ]
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("res_elec", "all_electricity", 1.0),
+        ("com_elec", "all_electricity", 1.0),
+        ("common_elec", "all_electricity", 1.0),
     )
     pivoted_columns = {"com_elec", "res_elec", "common_elec"}
     yield df, records, pivoted_columns
@@ -95,45 +66,14 @@ def tables():
 
 @pytest.fixture(scope="module")
 def pivoted_dataframe_with_time():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "time_index": 0,
-                "county": "Jefferson",
-                "cooling": 2.1,
-                "heating": 1.3,
-            },
-            {
-                "time_index": 1,
-                "county": "Jefferson",
-                "cooling": 2.2,
-                "heating": 1.4,
-            },
-            {
-                "time_index": 3,
-                "county": "Jefferson",
-                "cooling": 2.3,
-                "heating": 1.5,
-            },
-            {
-                "time_index": 0,
-                "county": "Boulder",
-                "cooling": 1.1,
-                "heating": None,
-            },
-            {
-                "time_index": 1,
-                "county": "Boulder",
-                "cooling": 1.2,
-                "heating": None,
-            },
-            {
-                "time_index": 3,
-                "county": "Boulder",
-                "cooling": 1.3,
-                "heating": None,
-            },
-        ]
+    df = make_table(
+        ["time_index", "county", "cooling", "heating"],
+        (0, "Jefferson", 2.1, 1.3),
+        (1, "Jefferson", 2.2, 1.4),
+        (3, "Jefferson", 2.3, 1.5),
+        (0, "Boulder", 1.1, None),
+        (1, "Boulder", 1.2, None),
+        (3, "Boulder", 1.3, None),
     )
     df = cache(df)
     yield df, ["time_index"], ["cooling", "heating"]
@@ -141,101 +81,39 @@ def pivoted_dataframe_with_time():
 
 
 def test_is_noop_mapping_true():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ]
+    df = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("elec_cooling", "elec_cooling", 1.0),
+        ("elec_heating", "elec_heating", 1.0),
     )
     assert is_noop_mapping(df)
 
 
 def test_is_noop_mapping_false():
-    for records in (
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "electricity_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "electricity_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 2.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 2.0,
-            },
-        ],
-        [
-            # NULLs are ignored
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_cooling",
-                "to_id": None,
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            # NULLs are ignored
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": None,
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-        ],
+    cols = ["from_id", "to_id", "from_fraction"]
+    for df in (
+        # a from_id differs from its to_id
+        make_table(
+            cols,
+            ("elec_cooling", "elec_cooling", 1.0),
+            ("electricity_heating", "elec_heating", 1.0),
+        ),
+        make_table(
+            cols,
+            ("elec_cooling", "electricity_cooling", 1.0),
+            ("elec_heating", "elec_heating", 1.0),
+        ),
+        # a from_fraction is not 1.0
+        make_table(
+            cols, ("elec_cooling", "elec_cooling", 2.0), ("elec_heating", "elec_heating", 1.0)
+        ),
+        make_table(
+            cols, ("elec_cooling", "elec_cooling", 1.0), ("elec_heating", "elec_heating", 2.0)
+        ),
+        # NULLs are ignored
+        make_table(cols, ("elec_cooling", "elec_cooling", 1.0), ("elec_cooling", None, 1.0)),
+        make_table(cols, ("elec_cooling", "elec_cooling", 1.0), (None, "elec_cooling", 1.0)),
     ):
-        df = create_dataframe_from_dicts(records)
         assert not is_noop_mapping(df)
 
 
@@ -277,54 +155,18 @@ def test_add_null_rows_from_load_data_lookup():
 
 
 def test_remove_invalid_null_timestamps():
-    df = create_dataframe_from_dicts(
-        [
-            # No nulls
-            {
-                "timestamp": 1,
-                "county": "Jefferson",
-                "subsector": "warehouse",
-                "value": 4,
-            },
-            {
-                "timestamp": 2,
-                "county": "Jefferson",
-                "subsector": "warehouse",
-                "value": 5,
-            },
-            # Nulls and valid values
-            {
-                "timestamp": None,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 0,
-            },
-            {
-                "timestamp": 1,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 4,
-            },
-            {
-                "timestamp": 2,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 5,
-            },
-            # Only nulls
-            {
-                "timestamp": None,
-                "county": "Adams",
-                "subsector": "retail_stripmall",
-                "value": 0,
-            },
-            {
-                "timestamp": None,
-                "county": "Denver",
-                "subsector": "hospital",
-                "value": 0,
-            },
-        ]
+    df = make_table(
+        ["timestamp", "county", "subsector", "value"],
+        # No nulls
+        (1, "Jefferson", "warehouse", 4),
+        (2, "Jefferson", "warehouse", 5),
+        # Nulls and valid values
+        (None, "Boulder", "large_office", 0),
+        (1, "Boulder", "large_office", 4),
+        (2, "Boulder", "large_office", 5),
+        # Only nulls
+        (None, "Adams", "retail_stripmall", 0),
+        (None, "Denver", "hospital", 0),
     )
     stacked = ["county", "subsector"]
     time_col = "timestamp"
@@ -719,3 +561,126 @@ class TestMergeExpectedAssociationsTables:
         with ScratchDirContext(tmp_path) as ctx:
             with pytest.raises(DSGFileInputError, match="Unexpected dimension type"):
                 merge_expected_associations_tables(dfs, dim_records, ctx)
+
+
+# ---------------------------------------------------------------------------
+# map_stacked_dimension: fraction-multiplier dimension mapping.
+#
+# Records are (from_id -> to_id, from_fraction). The function inner-joins the df
+# on column == from_id, drops records whose to_id IS NULL, renames to_id back to
+# the mapped column, and sets fraction = existing_fraction * from_fraction (the
+# existing fraction defaults to 1.0 when the df has no fraction column). Each
+# test below uses a hand-verifiable table so the expected output is obvious.
+# ---------------------------------------------------------------------------
+
+
+def test_map_stacked_dimension_one_to_many_split():
+    """A single from_id fanning out to two to_ids yields one row per to_id, each
+    carrying the source value and its own from_fraction (0.3 / 0.7)."""
+    df = make_table(
+        ["subsector", "value"],
+        ("A", 10.0),
+        ("B", 20.0),
+    )
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("A", "X", 0.3),
+        ("A", "Y", 0.7),
+        ("B", "Z", 1.0),
+    )
+    result = map_stacked_dimension(df, records, "subsector")
+    # The join's from_id/from_fraction are consumed, and to_id is renamed back to the
+    # mapped column -- no record columns leak into the output.
+    assert set(result.columns) == {"value", "subsector", "fraction"}
+    rows = {row.subsector: row for row in _collect(result)}
+    assert set(rows) == {"X", "Y", "Z"}
+    assert len(rows) == 3
+    assert rows["X"].value == 10.0
+    assert rows["X"].fraction == pytest.approx(0.3)
+    assert rows["Y"].value == 10.0
+    assert rows["Y"].fraction == pytest.approx(0.7)
+    assert rows["Z"].value == 20.0
+    assert rows["Z"].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_drops_row_with_no_matching_record():
+    """A df row whose column value has no from_id in the records is dropped by the
+    inner join; only the mapped row survives."""
+    df = make_table(["subsector", "value"], ("A", 10.0), ("B", 20.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 1.0))
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_drops_row_with_null_to_id():
+    """A from_id that maps to a NULL to_id is filtered out before the join, so its
+    df row is dropped even though a mapping record exists for it."""
+    df = make_table(["subsector", "value"], ("A", 10.0), ("B", 20.0))
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("A", "X", 1.0),
+        ("B", None, 1.0),
+    )
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_multiplies_existing_fraction():
+    """When the df already carries a fraction, the result is the product with
+    from_fraction (0.5 * 0.4 = 0.2), not an overwrite."""
+    df = make_table(["subsector", "value", "fraction"], ("A", 10.0, 0.5))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(0.2)
+
+
+def test_map_stacked_dimension_to_column_renames_target():
+    """to_column places the mapped ids in a differently-named column and, with the
+    default drop_column=True, removes the source column."""
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = map_stacked_dimension(df, records, "subsector", to_column="new_dim")
+    assert set(result.columns) == {"value", "new_dim", "fraction"}
+    rows = _collect(result)
+    assert len(rows) == 1
+    assert rows[0].new_dim == "X"
+    assert rows[0].value == 10.0
+    assert rows[0].fraction == pytest.approx(0.4)
+
+
+def test_map_stacked_dimension_keeps_source_column_when_not_dropped():
+    """drop_column=False retains the original column alongside the mapped to_column.
+
+    Mirrors the base-to-supplemental callsite (table_format_handler_base.py) that
+    adds a derived dimension beside its base column.
+    """
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = map_stacked_dimension(
+        df, records, "subsector", drop_column=False, to_column="new_dim"
+    )
+    assert set(result.columns) == {"subsector", "value", "new_dim", "fraction"}
+    rows = _collect(result)
+    assert len(rows) == 1
+    assert rows[0].subsector == "A"  # original preserved
+    assert rows[0].new_dim == "X"  # mapped target
+    assert rows[0].value == 10.0
+    assert rows[0].fraction == pytest.approx(0.4)
+
+
+def test_map_stacked_dimension_rejects_in_place_keep():
+    """drop_column=False without a distinct to_column would rename to_id onto the
+    still-present source column and clobber it, so it raises instead."""
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 1.0))
+    with pytest.raises(DSGInvalidOperation, match="drop_column"):
+        map_stacked_dimension(df, records, "subsector", drop_column=False)

@@ -5,13 +5,14 @@ from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 
 
 def read_parquet(filename: Path):
-    """Read a Parquet file into an ibis table.
+    """Read a Parquet file into an Ibis table.
 
-    Deliberately does not cache: on Spark, ``cache()`` returns a ``CachedTable``
-    whose backing view is dropped once that object is garbage-collected, and
-    callers immediately wrap the result in further expressions without retaining
-    it -- so caching here yields a use-after-free (``TABLE_OR_VIEW_NOT_FOUND``)
-    when a later operation executes the derived expression.
+    Deliberately does not cache: with the Spark backend, ``cache()`` returns
+    a ``CachedTable`` whose backing view is dropped once that object is
+    garbage-collected. Callers that immediately wrap the result in further
+    expressions without retaining the return value thus trigger a use-after-free
+    (``TABLE_OR_VIEW_NOT_FOUND``) error when a later operation executes the
+    derived expression.
     """
     return get_runtime_session().read.parquet(Path(filename).as_posix())
 

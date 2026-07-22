@@ -58,9 +58,41 @@ ORDER_DEPENDENT_OPS = ("first", "last")
 FORCED_SQL_GROUP_BY = ["geography AS geography"]
 
 
+# One group with a NULL among real values, one group of all NULLs. SUM/AVG and the
+# native reductions both skip NULLs; an all-NULL group yields NULL. The fully populated
+# LOAD_ROWS above cannot exercise either, so NULL parity gets its own table.
+#
+#     geography  values        sum   mean
+#     CO         1.0, ·, 3.0   4.0   2.0    (NULL skipped)
+#     NM         ·, ·          None  None   (all NULL)
+NULL_ROWS: list[dict[str, Any]] = [
+    {"id": "co1", "geography": "CO", "value": 1.0},
+    {"id": "co2", "geography": "CO", "value": None},
+    {"id": "co3", "geography": "CO", "value": 3.0},
+    {"id": "nm1", "geography": "NM", "value": None},
+    {"id": "nm2", "geography": "NM", "value": None},
+]
+
+EXPECTED_WITH_NULLS: dict[str, dict[str, float | None]] = {
+    "sum": {"CO": 4.0, "NM": None},
+    "mean": {"CO": 2.0, "NM": None},
+}
+
+
 @pytest.fixture
 def load_table():
     return create_dataframe_from_dicts(LOAD_ROWS)
+
+
+@pytest.fixture
+def null_table():
+    return create_dataframe_from_dicts(NULL_ROWS)
+
+
+def _close_or_none(actual: Any, expected: float | None) -> bool:
+    if expected is None:
+        return actual is None
+    return actual is not None and math.isclose(actual, expected)
 
 
 def _by_group(df) -> dict[str, Any]:
@@ -95,6 +127,28 @@ def test_paths_agree(load_table, op):
     assert fast.keys() == fallback.keys()
     for geography in fast:
         assert math.isclose(fast[geography], fallback[geography]), (op, geography)
+
+
+@pytest.mark.parametrize("op", ["sum", "mean"])
+def test_paths_agree_with_null_values(null_table, op):
+    """NULLs in a group must be handled identically by both engines.
+
+    This is the case the reviewer flagged that the fully populated table cannot
+    exercise: a group with one NULL (skipped) and a group of all NULLs (yields
+    NULL). Both paths must match each other and the hand-computed expectation.
+    """
+    fast = _by_group(_aggregate_value(null_table, ["geography"], op))
+    fallback = _by_group(_aggregate_value(null_table, FORCED_SQL_GROUP_BY, op))
+    expected = EXPECTED_WITH_NULLS[op]
+    assert fast.keys() == fallback.keys() == expected.keys()
+    for geography, exp in expected.items():
+        assert _close_or_none(fast[geography], exp), ("fast", op, geography, fast[geography])
+        assert _close_or_none(fallback[geography], exp), (
+            "fallback",
+            op,
+            geography,
+            fallback[geography],
+        )
 
 
 @pytest.mark.parametrize("op", ORDER_DEPENDENT_OPS)

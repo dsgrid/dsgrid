@@ -31,10 +31,10 @@ def create_temp_view(df: ibis.Table) -> str:
     3. Round-trip through parquet — last resort. Drops any leaked table/view name
        from earlier failed attempts before re-creating it.
 
-    Step 3 issues DuckDB-only SQL (``CREATE TEMP VIEW ... read_parquet(...)``) and
-    fails under a Spark runtime. That is survivable only because the sole
-    heterogeneous configuration, a DuckDB store beneath a Spark runtime, is rejected
-    by :meth:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore.__init__`.
+    Step 3 uses DuckDB-only SQL (``read_parquet``), so it is guarded to run only under
+    a DuckDB runtime; otherwise it raises. It is unreachable in practice because
+    :class:`~dsgrid.registry.duckdb_data_store.DuckDbDataStore` refuses to construct
+    beneath a Spark runtime.
     """
     view = make_temp_view_name()
     backend = get_runtime_backend()
@@ -49,6 +49,12 @@ def create_temp_view(df: ibis.Table) -> str:
         return view
     except Exception:
         pass
+    if not use_duckdb():
+        msg = (
+            "Cannot register a cross-backend table under a non-DuckDB runtime. "
+            "Build each operand from tables in the runtime backend before combining them."
+        )
+        raise DSGInvalidOperation(msg)
     tmp_file = NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp_file.close()
     track_temp_file(tmp_file.name)

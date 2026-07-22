@@ -167,8 +167,9 @@ def test_max_by_group_multiple_value_columns(spark):
 
 
 # create_temp_view's parquet fallback issues DuckDB-only SQL, so relocating a foreign
-# table cannot work under a Spark runtime. dsgrid never hits that combination:
-# DuckDbDataStore refuses to construct when the backend engine is Spark.
+# table only works under a DuckDB runtime; these tests exercise that relocation. The
+# complementary non-DuckDB behavior — the guard that raises instead — is pinned by
+# test_create_temp_view_rejects_non_duckdb_runtime below.
 _needs_duckdb = pytest.mark.skipif(
     not use_duckdb(), reason="relocating a foreign table requires a DuckDB runtime"
 )
@@ -276,6 +277,23 @@ def test_create_temp_view_parquet_fallback_materializes_and_cleans_up(foreign_ta
     drop_temp_tables_and_views()
     assert not tracked_file.exists(), "cleanup must delete the tracked parquet file"
     assert tracked_file not in ibis_temp._tracked_temp_files
+
+
+@pytest.mark.skipif(use_duckdb(), reason="the guard only fires under a non-DuckDB runtime")
+def test_create_temp_view_rejects_non_duckdb_runtime(foreign_table):
+    """Under a non-DuckDB runtime, create_temp_view raises instead of emitting the
+    DuckDB-only ``read_parquet`` SQL that would fail deep in the backend's analyzer.
+
+    Strategies 1 and 2 cannot register the foreign DuckDB table into this runtime, so
+    create_temp_view reaches strategy 3, where the guard fires before any file is
+    materialized or tracked. This is the complement of the DuckDB-only fallback test
+    above and closes the coverage gap the ``_needs_duckdb`` skips leave on Spark.
+    """
+    before = set(ibis_temp._tracked_temp_files)
+    with pytest.raises(DSGInvalidOperation, match="non-DuckDB runtime"):
+        create_temp_view(foreign_table)
+    # The guard fires before the parquet round-trip: nothing is written or tracked.
+    assert set(ibis_temp._tracked_temp_files) == before
 
 
 def test_with_literal_column(dataframe):

@@ -11,7 +11,7 @@ from dsgrid.ibis.operations import filter_sql
 from dsgrid.ibis.session import create_dataframe_from_dicts
 
 from dsgrid.ibis.table_utils import count_rows
-from tests._helpers import collect as _collect
+from tests._helpers import collect as _collect, make_table
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -138,6 +138,26 @@ def test_invalid_join():
     # dataset1) — anti-joins on both sides catch the mismatched coverage.
     with pytest.raises(DSGInvalidOperation, match="mismatched dimension coverage"):
         evaluate_expression("dataset1 + dataset2", datasets)
+
+
+@pytest.mark.parametrize("expr", ["a + b", "a - b", "a * b"])
+def test_null_dimension_key_raises(expr):
+    """A NULL dimension key present on both sides is rejected, not silently dropped.
+
+    Under SQL NULL semantics (NULL != NULL) the inner join drops NULL-key rows, and the
+    anti-join coverage check flags them as "extra" on both sides -- even though both
+    datasets carry the same NULL key -- so the operation raises deliberately rather than
+    producing arithmetic that silently omits those rows.
+    """
+    columns = STACKED_DIMENSION_COLUMNS + PIVOTED_COLUMNS
+    df1 = make_table(columns, ("Jefferson", "2030", 2, 3), ("Boulder", None, 3, 4))
+    df2 = make_table(columns, ("Jefferson", "2030", 9, 10), ("Boulder", None, 10, 11))
+    datasets = {
+        "a": DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS),
+        "b": DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS),
+    }
+    with pytest.raises(DSGInvalidOperation, match="mismatched dimension coverage"):
+        evaluate_expression(expr, datasets)
 
 
 def test_invalid_union():

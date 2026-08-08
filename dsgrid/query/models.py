@@ -13,6 +13,7 @@ from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
+    PivotedTableFormatModel,
     TableFormatModel,
     StackedTableFormatModel,
     ValueFormat,
@@ -587,9 +588,8 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
 
     @model_validator(mode="after")
     def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
-        if self.table_format.format_type == ValueFormat.PIVOTED:
-            table_format = self.table_format
-            pivoted_dim_type = table_format.pivoted_dimension_type
+        if isinstance(self.table_format, PivotedTableFormatModel):
+            pivoted_dim_type = self.table_format.pivoted_dimension_type
             for agg in self.aggregations:
                 names = getattr(agg.dimensions, pivoted_dim_type.value)
                 num_names = len(names)

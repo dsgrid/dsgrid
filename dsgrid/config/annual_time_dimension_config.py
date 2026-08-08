@@ -14,7 +14,7 @@ from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year, build_annual_ranges
 from dsgrid.ibis.operations import cross_join, filter_sql
-from dsgrid.ibis.table_utils import table_column_to_list
+from dsgrid.ibis.table_utils import is_table_empty, table_column_to_list, table_to_records
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.ibis.session import get_runtime_session
 from dsgrid.ibis.tz import custom_time_zone
@@ -143,9 +143,18 @@ def map_annual_time_to_date_time(
     dt_dim: DateTimeDimensionConfig,
     value_columns: set[str],
 ) -> ibis.Table:
-    """Map an Ibis table with an annual time dimension to a DateTime time dimension."""
+    """Map an Ibis table with an annual time dimension to a DateTime time dimension.
+
+    Raises
+    ------
+    DSGInvalidDataset
+        If ``df`` already has a model_year column whose values do not match the
+        annual time column.
+    """
     annual_col = annual_dim.get_load_data_time_columns()[0]
     myear_column = DimensionType.MODEL_YEAR.value
+    if myear_column in df.columns:
+        _check_model_year_matches_annual_time(df, annual_col, myear_column)
     timestamps = make_time_range_generator(dt_dim.to_chronify()).list_timestamps()
     time_cols = dt_dim.get_load_data_time_columns()
     assert len(time_cols) == 1, time_cols
@@ -193,3 +202,25 @@ def map_annual_time_to_date_time(
     if myear_column not in df.columns:
         exprs[myear_column] = df2[annual_col].cast("string")
     return df2.select(**exprs)  # ty: ignore[invalid-argument-type]
+
+
+def _check_model_year_matches_annual_time(
+    df: ibis.Table, annual_col: str, myear_column: str
+) -> None:
+    """Verify that existing model_year values match the annual time column.
+
+    Raises
+    ------
+    DSGInvalidDataset
+        If any (annual time, model_year) pair disagrees, including a NULL on
+        one side only.
+    """
+    pairs = df.select(annual_col, myear_column).distinct()
+    mismatches = pairs.filter(~pairs[annual_col].cast("string").identical_to(pairs[myear_column]))
+    if not is_table_empty(mismatches):
+        invalid = table_to_records(mismatches.limit(100))
+        msg = (
+            f"The existing {myear_column} column must match the annual time column "
+            f"{annual_col} when mapping annual time to datetime. mismatches={invalid}"
+        )
+        raise DSGInvalidDataset(msg)

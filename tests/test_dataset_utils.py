@@ -28,6 +28,7 @@ from dsgrid.ibis.session import (
     use_duckdb,
 )
 from dsgrid.ibis.operations import filter_sql
+from dsgrid.utils import dataset as dataset_module
 from dsgrid.utils.dataset import (
     add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
@@ -42,7 +43,7 @@ from dsgrid.utils.dataset import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 from dsgrid.ibis.table_utils import count_rows
-from tests._helpers import collect as _collect, make_table
+from tests._helpers import collect as _collect, make_table, spark_physical_plan
 
 
 @pytest.fixture(scope="module")
@@ -207,6 +208,39 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, tables):
             context,
         )
         assert "Completed repartition" in caplog.text
+
+
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
+def test_repartition_if_needed_by_mapping_shuffles_on_salted_key(tmp_path, monkeypatch, tables):
+    """The salted column exists only to force a shuffle, so assert the shuffle happens.
+
+    Neither the log message nor the returned rows can catch a regression here: an
+    implementation that adds the salted column, writes without repartitioning, and
+    drops the column again produces identical output and identical logs. Only the
+    plan handed to the writer shows whether the skew mitigation is still there.
+    """
+    df = tables[0]
+    context = ScratchDirContext(tmp_path)
+    written: list[Any] = []
+    real_write_dataframe = dataset_module.write_dataframe
+
+    def capture_write_dataframe(table, filename, **kwargs):
+        written.append(table)
+        real_write_dataframe(table, filename, **kwargs)
+
+    monkeypatch.setattr(dataset_module, "write_dataframe", capture_write_dataframe)
+    result, filename = repartition_if_needed_by_mapping(
+        df,
+        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+        context,
+    )
+
+    assert len(written) == 1
+    plan = spark_physical_plan(written[0])
+    assert "hashpartitioning(salted_key" in plan, plan
+    assert filename is not None
+    assert "salted_key" not in result.columns
+    assert _collect(result.order_by("county")) == _collect(df.order_by("county"))
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")

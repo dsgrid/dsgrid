@@ -14,7 +14,8 @@ from typing import Any
 
 import ibis
 
-from dsgrid.ibis.session import get_runtime_session
+from dsgrid.ibis.operations import create_temp_view
+from dsgrid.ibis.session import get_runtime_session, get_spark_session
 
 
 def make_table(columns: list[str], *rows: tuple) -> ibis.Table:
@@ -104,3 +105,19 @@ def row_value(row, key):
 def first_value(df, column: str):
     """Return ``column`` from the first row of ``df``."""
     return getattr(collect(df.limit(1))[0], column)
+
+
+def spark_physical_plan(df: ibis.Table) -> str:
+    """Return the Spark physical plan for ``df`` as a string.
+
+    Spark-only. Use this to assert that an operation whose entire purpose is a
+    shuffle (e.g. the salted repartitioning in
+    ``repartition_if_needed_by_mapping``) actually survives into the plan that
+    Spark executes — results alone cannot show it, because a missing shuffle
+    changes performance, not values.
+
+    Reaches through the JVM DataFrame because PySpark exposes the plan only via
+    ``explain()``, which prints to stdout instead of returning it.
+    """
+    spark_df = get_spark_session().table(create_temp_view(df))
+    return spark_df._jdf.queryExecution().executedPlan().toString()

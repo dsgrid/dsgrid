@@ -45,6 +45,9 @@ from dsgrid.ibis.operations import (
     join,
     join_multiple_columns,
     rename_columns,
+    # Aliased because repartition_if_needed_by_mapping has a ``repartition`` parameter
+    # that would otherwise shadow this function inside its body.
+    repartition as repartition_table,
     union_all,
     unpivot,
     with_literal_column,
@@ -918,27 +921,18 @@ def repartition_if_needed_by_mapping(
         # could be many instances of zero or null. So, add a new column with random values.
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
-        spark = get_runtime_session()
-        # spark.sql.shuffle.partitions is Spark-specific. On DuckDB the
-        # salting still happens but only as a column-tag for the post-write
-        # read-back; the actual number doesn't drive shuffle behavior, so
-        # any reasonable default works.
-        if use_duckdb():
-            num_partitions = 200
-        else:
-            num_partitions = int(get_spark_session().conf.get("spark.sql.shuffle.partitions"))
-        random_func = "random()" if use_duckdb() else "rand()"
+        # This is Spark-only code (DuckDB returned above), so spark.sql.shuffle.partitions
+        # is the partition count that a bare df.repartition(col) would use.
+        num_partitions = int(get_spark_session().conf.get("spark.sql.shuffle.partitions"))
         view = create_temp_view(df)
-        df = spark.sql(
-            f"SELECT *, CAST({random_func} * {num_partitions} AS INTEGER) + 1 "
+        salted = get_runtime_session().sql(
+            f"SELECT *, CAST(rand() * {num_partitions} AS INTEGER) + 1 "
             f"AS {salted_column} FROM {view}"
         )
-        if _is_ibis_table(df):
-            df.to_parquet(filename.as_posix())
-            df = drop_columns(read_parquet(filename), salted_column)
-        else:
-            df.repartition(salted_column).write.parquet(filename.as_posix())
-            df = drop_columns(read_parquet(filename), salted_column)
+        # repartition_table hash-partitions the underlying PySpark DataFrame on the
+        # salted column; the shuffle it forces is the entire point of the salting.
+        write_dataframe(repartition_table(salted, num_partitions, salted_column), filename)
+        df = drop_columns(read_parquet(filename), salted_column)
         logger.info("Completed repartition.")
         return df, filename
 

@@ -163,7 +163,6 @@ missing_associations/
 
 # Rust / Cargo
 rust/target/
-rust/Cargo.lock
 **/*.rs.bk
 *.pyd
 *.pyo

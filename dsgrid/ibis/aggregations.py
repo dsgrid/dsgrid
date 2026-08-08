@@ -35,8 +35,8 @@ class AggregationSpec:
         It must be a reduction; scalar methods (e.g. ``round``) are not
         valid inside ``aggregate()``.
     duckdb_sql
-        DuckDB SQL expression template for the raw-SQL fallback, with a
-        ``{column}`` placeholder for the (already quoted) value column.
+        DuckDB SQL expression template for the raw-SQL fallback, with one or
+        more ``{column}`` placeholders for the (already quoted) value column.
     spark_sql
         The same, for Spark SQL.
     """
@@ -48,8 +48,10 @@ class AggregationSpec:
 
 
 # The first value of each AggregationSpec is the user-facing name to use in
-# ``aggregation_function``. first/last are order-dependent on both backends,
-# and their raw-SQL forms do not skip nulls while the Ibis reductions do.
+# ``aggregation_function``. first/last are order-dependent on both backends, so
+# which row they pick is unspecified without an ORDER BY; their raw-SQL forms
+# are spelled to skip nulls (DuckDB via FILTER, Spark via the isIgnoreNull
+# argument) so that they agree with the null-skipping Ibis reductions.
 AGGREGATION_SPECS: tuple[AggregationSpec, ...] = (
     AggregationSpec("sum", "sum", "SUM({column})", "SUM({column})"),
     AggregationSpec("mean", "mean", "AVG({column})", "AVG({column})"),
@@ -63,8 +65,18 @@ AGGREGATION_SPECS: tuple[AggregationSpec, ...] = (
         "APPROX_QUANTILE({column}, 0.5)",
         "PERCENTILE_APPROX({column}, 0.5)",
     ),
-    AggregationSpec("first", "first", "FIRST({column})", "FIRST({column})"),
-    AggregationSpec("last", "last", "LAST({column})", "LAST({column})"),
+    AggregationSpec(
+        "first",
+        "first",
+        "FIRST({column}) FILTER (WHERE {column} IS NOT NULL)",
+        "FIRST({column}, TRUE)",
+    ),
+    AggregationSpec(
+        "last",
+        "last",
+        "LAST({column}) FILTER (WHERE {column} IS NOT NULL)",
+        "LAST({column}, TRUE)",
+    ),
 )
 
 

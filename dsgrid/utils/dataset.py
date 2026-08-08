@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Iterable, Literal, cast
+from typing import Any, Iterable, cast
 from datetime import tzinfo
 
 import chronify
@@ -85,45 +85,18 @@ def _create_runtime_chronify_store() -> chronify.Store:
     return create_chronify_store()
 
 
-def _is_ibis_table(df: ibis.Table) -> bool:
-    return isinstance(df, ibis.Table)
+def _create_chronify_source(store: chronify.Store, df: ibis.Table, schema: TableSchema) -> None:
+    """Register ``df`` with ``store`` as a view.
+
+    Ingesting the rows into a chronify table is never necessary: every dsgrid
+    table is an Ibis table bound to the runtime backend, so chronify can read
+    it in place.
+    """
+    store.create_view(schema, df)
 
 
-_ChronifySourceKind = Literal["view", "table"]
-
-
-def _create_chronify_source(
-    store: chronify.Store, df: ibis.Table, schema: TableSchema
-) -> _ChronifySourceKind:
-    if _is_ibis_table(df):
-        store.create_view(schema, df)
-        return "view"
-    if hasattr(df, "relation"):
-        store.ingest_table(df.relation, schema, skip_time_checks=True)
-    else:
-        store.ingest_table(df, schema, skip_time_checks=True)
-    return "table"
-
-
-def _drop_chronify_source(
-    store: chronify.Store, schema: TableSchema, kind: _ChronifySourceKind
-) -> None:
-    if kind == "view":
-        store.drop_view(schema.name, if_exists=True)
-    else:
-        store.drop_table(schema.name, if_exists=True)
-
-
-def _get_chronify_result(store: chronify.Store, schema: TableSchema, template: ibis.Table):
-    if _is_ibis_table(template):
-        return store.get_table(schema.name)
-    pandas_df = store.read_table(schema.name)
-    store.drop_table(schema.name)
-    return template.session.createDataFrame(pandas_df)
-
-
-def _read_chronify_output(df: ibis.Table, output_file: Path) -> ibis.Table:
-    return read_parquet(output_file)
+def _drop_chronify_source(store: chronify.Store, schema: TableSchema) -> None:
+    store.drop_view(schema.name, if_exists=True)
 
 
 def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
@@ -508,7 +481,7 @@ def map_time_dimension_with_chronify_duckdb(
         df, from_time_dim, to_time_dim, value_column=value_column
     )
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         store.map_table_time_config(
             src_schema.name,
@@ -516,9 +489,9 @@ def map_time_dimension_with_chronify_duckdb(
             wrap_time_allowed=wrap_time_allowed,
             data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_with_chronify_duckdb(
@@ -535,15 +508,15 @@ def convert_time_zone_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.convert_time_zone(
             src_schema.name,
             time_zone,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_by_column_with_chronify_duckdb(
@@ -562,16 +535,16 @@ def convert_time_zone_by_column_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.convert_time_zone_by_column(
             src_schema.name,
             time_zone_column,
             wrap_time_allowed=wrap_time_allowed,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_with_chronify_duckdb(
@@ -588,15 +561,15 @@ def localize_time_zone_with_chronify_duckdb(
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
 
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.localize_time_zone(
             src_schema.name,
             time_zone,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_by_column_with_chronify_duckdb(
@@ -614,15 +587,15 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
             time_zone_column,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def map_time_dimension_with_chronify_runtime_path(
@@ -652,7 +625,7 @@ def map_time_dimension_with_chronify_runtime_path(
         wrap_time_allowed=wrap_time_allowed,
         data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def convert_time_zone_with_chronify_runtime_path(
@@ -676,7 +649,7 @@ def convert_time_zone_with_chronify_runtime_path(
         time_zone,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def convert_time_zone_by_column_with_chronify_runtime_path(
@@ -703,7 +676,7 @@ def convert_time_zone_by_column_with_chronify_runtime_path(
         wrap_time_allowed=wrap_time_allowed,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def localize_time_zone_with_chronify_runtime_path(
@@ -726,7 +699,7 @@ def localize_time_zone_with_chronify_runtime_path(
         time_zone,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def localize_time_zone_by_column_with_chronify_runtime_path(
@@ -751,7 +724,7 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
         time_zone_column=time_zone_column,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def _to_chronify_time_based_data_adjustment(

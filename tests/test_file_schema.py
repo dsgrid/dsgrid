@@ -25,7 +25,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.ibis.types import SUPPORTED_TYPES, spec_for_name
 from dsgrid.ibis.session import (
-    F,
     SparkSession,
     get_runtime_session,
     use_duckdb,
@@ -43,10 +42,8 @@ def spark() -> Generator[SparkSession, None, None]:
     yield spark
 
 
-def _with_string_column(df, column: str, alias: str):
-    if isinstance(df, ibis.Table):
-        return df.mutate(**{alias: df[column].cast("string")})
-    return df.withColumn(alias, F.col(column).cast("string"))
+def _with_string_column(df: ibis.Table, column: str, alias: str):
+    return df.mutate(**{alias: df[column].cast("string")})
 
     # Column tests
 

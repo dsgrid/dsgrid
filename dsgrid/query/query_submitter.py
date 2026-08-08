@@ -546,10 +546,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = handler.replace_ids_with_names(df)
 
         if context.model.result.sort_columns:
-            if isinstance(df, ibis.Table):
-                df = df.order_by(*context.model.result.sort_columns)
-            else:
-                df = df.sort(*context.model.result.sort_columns)
+            df = df.order_by(*context.model.result.sort_columns)
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
@@ -949,10 +946,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
 
     def _postprocess(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
         if context.model.result.sort_columns:
-            if isinstance(df, ibis.Table):
-                df = df.order_by(*context.model.result.sort_columns)
-            else:
-                df = df.sort(*context.model.result.sort_columns)
+            df = df.order_by(*context.model.result.sort_columns)
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)

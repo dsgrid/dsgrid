@@ -25,7 +25,6 @@ from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
 from dsgrid.ibis.functions import cache, unpersist
 from dsgrid.ibis.session import (
-    F,
     create_dataframe_from_dicts,
     get_runtime_session,
     use_duckdb,
@@ -36,20 +35,12 @@ from dsgrid.ibis.types import is_tz_aware_timestamp
 from tests._helpers import collect as _collect
 
 
-def _count_timestamps_per_model_year(df, time_col: str):
-    if isinstance(df, ibis.Table):
-        return _collect(
-            df.group_by("model_year")
-            .aggregate(count_timestamps=df[time_col].count())
-            .select("count_timestamps")
-            .distinct()
-        )
-    return (
-        df.groupBy("model_year")
-        .agg(F.count(time_col).alias("count_timestamps"))
+def _count_timestamps_per_model_year(df: ibis.Table, time_col: str):
+    return _collect(
+        df.group_by("model_year")
+        .aggregate(count_timestamps=df[time_col].count())
         .select("count_timestamps")
         .distinct()
-        .collect()
     )
 
 

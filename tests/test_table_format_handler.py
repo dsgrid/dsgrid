@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from dsgrid.dataset.unpivoted_table import UnpivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.query.models import (
     ColumnModel,
     ColumnType,
@@ -88,7 +89,14 @@ def test_repeated_plain_column_is_deduplicated():
 
 
 def test_group_by_expressions_are_quoted():
-    """Pin the expressions handed to the aggregation builder."""
+    """Pin the expressions handed to the aggregation builder.
+
+    ``handle_column_spaces`` quotes with the runtime backend's identifier
+    character: double quotes on DuckDB, backticks on Spark. The expected strings
+    are spelled out per backend rather than built with that helper, so this test
+    pins the actual quoting instead of restating the implementation.
+    """
+    quote = '"' if use_duckdb() else "`"
     handler = _make_handler({"county": DimensionType.GEOGRAPHY, TIME_DIM: DimensionType.TIME})
     context = _make_context(ColumnType.DIMENSION_NAMES)
     metadata = DatasetDimensionsMetadataModel()
@@ -102,4 +110,7 @@ def test_group_by_expressions_are_quoted():
         metadata,
     )
 
-    assert group_by_cols == ['"county"', 'hour("time_est") AS "hour"']
+    assert group_by_cols == [
+        f"{quote}county{quote}",
+        f"hour({quote}{TIME_DIM}{quote}) AS {quote}hour{quote}",
+    ]

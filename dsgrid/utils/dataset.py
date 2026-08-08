@@ -51,7 +51,7 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
-    get_unique_values_per_column,
+    get_unique_values,
     is_table_empty,
     table_to_records,
 )
@@ -65,6 +65,7 @@ from dsgrid.ibis.session import (
     get_spark_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 
 logger = logging.getLogger(__name__)
 
@@ -1056,18 +1057,15 @@ def merge_expected_associations_tables(
         group_label = "{" + ", ".join(sorted(col_set)) + "}"
 
         # Validate that this group covers every record for its dimensions.
-        # Single execute via get_unique_values_per_column instead of one
-        # execute per dimension column.
         df_cols = sorted(col_set)
         for col in df_cols:
             if col not in all_dim_records:
                 msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
                 raise DSGFileInputError(msg)
-        df_unique = get_unique_values_per_column(df, df_cols)
         for col in df_cols:
-            actual_ids = df_unique[col]
+            actual_ids = get_unique_values(df, col)
             expected_ids = set(all_dim_records[col])
-            missing = sorted(expected_ids - actual_ids)
+            missing = sorted_with_nulls(expected_ids - actual_ids)
             if missing:
                 msg = (
                     f"Expected associations table with columns {group_label} is missing "
@@ -1084,35 +1082,22 @@ def merge_expected_associations_tables(
         else:
             overlap = covered_columns & set(col_set)
             if overlap:
-                # Collect pre-join distinct values for each side in one execute
-                # each (was previously one execute per shared column per side).
+                # Collect pre-join distinct values for each side.
                 covered_dim_cols = sorted(c for c in covered_columns if c in all_dim_records)
                 set_dim_cols = sorted(c for c in col_set if c in all_dim_records)
-                merged_unique = (
-                    get_unique_values_per_column(merged, covered_dim_cols)
-                    if covered_dim_cols
-                    else {}
-                )
-                df_unique_overlap = (
-                    get_unique_values_per_column(df, set_dim_cols) if set_dim_cols else {}
-                )
                 pre_join_values: dict[str, set[str]] = {}
                 for col in covered_dim_cols:
-                    pre_join_values[col] = merged_unique[col]
+                    pre_join_values[col] = get_unique_values(merged, col)
                 for col in set_dim_cols:
-                    pre_join_values.setdefault(col, set()).update(df_unique_overlap[col])
+                    pre_join_values.setdefault(col, set()).update(get_unique_values(df, col))
 
                 merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
 
-                # Post-join check: single execute for all overlap dim columns.
                 overlap_dim_cols = sorted(c for c in overlap if c in all_dim_records)
-                post_unique = (
-                    get_unique_values_per_column(merged, overlap_dim_cols)
-                    if overlap_dim_cols
-                    else {}
-                )
                 for col in overlap_dim_cols:
-                    lost = sorted(pre_join_values.get(col, set()) - post_unique[col])
+                    lost = sorted_with_nulls(
+                        pre_join_values.get(col, set()) - get_unique_values(merged, col)
+                    )
                     if lost:
                         msg = (
                             f"Inner join of expected associations tables with columns "

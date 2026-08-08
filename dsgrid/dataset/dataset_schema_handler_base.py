@@ -56,7 +56,7 @@ from dsgrid.ibis.operations import (
     rename_columns,
 )
 from dsgrid.ibis.table_utils import (
-    get_unique_values_per_column,
+    get_unique_values,
     is_table_empty,
     table_column_to_list,
 )
@@ -84,6 +84,7 @@ from dsgrid.ibis.io import persist_table, read_dataframe, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
     DimensionMappingRegistryManager,
@@ -268,18 +269,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # Performed after missing-association subtraction so that a dimension value
                 # that is entirely absent due to declared missing combinations does not
                 # produce a false positive.
-                expected_per_col = get_unique_values_per_column(
-                    required_assoc, required_assoc.columns
-                )
-                actual_per_col = get_unique_values_per_column(
-                    assoc_by_data, required_assoc.columns
-                )
                 for column in required_assoc.columns:
-                    expected = expected_per_col[column]
-                    actual = actual_per_col[column]
+                    expected = get_unique_values(required_assoc, column)
+                    actual = get_unique_values(assoc_by_data, column)
                     if actual != expected:
-                        missing = sorted(expected.difference(actual))
-                        extra = sorted(actual.difference(expected))
+                        missing = sorted_with_nulls(expected.difference(actual))
+                        extra = sorted_with_nulls(actual.difference(expected))
                         num_matching = len(actual.intersection(expected))
                         msg = (
                             f"Dataset records for dimension type {column} do not match expected "

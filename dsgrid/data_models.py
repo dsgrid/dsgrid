@@ -124,6 +124,10 @@ class EnumValue:
 class DSGEnum(Enum):
     """dsgrid Enum class"""
 
+    # Declared, never assigned: an assignment here would make this an enum member.
+    # Each member's value is set in __new__.
+    description: str | None
+
     def __new__(cls, *args):
         obj = object.__new__(cls)
         assert len(args) in (1, 2)

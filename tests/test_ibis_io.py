@@ -15,6 +15,7 @@ from dsgrid.ibis.io import (
     persist_table,
     read_csv,
     read_dataframe,
+    read_json,
     read_parquet,
     try_read_dataframe,
     write_dataframe,
@@ -37,6 +38,37 @@ from tests._helpers import collect as _collect
 
 def _filter(df, predicate):
     return filter_sql(df, predicate)
+
+
+def test_read_json_valid(tmp_path):
+    filename = tmp_path / "table.json"
+    filename.write_text('{"id": "a", "value": 1.5}\n{"id": "b", "value": 2.5}\n')
+
+    df = read_json(filename)
+
+    assert sorted(df.columns) == ["id", "value"]
+    assert count_rows(df) == 2
+
+
+def test_read_json_rejects_malformed_records(tmp_path):
+    """A malformed record must raise, not read as nulls.
+
+    Spark's default PERMISSIVE mode turns the bad record into a null row and
+    adds a ``_corrupt_record`` column; both would flow into the dataset
+    unnoticed because dsgrid matches columns by name. DuckDB's reader already
+    raises, so this pins the behavior as equivalent across backends.
+
+    The two backends raise different exception types (and at different points --
+    Spark during schema inference, DuckDB during the scan), so this asserts only
+    that the read fails.
+    """
+    filename = tmp_path / "table.json"
+    filename.write_text(
+        '{"id": "a", "value": 1.5}\n{"id": "b", "value": \n{"id": "c", "value": 3.5}\n'
+    )
+
+    with pytest.raises(Exception):
+        count_rows(read_json(filename))
 
 
 def test_try_read_dataframe_invalid(tmp_path):

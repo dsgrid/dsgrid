@@ -215,8 +215,18 @@ def read_csv(
 
 
 def read_json(path: Path | str) -> ibis.Table:
-    """Return an Ibis table from a JSON file."""
-    return get_runtime_backend().connection.read_json(str(path))
+    """Return an Ibis table from a line-delimited JSON file.
+
+    A malformed record raises on both backends. DuckDB's reader already fails
+    on invalid JSON, but Spark's default PERMISSIVE mode nulls the record out
+    and adds a ``_corrupt_record`` column to the schema, so it needs
+    ``mode="FAILFAST"`` to match. Silently reading a data file as nulls is the
+    worse failure: dsgrid's column handling is name-based, so the extra column
+    and the null row propagate into the dataset instead of stopping the load.
+    """
+    # DuckDB's read_json_auto has no `mode` option and would reject the kwarg.
+    kwargs = {} if use_duckdb() else {"mode": "FAILFAST"}
+    return get_runtime_backend().connection.read_json(str(path), **kwargs)
 
 
 def read_parquet(path: Path | str) -> ibis.Table:

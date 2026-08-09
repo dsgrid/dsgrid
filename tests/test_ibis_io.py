@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import ibis
 import pandas as pd
 import pytest
+from chronify.exceptions import InvalidOperation
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 from dsgrid.ibis.functions import write_csv
@@ -187,8 +188,59 @@ def test_read_dataframe_and_write_error_paths(tmp_path):
     with pytest.raises(NotImplementedError, match="Unsupported file format"):
         write_table(table, (tmp_path / "table.invalid").as_posix(), "invalid")
 
+    # A suffix write_dataframe cannot dispatch on must raise rather than
+    # silently write nothing and leave the caller pointing at a missing file.
+    unwritable = tmp_path / "output.txt"
+    with pytest.raises(NotImplementedError, match="Unsupported file extension"):
+        write_dataframe(table, unwritable)
+    assert not unwritable.exists()
+
     with pytest.raises(DSGInvalidParameter, match="only supports Parquet"):
         write_dataframe_and_auto_partition(table, tmp_path / "table.csv")
+
+
+def test_write_dataframe_requires_overwrite(tmp_path):
+    """An existing path is only replaced when the caller asks for it."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.parquet"
+    write_dataframe(table, filename)
+    with pytest.raises(InvalidOperation, match="already exists"):
+        write_dataframe(replacement, filename)
+    assert count_rows(read_parquet(filename)) == 1
+
+    write_dataframe(replacement, filename, overwrite=True)
+    assert count_rows(read_parquet(filename)) == 2
+
+
+def test_write_dataframe_json_requires_overwrite(tmp_path):
+    """The DuckDB .json -> .parquet rewrite checks the path it actually writes."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.json"
+    write_dataframe(table, filename)
+    with pytest.raises(InvalidOperation, match="already exists"):
+        write_dataframe(replacement, filename)
+
+    write_dataframe(replacement, filename, overwrite=True)
+    written = tmp_path / "table.parquet" if use_duckdb() else filename
+    assert count_rows(read_dataframe(written)) == 2
+
+
+def test_overwrite_dataframe_file_clears_stale_tmp(tmp_path):
+    """A .tmp sibling left by a crashed call does not block the next write."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.parquet"
+    write_dataframe(table, filename)
+    tmp_sibling = filename.with_name(filename.name + ".tmp")
+    tmp_sibling.write_text("leftover from a crashed write")
+
+    assert count_rows(overwrite_dataframe_file(filename, replacement)) == 2
+    assert not tmp_sibling.exists()
 
 
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB file overwrite paths only apply to DuckDB")

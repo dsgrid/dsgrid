@@ -115,7 +115,7 @@ def read_data_file(
             # are checked against that schema — a declaration that disagrees
             # with the file is a config error — but never cast.
             df = read_parquet(path)
-            _validate_declared_types(df, schema.columns)
+            validate_declared_types(df, schema.columns)
         case ".csv":
             column_schema = _get_column_schema(schema)
             df = read_csv(path, schema=column_schema)
@@ -299,12 +299,12 @@ def _spec_for_column(column_name: str, data_type: str) -> TypeSpec:
         raise DSGInvalidField(msg) from exc
 
 
-def _validate_declared_types(df: ibis.Table, columns: list[Column]) -> None:
+def validate_declared_types(df: ibis.Table, columns: list[Column]) -> None:
     """Check declared types against a self-describing file's actual schema.
 
-    Used for Parquet, whose on-disk schema is honored verbatim and never cast
-    (see :func:`read_data_file`). A declaration there is documentation, so one
-    that disagrees with the file — a different type family, or a narrower
+    Used for Parquet reads, whose on-disk schema is honored verbatim and never
+    cast (see :func:`read_data_file`). A declaration there is documentation, so
+    one that disagrees with the file — a different type family, or a narrower
     width — is a config error and raises instead of being silently ignored.
     Equal-or-wider same-family declarations pass; the column keeps the file's
     type either way.

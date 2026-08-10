@@ -194,13 +194,20 @@ def test_invalid_load_data_lookup_column_name(register_dataset):
 
 
 def test_invalid_load_data_lookup_integer_column(register_dataset):
-    _, dataset_path, expected_errors = register_dataset
+    config_file, dataset_path, expected_errors = register_dataset
     lookup_file = dataset_path / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
     # Convert geography values from strings to integers to trigger the type validation error
     for item in data:
         item["geography"] = int(item["geography"])
     dump_line_delimited_json(data, lookup_file)
+    # A declared string type would coerce the integers back to strings, so remove the
+    # declaration and let the inferred integer type reach the consistency check.
+    config = load_data(config_file)
+    for column in config["data_layout"]["lookup_data_file"]["columns"]:
+        if column["name"] == "geography":
+            column.pop("data_type")
+    dump_data(config, config_file)
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"geography.*must have data type.*StringType"
 

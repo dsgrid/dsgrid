@@ -579,6 +579,44 @@ class TestMergeExpectedAssociationsTables:
             with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped"):
                 merge_expected_associations_tables(dfs, dim_records, ctx)
 
+    def test_inner_join_drops_null_shared_column_value(self, tmp_path):
+        """A NULL in a shared column is reported, not silently dropped.
+
+        An expected-associations file with an empty cell reads back as NULL.
+        The inner join drops those rows because ``NULL = NULL`` is never true,
+        so the merged table would silently cover fewer associations than the
+        file declared. The post-join check must name the lost NULL.
+        """
+        dim_records = {
+            "geography": ["A", "B"],
+            "sector": ["s1", "s2"],
+            "subsector": ["p", "q"],
+        }
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "s1"},
+                    {"geography": "A", "sector": "s2"},
+                    {"geography": "B", "sector": "s1"},
+                    {"geography": "B", "sector": "s2"},
+                    # Empty cell in the shared 'sector' column.
+                    {"geography": "B", "sector": None},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    {"sector": "s1", "subsector": "p"},
+                    {"sector": "s1", "subsector": "q"},
+                    {"sector": "s2", "subsector": "p"},
+                    {"sector": "s2", "subsector": "q"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped.*None"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
     def test_column_not_in_dim_records(self, tmp_path):
         """A table column not in all_dim_records raises DSGFileInputError."""
         dim_records = {

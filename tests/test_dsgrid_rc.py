@@ -1,6 +1,7 @@
 """Tests for the dsgrid runtime configuration loader."""
 
 import json
+import logging
 import warnings
 from pathlib import Path
 
@@ -34,14 +35,19 @@ def test_load_from_file(tmp_path: Path, monkeypatch) -> None:
 
 
 @pytest.mark.parametrize("field", ["database_name", "thrift_server_url", "use_hive_metastore"])
-def test_legacy_field_emits_deprecation_warning(field: str) -> None:
+def test_legacy_field_emits_deprecation_warning(field: str, caplog) -> None:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        config = DsgridRuntimeConfig(**{field: "anything"})
+        with caplog.at_level(logging.WARNING, logger="dsgrid.dsgrid_rc"):
+            config = DsgridRuntimeConfig(**{field: "anything"})
     deprecation_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
     assert len(deprecation_warnings) == 1
     assert field in str(deprecation_warnings[0].message)
     assert not hasattr(config, field)
+    # The warning must also be logged. This validator runs at ``import dsgrid`` time,
+    # where Python's default filters hide a library-raised DeprecationWarning, so the
+    # log record is what a user running the CLI actually sees.
+    assert field in caplog.text
 
 
 def test_unknown_field_is_ignored_without_warning() -> None:

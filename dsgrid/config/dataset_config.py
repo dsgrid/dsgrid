@@ -960,12 +960,11 @@ def get_unique_dimension_record_ids(
 def _read_and_apply_types(filename: Path, columns: list[Column] | None) -> ibis.Table:
     """Read ``filename`` and cast user-declared columns to their requested type.
 
-    The cast runs after read so the same schema applies uniformly to CSV and
-    JSON and Parquet (which is already self-describing). Passes ``strict_family=False``
-    because the CLI's ``--schema-file`` is an authoritative declaration about
-    raw inputs that have no registered schema yet (e.g. a string column the
-    user knows is an integer id), unlike registered datasets where a
-    cross-family mismatch usually indicates a data error.
+    The cast runs after read so the same schema applies uniformly to CSV,
+    JSON, and Parquet. The CLI's ``--schema-file`` is an authoritative
+    declaration about raw inputs that have no registered schema yet (e.g. a
+    string column the user knows is an integer id), so declared types always
+    take effect here, even for a self-describing Parquet file.
     """
     df = read_dataframe(filename)
-    return apply_declared_types(df, columns, strict_family=False) if columns else df
+    return apply_declared_types(df, columns) if columns else df

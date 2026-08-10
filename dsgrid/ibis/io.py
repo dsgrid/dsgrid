@@ -637,11 +637,7 @@ def write_dataframe(df: ibis.Table, filename: str | Path, overwrite: bool = Fals
     elif suffix == ".csv":
         write_table(df, name, "csv", overwrite=overwrite)
     elif suffix == ".json":
-        if use_duckdb():
-            new_name = name.replace(".json", ".parquet")
-            write_table(df, new_name, "parquet", overwrite=overwrite)
-        else:
-            write_table(df, name, "json", overwrite=overwrite)
+        write_table(df, name, "json", overwrite=overwrite)
     else:
         msg = f"Unsupported file extension: {filename}"
         raise NotImplementedError(msg)

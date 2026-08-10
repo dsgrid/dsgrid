@@ -215,7 +215,7 @@ def test_write_dataframe_requires_overwrite(tmp_path):
 
 
 def test_write_dataframe_json_requires_overwrite(tmp_path):
-    """The DuckDB .json -> .parquet rewrite checks the path it actually writes."""
+    """A .json write lands on the requested path and honors the overwrite contract."""
     table = get_runtime_session().createDataFrame([(1,)], ["a"])
     replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
 
@@ -223,10 +223,10 @@ def test_write_dataframe_json_requires_overwrite(tmp_path):
     write_dataframe(table, filename)
     with pytest.raises(InvalidOperation, match="already exists"):
         write_dataframe(replacement, filename)
+    assert count_rows(read_dataframe(filename)) == 1
 
     write_dataframe(replacement, filename, overwrite=True)
-    written = tmp_path / "table.parquet" if use_duckdb() else filename
-    assert count_rows(read_dataframe(written)) == 2
+    assert count_rows(read_dataframe(filename)) == 2
 
 
 def test_overwrite_dataframe_file_clears_stale_tmp(tmp_path):
@@ -264,8 +264,8 @@ def test_persist_and_overwrite_file_helpers(tmp_path):
     if use_duckdb():
         duckdb_json = tmp_path / "duckdb.json"
         write_dataframe(table, duckdb_json)
-        assert not duckdb_json.exists()
-        assert (tmp_path / "duckdb.parquet").exists()
+        assert duckdb_json.exists()
+        assert not (tmp_path / "duckdb.parquet").exists()
 
     with ScratchDirContext(tmp_path / "scratch") as context:
         path = persist_table(table, context, tag="test")

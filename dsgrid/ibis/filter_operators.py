@@ -78,6 +78,10 @@ def spec_for_filter_operator(name: str) -> FilterOperatorSpec:
 def check_filter_value(spec: FilterOperatorSpec, value: Any) -> Any:
     """Validate ``value`` against the shape ``spec`` expects and return it.
 
+    Every rejection here is a value the backend would otherwise accept and quietly
+    match zero rows against, which reads to a user as "the data doesn't contain what
+    I asked for" rather than "my filter is malformed".
+
     Raises
     ------
     DSGInvalidField
@@ -85,6 +89,14 @@ def check_filter_value(spec: FilterOperatorSpec, value: Any) -> Any:
     """
     match spec.value_kind:
         case "scalar":
+            if spec.family == "string" and not isinstance(value, str):
+                # Ibis casts a non-string operand rather than rejecting it, so e.g.
+                # startswith=5 compiles and matches nothing.
+                msg = (
+                    f"value must be a string for operator={spec.name!r}, "
+                    f"got {type(value).__name__}: {value!r}"
+                )
+                raise DSGInvalidField(msg)
             return value
         case "none":
             return None
@@ -92,12 +104,23 @@ def check_filter_value(spec: FilterOperatorSpec, value: Any) -> Any:
             if not isinstance(value, list | tuple | set):
                 msg = f"value must be a list, tuple, or set for operator={spec.name!r}"
                 raise DSGInvalidField(msg)
+            if not value:
+                msg = f"value must not be empty for operator={spec.name!r}"
+                raise DSGInvalidField(msg)
             return value
         case "bounds":
             if not isinstance(value, list | tuple) or len(value) != 2:
                 msg = (
                     "value must be a two-element list or tuple of (lower, upper) for "
                     f"operator={spec.name!r}"
+                )
+                raise DSGInvalidField(msg)
+            if value[0] is None or value[1] is None:
+                # A NULL bound makes the comparison NULL for every row. There is no
+                # open-ended form of BETWEEN, so an unset bound is always a mistake.
+                msg = (
+                    f"both bounds must be set for operator={spec.name!r}; "
+                    f"got lower={value[0]!r} upper={value[1]!r}"
                 )
                 raise DSGInvalidField(msg)
             return value

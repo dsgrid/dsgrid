@@ -73,6 +73,40 @@ def test_isin_invalid(name_table):
         _filter_ids(_model("isin", "abc"), name_table)
 
 
+# A malformed filter must fail loudly. Every case below is one the backend accepts and
+# silently matches zero rows against, which a user reads as "the data has none of what I
+# asked for" rather than "my filter is wrong". PySpark rejected some of these (a non-str
+# operand to startswith/like raised Py4JError) and quietly returned no rows for the
+# others; the checks make all of them explicit.
+@pytest.mark.parametrize(
+    "operator,value,match",
+    [
+        ("isin", [], "must not be empty"),
+        ("startswith", 5, "must be a string"),
+        ("contains", 5, "must be a string"),
+        ("like", 5, "must be a string"),
+        ("rlike", 5, "must be a string"),
+        ("endswith", 5, "must be a string"),
+        ("between", [None, None], "both bounds must be set"),
+        ("between", ["A", None], "both bounds must be set"),
+    ],
+)
+def test_filter_value_rejected(name_table, operator, value, match):
+    with pytest.raises(DSGInvalidField, match=match):
+        _filter_ids(_model(operator, value), name_table)
+
+
+def test_between_model_rejects_unset_bounds(name_table):
+    """The bounds default to None, so a filter that sets neither must not run silently."""
+    model = DimensionFilterBetweenColumnOperatorModel(
+        dimension_type=DimensionType.GEOGRAPHY,
+        dimension_name="county",
+        column="name",
+    )
+    with pytest.raises(DSGInvalidField, match="both bounds must be set"):
+        _filter_ids(model, name_table)
+
+
 def test_like(name_table):
     assert _filter_ids(_model("like", "A%"), name_table) == ["a"]
 

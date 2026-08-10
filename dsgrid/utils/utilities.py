@@ -125,7 +125,9 @@ def sorted_with_nulls(values: Iterable) -> list:
     Parameters
     ----------
     values : Iterable
-        Values to sort. Non-null values must be mutually comparable.
+        Values to sort. Mutually incomparable non-null values (e.g. ``6037``
+        and ``"6037"`` from sources that disagree on a column's type) fall
+        back to ordering by type name and string form rather than raising.
 
     Returns
     -------
@@ -144,7 +146,12 @@ def sorted_with_nulls(values: Iterable) -> list:
             has_null = True
         else:
             non_null.append(value)
-    non_null.sort()
+    try:
+        non_null.sort()
+    except TypeError:
+        # This sorts for display in an error message; a crash here would mask
+        # the error being reported.
+        non_null.sort(key=lambda value: (type(value).__name__, str(value)))
     return [None, *non_null] if has_null else non_null
 
 

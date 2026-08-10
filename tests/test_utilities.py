@@ -91,3 +91,8 @@ def test_sorted_with_nulls_empty():
 def test_sorted_with_nulls_ints():
     """Test that non-string values sort by value."""
     assert sorted_with_nulls({3, None, 1, 2}) == [None, 1, 2, 3]
+
+
+def test_sorted_with_nulls_mixed_types():
+    """Test that mutually incomparable values fall back to a stable order."""
+    assert sorted_with_nulls({6037, "6037", None}) == [None, 6037, "6037"]

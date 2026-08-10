@@ -276,8 +276,27 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
         for key, val in spark_conf.items():
             conf.set(key, val)
 
-    if conf.get("spark.sql.session.timeZone") is None:
-        conf.set("spark.sql.session.timeZone", "UTC")
+    # Default the render TZ to UTC so both backends agree regardless of the machine's TZ:
+    # dsgrid pins the DuckDB connection TimeZone to UTC (see
+    # dsgrid.ibis.backend._pin_duckdb_time_zone), so leaving Spark at the JVM's system TZ
+    # would make tz-naive ingestion and .year()/.hour() extractions backend-dependent.
+    # Callers needing another render TZ set it explicitly via ``spark_conf=``,
+    # ``SPARK_CONF_DIR``, or :func:`dsgrid.ibis.tz.custom_time_zone`.
+    #
+    # Apply the default only when this call creates the session. getOrCreate returns an
+    # active session but still pushes conf's spark.sql.* values onto it, so an
+    # unconditional default would reset a TZ another component set on the live session
+    # (e.g. inside custom_time_zone) whenever any code path calls init_runtime_session
+    # mid-flow. ``conf`` cannot answer "did the caller ask for a TZ?" — a fresh
+    # SparkConf() inherits the JVM defaults, which already carry the UTC dsgrid set when
+    # it created the earlier session. Only ``spark_conf`` reflects an explicit request.
+    requested_tz = None if spark_conf is None else spark_conf.get("spark.sql.session.timeZone")
+    if requested_tz is None:
+        active_session = SparkSession.getActiveSession()
+        default_tz = "UTC"
+        if active_session is not None:
+            default_tz = active_session.conf.get("spark.sql.session.timeZone") or default_tz
+        conf.set("spark.sql.session.timeZone", default_tz)
 
     out_ts_type = conf.get("spark.sql.parquet.outputTimestampType")
     if out_ts_type is None:
@@ -299,8 +318,11 @@ def _create_spark_session(name="dsgrid", check_env=True, spark_conf=None) -> Any
 
     spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
-    requested_tz = conf.get("spark.sql.session.timeZone")
+    # Safety net for a caller's explicit request: a Spark version that declines to push
+    # conf onto an already-active session would otherwise drop it silently. Only the
+    # caller's own request is re-applied here, never the dsgrid default.
     if requested_tz is not None and spark.conf.get("spark.sql.session.timeZone") != requested_tz:
+        logger.info("Set spark.sql.session.timeZone=%s on the active session", requested_tz)
         spark.conf.set("spark.sql.session.timeZone", requested_tz)
 
     with disable_console_logging():

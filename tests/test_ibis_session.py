@@ -30,6 +30,7 @@ from dsgrid.ibis.session import (
     get_duckdb_runtime_session,
     get_runtime_session,
     get_spark_session,
+    init_runtime_session,
     is_runtime_session_active,
     restart_runtime_session,
     restart_runtime_session_with_custom_conf,
@@ -73,6 +74,30 @@ def test_custom_runtime_conf():
         restart_runtime_session(force=True)
         assert get_spark_session().conf.get("spark.sql.session.timeZone") == new_session_tz
     assert get_spark_session().conf.get("spark.sql.session.timeZone") == orig_session_tz
+
+
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB")
+def test_init_runtime_session_and_active_session_time_zone():
+    """dsgrid's default TZ must not overwrite a TZ already set on a live session.
+
+    ``getOrCreate`` returns an active session untouched, so dsgrid re-applies the TZ
+    afterwards. Only a caller's explicit request may be re-applied: re-applying the
+    dsgrid default would reset a TZ that another component set on the live session
+    (e.g. inside ``custom_time_zone``) whenever any code path calls
+    ``init_runtime_session`` mid-flow.
+    """
+    orig_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    other_tz = "America/Denver" if orig_tz != "America/Denver" else "America/New_York"
+    try:
+        get_spark_session().conf.set("spark.sql.session.timeZone", other_tz)
+        init_runtime_session("dsgrid_test")
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == other_tz
+
+        # An explicitly requested TZ still wins on an already-active session.
+        init_runtime_session("dsgrid_test", spark_conf={"spark.sql.session.timeZone": "UTC"})
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == "UTC"
+    finally:
+        get_spark_session().conf.set("spark.sql.session.timeZone", orig_tz)
 
 
 def test_create_dataframe_from_product(tmp_path):

@@ -56,7 +56,7 @@ from dsgrid.ibis.operations import (
     rename_columns,
 )
 from dsgrid.ibis.table_utils import (
-    get_unique_values,
+    get_unique_values_per_column,
     is_table_empty,
     table_column_to_list,
 )
@@ -269,9 +269,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # Performed after missing-association subtraction so that a dimension value
                 # that is entirely absent due to declared missing combinations does not
                 # produce a false positive.
+                expected_per_col = get_unique_values_per_column(
+                    required_assoc, required_assoc.columns
+                )
+                actual_per_col = get_unique_values_per_column(
+                    assoc_by_data, required_assoc.columns
+                )
                 for column in required_assoc.columns:
-                    expected = get_unique_values(required_assoc, column)
-                    actual = get_unique_values(assoc_by_data, column)
+                    expected = expected_per_col[column]
+                    actual = actual_per_col[column]
                     if actual != expected:
                         missing = sorted_with_nulls(expected.difference(actual))
                         extra = sorted_with_nulls(actual.difference(expected))

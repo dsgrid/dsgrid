@@ -31,7 +31,11 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.temp import drop_temp_tables_and_views
 from dsgrid.ibis.session import get_runtime_session
-from dsgrid.ibis.table_utils import count_rows, get_unique_values
+from dsgrid.ibis.table_utils import (
+    count_rows,
+    get_unique_values,
+    get_unique_values_per_column,
+)
 from dsgrid.ibis.types import use_duckdb
 
 from tests._helpers import collect as _collect
@@ -395,3 +399,33 @@ def test_get_unique_values_keeps_nulls():
     )
     assert get_unique_values(df, "sector") == {"res", None}
     assert get_unique_values(df, ["geography", "sector"]) == {("A", "res"), ("B", None)}
+
+
+def test_get_unique_values_per_column_keeps_nulls():
+    # Same regression guard as above for the batched variant: the validators
+    # collect all columns in one execute, and a NULL must still appear as a
+    # value in the affected column's set.
+    df = make_table(
+        ["geography", "sector", "subsector"],
+        ("A", "res", "warehouse"),
+        ("B", None, None),
+        ("B", None, None),
+    )
+    assert get_unique_values_per_column(df, ["geography", "sector", "subsector"]) == {
+        "geography": {"A", "B"},
+        "sector": {"res", None},
+        "subsector": {"warehouse", None},
+    }
+
+
+def test_get_unique_values_per_column_empty_inputs():
+    df = make_table(
+        ["geography", "sector"],
+        ("A", "res"),
+    )
+    assert get_unique_values_per_column(df, []) == {}
+    empty = df.filter(df["geography"] == "no-such-value")
+    assert get_unique_values_per_column(empty, ["geography", "sector"]) == {
+        "geography": set(),
+        "sector": set(),
+    }

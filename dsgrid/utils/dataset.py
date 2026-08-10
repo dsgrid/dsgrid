@@ -54,7 +54,7 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
-    get_unique_values,
+    get_unique_values_per_column,
     is_table_empty,
     table_to_records,
 )
@@ -1029,8 +1029,9 @@ def merge_expected_associations_tables(
             if col not in all_dim_records:
                 msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
                 raise DSGFileInputError(msg)
+        actual_ids_per_col = get_unique_values_per_column(df, df_cols)
         for col in df_cols:
-            actual_ids = get_unique_values(df, col)
+            actual_ids = actual_ids_per_col[col]
             expected_ids = set(all_dim_records[col])
             missing = sorted_with_nulls(expected_ids - actual_ids)
             if missing:
@@ -1052,18 +1053,19 @@ def merge_expected_associations_tables(
                 # Collect pre-join distinct values for each side.
                 covered_dim_cols = sorted(c for c in covered_columns if c in all_dim_records)
                 set_dim_cols = sorted(c for c in col_set if c in all_dim_records)
-                pre_join_values: dict[str, set[str]] = {}
-                for col in covered_dim_cols:
-                    pre_join_values[col] = get_unique_values(merged, col)
-                for col in set_dim_cols:
-                    pre_join_values.setdefault(col, set()).update(get_unique_values(df, col))
+                pre_join_values: dict[str, set] = {}
+                for col, values in get_unique_values_per_column(merged, covered_dim_cols).items():
+                    pre_join_values[col] = values
+                for col, values in get_unique_values_per_column(df, set_dim_cols).items():
+                    pre_join_values.setdefault(col, set()).update(values)
 
                 merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
 
                 overlap_dim_cols = sorted(c for c in overlap if c in all_dim_records)
+                post_join_values = get_unique_values_per_column(merged, overlap_dim_cols)
                 for col in overlap_dim_cols:
                     lost = sorted_with_nulls(
-                        pre_join_values.get(col, set()) - get_unique_values(merged, col)
+                        pre_join_values.get(col, set()) - post_join_values[col]
                     )
                     if lost:
                         msg = (

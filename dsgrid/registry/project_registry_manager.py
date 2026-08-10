@@ -76,6 +76,7 @@ from dsgrid.ibis.functions import cache, unpersist, write_csv
 from dsgrid.ibis.operations import except_all
 from dsgrid.ibis.table_utils import (
     get_unique_values,
+    get_unique_values_per_column,
     is_table_empty,
 )
 from dsgrid.ibis.types import use_duckdb
@@ -1599,9 +1600,12 @@ def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_tabl
     comparison is typically a few hundred values per column at most.
     """
     has_mismatch = False
-    for column in project_table.columns:
-        project_values = get_unique_values(project_table, column)
-        mapped_values = get_unique_values(mapped_dataset_table, column)
+    columns = project_table.columns
+    project_values_per_column = get_unique_values_per_column(project_table, columns)
+    mapped_values_per_column = get_unique_values_per_column(mapped_dataset_table, columns)
+    for column in columns:
+        project_values = project_values_per_column[column]
+        mapped_values = mapped_values_per_column[column]
         diff = project_values.difference(mapped_values)
         if diff:
             has_mismatch = True

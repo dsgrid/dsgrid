@@ -218,11 +218,6 @@ class TableFormatHandlerBase(abc.ABC):
                     if column.function is not None:
                         # In this case we are replacing any existing query name with an expression
                         # or alias, and so the old name must be removed.
-                        # Test the function rather than the expression: _make_group_by_column_expr
-                        # quotes bare column names, so comparing expr to dimension_name would be
-                        # true for every plain column and would drop metadata that an earlier
-                        # aggregation recorded under an alias (final_metadata spans the whole
-                        # aggregation loop in process_stacked_aggregations).
                         final_metadata.remove_metadata(dim_type, column.dimension_name)
                 case _:
                     msg = f"Bug: unhandled: {context.model.result.column_type}"

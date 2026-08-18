@@ -71,6 +71,10 @@ def setup_logging(
     packages = packages or []
     packages = set(packages)
     packages.add("dsgrid")
+    # ``logging.captureWarnings`` below routes warnings.warn() messages to this logger.
+    # The two go together: without this handler configuration the logging module attaches
+    # a NullHandler to ``py.warnings`` and the captured warnings are dropped entirely.
+    packages.add("py.warnings")
     for package in packages:
         log_config["loggers"][package] = {
             "handlers": ["console"],
@@ -88,6 +92,7 @@ def setup_logging(
         log_config["handlers"].pop("file")
 
     logging.config.dictConfig(log_config)
+    logging.captureWarnings(True)
     logger = logging.getLogger(name)
 
     # TODO: more consideration is warranted, but this is usually what we want.

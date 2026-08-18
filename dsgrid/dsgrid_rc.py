@@ -63,7 +63,9 @@ class DsgridRuntimeConfig(DSGBaseModel):
                 # is exactly the "silently ignored" behavior the deprecation exists to
                 # avoid. The warning is kept for programmatic callers and tests.
                 logger.warning(msg)
-                warn(msg, DeprecationWarning, stacklevel=2)
+                # stacklevel=3 skips this validator and pydantic's ``BaseModel.__init__``
+                # so the warning points at the dsgrid/user code that built the config.
+                warn(msg, DeprecationWarning, stacklevel=3)
         return data
 
     @classmethod

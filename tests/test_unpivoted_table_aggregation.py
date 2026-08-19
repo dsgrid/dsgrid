@@ -78,6 +78,19 @@ EXPECTED_WITH_NULLS: dict[str, dict[str, float | None]] = {
     "mean": {"CO": 2.0, "NM": None},
 }
 
+# first/last need the NULLs at the *edges* of the group to be discriminating: with a
+# NULL only in the middle, a non-skipping FIRST/LAST still lands on a real value and a
+# broken spelling passes by luck. Here an unfiltered FIRST returns NULL and an
+# unfiltered LAST returns NULL, while the null-skipping forms must return 1.0 and 3.0.
+NULL_EDGE_ROWS: list[dict[str, Any]] = [
+    {"id": "co1", "geography": "CO", "value": None},
+    {"id": "co2", "geography": "CO", "value": 1.0},
+    {"id": "co3", "geography": "CO", "value": 3.0},
+    {"id": "co4", "geography": "CO", "value": None},
+    {"id": "nm1", "geography": "NM", "value": None},
+    {"id": "nm2", "geography": "NM", "value": None},
+]
+
 
 @pytest.fixture
 def load_table():
@@ -87,6 +100,11 @@ def load_table():
 @pytest.fixture
 def null_table():
     return create_dataframe_from_dicts(NULL_ROWS)
+
+
+@pytest.fixture
+def null_edge_table():
+    return create_dataframe_from_dicts(NULL_EDGE_ROWS)
 
 
 def _close_or_none(actual: Any, expected: float | None) -> bool:
@@ -149,6 +167,22 @@ def test_paths_agree_with_null_values(null_table, op):
             geography,
             fallback[geography],
         )
+
+
+@pytest.mark.parametrize("op", ORDER_DEPENDENT_OPS)
+def test_order_dependent_ops_skip_nulls_on_both_paths(null_edge_table, op):
+    """first/last must skip NULLs on both paths.
+
+    Which row they pick is unspecified without an ORDER BY, so only the NULL
+    handling is pinned: the mixed group must yield one of its real values and
+    never NULL, and the all-NULL group must yield NULL. The Ibis reductions
+    filter NULLs out, so the raw-SQL spellings carry an explicit filter to
+    match; a bare ``FIRST(value)`` lets the fallback return NULL for CO.
+    """
+    for group_by in (["geography"], FORCED_SQL_GROUP_BY):
+        result = _by_group(_aggregate_value(null_edge_table, group_by, op))
+        assert result["CO"] in (1.0, 3.0), (op, group_by, result["CO"])
+        assert result["NM"] is None, (op, group_by, result["NM"])
 
 
 @pytest.mark.parametrize("op", ORDER_DEPENDENT_OPS)

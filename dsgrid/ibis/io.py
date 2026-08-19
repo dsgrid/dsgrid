@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import ibis
+from chronify.utils.path_utils import check_overwrite
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 from dsgrid.ibis.backend import get_runtime_backend
@@ -37,6 +38,7 @@ from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 MAX_PARTITION_SIZE_MB = 128
+_WRITE_FORMATS = ("parquet", "csv", "json")
 
 
 def _read_csv_header_columns(path: str, kwargs: dict[str, Any]) -> list[str] | None:
@@ -215,8 +217,18 @@ def read_csv(
 
 
 def read_json(path: Path | str) -> ibis.Table:
-    """Return an Ibis table from a JSON file."""
-    return get_runtime_backend().connection.read_json(str(path))
+    """Return an Ibis table from a line-delimited JSON file.
+
+    A malformed record raises on both backends. DuckDB's reader already fails
+    on invalid JSON, but Spark's default PERMISSIVE mode nulls the record out
+    and adds a ``_corrupt_record`` column to the schema, so it needs
+    ``mode="FAILFAST"`` to match. Silently reading a data file as nulls is the
+    worse failure: dsgrid's column handling is name-based, so the extra column
+    and the null row propagate into the dataset instead of stopping the load.
+    """
+    # DuckDB's read_json_auto has no `mode` option and would reject the kwarg.
+    kwargs = {} if use_duckdb() else {"mode": "FAILFAST"}
+    return get_runtime_backend().connection.read_json(str(path), **kwargs)
 
 
 def read_parquet(path: Path | str) -> ibis.Table:
@@ -405,6 +417,11 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     suffix = path.suffix
     tmp = path.with_name(path.name + ".tmp")
     stale = path.with_name(path.name + ".stale")
+    # A prior crashed call may have left either sibling lying around. Clear both
+    # up front: .tmp so the write below does not reject the existing path,
+    # .stale so the os.rename further down cannot collide.
+    delete_if_exists(tmp)
+    delete_if_exists(stale)
     if suffix == ".parquet":
         write_table(df, tmp.as_posix(), "parquet")
         read_method = read_parquet
@@ -417,9 +434,6 @@ def overwrite_dataframe_file(filename: Path | str, df: ibis.Table) -> ibis.Table
     else:
         msg = f"Unsupported file suffix: {suffix}"
         raise NotImplementedError(msg)
-    # A prior crashed call may have left a .stale sibling lying around; clear
-    # it before the rename so the os.rename below cannot collide.
-    delete_if_exists(stale)
     if tmp.is_dir():
         # Spark distributed write produces a directory of part files. Step
         # through stale so path is never missing for a concurrent reader.
@@ -600,25 +614,33 @@ def write_dataframe(df: ibis.Table, filename: str | Path, overwrite: bool = Fals
 
     Parameters
     ----------
-    filename : str
     df : ibis.Table
+    filename : str or Path
+    overwrite : bool, optional
+        If True, replace the output path if it already exists. Defaults to
+        False, which raises.
+
+    Raises
+    ------
+    chronify.exceptions.InvalidOperation
+        If the output path exists and ``overwrite`` is False.
+    NotImplementedError
+        If the file extension is not supported. Mirrors :func:`read_dataframe`;
+        returning quietly would leave callers pointing at a file that was never
+        written.
     """
     path = Path(filename)
-    if overwrite:
-        delete_if_exists(path)
-
     suffix = path.suffix
     name = path.as_posix()
     if suffix == ".parquet":
-        write_table(df, name, "parquet")
+        write_table(df, name, "parquet", overwrite=overwrite)
     elif suffix == ".csv":
-        write_table(df, name, "csv")
+        write_table(df, name, "csv", overwrite=overwrite)
     elif suffix == ".json":
-        if use_duckdb():
-            new_name = name.replace(".json", ".parquet")
-            write_table(df, new_name, "parquet")
-        else:
-            write_table(df, name, "json")
+        write_table(df, name, "json", overwrite=overwrite)
+    else:
+        msg = f"Unsupported file extension: {filename}"
+        raise NotImplementedError(msg)
 
 
 @track_timing(timer_stats_collector)
@@ -635,7 +657,7 @@ def persist_table(df: ibis.Table, context: ScratchDirContext, tag=None) -> Path:
     return path
 
 
-def write_table(df: ibis.Table, path: str, file_format: str) -> None:
+def write_table(df: ibis.Table, path: str, file_format: str, overwrite: bool = False) -> None:
     """Write a table to ``path`` in the backend's native shape.
 
     On Spark, the output is a directory of part files (Spark's distributed
@@ -643,40 +665,88 @@ def write_table(df: ibis.Table, path: str, file_format: str) -> None:
     :func:`read_parquet` / :func:`read_csv` / :func:`read_json` transparently
     read either shape.
 
+    The existence check is performed here rather than delegated to the backend
+    because the backends disagree: Spark's writer defaults to ``errorIfExists``
+    while DuckDB's ``COPY ... TO`` silently replaces the file. Doing it once
+    here gives every caller the same semantics on both backends.
+
+    The writes go through ibis wherever a backend implements one natively. The
+    two exceptions, and why they are exceptions:
+
+    * JSON on Spark. The PySpark backend has no JSON writer, so
+      ``Table.to_json`` reaches the base implementation and raises
+      ``NotImplementedError``. Only the PySpark writer can produce the file.
+    * JSON on DuckDB. ``Table.to_json`` works but passes ``ARRAY TRUE``,
+      producing one JSON array. DuckDB reads that back, but Spark's reader
+      needs ``multiline`` for it, so we keep emitting line-delimited records
+      that both backends read.
+
+    CSV on Spark goes through the backend's ``to_csv_dir`` rather than
+    ``Table.to_csv`` for the same reason: the PySpark backend has no CSV
+    writer, and the base implementation streams the whole table through
+    PyArrow in the driver instead of writing from the executors.
+
     Partitioning (e.g. Hive-style ``PARTITION_BY`` directories) is not
     handled here — neither backend writes partitioned output through this
     helper. Spark's ``writer.partitionBy(...)`` and DuckDB's
     ``COPY ... (FORMAT PARQUET, PARTITION_BY (col))`` are intentionally
     out of scope; callers that need them should issue the SQL directly.
+
+    Parameters
+    ----------
+    df : ibis.Table
+    path : str
+    file_format : str
+        One of ``parquet``, ``csv``, or ``json``.
+    overwrite : bool, optional
+        If True, replace ``path`` if it already exists. Defaults to False,
+        which raises.
+
+    Raises
+    ------
+    chronify.exceptions.InvalidOperation
+        If ``path`` exists and ``overwrite`` is False.
+    NotImplementedError
+        If ``file_format`` is not supported.
     """
+    if file_format not in _WRITE_FORMATS:
+        msg = f"Unsupported file format: {file_format}"
+        raise NotImplementedError(msg)
+
+    check_overwrite(Path(path), overwrite)
     view = create_temp_view(df)
-    if not use_duckdb():
+    conn = cast(Any, get_runtime_backend().connection)
+    table = conn.table(view)
+
+    if file_format == "parquet":
+        # Native on both backends: Spark writes a directory of part files,
+        # DuckDB a single file. Neither writer takes a save mode, which is why
+        # check_overwrite above owns the existing-path decision.
+        table.to_parquet(path)
+    elif file_format == "csv":
+        if use_duckdb():
+            table.to_csv(path)
+        else:
+            # Not table.to_csv: the PySpark backend has no CSV writer, so the
+            # generic implementation would pull every row through PyArrow in
+            # the driver and emit a single file. to_csv_dir is the distributed
+            # writer, and the header option matches dsgrid's name-based reader.
+            conn.to_csv_dir(table, path, options={"header": "true"})
+    elif use_duckdb():
+        # Not table.to_json: ibis's DuckDB writer passes ARRAY TRUE, producing
+        # a single JSON array. DuckDB reads that back, but Spark's reader needs
+        # multiline mode for it, so keep writing line-delimited records.
+        escaped_path = path.replace("'", "''")
+        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT JSON)")
+    else:
+        # ibis has no Spark JSON writer at all: Table.to_json falls through to
+        # the base implementation, which raises NotImplementedError.
         # Lazy import: session.py imports this module during bootstrap.
         from dsgrid.ibis.session import get_spark_session
 
-        writer = get_spark_session().table(view).write.mode("overwrite")
-        if file_format == "parquet":
-            writer.parquet(path)
-        elif file_format == "csv":
-            writer.option("header", True).csv(path)
-        elif file_format == "json":
-            writer.json(path)
-        else:
-            msg = f"Unsupported file format: {file_format}"
-            raise NotImplementedError(msg)
-        return
-
-    escaped_path = path.replace("'", "''")
-    conn = cast(Any, get_runtime_backend().connection)
-    if file_format == "parquet":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT PARQUET)")
-    elif file_format == "csv":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT CSV, HEADER)")
-    elif file_format == "json":
-        conn.raw_sql(f"COPY (SELECT * FROM {view}) TO '{escaped_path}' (FORMAT JSON)")
-    else:
-        msg = f"Unsupported file format: {file_format}"
-        raise NotImplementedError(msg)
+        # No .mode("overwrite"): check_overwrite already cleared the path, so
+        # Spark's default errorIfExists is a backstop rather than a surprise.
+        get_spark_session().table(view).write.json(path)
 
 
 class CsvPartitionWriter:

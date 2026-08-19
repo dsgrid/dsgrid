@@ -66,24 +66,29 @@ def get_unique_values_per_column(table: Any, columns: Sequence[str]) -> dict[str
     a hot-path pattern that dominated cost in the dimension-association
     validators (one execute per column × two sides of the comparison).
 
-    Empty tables produce ``None`` for a ``collect`` aggregation on both Spark
-    and DuckDB; in that case the corresponding entry is an empty set. NULL
-    values within a column are dropped by ``collect`` (matching the
-    semantics of the per-column ``.distinct()`` loop this replaces).
+    ``collect`` drops NULL on both backends, so each column also aggregates a
+    non-null count that is compared against the table's row count; a column
+    containing NULL gets ``None`` added to its set, matching the semantics of
+    per-column :func:`get_unique_values`.
     """
     column_names = list(columns)
     if not column_names:
         return {}
-    aggs = {col: table[col].collect(distinct=True) for col in column_names}
+    aggs: dict[str, Any] = {"__row_count": table.count()}
+    for col in column_names:
+        aggs[f"{col}__values"] = table[col].collect(distinct=True)
+        # count(col) excludes NULL; comparing to the row count detects NULL
+        # without a bool_or aggregate, which is NULL (not False) on empty input.
+        aggs[f"{col}__non_null_count"] = table[col].count()
     row = table.aggregate(**aggs).execute().iloc[0]
     result: dict[str, set] = {}
     for col in column_names:
-        value = row[col]
-        if value is None:
-            # Empty table: collect returns NULL.
-            result[col] = set()
-        else:
-            # value is a list (DuckDB) or numpy array (Spark/pandas); both are
-            # iterable. Filter NULL entries that an all-NULL column may emit.
-            result[col] = {v for v in value if v is not None}
+        collected = row[f"{col}__values"]
+        # Empty table: collect returns NULL instead of an empty list/array. An
+        # all-NULL column may emit null entries in the array on some backends;
+        # the non-null-count comparison below is the sole authority on NULL.
+        values = set() if collected is None else {v for v in collected if v is not None}
+        if row[f"{col}__non_null_count"] < row["__row_count"]:
+            values.add(None)
+        result[col] = values
     return result

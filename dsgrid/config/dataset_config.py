@@ -12,7 +12,12 @@ from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
-from dsgrid.config.file_schema import Column, FileSchema, apply_declared_types
+from dsgrid.config.file_schema import (
+    Column,
+    FileSchema,
+    apply_declared_types,
+    validate_declared_types,
+)
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
     TableFormat,
@@ -958,14 +963,20 @@ def get_unique_dimension_record_ids(
 
 
 def _read_and_apply_types(filename: Path, columns: list[Column] | None) -> ibis.Table:
-    """Read ``filename`` and cast user-declared columns to their requested type.
+    """Read ``filename`` and apply user-declared column types.
 
-    The cast runs after read so the same schema applies uniformly to CSV and
-    JSON and Parquet (which is already self-describing). Passes ``strict_family=False``
-    because the CLI's ``--schema-file`` is an authoritative declaration about
-    raw inputs that have no registered schema yet (e.g. a string column the
-    user knows is an integer id), unlike registered datasets where a
-    cross-family mismatch usually indicates a data error.
+    Follows the same per-format contract as
+    :func:`dsgrid.config.file_schema.read_data_file`, which registration will
+    later apply to the same files: declarations are cast for CSV and JSON,
+    whose formats cannot express type intent, and validated but never cast
+    for self-describing Parquet. Honoring a declaration that a Parquet file
+    disagrees with would generate dimension records that registration then
+    rejects.
     """
     df = read_dataframe(filename)
-    return apply_declared_types(df, columns, strict_family=False) if columns else df
+    if not columns:
+        return df
+    if filename.suffix == ".parquet":
+        validate_declared_types(df, columns)
+        return df
+    return apply_declared_types(df, columns)

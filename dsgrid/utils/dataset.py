@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Iterable, Literal, cast
+from typing import Any, Iterable, cast
 from datetime import tzinfo
 
 import chronify
@@ -45,6 +45,9 @@ from dsgrid.ibis.operations import (
     join,
     join_multiple_columns,
     rename_columns,
+    # Aliased because repartition_if_needed_by_mapping has a ``repartition`` parameter
+    # that would otherwise shadow this function inside its body.
+    repartition as repartition_table,
     union_all,
     unpivot,
     with_literal_column,
@@ -65,6 +68,7 @@ from dsgrid.ibis.session import (
     get_spark_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 
 logger = logging.getLogger(__name__)
 
@@ -81,45 +85,18 @@ def _create_runtime_chronify_store() -> chronify.Store:
     return create_chronify_store()
 
 
-def _is_ibis_table(df: ibis.Table) -> bool:
-    return isinstance(df, ibis.Table)
+def _create_chronify_source(store: chronify.Store, df: ibis.Table, schema: TableSchema) -> None:
+    """Register ``df`` with ``store`` as a view.
+
+    Ingesting the rows into a chronify table is never necessary: every dsgrid
+    table is an Ibis table bound to the runtime backend, so chronify can read
+    it in place.
+    """
+    store.create_view(schema, df)
 
 
-_ChronifySourceKind = Literal["view", "table"]
-
-
-def _create_chronify_source(
-    store: chronify.Store, df: ibis.Table, schema: TableSchema
-) -> _ChronifySourceKind:
-    if _is_ibis_table(df):
-        store.create_view(schema, df)
-        return "view"
-    if hasattr(df, "relation"):
-        store.ingest_table(df.relation, schema, skip_time_checks=True)
-    else:
-        store.ingest_table(df, schema, skip_time_checks=True)
-    return "table"
-
-
-def _drop_chronify_source(
-    store: chronify.Store, schema: TableSchema, kind: _ChronifySourceKind
-) -> None:
-    if kind == "view":
-        store.drop_view(schema.name, if_exists=True)
-    else:
-        store.drop_table(schema.name, if_exists=True)
-
-
-def _get_chronify_result(store: chronify.Store, schema: TableSchema, template: ibis.Table):
-    if _is_ibis_table(template):
-        return store.get_table(schema.name)
-    pandas_df = store.read_table(schema.name)
-    store.drop_table(schema.name)
-    return template.session.createDataFrame(pandas_df)
-
-
-def _read_chronify_output(df: ibis.Table, output_file: Path) -> ibis.Table:
-    return read_parquet(output_file)
+def _drop_chronify_source(store: chronify.Store, schema: TableSchema) -> None:
+    store.drop_view(schema.name, if_exists=True)
 
 
 def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
@@ -504,7 +481,7 @@ def map_time_dimension_with_chronify_duckdb(
         df, from_time_dim, to_time_dim, value_column=value_column
     )
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         store.map_table_time_config(
             src_schema.name,
@@ -512,9 +489,9 @@ def map_time_dimension_with_chronify_duckdb(
             wrap_time_allowed=wrap_time_allowed,
             data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_with_chronify_duckdb(
@@ -531,15 +508,15 @@ def convert_time_zone_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.convert_time_zone(
             src_schema.name,
             time_zone,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_by_column_with_chronify_duckdb(
@@ -558,16 +535,16 @@ def convert_time_zone_by_column_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.convert_time_zone_by_column(
             src_schema.name,
             time_zone_column,
             wrap_time_allowed=wrap_time_allowed,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_with_chronify_duckdb(
@@ -584,15 +561,15 @@ def localize_time_zone_with_chronify_duckdb(
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
 
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.localize_time_zone(
             src_schema.name,
             time_zone,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_by_column_with_chronify_duckdb(
@@ -610,15 +587,15 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     """
     src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
     store = _create_runtime_chronify_store()
-    src_kind = _create_chronify_source(store, df, src_schema)
+    _create_chronify_source(store, df, src_schema)
     try:
         dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
             time_zone_column,
         )
-        return _get_chronify_result(store, dst_schema, df)
+        return store.get_table(dst_schema.name)
     finally:
-        _drop_chronify_source(store, src_schema, src_kind)
+        _drop_chronify_source(store, src_schema)
 
 
 def map_time_dimension_with_chronify_runtime_path(
@@ -648,7 +625,7 @@ def map_time_dimension_with_chronify_runtime_path(
         wrap_time_allowed=wrap_time_allowed,
         data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def convert_time_zone_with_chronify_runtime_path(
@@ -672,7 +649,7 @@ def convert_time_zone_with_chronify_runtime_path(
         time_zone,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def convert_time_zone_by_column_with_chronify_runtime_path(
@@ -699,7 +676,7 @@ def convert_time_zone_by_column_with_chronify_runtime_path(
         wrap_time_allowed=wrap_time_allowed,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def localize_time_zone_with_chronify_runtime_path(
@@ -722,7 +699,7 @@ def localize_time_zone_with_chronify_runtime_path(
         time_zone,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def localize_time_zone_by_column_with_chronify_runtime_path(
@@ -747,7 +724,7 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
         time_zone_column=time_zone_column,
         output_file=output_file,
     )
-    return _read_chronify_output(df, output_file)
+    return read_parquet(output_file)
 
 
 def _to_chronify_time_based_data_adjustment(
@@ -917,27 +894,18 @@ def repartition_if_needed_by_mapping(
         # could be many instances of zero or null. So, add a new column with random values.
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
-        spark = get_runtime_session()
-        # spark.sql.shuffle.partitions is Spark-specific. On DuckDB the
-        # salting still happens but only as a column-tag for the post-write
-        # read-back; the actual number doesn't drive shuffle behavior, so
-        # any reasonable default works.
-        if use_duckdb():
-            num_partitions = 200
-        else:
-            num_partitions = int(get_spark_session().conf.get("spark.sql.shuffle.partitions"))
-        random_func = "random()" if use_duckdb() else "rand()"
+        # This is Spark-only code (DuckDB returned above), so spark.sql.shuffle.partitions
+        # is the partition count that a bare df.repartition(col) would use.
+        num_partitions = int(get_spark_session().conf.get("spark.sql.shuffle.partitions"))
         view = create_temp_view(df)
-        df = spark.sql(
-            f"SELECT *, CAST({random_func} * {num_partitions} AS INTEGER) + 1 "
+        salted = get_runtime_session().sql(
+            f"SELECT *, CAST(rand() * {num_partitions} AS INTEGER) + 1 "
             f"AS {salted_column} FROM {view}"
         )
-        if _is_ibis_table(df):
-            df.to_parquet(filename.as_posix())
-            df = drop_columns(read_parquet(filename), salted_column)
-        else:
-            df.repartition(salted_column).write.parquet(filename.as_posix())
-            df = drop_columns(read_parquet(filename), salted_column)
+        # repartition_table hash-partitions the underlying PySpark DataFrame on the
+        # salted column; the shuffle it forces is the entire point of the salting.
+        write_dataframe(repartition_table(salted, num_partitions, salted_column), filename)
+        df = drop_columns(read_parquet(filename), salted_column)
         logger.info("Completed repartition.")
         return df, filename
 
@@ -1056,18 +1024,16 @@ def merge_expected_associations_tables(
         group_label = "{" + ", ".join(sorted(col_set)) + "}"
 
         # Validate that this group covers every record for its dimensions.
-        # Single execute via get_unique_values_per_column instead of one
-        # execute per dimension column.
         df_cols = sorted(col_set)
         for col in df_cols:
             if col not in all_dim_records:
                 msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
                 raise DSGFileInputError(msg)
-        df_unique = get_unique_values_per_column(df, df_cols)
+        actual_ids_per_col = get_unique_values_per_column(df, df_cols)
         for col in df_cols:
-            actual_ids = df_unique[col]
+            actual_ids = actual_ids_per_col[col]
             expected_ids = set(all_dim_records[col])
-            missing = sorted(expected_ids - actual_ids)
+            missing = sorted_with_nulls(expected_ids - actual_ids)
             if missing:
                 msg = (
                     f"Expected associations table with columns {group_label} is missing "
@@ -1084,35 +1050,23 @@ def merge_expected_associations_tables(
         else:
             overlap = covered_columns & set(col_set)
             if overlap:
-                # Collect pre-join distinct values for each side in one execute
-                # each (was previously one execute per shared column per side).
+                # Collect pre-join distinct values for each side.
                 covered_dim_cols = sorted(c for c in covered_columns if c in all_dim_records)
                 set_dim_cols = sorted(c for c in col_set if c in all_dim_records)
-                merged_unique = (
-                    get_unique_values_per_column(merged, covered_dim_cols)
-                    if covered_dim_cols
-                    else {}
-                )
-                df_unique_overlap = (
-                    get_unique_values_per_column(df, set_dim_cols) if set_dim_cols else {}
-                )
-                pre_join_values: dict[str, set[str]] = {}
-                for col in covered_dim_cols:
-                    pre_join_values[col] = merged_unique[col]
-                for col in set_dim_cols:
-                    pre_join_values.setdefault(col, set()).update(df_unique_overlap[col])
+                pre_join_values: dict[str, set] = {}
+                for col, values in get_unique_values_per_column(merged, covered_dim_cols).items():
+                    pre_join_values[col] = values
+                for col, values in get_unique_values_per_column(df, set_dim_cols).items():
+                    pre_join_values.setdefault(col, set()).update(values)
 
                 merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
 
-                # Post-join check: single execute for all overlap dim columns.
                 overlap_dim_cols = sorted(c for c in overlap if c in all_dim_records)
-                post_unique = (
-                    get_unique_values_per_column(merged, overlap_dim_cols)
-                    if overlap_dim_cols
-                    else {}
-                )
+                post_join_values = get_unique_values_per_column(merged, overlap_dim_cols)
                 for col in overlap_dim_cols:
-                    lost = sorted(pre_join_values.get(col, set()) - post_unique[col])
+                    lost = sorted_with_nulls(
+                        pre_join_values.get(col, set()) - post_join_values[col]
+                    )
                     if lost:
                         msg = (
                             f"Inner join of expected associations tables with columns "

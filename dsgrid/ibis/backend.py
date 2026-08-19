@@ -66,6 +66,7 @@ def get_runtime_backend(**kwargs: Any) -> IbisBackend:
     else:
         key = _make_backend_cache_key(config.backend_engine, kwargs)
         backend = make_backend("duckdb", **kwargs)
+        _pin_duckdb_time_zone(backend)
 
     _RUNTIME_BACKEND = backend
     _RUNTIME_BACKEND_KEY = key
@@ -91,7 +92,28 @@ def build_independent_backend(**kwargs: Any) -> IbisBackend:
 
             session = get_spark_session()
         return make_backend("spark", session=session, **kwargs)
-    return make_backend("duckdb", **kwargs)
+    backend = make_backend("duckdb", **kwargs)
+    _pin_duckdb_time_zone(backend)
+    return backend
+
+
+def _pin_duckdb_time_zone(backend: IbisBackend) -> None:
+    """Pin a DuckDB connection's ``TimeZone`` to UTC.
+
+    A bare DuckDB connection defaults ``TimeZone`` to the machine's system TZ, which
+    would make ``TIMESTAMPTZ`` rendering and tz-naive ingestion machine-dependent and
+    would disagree with the Spark backend (whose session TZ dsgrid defaults to UTC in
+    :func:`dsgrid.ibis.session._create_spark_session`). This matters because a Spark
+    ``TimestampType`` maps to DuckDB ``TIMESTAMP WITH TIME ZONE``
+    (:data:`dsgrid.ibis.types.TYPE_SPECS`), so a declared-timestamp CSV column parses
+    through this setting. Ibis happens to do the same in its own ``_post_connect``, but
+    that is an implementation detail of a dependency; state the requirement here so the
+    contract is dsgrid's.
+
+    Callers that need a different render TZ for a code block use
+    :func:`dsgrid.ibis.tz.custom_time_zone`, which sets and restores this setting.
+    """
+    cast(Any, backend.connection).raw_sql("SET TimeZone='UTC'")
 
 
 def create_chronify_store(**kwargs: Any) -> chronify.Store:

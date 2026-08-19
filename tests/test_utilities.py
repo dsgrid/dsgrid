@@ -1,6 +1,6 @@
 """Tests for dsgrid.utils.utilities module."""
 
-from dsgrid.utils.utilities import make_unique_key
+from dsgrid.utils.utilities import make_unique_key, sorted_with_nulls
 
 
 def test_make_unique_key_new_name():
@@ -66,3 +66,33 @@ def test_make_unique_key_similar_names():
 
     result2 = make_unique_key("file_name", existing)
     assert result2 == "file_name_1"
+
+
+def test_sorted_with_nulls_no_nulls():
+    """Test that values without None sort normally."""
+    assert sorted_with_nulls({"b", "a", "c"}) == ["a", "b", "c"]
+
+
+def test_sorted_with_nulls_none_first():
+    """Test that None sorts before all other values."""
+    assert sorted_with_nulls({"b", None, "a"}) == [None, "a", "b"]
+
+
+def test_sorted_with_nulls_only_none():
+    """Test a collection containing only None."""
+    assert sorted_with_nulls([None, None]) == [None]
+
+
+def test_sorted_with_nulls_empty():
+    """Test an empty collection."""
+    assert sorted_with_nulls(set()) == []
+
+
+def test_sorted_with_nulls_ints():
+    """Test that non-string values sort by value."""
+    assert sorted_with_nulls({3, None, 1, 2}) == [None, 1, 2, 3]
+
+
+def test_sorted_with_nulls_mixed_types():
+    """Test that mutually incomparable values fall back to a stable order."""
+    assert sorted_with_nulls({6037, "6037", None}) == [None, 6037, "6037"]

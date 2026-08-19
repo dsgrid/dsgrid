@@ -86,7 +86,7 @@ from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, read_dataframe
 from dsgrid.ibis.models import models_to_dataframe
-from dsgrid.utils.utilities import check_uniqueness, display_table
+from dsgrid.utils.utilities import check_uniqueness, display_table, sorted_with_nulls
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
 from .common import (
     VersionUpdateType,
@@ -1595,23 +1595,21 @@ def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_tabl
     """Ensure that the mapped dataset has the same distinct values as the project for all
     columns. This should be called before running a full comparison of the two tables.
 
-    Collects all per-column distinct sets in a single aggregation per side
-    (2 executes total) instead of issuing ``except_all`` + ``is_table_empty``
-    per column (2N executes). The diff is computed in Python because
-    dimension columns are bounded-cardinality (geographies, subsectors,
-    etc.) and the post-mapping comparison is typically a few hundred values
-    per column at most.
+    The diff is computed in Python because dimension columns are
+    bounded-cardinality (geographies, subsectors, etc.) and the post-mapping
+    comparison is typically a few hundred values per column at most.
     """
-    columns = list(project_table.columns)
-    project_values = get_unique_values_per_column(project_table, columns)
-    mapped_values = get_unique_values_per_column(mapped_dataset_table, columns)
-
     has_mismatch = False
+    columns = project_table.columns
+    project_values_per_column = get_unique_values_per_column(project_table, columns)
+    mapped_values_per_column = get_unique_values_per_column(mapped_dataset_table, columns)
     for column in columns:
-        diff = project_values[column].difference(mapped_values[column])
+        project_values = project_values_per_column[column]
+        mapped_values = mapped_values_per_column[column]
+        diff = project_values.difference(mapped_values)
         if diff:
             has_mismatch = True
-            sample = set(sorted(diff)[:100])
+            sample = set(sorted_with_nulls(diff)[:100])
             logger.error(
                 "The mapped dataset has different distinct values than the project "
                 "for column=%s. Showing at most 100 values: diff=%s",

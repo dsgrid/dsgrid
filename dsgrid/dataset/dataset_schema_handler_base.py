@@ -84,6 +84,7 @@ from dsgrid.ibis.io import persist_table, read_dataframe, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
     DimensionMappingRegistryManager,
@@ -278,8 +279,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     expected = expected_per_col[column]
                     actual = actual_per_col[column]
                     if actual != expected:
-                        missing = sorted(expected.difference(actual))
-                        extra = sorted(actual.difference(expected))
+                        missing = sorted_with_nulls(expected.difference(actual))
+                        extra = sorted_with_nulls(actual.difference(expected))
                         num_matching = len(actual.intersection(expected))
                         msg = (
                             f"Dataset records for dimension type {column} do not match expected "

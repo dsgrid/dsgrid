@@ -111,20 +111,21 @@ def read_data_file(
     match path.suffix:
         case ".parquet":
             # Parquet is self-describing; honor its on-disk schema (including
-            # precision, e.g. timestamp microseconds) verbatim. The FileSchema
-            # declaration is documentation/validation for Parquet, not a
-            # runtime type override.
+            # precision, e.g. timestamp microseconds) verbatim. Declared types
+            # are checked against that schema — a declaration that disagrees
+            # with the file is a config error — but never cast.
             df = read_parquet(path)
+            validate_declared_types(df, schema.columns)
         case ".csv":
             column_schema = _get_column_schema(schema)
             df = read_csv(path, schema=column_schema)
         case ".json":
-            # JSON readers infer types from content (DuckDB) or default to
-            # strings (Spark). Apply user-declared types after the read so a
-            # FileSchema is the single source of truth for JSON inputs the
-            # same way it is for CSV.
+            # JSON cannot encode type intent: both backends infer 64-bit
+            # numerics from literals and cannot mark a number as a string ID.
+            # Apply user-declared types after the read so a FileSchema is
+            # authoritative for JSON inputs the same way it is for CSV.
             df = read_json(path)
-            df = _apply_declared_types_post_read(df, schema)
+            df = apply_declared_types(df, schema.columns)
         case _:
             msg = f"Unsupported file type: {path.suffix}"
             raise DSGInvalidDataset(msg)
@@ -224,8 +225,9 @@ def _check_narrowing(spec: TypeSpec, column_name: str, actual_dtype: Any) -> Non
     (32-bit) declared on a float64 column. Equal-or-wider declarations pass,
     including widening casts that bridge type families (e.g. int32 -> float64).
 
-    Only width is checked here. Whether a cross-family cast is permitted at all
-    is decided by the caller via ``strict_family`` in :func:`apply_declared_types`.
+    Only width is checked here. Cross-family conversion failures (e.g.
+    non-numeric text declared BIGINT) surface from the backend when the cast
+    executes.
     """
     if spec.bit_width is None:
         return
@@ -242,27 +244,15 @@ def _check_narrowing(spec: TypeSpec, column_name: str, actual_dtype: Any) -> Non
         raise DSGInvalidField(msg)
 
 
-def apply_declared_types(
-    df: ibis.Table,
-    columns: list[Column],
-    *,
-    strict_family: bool = True,
-) -> ibis.Table:
+def apply_declared_types(df: ibis.Table, columns: list[Column]) -> ibis.Table:
     """Cast columns of ``df`` to match user-declared types in ``columns``.
 
-    Used in two contexts that differ in how much the framework trusts the
-    declaration:
-
-    - Registered datasets (after a JSON read): the FileSchema is declarative;
-      cross-family mismatches usually indicate bad input data and should fail
-      loudly via dsgrid's downstream validators. Pass ``strict_family=True``
-      so this function only normalizes width within the same type family
-      (e.g. int32 ↔ int64) and skips int → string or similar cross-family
-      casts.
-    - CLI ``generate-config --schema-file``: the user is feeding the readers
-      authoritative hints for raw files that have no registered schema yet
-      (e.g. a string-typed column that the user knows is an integer ID).
-      Pass ``strict_family=False`` so declared types always take effect.
+    The declaration is authoritative: it is how a user assigns types the
+    source format cannot express (a CSV or JSON number that is really a
+    string ID, a timestamp's TZ-awareness). Casts apply even across type
+    families. A declaration the data cannot satisfy fails loudly: narrowing
+    declarations are rejected here, and invalid conversions (e.g. non-numeric
+    text declared BIGINT) raise in the backend when the cast executes.
 
     Columns declared in ``columns`` but missing from the table are silently
     ignored; downstream validation surfaces missing required columns with a
@@ -273,8 +263,6 @@ def apply_declared_types(
     ----------
     df : ibis.Table
     columns : list[Column]
-    strict_family : bool, optional
-        If True, skip casts that cross type families. By default True.
 
     Returns
     -------
@@ -283,8 +271,8 @@ def apply_declared_types(
     Raises
     ------
     DSGInvalidField
-        If a declared ``data_type`` has no mapping in
-        :data:`_USER_TYPE_TO_IBIS_DTYPE`.
+        If a declared ``data_type`` has no Ibis dtype mapping, or is narrower
+        than the column's actual type.
     """
     if not columns:
         return df
@@ -293,21 +281,56 @@ def apply_declared_types(
     for col in columns:
         if col.data_type is None or col.name not in schema:
             continue
-        try:
-            spec = spec_for_name(col.data_type)
-        except KeyError as exc:
-            msg = (
-                f"Declared data_type={col.data_type!r} for column {col.name!r} "
-                f"has no Ibis dtype mapping."
-            )
-            raise DSGInvalidField(msg) from exc
-        actual_dtype = schema[col.name]
-        if strict_family and spec.family != _actual_type_family(actual_dtype):
-            continue
-        _check_narrowing(spec, col.name, actual_dtype)
+        spec = _spec_for_column(col.name, col.data_type)
+        _check_narrowing(spec, col.name, schema[col.name])
         _warn_if_timestamp_tz_lossy_on_spark(spec, col.name)
         casts[col.name] = df[col.name].cast(spec.ibis_dtype)
     return df.mutate(**casts) if casts else df
+
+
+def _spec_for_column(column_name: str, data_type: str) -> TypeSpec:
+    try:
+        return spec_for_name(data_type)
+    except KeyError as exc:
+        msg = (
+            f"Declared data_type={data_type!r} for column {column_name!r} "
+            f"has no Ibis dtype mapping."
+        )
+        raise DSGInvalidField(msg) from exc
+
+
+def validate_declared_types(df: ibis.Table, columns: list[Column]) -> None:
+    """Check declared types against a self-describing file's actual schema.
+
+    Used for Parquet reads, whose on-disk schema is honored verbatim and never
+    cast (see :func:`read_data_file`). A declaration there is documentation, so
+    one that disagrees with the file — a different type family, or a narrower
+    width — is a config error and raises instead of being silently ignored.
+    Equal-or-wider same-family declarations pass; the column keeps the file's
+    type either way.
+
+    Raises
+    ------
+    DSGInvalidField
+        If a declared ``data_type`` conflicts with the column's actual type.
+    """
+    schema = df.schema()
+    for col in columns:
+        if col.data_type is None or col.name not in schema:
+            continue
+        spec = _spec_for_column(col.name, col.data_type)
+        actual_dtype = schema[col.name]
+        actual_family = _actual_type_family(actual_dtype)
+        if spec.family != actual_family:
+            msg = (
+                f"Declared data_type={spec.name!r} ({spec.family}) for column "
+                f"{col.name!r} conflicts with the Parquet file's actual type "
+                f"{actual_dtype} ({actual_family}). Parquet files are read with "
+                f"their own schema; dsgrid does not cast them. Update the "
+                f"declaration to match the file, or remove it."
+            )
+            raise DSGInvalidField(msg)
+        _check_narrowing(spec, col.name, actual_dtype)
 
 
 def _warn_if_timestamp_tz_lossy_on_spark(spec: "TypeSpec", column_name: str) -> None:
@@ -336,8 +359,3 @@ def _warn_if_timestamp_tz_lossy_on_spark(spec: "TypeSpec", column_name: str) -> 
         "the original TZ offset to survive in rendered output."
     )
     warnings.warn(msg, UserWarning, stacklevel=4)
-
-
-def _apply_declared_types_post_read(df: ibis.Table, schema: FileSchema) -> ibis.Table:
-    """Internal: apply declared column types after reading a JSON file (strict)."""
-    return apply_declared_types(df, schema.columns, strict_family=True)

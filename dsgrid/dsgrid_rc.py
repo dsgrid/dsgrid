@@ -54,10 +54,18 @@ class DsgridRuntimeConfig(DSGBaseModel):
             if data.pop(field, None) is not None:
                 msg = (
                     f"The dsgrid runtime config field {field!r} is deprecated and is being "
-                    "ignored. Please remove it from your config file. This will cause an error "
+                    f"ignored. Please remove it from {RC_FILENAME}. This will cause an error "
                     "in a future release."
                 )
-                warn(msg, DeprecationWarning, stacklevel=2)
+                # Log as well as warn. This validator runs at ``import dsgrid`` time, and
+                # Python's default filters hide a DeprecationWarning raised from library
+                # code, so the warning alone never reaches a user running the CLI -- which
+                # is exactly the "silently ignored" behavior the deprecation exists to
+                # avoid. The warning is kept for programmatic callers and tests.
+                logger.warning(msg)
+                # stacklevel=3 skips this validator and pydantic's ``BaseModel.__init__``
+                # so the warning points at the dsgrid/user code that built the config.
+                warn(msg, DeprecationWarning, stacklevel=3)
         return data
 
     @classmethod

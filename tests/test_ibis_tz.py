@@ -17,6 +17,18 @@ def _years_under_tz(table, time_zone: str) -> list[int]:
         )
 
 
+def test_default_render_time_zone_is_utc():
+    """The runtime session renders in UTC on both backends, whatever the machine's TZ.
+
+    dsgrid pins this on both sides — ``SET TimeZone='UTC'`` on a new DuckDB connection
+    and ``spark.sql.session.timeZone=UTC`` on a new SparkSession — so that tz-naive
+    ingestion and ``.year()``/``.hour()`` extractions produce the same instants on a
+    developer laptop, a UTC cluster, and across the two backends. Without it the DuckDB
+    default is the system TZ and Spark's is the JVM TZ.
+    """
+    assert get_current_time_zone() == "UTC"
+
+
 def test_current_time_zone_contexts():
     original = get_current_time_zone()
     try:

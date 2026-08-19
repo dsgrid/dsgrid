@@ -25,7 +25,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.ibis.types import SUPPORTED_TYPES, spec_for_name
 from dsgrid.ibis.session import (
-    F,
     SparkSession,
     get_runtime_session,
     use_duckdb,
@@ -43,10 +42,8 @@ def spark() -> Generator[SparkSession, None, None]:
     yield spark
 
 
-def _with_string_column(df, column: str, alias: str):
-    if isinstance(df, ibis.Table):
-        return df.mutate(**{alias: df[column].cast("string")})
-    return df.withColumn(alias, F.col(column).cast("string"))
+def _with_string_column(df: ibis.Table, column: str, alias: str):
+    return df.mutate(**{alias: df[column].cast("string")})
 
     # Column tests
 
@@ -417,6 +414,83 @@ def test_read_data_file_json(tmp_path, spark):
     assert "name" in df.columns
 
 
+def test_read_data_file_json_declared_string_casts(tmp_path, spark):
+    """A STRING declaration overrides JSON numeric inference.
+
+    JSON cannot mark a number as a string ID, so the FileSchema declaration
+    is authoritative — the same contract as CSV.
+    """
+    json_file = tmp_path / "test.json"
+    data = [{"model_year": 2030, "value": 1.5}, {"model_year": 2040, "value": 2.5}]
+    json_file.write_text("\n".join(json.dumps(row) for row in data))
+
+    columns = [Column(name="model_year", data_type="STRING")]
+    schema = FileSchema(path=str(json_file), columns=columns)
+    df = read_data_file(schema)
+
+    assert str(df.schema()["model_year"]) == "string"
+    assert sorted(row.model_year for row in _collect(df)) == ["2030", "2040"]
+
+
+def test_read_data_file_json_narrowing_declaration_raises(tmp_path, spark):
+    """JSON inference always yields 64-bit numerics, so a 32-bit declaration
+    is rejected rather than silently narrowing."""
+    json_file = tmp_path / "test.json"
+    json_file.write_text(json.dumps({"model_year": 2030}))
+
+    columns = [Column(name="model_year", data_type="INT")]
+    schema = FileSchema(path=str(json_file), columns=columns)
+    with pytest.raises(DSGInvalidField, match="is narrower than"):
+        read_data_file(schema)
+
+
+def test_read_data_file_parquet_declared_types_validated_not_cast(tmp_path, spark):
+    """Matching or wider same-family declarations pass; the file's type wins.
+
+    Parquet is self-describing, so declarations are validated against the
+    on-disk schema but never cast — a declared BIGINT on an int32 column
+    passes and the column stays int32.
+    """
+    parquet_file = tmp_path / "test.parquet"
+    test_df = ibis.memtable({"id": [1, 2], "name": ["a", "b"]}).cast({"id": "int32"})
+    write_dataframe(test_df, parquet_file)
+
+    columns = [
+        Column(name="id", data_type="BIGINT"),
+        Column(name="name", data_type="STRING"),
+    ]
+    schema = FileSchema(path=str(parquet_file), columns=columns)
+    df = read_data_file(schema)
+
+    assert str(df.schema()["id"]) == "int32"
+    assert str(df.schema()["name"]) == "string"
+
+
+def test_read_data_file_parquet_family_mismatch_raises(tmp_path, spark):
+    """A declaration whose type family disagrees with the Parquet schema is a
+    config error, not a silent no-op."""
+    parquet_file = tmp_path / "test.parquet"
+    test_df = spark.createDataFrame([(6037,)], ["geography"])
+    write_dataframe(test_df, parquet_file)
+
+    columns = [Column(name="geography", data_type="STRING")]
+    schema = FileSchema(path=str(parquet_file), columns=columns)
+    with pytest.raises(DSGInvalidField, match="conflicts with the Parquet"):
+        read_data_file(schema)
+
+
+def test_read_data_file_parquet_narrowing_declaration_raises(tmp_path, spark):
+    """A same-family declaration narrower than the Parquet type is rejected."""
+    parquet_file = tmp_path / "test.parquet"
+    test_df = spark.createDataFrame([(1,)], ["id"])  # int64
+    write_dataframe(test_df, parquet_file)
+
+    columns = [Column(name="id", data_type="INT")]
+    schema = FileSchema(path=str(parquet_file), columns=columns)
+    with pytest.raises(DSGInvalidField, match="is narrower than"):
+        read_data_file(schema)
+
+
 def test_read_data_file_nonexistent_raises():
     """Test that reading a nonexistent file raises FileNotFoundError."""
     schema = FileSchema(path="/nonexistent/file.csv")
@@ -760,13 +834,13 @@ def test_apply_declared_types_skips_columns_not_in_table(spark):
     assert apply_declared_types(df, columns).schema() == df.schema()
 
 
-def test_apply_declared_types_strict_same_family_int_widening(spark):
-    """Same-family widening (e.g. int32 → int64) is applied even in strict mode."""
+def test_apply_declared_types_same_family_int_widening(spark):
+    """Same-family widening (e.g. int32 → int64) is applied."""
     # The default createDataFrame path produces int64, so build via an
     # explicit int32 memtable to exercise the widening path.
     df = ibis.memtable({"id": [1]}).cast({"id": "int32"})
     columns = [Column(name="id", data_type="BIGINT")]  # int32 → int64 (widening)
-    result = apply_declared_types(df, columns, strict_family=True)
+    result = apply_declared_types(df, columns)
     assert str(result.schema()["id"]) == "int64"
 
 
@@ -779,37 +853,36 @@ def test_apply_declared_types_narrowing_raises(spark):
     df = spark.createDataFrame([(1,)], ["id"])  # Spark createDataFrame → int64
     columns = [Column(name="id", data_type="INT")]  # INT → int32 (would narrow)
     with pytest.raises(DSGInvalidField, match="is narrower than"):
-        apply_declared_types(df, columns, strict_family=True)
+        apply_declared_types(df, columns)
 
 
-def test_apply_declared_types_strict_cross_family_skipped(spark):
-    """Strict mode leaves cross-family declarations alone so a downstream
-    type validator can surface the real error rather than silently coercing
-    (e.g. int data hiding behind a declared VARCHAR loses leading zeros)."""
+def test_apply_declared_types_int_to_string(spark):
+    """A declared string type coerces numeric data across families.
+
+    This is the main cross-family use case: dimension record IDs are strings,
+    and JSON/CSV numbers cannot be marked as strings in the file itself.
+    """
     df = spark.createDataFrame([(6037,)], ["geography"])
     columns = [Column(name="geography", data_type="VARCHAR")]
-    result = apply_declared_types(df, columns, strict_family=True)
-    # int64 stays int64 — no silent coercion to string.
-    assert str(result.schema()["geography"]) == "int64"
+    result = apply_declared_types(df, columns)
+    assert str(result.schema()["geography"]) == "string"
+    assert [row.geography for row in _collect(result)] == ["6037"]
 
 
-def test_apply_declared_types_force_cross_family_applied(spark):
-    """strict_family=False force-casts across families.
-
-    Used by the generate-config CLI where the user is authoritatively
-    declaring types for raw files with no registered schema.
-    """
+def test_apply_declared_types_string_to_int(spark):
+    """A declared integer type coerces numeric text across families."""
     df = spark.createDataFrame([("6202",)], ["id"])  # e.g. an ID column read as string
     columns = [Column(name="id", data_type="BIGINT")]
-    result = apply_declared_types(df, columns, strict_family=False)
+    result = apply_declared_types(df, columns)
     assert str(result.schema()["id"]) == "int64"
+    assert [row.id for row in _collect(result)] == [6202]
 
 
 def test_apply_declared_types_partial_declaration_only_casts_declared(spark):
     """Only the declared subset is touched; the rest keeps inferred types."""
     df = spark.createDataFrame([(1, "a", 1.5)], ["id", "name", "value"])
     columns = [Column(name="id", data_type="BIGINT")]  # only id; matches actual int64
-    result = apply_declared_types(df, columns, strict_family=True)
+    result = apply_declared_types(df, columns)
     schema = result.schema()
     assert str(schema["id"]) == "int64"
     assert str(schema["name"]) == "string"
@@ -880,7 +953,7 @@ def test_timestamp_tz_warning_on_duckdb_is_silent(spark):
 
     with _warnings.catch_warnings(record=True) as caught:
         _warnings.simplefilter("always")
-        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+        apply_declared_types(df, _make_timestamp_tz_schema())
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert relevant == []
 
@@ -897,7 +970,7 @@ def test_timestamp_tz_warning_on_spark_non_utc_emits(monkeypatch, spark):
     df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+        apply_declared_types(df, _make_timestamp_tz_schema())
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert len(relevant) == 1
     assert "Denver" in str(relevant[0].message)
@@ -912,7 +985,7 @@ def test_timestamp_tz_warning_on_spark_utc_is_silent(monkeypatch, spark):
     df = ibis.memtable({"ts": [datetime(2024, 1, 1)]}).cast({"ts": "timestamp"})
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        apply_declared_types(df, _make_timestamp_tz_schema(), strict_family=True)
+        apply_declared_types(df, _make_timestamp_tz_schema())
     relevant = [w for w in caught if "TIMESTAMP_TZ" in str(w.message)]
     assert relevant == []
 

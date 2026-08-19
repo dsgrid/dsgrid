@@ -115,6 +115,46 @@ def check_uniqueness(iterable: Iterable, tag: str) -> set[str]:
     return values
 
 
+def sorted_with_nulls(values: Iterable) -> list:
+    """Sort values that may contain ``None``, ordering ``None`` first.
+
+    ``sorted`` raises TypeError when a collection mixes ``None`` with other types.
+    Distinct-value sets read from a table can contain NULL, so use this whenever
+    such a set is sorted for display in a log or error message.
+
+    Parameters
+    ----------
+    values : Iterable
+        Values to sort. Mutually incomparable non-null values (e.g. ``6037``
+        and ``"6037"`` from sources that disagree on a column's type) fall
+        back to ordering by type name and string form rather than raising.
+
+    Returns
+    -------
+    list
+        Sorted values, with ``None`` first if present.
+
+    Examples
+    --------
+    >>> sorted_with_nulls({"b", None, "a"})
+    [None, 'a', 'b']
+    """
+    non_null = []
+    has_null = False
+    for value in values:
+        if value is None:
+            has_null = True
+        else:
+            non_null.append(value)
+    try:
+        non_null.sort()
+    except TypeError:
+        # This sorts for display in an error message; a crash here would mask
+        # the error being reported.
+        non_null.sort(key=lambda value: (type(value).__name__, str(value)))
+    return [None, *non_null] if has_null else non_null
+
+
 def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list[str] = None):
     """Convert an iterable of dicts to instances of a data class.
 

@@ -18,7 +18,6 @@ from dsgrid.query.query_context import QueryContext
 
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.dataset.table_format_handler_base import TableFormatHandlerBase
-from dsgrid.ibis.session import get_runtime_session
 
 
 logger = logging.getLogger(__name__)
@@ -153,9 +152,7 @@ def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> 
     )
     if group_cols:
         query += f" GROUP BY {group_cols}"
-    if isinstance(df, ibis.Table):
-        return get_runtime_backend().sql(query)
-    return get_runtime_session().sql(query)
+    return get_runtime_backend().sql(query)
 
 
 def _looks_like_bare_column(expr: str, columns: Sequence[str]) -> bool:

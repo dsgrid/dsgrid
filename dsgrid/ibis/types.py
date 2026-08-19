@@ -36,8 +36,9 @@ class TypeSpec:
     ibis_dtype
         The Ibis dtype string used in ``column.cast(...)``.
     family
-        Coarse compatibility bucket. Casts that stay within a family are
-        considered safe; cross-family casts are skipped in strict mode.
+        Coarse compatibility bucket used to compare a declaration against a
+        column's actual runtime type (e.g. when validating a declaration
+        against a self-describing Parquet schema).
     bit_width
         For fixed-width numeric types, the bit width. Used to detect
         narrowing casts. ``None`` for non-numeric or variable-width types.

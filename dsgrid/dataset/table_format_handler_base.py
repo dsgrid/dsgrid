@@ -215,7 +215,7 @@ class TableFormatHandlerBase(abc.ABC):
                     column_names = [column.get_column_name()]
                     expr = self._make_group_by_column_expr(column)
                     group_by_cols.append(expr)
-                    if not isinstance(expr, str) or expr != column.dimension_name:
+                    if column.function is not None:
                         # In this case we are replacing any existing query name with an expression
                         # or alias, and so the old name must be removed.
                         final_metadata.remove_metadata(dim_type, column.dimension_name)

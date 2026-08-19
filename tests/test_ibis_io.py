@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import ibis
 import pandas as pd
 import pytest
+from chronify.exceptions import InvalidOperation
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 from dsgrid.ibis.functions import write_csv
@@ -15,6 +16,7 @@ from dsgrid.ibis.io import (
     persist_table,
     read_csv,
     read_dataframe,
+    read_json,
     read_parquet,
     try_read_dataframe,
     write_dataframe,
@@ -37,6 +39,37 @@ from tests._helpers import collect as _collect
 
 def _filter(df, predicate):
     return filter_sql(df, predicate)
+
+
+def test_read_json_valid(tmp_path):
+    filename = tmp_path / "table.json"
+    filename.write_text('{"id": "a", "value": 1.5}\n{"id": "b", "value": 2.5}\n')
+
+    df = read_json(filename)
+
+    assert sorted(df.columns) == ["id", "value"]
+    assert count_rows(df) == 2
+
+
+def test_read_json_rejects_malformed_records(tmp_path):
+    """A malformed record must raise, not read as nulls.
+
+    Spark's default PERMISSIVE mode turns the bad record into a null row and
+    adds a ``_corrupt_record`` column; both would flow into the dataset
+    unnoticed because dsgrid matches columns by name. DuckDB's reader already
+    raises, so this pins the behavior as equivalent across backends.
+
+    The two backends raise different exception types (and at different points --
+    Spark during schema inference, DuckDB during the scan), so this asserts only
+    that the read fails.
+    """
+    filename = tmp_path / "table.json"
+    filename.write_text(
+        '{"id": "a", "value": 1.5}\n{"id": "b", "value": \n{"id": "c", "value": 3.5}\n'
+    )
+
+    with pytest.raises(Exception):
+        count_rows(read_json(filename))
 
 
 def test_try_read_dataframe_invalid(tmp_path):
@@ -155,8 +188,59 @@ def test_read_dataframe_and_write_error_paths(tmp_path):
     with pytest.raises(NotImplementedError, match="Unsupported file format"):
         write_table(table, (tmp_path / "table.invalid").as_posix(), "invalid")
 
+    # A suffix write_dataframe cannot dispatch on must raise rather than
+    # silently write nothing and leave the caller pointing at a missing file.
+    unwritable = tmp_path / "output.txt"
+    with pytest.raises(NotImplementedError, match="Unsupported file extension"):
+        write_dataframe(table, unwritable)
+    assert not unwritable.exists()
+
     with pytest.raises(DSGInvalidParameter, match="only supports Parquet"):
         write_dataframe_and_auto_partition(table, tmp_path / "table.csv")
+
+
+def test_write_dataframe_requires_overwrite(tmp_path):
+    """An existing path is only replaced when the caller asks for it."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.parquet"
+    write_dataframe(table, filename)
+    with pytest.raises(InvalidOperation, match="already exists"):
+        write_dataframe(replacement, filename)
+    assert count_rows(read_parquet(filename)) == 1
+
+    write_dataframe(replacement, filename, overwrite=True)
+    assert count_rows(read_parquet(filename)) == 2
+
+
+def test_write_dataframe_json_requires_overwrite(tmp_path):
+    """A .json write lands on the requested path and honors the overwrite contract."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.json"
+    write_dataframe(table, filename)
+    with pytest.raises(InvalidOperation, match="already exists"):
+        write_dataframe(replacement, filename)
+    assert count_rows(read_dataframe(filename)) == 1
+
+    write_dataframe(replacement, filename, overwrite=True)
+    assert count_rows(read_dataframe(filename)) == 2
+
+
+def test_overwrite_dataframe_file_clears_stale_tmp(tmp_path):
+    """A .tmp sibling left by a crashed call does not block the next write."""
+    table = get_runtime_session().createDataFrame([(1,)], ["a"])
+    replacement = get_runtime_session().createDataFrame([(2,), (3,)], ["a"])
+
+    filename = tmp_path / "table.parquet"
+    write_dataframe(table, filename)
+    tmp_sibling = filename.with_name(filename.name + ".tmp")
+    tmp_sibling.write_text("leftover from a crashed write")
+
+    assert count_rows(overwrite_dataframe_file(filename, replacement)) == 2
+    assert not tmp_sibling.exists()
 
 
 @pytest.mark.skipif(not use_duckdb(), reason="DuckDB file overwrite paths only apply to DuckDB")
@@ -180,8 +264,8 @@ def test_persist_and_overwrite_file_helpers(tmp_path):
     if use_duckdb():
         duckdb_json = tmp_path / "duckdb.json"
         write_dataframe(table, duckdb_json)
-        assert not duckdb_json.exists()
-        assert (tmp_path / "duckdb.parquet").exists()
+        assert duckdb_json.exists()
+        assert not (tmp_path / "duckdb.parquet").exists()
 
     with ScratchDirContext(tmp_path / "scratch") as context:
         path = persist_table(table, context, tag="test")

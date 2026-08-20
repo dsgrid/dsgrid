@@ -380,9 +380,15 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
 
 
 def test_index_time_single_tz_model(index_time_dimension_model_single_tz):
+    """Exercise the single-tz index entry through the json5 fixture path.
+
+    Accessor behavior on directly-constructed models is covered in
+    tests/test_timezone_validation.py; this test pins that the new config file
+    entry parses through DimensionsConfigModel and that derived values
+    (lengths, tz-aware start times) are computed correctly from it.
+    """
     model = index_time_dimension_model_single_tz
     assert not model.is_time_zone_required_in_geography()
     config = IndexTimeDimensionConfig(model)
-    assert config.get_time_zone() == "Etc/GMT+5"
     assert config.get_lengths() == [8784]
     assert config.get_start_times()[0].tzinfo is not None

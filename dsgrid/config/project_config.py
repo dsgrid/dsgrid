@@ -273,11 +273,10 @@ class DimensionsModel(DSGBaseModel):
     @classmethod
     def check_time_zone(cls, values: list) -> list:
         """Validate the time zone column in geography records."""
-        time_dims = [d for d in values if d.dimension_type == DimensionType.TIME]
-        # Conservative: when the time dimension is supplied via references (not
-        # inline), keep the historical unconditional geography check.
-        requires_tz = (not time_dims) or any(
-            d.is_time_zone_required_in_geography() for d in time_dims
+        requires_tz = any(
+            d.is_time_zone_required_in_geography()
+            for d in values
+            if d.dimension_type == DimensionType.TIME
         )
         if requires_tz:
             for dimension in values:

@@ -122,6 +122,21 @@ class QuerySubmitterBase:
     def _cached_table_filename(path: Path):
         return path / "table.parquet"
 
+    def _postprocess(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
+        """Apply final result transforms (sort, pivot) before writing the output table.
+
+        Only invoked at the actual final save site; intermediate saves skip this so
+        downstream stages (e.g. time zone conversion in ``_convert_time_zone``)
+        operate on the stacked, value-column-bearing schema they expect.
+        """
+        if context.model.result.sort_columns:
+            df = df.order_by(*context.model.result.sort_columns)
+
+        if isinstance(context.model.result.table_format, PivotedTableFormatModel):
+            df = _pivot_table(df, context)
+
+        return df
+
 
 class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def __init__(self, project: Project, *args, **kwargs):
@@ -327,7 +342,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = self._process_aggregations(df, context)
 
         repartition = not persist_intermediate_table
-        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
+        # When time zone conversion runs next, _convert_time_zone owns the final save.
+        final = not bool(model.result.time_zone)
+        table_filename = self._save_query_results(
+            context, df, repartition, final=final, zip_file=zip_file
+        )
 
         for report_inputs in context.model.result.reports:
             report = make_report(report_inputs.report_type)
@@ -545,12 +564,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if context.model.result.replace_ids_with_names:
             df = handler.replace_ids_with_names(df)
 
-        if context.model.result.sort_columns:
-            df = df.order_by(*context.model.result.sort_columns)
-
-        if isinstance(context.model.result.table_format, PivotedTableFormatModel):
-            df = _pivot_table(df, context)
-
         return df
 
     def _process_aggregations_and_save(
@@ -595,7 +608,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         repartition,
         aggregation_name=None,
         zip_file=False,
+        final=True,
     ):
+        if final:
+            df = self._postprocess(context, df)
         output_dir = self._output_dir / context.model.name
         output_dir.mkdir(exist_ok=True)
         if aggregation_name is not None:
@@ -940,24 +956,16 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         time_dimension: TimeDimensionBaseConfig | None,
     ) -> ibis.Table:
         df = handler.make_mapped_dataframe(context, time_dimension=time_dimension)
-        df = self._postprocess(context, df)
-        self._save_results(context, df)
-        return df
-
-    def _postprocess(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
-        if context.model.result.sort_columns:
-            df = df.order_by(*context.model.result.sort_columns)
-
-        if isinstance(context.model.result.table_format, PivotedTableFormatModel):
-            df = _pivot_table(df, context)
-
+        df = self._save_results(context, df)
         return df
 
     def _query_output_dir(self, context: QueryContext) -> Path:
         return self._output_dir / context.model.name
 
     @track_timing(timer_stats_collector)
-    def _save_results(self, context: QueryContext, df) -> Path:
+    def _save_results(self, context: QueryContext, df, final=True) -> ibis.Table:
+        if final:
+            df = self._postprocess(context, df)
         output_dir = self._query_output_dir(context)
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / f"table.{context.model.result.output_format}"
@@ -971,7 +979,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
             raise NotImplementedError(msg)
 
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
-        return filename
+        return df
 
 
 def _pivot_table(df: ibis.Table, context: QueryContext):

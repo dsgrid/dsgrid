@@ -853,6 +853,7 @@ class QueryTestElectricityValues(QueryTestBase):
                 replace_ids_with_names=True,
                 table_format=StackedTableFormatModel(),
                 time_zone=self._to_time_zone,
+                sort_columns=["county", "time_est"],
             ),
         )
         match self._category:
@@ -900,6 +901,15 @@ class QueryTestElectricityValues(QueryTestBase):
         expected = [VALUE_COLUMN]
 
         pdf = table_to_pandas(df)
+        # Regression check: sort_columns must produce a globally sorted result, including
+        # when time zone conversion runs after the initial save (see _convert_time_zone).
+        sort_columns = self._model.result.sort_columns
+        assert sort_columns, "test must declare sort_columns to exercise the sort path"
+        assert (
+            pdf[sort_columns]
+            .reset_index(drop=True)
+            .equals(pdf[sort_columns].sort_values(sort_columns).reset_index(drop=True))
+        ), f"output is not globally sorted by {sort_columns}"
         # Check time zone conversion
         if self._model.result.time_zone:
             expected.append("time_zone")

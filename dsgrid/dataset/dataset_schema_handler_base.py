@@ -880,7 +880,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     dim_mapping.name,
                 )
                 continue
-            assert dim_mapping.mapping_reference is not None
+            if dim_mapping.mapping_reference is None:
+                msg = (
+                    f"Mapping operation '{dim_mapping.name}' has no mapping reference. "
+                    "This can occur when the mapping plan specifies a dimension name that "
+                    "does not match a registered dimension mapping."
+                )
+                raise DSGInvalidDimensionMapping(msg)
             ref = dim_mapping.mapping_reference
             dim_type = ref.from_dimension_type
             column = dim_type.value

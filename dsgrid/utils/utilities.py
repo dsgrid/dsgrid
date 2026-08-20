@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any, Iterable, Type, cast
 
 from prettytable import PrettyTable
+from pydantic import ValidationError
 
 try:
     _ipython_display = cast(Any, importlib.import_module("IPython.display"))
@@ -175,16 +176,20 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     check_duplicates = check_duplicates or []
     values = {x: set() for x in check_duplicates}
     length = None
-    for row in iterable:
+    for i, row in enumerate(iterable, start=1):
         if None in row:
-            msg = f"row has a key that is None: {row=}"
+            msg = f"row {i} has a key that is None: {row=}"
             raise ValueError(msg)
         if length is None:
             length = len(row)
         elif len(row) != length:
-            msg = f"Rows have inconsistent length: first_row_length={length} {row=}"
+            msg = f"Rows have inconsistent length: first_row_length={length} row {i}: {row=}"
             raise ValueError(msg)
-        record = cls(**row)
+        try:
+            record = cls(**row)
+        except ValidationError as e:
+            msg = f"Validation error in row {i}: {row}\n{e}"
+            raise ValueError(msg) from e
         for name in check_duplicates:
             val = getattr(record, name)
             if val in values[name]:

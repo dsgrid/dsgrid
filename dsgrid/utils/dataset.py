@@ -8,6 +8,7 @@ import chronify
 import ibis
 import ibis.expr.datatypes as dt
 import ibis.expr.types as ir
+import pandas as pd
 from chronify.models import TableSchema
 
 import dsgrid
@@ -58,7 +59,7 @@ from dsgrid.ibis.table_utils import (
     is_table_empty,
     table_to_records,
 )
-from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.types import is_tz_aware_timestamp, use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls
@@ -761,6 +762,60 @@ def _to_chronify_time_based_data_adjustment(
     )
 
 
+def _df_time_column_is_tz_aware(df: ibis.Table, time_column: str) -> bool:
+    """Return True when df's ``time_column`` is a tz-aware timestamp.
+
+    On ibis-on-Spark, timestamps report as tz-naive even though they render via
+    the session time zone, so on that backend this returns False and the
+    post-localization adjustment degrades to a no-op (the pre-shim behavior).
+    """
+    return is_tz_aware_timestamp(df[time_column].type())
+
+
+def _adjust_time_config_for_post_localization(
+    time_config: chronify.TimeBaseModel,
+    time_dim: TimeDimensionBaseConfig,
+    df: ibis.Table,
+) -> chronify.TimeBaseModel:
+    """Reflect post-localization shape in the chronify time_config.
+
+    ``DateTimeDimensionConfig.to_chronify()`` describes the pre-localization shape
+    (NTZ dtype + naive ``start``) when the dim has a ``localize_to_single_tz`` plan,
+    because some pipelines (e.g. ``localize_time_zone_with_chronify_*``) invoke
+    chronify *before* localization. The query path, however, hands chronify a
+    table whose time column has already been localized (the registered parquet on
+    disk is ``TIMESTAMP WITH TIME ZONE``) while the persisted time-dimension record
+    still says ``timestamp_ntz``. When the actual time column is tz-aware, rebuild
+    the time_config so its dtype and start match the data.
+    """
+    if not isinstance(time_dim, DateTimeDimensionConfig):
+        return time_config
+    if time_dim.get_localization_plan() != "localize_to_single_tz":
+        return time_config
+    # ``localize_to_single_tz`` only ever pairs with the ALIGNED_IN_ABSOLUTE_TIME
+    # branch of ``to_chronify()``, which returns ``DatetimeRange``.
+    if not isinstance(time_config, chronify.DatetimeRange):
+        return time_config
+
+    time_columns = time_dim.get_load_data_time_columns()
+    if len(time_columns) != 1 or not _df_time_column_is_tz_aware(df, time_columns[0]):
+        return time_config
+
+    tz = time_dim.get_chronify_time_zone()
+    new_start = pd.Timestamp(time_config.start)
+    if new_start.tzinfo is None:
+        new_start = new_start.tz_localize(tz)
+    return chronify.DatetimeRange(
+        dtype=chronify.TimeDataType.TIMESTAMP_TZ,
+        time_column=time_config.time_column,
+        start=new_start,
+        length=time_config.length,
+        resolution=time_config.resolution,
+        measurement_type=time_config.measurement_type,
+        interval_type=time_config.interval_type,
+    )
+
+
 def _get_src_schema(
     df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
@@ -769,7 +824,9 @@ def _get_src_schema(
 ) -> TableSchema:
     src = src_name or "src_" + make_temp_view_name()
     time_col_list = from_time_dim.get_load_data_time_columns()
-    time_config = from_time_dim.to_chronify()
+    time_config = _adjust_time_config_for_post_localization(
+        from_time_dim.to_chronify(), from_time_dim, df
+    )
     time_array_id_columns = [
         x
         for x in df.columns
@@ -790,7 +847,9 @@ def _get_dst_schema(
     to_time_dim: TimeDimensionBaseConfig,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
-    time_config = to_time_dim.to_chronify()
+    time_config = _adjust_time_config_for_post_localization(
+        to_time_dim.to_chronify(), to_time_dim, df
+    )
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_array_id_columns = [
         x

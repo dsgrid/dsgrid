@@ -153,10 +153,13 @@ def test_check_timezone_in_geography_valid_passes(tmp_path):
     check_timezone_in_geography(geo_dim)
 
 
-def test_check_timezone_in_geography_custom_err_msg(tmp_path):
+def test_check_timezone_in_geography_err_msg_override(tmp_path):
+    """A caller-supplied err_msg replaces the default all-null message."""
     geo_dim = _make_geography_dimension(tmp_path, with_time_zone=False)
-    with pytest.raises(DSGInvalidDimension, match="Custom error"):
-        check_timezone_in_geography(geo_dim, err_msg="Custom error about missing time zones")
+    caller_msg = "Dataset xyz requires geography time zones for time mapping"
+    with pytest.raises(DSGInvalidDimension, match=caller_msg) as exc:
+        check_timezone_in_geography(geo_dim, err_msg=caller_msg)
+    assert "all values" not in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
@@ -237,20 +240,21 @@ def test_localize_all_null_time_zone_raises(spark, tmp_path):
     time_dim = DateTimeDimensionConfig.load_from_model(_make_time_dimension_ntz_multi_tz())
     config = DummyDatasetConfig(time_dim, geography_dim=DummyGeoDim(spark, time_zone=None))
 
+    geography_column = DimensionType.GEOGRAPHY.value
     pdf = pd.DataFrame(
         {
             TIME_COLUMN: [
                 pd.Timestamp("2018-01-01 00:00:00"),
                 pd.Timestamp("2018-01-01 01:00:00"),
             ],
-            "geography": ["g1", "g1"],
+            geography_column: ["g1", "g1"],
             VALUE_COLUMN: [1.0, 2.0],
         }
     )
     schema = StructType(
         [
             StructField(TIME_COLUMN, TimestampNTZType(), True),
-            StructField("geography", StringType(), True),
+            StructField(geography_column, StringType(), True),
             StructField(VALUE_COLUMN, DoubleType(), True),
         ]
     )

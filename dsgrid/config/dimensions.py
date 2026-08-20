@@ -255,6 +255,10 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("dtype") == "TIMESTAMP_TZ":
             logger.warning(
                 "Renaming legacy dtype 'TIMESTAMP_TZ' to 'timestamp_tz' within TimeFormatDateTimeTZModel."
@@ -279,6 +283,10 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("dtype") == "TIMESTAMP_NTZ":
             logger.warning(
                 "Renaming legacy dtype 'TIMESTAMP_NTZ' to 'timestamp_ntz' within TimeFormatDateTimeNTZModel."
@@ -499,6 +507,10 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("format_type") == "aligned":
             logger.warning(
                 "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config time_zone_format parameter."
@@ -628,6 +640,24 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
+        # Normalize column_format.dtype to lowercase before the discriminated union
+        # resolves, because Pydantic reads the discriminator tag before running
+        # per-member validators.
+        column_format = values.get("column_format")
+        if isinstance(column_format, dict) and isinstance(column_format.get("dtype"), str):
+            dtype = column_format["dtype"]
+            if dtype != dtype.lower():
+                logger.warning(
+                    "Renaming legacy dtype '%s' to '%s' within the datetime config.",
+                    dtype,
+                    dtype.lower(),
+                )
+                column_format["dtype"] = dtype.lower()
+
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
                 msg = f"Unknown data_schema format: {values=}"
@@ -810,6 +840,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if "str_format" in values:
             logger.warning(
                 "Moving legacy str_format field to ranges struct within the annual time config."
@@ -907,6 +941,10 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if "starting_timestamps" in values:
             logger.warning(
                 "Moving legacy starting_timestamps field to ranges struct within the index time config."

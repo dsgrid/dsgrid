@@ -188,6 +188,8 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
         try:
             record = cls(**row)
         except ValidationError as e:
+            # ValueError, not a DSG exception: callers are pydantic field validators,
+            # which convert ValueError into a ValidationError with field context.
             msg = f"Validation error in record {i}: {row}\n{e}"
             raise ValueError(msg) from e
         for name in check_duplicates:

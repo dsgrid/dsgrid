@@ -1,6 +1,11 @@
-"""Tests for validation error messages that include file and record context."""
+"""Tests for validation error messages that include file context.
+
+Record-level context for ``convert_record_dicts_to_classes`` is tested in
+``tests/test_utilities.py`` alongside that module's other tests.
+"""
 
 import pytest
+from pydantic import ValidationError
 
 from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.mapping_tables import (
@@ -11,23 +16,14 @@ from dsgrid.config.mapping_tables import (
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDimensionMapping, DSGInvalidParameter
 from dsgrid.utils.files import dump_data
-from dsgrid.utils.utilities import convert_record_dicts_to_classes
 
 
 def test_from_file_reports_filename_on_validation_error(tmp_path):
     filename = tmp_path / "model.json"
     dump_data({"from_id": "a", "from_fraction": "not-a-float"}, filename)
-    with pytest.raises(DSGInvalidParameter, match="model.json"):
+    with pytest.raises(DSGInvalidParameter, match="model.json") as exc:
         MappingTableRecordModel.from_file(filename)
-
-
-def test_convert_record_dicts_to_classes_reports_record_number():
-    rows = [
-        {"from_id": "a", "from_fraction": 1.0},
-        {"from_id": "b", "from_fraction": "not-a-float"},
-    ]
-    with pytest.raises(ValueError, match="record 2"):
-        convert_record_dicts_to_classes(rows, MappingTableRecordModel)
+    assert isinstance(exc.value.__cause__, ValidationError)
 
 
 def test_from_pre_registered_model_reports_mapping_file(tmp_path):
@@ -37,5 +33,8 @@ def test_from_pre_registered_model_reports_mapping_file(tmp_path):
     ref = DimensionReferenceModel(
         dimension_type=DimensionType.GEOGRAPHY, dimension_id="d1", version="1.0.0"
     )
-    with pytest.raises(DSGInvalidDimensionMapping, match="records.csv"):
+    with pytest.raises(DSGInvalidDimensionMapping, match="records.csv") as exc:
         MappingTableModel.from_pre_registered_model(model, ref, ref)
+    # The record-level context from convert_record_dicts_to_classes is preserved.
+    assert "record 2" in str(exc.value)
+    assert isinstance(exc.value.__cause__, ValidationError)

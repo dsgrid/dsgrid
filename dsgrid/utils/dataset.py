@@ -777,25 +777,22 @@ def _adjust_time_config_for_post_localization(
     time_dim: TimeDimensionBaseConfig,
     df: ibis.Table,
 ) -> chronify.TimeBaseModel:
-    """Reflect post-localization shape in the chronify time_config.
+    """Return ``time_config`` adjusted to match a time column that was already localized.
 
-    ``DateTimeDimensionConfig.to_chronify()`` describes the pre-localization shape
-    (NTZ dtype + naive ``start``) when the dim has a ``localize_to_single_tz`` plan,
-    because some pipelines (e.g. ``localize_time_zone_with_chronify_*``) invoke
-    chronify *before* localization. The query path, however, hands chronify a
-    table whose time column has already been localized (the registered parquet on
-    disk is ``TIMESTAMP WITH TIME ZONE``) while the persisted time-dimension record
-    still says ``timestamp_ntz``. When the actual time column is tz-aware, rebuild
-    the time_config so its dtype and start match the data.
+    With a ``localize_to_single_tz`` plan, ``to_chronify()`` reports the
+    pre-localization shape (NTZ dtype, naive start) because localization itself
+    runs through chronify. After registration the stored data is tz-aware, but
+    the persisted dimension config still says ``timestamp_ntz`` (see #427). If
+    ``df``'s time column is tz-aware, rebuild the config as ``TIMESTAMP_TZ``
+    with a localized start; otherwise return it unchanged.
     """
     if not isinstance(time_dim, DateTimeDimensionConfig):
         return time_config
     if time_dim.get_localization_plan() != "localize_to_single_tz":
         return time_config
-    # ``localize_to_single_tz`` only ever pairs with the ALIGNED_IN_ABSOLUTE_TIME
-    # branch of ``to_chronify()``, which returns ``DatetimeRange``.
-    if not isinstance(time_config, chronify.DatetimeRange):
-        return time_config
+    # localize_to_single_tz requires ALIGNED_IN_ABSOLUTE_TIME, whose to_chronify()
+    # branch always returns DatetimeRange.
+    assert isinstance(time_config, chronify.DatetimeRange), time_config
 
     time_columns = time_dim.get_load_data_time_columns()
     if len(time_columns) != 1 or not _df_time_column_is_tz_aware(df, time_columns[0]):

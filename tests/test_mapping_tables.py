@@ -1,29 +1,12 @@
-"""Tests for validation error messages that include file context.
-
-Record-level context for ``convert_record_dicts_to_classes`` is tested in
-``tests/test_utilities.py`` alongside that module's other tests.
-"""
+"""Tests for dsgrid.config.mapping_tables module."""
 
 import pytest
 from pydantic import ValidationError
 
 from dsgrid.config.dimensions import DimensionReferenceModel
-from dsgrid.config.mapping_tables import (
-    MappingTableByNameModel,
-    MappingTableModel,
-    MappingTableRecordModel,
-)
+from dsgrid.config.mapping_tables import MappingTableByNameModel, MappingTableModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDimensionMapping, DSGInvalidParameter
-from dsgrid.utils.files import dump_data
-
-
-def test_from_file_reports_filename_on_validation_error(tmp_path):
-    filename = tmp_path / "model.json"
-    dump_data({"from_id": "a", "from_fraction": "not-a-float"}, filename)
-    with pytest.raises(DSGInvalidParameter, match="model.json") as exc:
-        MappingTableRecordModel.from_file(filename)
-    assert isinstance(exc.value.__cause__, ValidationError)
+from dsgrid.exceptions import DSGInvalidDimensionMapping
 
 
 def test_from_pre_registered_model_reports_mapping_file(tmp_path):

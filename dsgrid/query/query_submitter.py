@@ -123,17 +123,20 @@ class QuerySubmitterBase:
         return path / "table.parquet"
 
     def _postprocess(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
-        """Apply final result transforms (sort, pivot) before writing the output table.
+        """Apply final result transforms (pivot, sort) before writing the output table.
 
         Only invoked at the actual final save site; intermediate saves skip this so
         downstream stages (e.g. time zone conversion in ``_convert_time_zone``)
         operate on the stacked, value-column-bearing schema they expect.
-        """
-        if context.model.result.sort_columns:
-            df = df.order_by(*context.model.result.sort_columns)
 
+        Pivot runs before sort: the pivot is a GROUP BY aggregation, which does not
+        preserve pre-existing row order.
+        """
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
+
+        if context.model.result.sort_columns:
+            df = df.order_by(*context.model.result.sort_columns)
 
         return df
 

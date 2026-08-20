@@ -1629,12 +1629,22 @@ class QueryTestMapAnnualTime(QueryTestBase):
                 ],
                 output_format="parquet",
                 table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+                # Regression check: sorting must run after the pivot aggregation, which
+                # does not preserve pre-existing row order.
+                sort_columns=["state", "sector"],
             ),
         )
         return self._model
 
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
+        sort_columns = self._model.result.sort_columns
+        pdf = table_to_pandas(df)
+        assert (
+            pdf[sort_columns]
+            .reset_index(drop=True)
+            .equals(pdf[sort_columns].sort_values(sort_columns).reset_index(drop=True))
+        ), f"pivoted output is not globally sorted by {sort_columns}"
         distinct_model_years = _collect(df.select(DimensionType.MODEL_YEAR.value).distinct())
         assert len(distinct_model_years) == 1
         assert _row_value(distinct_model_years[0], DimensionType.MODEL_YEAR.value) == "2020"

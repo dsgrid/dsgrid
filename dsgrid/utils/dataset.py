@@ -779,10 +779,10 @@ def _adjust_time_config_for_post_localization(
 ) -> chronify.TimeBaseModel:
     """Return ``time_config`` adjusted to match a time column that was already localized.
 
-    With a ``localize_to_single_tz`` plan, ``to_chronify()`` reports the
-    pre-localization shape (NTZ dtype, naive start) because localization itself
-    runs through chronify. After registration the stored data is tz-aware, but
-    the persisted dimension config still says ``timestamp_ntz`` (see #427). If
+    Currently ``to_chronify()`` always reports the original datetime shape,
+    which doesn't match the actual data with a ``localize_to_single_tz`` plan.
+    In that case, the pre-localization shape has a NTZ dtype and a naive start,
+    but after registration the stored data is tz-aware (see #427). If
     ``df``'s time column is tz-aware, rebuild the config as ``TIMESTAMP_TZ``
     with a localized start; otherwise return it unchanged.
     """

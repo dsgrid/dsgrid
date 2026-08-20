@@ -49,6 +49,7 @@ from dsgrid.ibis.session import (
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from tests._helpers import DummyDatasetConfig, DummyGeoDim
 
 
 @pytest.fixture(scope="module")
@@ -223,34 +224,6 @@ def test_datetime_model_allows_dst_zone_when_tz_aware():
     dimension may legitimately use a DST-observing zone like ``America/New_York``."""
     config = make_datetime_config_tz_aware()  # America/New_York, TZ-aware column format
     assert config.get_time_zone() == "America/New_York"
-
-
-class DummyDatasetConfig:
-    def __init__(self, time_dim, value_columns=None, geography_dim=None):
-        self._time_dim = time_dim
-        self._value_columns = value_columns or [VALUE_COLUMN]
-        self._geo_dim = geography_dim
-
-    def get_dimension(self, dimension_type):
-        if dimension_type == DimensionType.TIME:
-            return self._time_dim
-        if dimension_type == DimensionType.GEOGRAPHY:
-            return self._geo_dim
-        return None
-
-    def get_value_columns(self):
-        return self._value_columns
-
-
-class DummyGeoDim:
-    """Minimal geography dimension stub that maps 'g1' to Etc/GMT+5."""
-
-    def __init__(self, spark):
-        self._spark = spark
-
-    def get_records_dataframe(self):
-        pdf = pd.DataFrame({"id": ["g1"], "time_zone": ["Etc/GMT+5"]})
-        return self._spark.createDataFrame(pdf)
 
 
 def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> ibis.Table:

@@ -35,10 +35,13 @@ from dsgrid.ibis.io import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
+    DateTimeDimensionModel,
     DimensionsListModel,
     DimensionReferenceModel,
     DimensionModel,
     TimeDimensionBaseModel,
+    TimeFormatDateTimeNTZModel,
+    TimeFormatInPartsModel,
 )
 
 
@@ -447,8 +450,11 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     # This field must be listed before dimensions.
     use_project_geography_time_zone: bool = Field(
         default=False,
-        description="If true, time zones will be applied from the project's geography dimension. "
-        "If false, the dataset's geography dimension records must provide a time zone column.",
+        description="If true, time zones will be applied from the project's geography dimension "
+        "during query-time mapping. If false, the dataset's own geography dimension is used. "
+        "Note: for timezone-naive data with aligned_in_std_clock_time, the dataset's geography "
+        "records must include a time_zone column regardless of this setting, because dsgrid "
+        "localizes timestamps during registration before any project mapping.",
     )
     dimensions: DimensionsListModel = Field(
         title="dimensions",
@@ -521,25 +527,67 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
     @model_validator(mode="after")
     def check_time_zone(self) -> "DatasetConfigModel":
-        """Validate whether required time zone information is present."""
-        geo_requires_time_zone = False
-        time_dim = None
-        if not self.use_project_geography_time_zone:
-            for dimension in self.dimensions:
-                if dimension.dimension_type == DimensionType.TIME:
-                    assert isinstance(dimension, TimeDimensionBaseModel)
-                    geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
-                    time_dim = dimension
-                    break
+        """Validate whether required time zone information is present.
 
-        if geo_requires_time_zone:
-            for dimension in self.dimensions:
-                if dimension.dimension_type == DimensionType.GEOGRAPHY:
-                    check_timezone_in_geography(
-                        dimension,
-                        err_msg=f"Dataset with time dimension {time_dim} requires that its "
-                        "geography dimension records include a time_zone column.",
-                    )
+        Geography records must include a ``time_zone`` column whenever the time
+        dimension uses ``aligned_in_std_clock_time`` *and* the timestamps are
+        timezone-naive (``timestamp_ntz`` or ``time_format_in_parts`` without
+        ``offset_column``).  This is true even when
+        ``use_project_geography_time_zone`` is ``True``, because dsgrid
+        localizes timestamps during registration using the *dataset's* geography
+        — project geography is only consulted at query-time mapping.
+        """
+        time_dim = None
+        geo_requires_time_zone = False
+        for dimension in self.dimensions:
+            if dimension.dimension_type == DimensionType.TIME:
+                assert isinstance(dimension, TimeDimensionBaseModel)
+                geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
+                time_dim = dimension
+                break
+
+        if not geo_requires_time_zone:
+            return self
+
+        # Determine whether registration-time localization will need the
+        # geography time_zone column.  Localization is only needed for
+        # timezone-naive data (NTZ or in-parts without offset).
+        needs_registration_localization = False
+        if isinstance(time_dim, DateTimeDimensionModel):
+            column_format = time_dim.column_format
+            if isinstance(column_format, TimeFormatDateTimeNTZModel):
+                needs_registration_localization = True
+            elif isinstance(column_format, TimeFormatInPartsModel):
+                needs_registration_localization = column_format.offset_column is None
+
+        for dimension in self.dimensions:
+            if dimension.dimension_type != DimensionType.GEOGRAPHY:
+                continue
+
+            if not self.use_project_geography_time_zone:
+                # Default path: dataset geography must have time_zone.
+                check_timezone_in_geography(
+                    dimension,
+                    err_msg=f"Dataset with time dimension {time_dim} requires that its "
+                    "geography dimension records include a time_zone column.",
+                )
+            elif needs_registration_localization:
+                # use_project_geography_time_zone=True, but registration still
+                # uses the dataset's geography for localization.
+                check_timezone_in_geography(
+                    dimension,
+                    err_msg=(
+                        "This dataset uses 'aligned_in_std_clock_time' with "
+                        "timezone-naive timestamps, which requires localization "
+                        "during registration. The dataset's geography dimension "
+                        "records must include a 'time_zone' column with valid "
+                        "IANA time zone values even when "
+                        "use_project_geography_time_zone=true. "
+                        "use_project_geography_time_zone only controls which "
+                        "geography provides time zones during query-time "
+                        "mapping to a project, not during registration."
+                    ),
+                )
 
         return self
 

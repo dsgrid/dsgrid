@@ -93,6 +93,14 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 logger = logging.getLogger(__name__)
 
 
+def _has_time_zone_column(geography_dim: DimensionBaseConfigWithFiles) -> bool:
+    """Return True if the geography dimension records include a time_zone column."""
+    records = geography_dim.model.records
+    if not records:
+        return False
+    return hasattr(records[0], "time_zone") and any(r.time_zone is not None for r in records)
+
+
 class DatasetSchemaHandlerBase(abc.ABC):
     """define interface/required behaviors per dataset schema"""
 
@@ -960,18 +968,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_time_dimension()
         assert time_dim is not None
-        if time_dim.model.is_time_zone_required_in_geography():
-            if self._config.model.use_project_geography_time_zone:
-                if to_geo_dim is None:
-                    msg = "Bug: to_geo_dim must be provided if time zone is required in geography."
-                    raise Exception(msg)
-                logger.info("Add time zone from project geography dimension.")
-                geography_dim = to_geo_dim
-            else:
-                logger.info("Add time zone from dataset geography dimension.")
-                geography_dim = self._config.get_dimension_with_records(DimensionType.GEOGRAPHY)
-                assert geography_dim is not None
-            load_data_df = add_time_zone(load_data_df, geography_dim)
 
         if isinstance(time_dim, AnnualTimeDimensionConfig):
             if not isinstance(to_time_dim, DateTimeDimensionConfig):
@@ -993,6 +989,47 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
             return load_data_df
+
+        needs_time_zone = (
+            time_dim.model.is_time_zone_required_in_geography()
+            or to_time_dim.model.is_time_zone_required_in_geography()
+        )
+        if needs_time_zone:
+            if self._config.model.use_project_geography_time_zone:
+                if to_geo_dim is not None:
+                    logger.info("Add time zone from project geography dimension.")
+                    geography_dim = to_geo_dim
+                else:
+                    # Reachable from standalone dataset queries, which have no
+                    # dataset-to-project geography mapping.
+                    geography_dim = self._config.get_dimension_with_records(
+                        DimensionType.GEOGRAPHY
+                    )
+                    if geography_dim is not None and _has_time_zone_column(geography_dim):
+                        logger.info(
+                            "use_project_geography_time_zone is True but no target "
+                            "geography dimension is available. Falling back to the "
+                            "dataset's geography dimension for time zones."
+                        )
+                    else:
+                        msg = (
+                            "Time mapping requires time zone information from a "
+                            "geography dimension, and use_project_geography_time_zone "
+                            "is True, but no target geography dimension is available "
+                            "and the dataset's geography dimension does not include a "
+                            "time_zone column. Either set "
+                            "use_project_geography_time_zone=False and add a time_zone "
+                            "column to the dataset's geography dimension, or run the "
+                            "query through a project."
+                        )
+                        raise DSGInvalidDataset(msg)
+            else:
+                logger.info("Add time zone from dataset geography dimension.")
+                geography_dim = self._config.get_dimension_with_records(DimensionType.GEOGRAPHY)
+            assert geography_dim is not None
+            assert isinstance(geography_dim, DimensionBaseConfigWithFiles)
+            load_data_df = add_time_zone(load_data_df, geography_dim)
+
         match config.backend_engine:
             case BackendEngine.SPARK:
                 filename = persist_table(
@@ -1021,7 +1058,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     wrap_time_allowed=wrap_time_allowed,
                 )
 
-        if time_dim.model.is_time_zone_required_in_geography():
+        if needs_time_zone:
             load_data_df = drop_columns(load_data_df, "time_zone")
 
         if op.persist:

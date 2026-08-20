@@ -13,7 +13,10 @@ pandas conversion, call ``dsgrid.ibis.table_utils`` (``count_rows`` /
 from typing import Any
 
 import ibis
+import pandas as pd
 
+from dsgrid.common import VALUE_COLUMN
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import create_temp_view
 from dsgrid.ibis.session import get_runtime_session, get_spark_session
 
@@ -105,6 +108,41 @@ def row_value(row, key):
 def first_value(df, column: str):
     """Return ``column`` from the first row of ``df``."""
     return getattr(collect(df.limit(1))[0], column)
+
+
+class DummyDatasetConfig:
+    """Minimal stub of DatasetConfig for functions that only need dimension lookups."""
+
+    def __init__(self, time_dim, value_columns=None, geography_dim=None):
+        self._time_dim = time_dim
+        self._value_columns = value_columns or [VALUE_COLUMN]
+        self._geo_dim = geography_dim
+
+    def get_dimension(self, dimension_type):
+        if dimension_type == DimensionType.TIME:
+            return self._time_dim
+        if dimension_type == DimensionType.GEOGRAPHY:
+            return self._geo_dim
+        return None
+
+    def get_value_columns(self):
+        return self._value_columns
+
+
+class DummyGeoDim:
+    """Geography dimension stub with a single record mapping 'g1' to ``time_zone``."""
+
+    def __init__(self, spark, time_zone: str | None = "Etc/GMT+5"):
+        self._spark = spark
+        self._time_zone = time_zone
+
+    def get_records_dataframe(self):
+        # An explicit string dtype keeps an all-null column from being inferred
+        # as NULL-typed, which DuckDB rejects.
+        pdf = pd.DataFrame(
+            {"id": ["g1"], "time_zone": pd.Series([self._time_zone], dtype="string")}
+        )
+        return self._spark.createDataFrame(pdf)
 
 
 def spark_physical_plan(df: ibis.Table) -> str:

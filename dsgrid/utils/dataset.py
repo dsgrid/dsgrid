@@ -1256,6 +1256,18 @@ def localize_timestamps_if_necessary(
                 geo_dim = cast(DimensionBaseConfigWithFiles, geo_dim)
                 df = add_time_zone(df, geo_dim)
 
+            if is_table_empty(filter_sql(df, f"{TIME_ZONE_COLUMN} IS NOT NULL")):
+                msg = (
+                    f"The '{TIME_ZONE_COLUMN}' column is all null, or no rows matched "
+                    f"the geography dimension records, after joining with them. The "
+                    f"geography dimension records file must include a 'time_zone' "
+                    f"column with valid IANA time zone values (e.g., 'Etc/GMT+5') for "
+                    f"'aligned_in_std_clock_time' localization during registration. "
+                    f"Note: 'use_project_geography_time_zone' only applies during "
+                    f"query-time mapping, not during registration."
+                )
+                raise DSGInvalidOperation(msg)
+
             match dsgrid.runtime_config.backend_engine:
                 case BackendEngine.SPARK:
                     filename = persist_table(

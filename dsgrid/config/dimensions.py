@@ -926,6 +926,12 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             "options": MeasurementType.format_for_docs(),
         },
     )
+    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+        title="time_zone_format",
+        discriminator="format_type",
+        description="Specifies whether all geographies share a single time zone or each "
+        "geography has its own.",
+    )
     ranges: list[IndexRangeModel] = Field(
         title="ranges",
         description="Defines the continuous ranges of indices of the data, inclusive of start and end index.",
@@ -970,6 +976,18 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             for trange in values.get("ranges", []):
                 trange["frequency"] = frequency
 
+        # Legacy configs without time_zone_format default to local time with
+        # per-geography time zones (the previous unconditional behavior).
+        if "time_zone_format" not in values:
+            logger.warning(
+                "Index time config missing time_zone_format. Defaulting to "
+                "aligned_in_std_clock_time (per-geography time zones from geography records)."
+            )
+            values["time_zone_format"] = {
+                "format_type": TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME.value,
+                "time_zones": [],
+            }
+
         return values
 
     @field_validator("ranges")
@@ -978,7 +996,7 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
         return _check_index_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
-        return True
+        return self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
 
 
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):

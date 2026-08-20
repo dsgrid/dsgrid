@@ -16,6 +16,7 @@ from dsgrid.config.dimensions import (
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
+from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
@@ -100,6 +101,14 @@ def datetime_eq_index_time_model():
     config_as_dict["dimensions"] = [config_as_dict["dimensions"][7]]
     model = DimensionsConfigModel(**config_as_dict).dimensions[0]
     yield model  # DateTime version of index_time model 1
+
+
+@pytest.fixture
+def index_time_dimension_model_single_tz():
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][8]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # IndexTimeDimensionModel (aligned_in_absolute_time, single tz)
 
 
 @pytest.fixture
@@ -368,3 +377,12 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     check_date_range_creation(
         time_dimension_model0, time_based_data_adjustment=time_based_data_adjustment
     )
+
+
+def test_index_time_single_tz_model(index_time_dimension_model_single_tz):
+    model = index_time_dimension_model_single_tz
+    assert not model.is_time_zone_required_in_geography()
+    config = IndexTimeDimensionConfig(model)
+    assert config.get_time_zone() == "Etc/GMT+5"
+    assert config.get_lengths() == [8784]
+    assert config.get_start_times()[0].tzinfo is not None

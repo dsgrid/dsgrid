@@ -156,6 +156,13 @@ class MappingTableModel(DimensionMappingBaseModel):
         from_dimension: DimensionReferenceModel,
         to_dimension: DimensionReferenceModel,
     ):
+        """Create a MappingTableModel from a pre-registered mapping model.
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            If the mapping file contents fail model validation.
+        """
         try:
             return MappingTableModel.model_validate(
                 {
@@ -170,7 +177,7 @@ class MappingTableModel(DimensionMappingBaseModel):
                 }
             )
         except ValidationError as e:
-            msg = f"Validation error in dimension mapping file '{model.filename}': {e}"
+            msg = f"Validation error creating dimension mapping (file '{model.filename}'): {e}"
             raise DSGInvalidDimensionMapping(msg) from e
 
 

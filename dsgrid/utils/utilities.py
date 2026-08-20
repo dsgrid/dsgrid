@@ -178,17 +178,17 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     length = None
     for i, row in enumerate(iterable, start=1):
         if None in row:
-            msg = f"row {i} has a key that is None: {row=}"
+            msg = f"record {i} has a key that is None: {row=}"
             raise ValueError(msg)
         if length is None:
             length = len(row)
         elif len(row) != length:
-            msg = f"Rows have inconsistent length: first_row_length={length} row {i}: {row=}"
+            msg = f"Record {i} has {len(row)} columns; expected {length}: {row}"
             raise ValueError(msg)
         try:
             record = cls(**row)
         except ValidationError as e:
-            msg = f"Validation error in row {i}: {row}\n{e}"
+            msg = f"Validation error in record {i}: {row}\n{e}"
             raise ValueError(msg) from e
         for name in check_duplicates:
             val = getattr(record, name)

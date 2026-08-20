@@ -816,9 +816,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # aggregrations. As it stands, we can are only using this within our
                 # project query process. We need much more handling to make that work.
                 msg = (
-                    "DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
                     f"a supplemental dimension: {mapping.name}"
                 )
+                raise DSGInvalidDimensionMapping(msg)
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
                     f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "

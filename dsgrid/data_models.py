@@ -81,6 +81,11 @@ class DSGBaseModel(BaseModel):
     def from_file(cls, filename: Path | str) -> Self:
         """Deserialize the model from a file. Unlike the load method,
         this does not change directories.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            If the file contents fail model validation.
         """
         try:
             return cls(**load_data(filename))

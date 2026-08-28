@@ -1,3 +1,4 @@
+import ibis
 import logging
 from enum import Enum
 from pathlib import Path
@@ -11,7 +12,12 @@ from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
-from dsgrid.config.file_schema import FileSchema
+from dsgrid.config.file_schema import (
+    Column,
+    FileSchema,
+    apply_declared_types,
+    validate_declared_types,
+)
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
     TableFormat,
@@ -23,18 +29,19 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
-)
-from dsgrid.utils.spark import get_unique_values, read_dataframe
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns, with_literal_column
+from dsgrid.ibis.table_utils import get_unique_values
+from dsgrid.ibis.io import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
+    DateTimeDimensionModel,
     DimensionsListModel,
     DimensionReferenceModel,
     DimensionModel,
     TimeDimensionBaseModel,
+    TimeFormatDateTimeNTZModel,
+    TimeFormatInPartsModel,
 )
 
 
@@ -440,12 +447,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="If the dataset uses its dimension mapping for the metric dimension to also "
         "perform unit conversion, then this value should be false.",
     )
-    # This field must be listed before dimensions.
-    use_project_geography_time_zone: bool = Field(
-        default=False,
-        description="If true, time zones will be applied from the project's geography dimension. "
-        "If false, the dataset's geography dimension records must provide a time zone column.",
-    )
     dimensions: DimensionsListModel = Field(
         title="dimensions",
         description="List of dimensions that make up the dimensions of dataset. They will be "
@@ -466,6 +467,24 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         "Trivial dimensions are 1-element dimensions that are not present in the parquet data "
         "columns. Instead they are added by dsgrid as an alias column.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values: dict) -> dict:
+        """Drop fields that dsgrid no longer uses."""
+        if not isinstance(values, dict):
+            return values
+
+        if "use_project_geography_time_zone" in values:
+            logger.warning(
+                "Dropping deprecated use_project_geography_time_zone field from the dataset "
+                "config. dsgrid now takes time zones from the geography dimension whose record "
+                "ids the data carries: the mapping target when geography is mapped, the "
+                "dataset's own geography otherwise."
+            )
+            values.pop("use_project_geography_time_zone")
+
+        return values
 
     @model_validator(mode="after")
     def check_layout_fields(self):
@@ -517,25 +536,59 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
     @model_validator(mode="after")
     def check_time_zone(self) -> "DatasetConfigModel":
-        """Validate whether required time zone information is present."""
-        geo_requires_time_zone = False
-        time_dim = None
-        if not self.use_project_geography_time_zone:
-            for dimension in self.dimensions:
-                if dimension.dimension_type == DimensionType.TIME:
-                    assert isinstance(dimension, TimeDimensionBaseModel)
-                    geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
-                    time_dim = dimension
-                    break
+        """Validate that time zone information needed during registration is present.
 
-        if geo_requires_time_zone:
-            for dimension in self.dimensions:
-                if dimension.dimension_type == DimensionType.GEOGRAPHY:
-                    check_timezone_in_geography(
-                        dimension,
-                        err_msg=f"Dataset with time dimension {time_dim} requires that its "
-                        "geography dimension records include a time_zone column.",
-                    )
+        Geography records must include a ``time_zone`` column whenever the time
+        dimension uses ``aligned_in_std_clock_time`` *and* the timestamps are
+        timezone-naive (``timestamp_ntz`` or ``time_format_in_parts`` without
+        ``offset_column``), because dsgrid localizes those timestamps during
+        registration using the dataset's own geography.
+
+        Time zones needed only for query-time mapping are not checked here.  Which
+        geography supplies them depends on whether the dataset's geography gets
+        mapped, which is known at dataset submission rather than at config load.
+        See :meth:`ProjectRegistryManager._check_time_zone_for_mapping`.
+        """
+        time_dim = None
+        geo_requires_time_zone = False
+        for dimension in self.dimensions:
+            if dimension.dimension_type == DimensionType.TIME:
+                assert isinstance(dimension, TimeDimensionBaseModel)
+                geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
+                time_dim = dimension
+                break
+
+        if not geo_requires_time_zone:
+            return self
+
+        # Determine whether registration-time localization will need the
+        # geography time_zone column.  Localization is only needed for
+        # timezone-naive data (NTZ or in-parts without offset).
+        needs_registration_localization = False
+        if isinstance(time_dim, DateTimeDimensionModel):
+            column_format = time_dim.column_format
+            if isinstance(column_format, TimeFormatDateTimeNTZModel):
+                needs_registration_localization = True
+            elif isinstance(column_format, TimeFormatInPartsModel):
+                needs_registration_localization = column_format.offset_column is None
+
+        if not needs_registration_localization:
+            return self
+
+        for dimension in self.dimensions:
+            if dimension.dimension_type != DimensionType.GEOGRAPHY:
+                continue
+
+            check_timezone_in_geography(
+                dimension,
+                err_msg=(
+                    "This dataset uses 'aligned_in_std_clock_time' with timezone-naive "
+                    "timestamps, which dsgrid localizes during registration using the "
+                    "dataset's own geography. Its geography dimension records must "
+                    "include a 'time_zone' column with valid IANA time zone values "
+                    "(e.g., 'Etc/GMT+5')."
+                ),
+            )
 
         return self
 
@@ -548,7 +601,6 @@ def make_unvalidated_dataset_config(
     dataset_type=InputDatasetType.UNSPECIFIED,
     included_dimensions: list[DimensionType] | None = None,
     time_type: TimeDimensionType | None = None,
-    use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
     slim: bool = True,
@@ -590,7 +642,6 @@ def make_unvalidated_dataset_config(
             },
             "description": "",
             "data_classification": data_classification,
-            "use_project_geography_time_zone": use_project_geography_time_zone,
             "dimensions": dimensions,
             "dimension_references": [
                 x.model_dump(mode="json") for x in dimension_references or []
@@ -628,7 +679,6 @@ def make_unvalidated_dataset_config(
             "tags": [],
             "data_classification": data_classification,
             "enable_unit_conversion": True,
-            "use_project_geography_time_zone": use_project_geography_time_zone,
             "dimensions": dimensions,
             "dimension_references": [
                 x.model_dump(mode="json") for x in dimension_references or []
@@ -892,14 +942,14 @@ class DatasetConfig(ConfigBase):
         msg = "Neither data_layout nor registry_data_layout is set"
         raise DSGInvalidDataset(msg)
 
-    def add_trivial_dimensions(self, df: DataFrame):
+    def add_trivial_dimensions(self, df: ibis.Table):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                df = df.withColumn(col, F.lit(val))
+                df = with_literal_column(df, col, val)
         return df
 
     def remove_trivial_dimensions(self, df):
@@ -919,15 +969,22 @@ def get_unique_dimension_record_ids(
     table_format: TableFormat,
     pivoted_dimension_type: DimensionType | None,
     time_columns: set[str],
+    load_data_columns: list[Column] | None = None,
+    load_data_lookup_columns: list[Column] | None = None,
 ) -> dict[DimensionType, list[str]]:
-    """Get the unique dimension record IDs from a table."""
+    """Get the unique dimension record IDs from a table.
+
+    The optional ``load_data_columns`` and ``load_data_lookup_columns`` apply
+    user-declared types to the corresponding file after read. Columns omitted
+    from those lists keep whatever type the backend's default reader inferred.
+    """
     if table_format == TableFormat.TWO_TABLE:
-        ld = read_dataframe(check_load_data_filename(path))
-        lk = read_dataframe(check_load_data_lookup_filename(path))
-        df = ld.join(lk, on="id").drop("id")
+        ld = _read_and_apply_types(check_load_data_filename(path), load_data_columns)
+        lk = _read_and_apply_types(check_load_data_lookup_filename(path), load_data_lookup_columns)
+        df = drop_columns(join_multiple_columns(ld, lk, ["id"]), "id")
     elif table_format == TableFormat.ONE_TABLE:
         ld_path = check_load_data_filename(path)
-        df = read_dataframe(ld_path)
+        df = _read_and_apply_types(ld_path, load_data_columns)
     else:
         msg = f"Unsupported table format: {table_format}"
         raise NotImplementedError(msg)
@@ -949,3 +1006,23 @@ def get_unique_dimension_record_ids(
         ids_by_dimension_type[pivoted_dimension_type] = sorted(pivoted_columns)
 
     return ids_by_dimension_type
+
+
+def _read_and_apply_types(filename: Path, columns: list[Column] | None) -> ibis.Table:
+    """Read ``filename`` and apply user-declared column types.
+
+    Follows the same per-format contract as
+    :func:`dsgrid.config.file_schema.read_data_file`, which registration will
+    later apply to the same files: declarations are cast for CSV and JSON,
+    whose formats cannot express type intent, and validated but never cast
+    for self-describing Parquet. Honoring a declaration that a Parquet file
+    disagrees with would generate dimension records that registration then
+    rejects.
+    """
+    df = read_dataframe(filename)
+    if not columns:
+        return df
+    if filename.suffix == ".parquet":
+        validate_declared_types(df, columns)
+        return df
+    return apply_declared_types(df, columns)

@@ -2,9 +2,11 @@ import abc
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Self
+from typing import Any, Iterable, Self, cast
 
 import chronify
+import ibis
+from chronify.time_series_checker import check_timestamps
 from sqlalchemy import Connection
 
 import dsgrid
@@ -24,7 +26,7 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.common import VALUE_COLUMN, BackendEngine
+from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
@@ -46,16 +48,21 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.spark.functions import (
-    cache,
+from dsgrid.ibis.operations import (
+    count_groups,
+    drop_columns,
     except_all,
-    is_dataframe_empty,
     join,
-    make_temp_view_name,
-    unpersist,
+    rename_columns,
 )
+from dsgrid.ibis.table_utils import (
+    get_unique_values_per_column,
+    is_table_empty,
+    table_column_to_list,
+)
+from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import DataFrame, F, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -66,29 +73,32 @@ from dsgrid.utils.dataset import (
     merge_expected_associations_tables,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_spark_hive,
-    map_time_dimension_with_chronify_spark_path,
+    map_time_dimension_with_chronify_runtime_path,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
-    check_for_nulls,
-    create_dataframe_from_product,
-    get_unique_values,
-    persist_table,
-    read_dataframe,
-    save_to_warehouse,
-    write_dataframe,
-)
+from dsgrid.ibis.functions import cache, unpersist
+from dsgrid.ibis.io import persist_table, read_dataframe, write_dataframe
+from dsgrid.ibis.null_checks import check_for_nulls
+from dsgrid.ibis.session import create_dataframe_from_product
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import (
     DimensionMappingRegistryManager,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _has_time_zone_column(geography_dim: DimensionBaseConfigWithFiles) -> bool:
+    """Return True if the geography dimension records include a time_zone column."""
+    records = geography_dim.model.records
+    if not records:
+        return False
+    return hasattr(records[0], "time_zone") and any(r.time_zone is not None for r in records)
 
 
 class DatasetSchemaHandlerBase(abc.ABC):
@@ -129,8 +139,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @abc.abstractmethod
     def check_consistency(
         self,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -155,19 +165,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
-    def get_base_load_data_table(self) -> DataFrame:
+    def get_base_load_data_table(self) -> ibis.Table:
         """Return the base load data table, which must include time."""
 
     @abc.abstractmethod
-    def _get_load_data_table(self) -> DataFrame:
+    def _get_load_data_table(self) -> ibis.Table:
         """Return the full load data table."""
 
-    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
+    def _make_actual_dimension_association_table_from_data(self) -> ibis.Table:
         return self._remove_non_dimension_columns(self._get_load_data_table()).distinct()
 
     def _make_expected_dimension_association_table_from_records(
         self, dimension_types: Iterable[DimensionType], context: ScratchDirContext
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use dimensions in the dataset's dimension records.
         """
@@ -193,10 +203,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _make_expected_dimension_association_table_from_user(
         self,
-        expected_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
         context: ScratchDirContext,
-    ) -> DataFrame:
-        """Merge user-provided expected association tables into a single DataFrame.
+    ) -> ibis.Table:
+        """Merge user-provided expected association tables into a single Ibis table.
 
         Delegates to :func:`merge_expected_associations_tables`.
         See that function for the merge semantics.
@@ -216,8 +226,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
         self,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -253,11 +263,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     required_assoc, missing_df
                 )
 
-        # Cache both DataFrames before the per-column loop and the except_all below so
+        # Cache both Ibis tables before the per-column loop and the except_all below so
         # that each of the multiple Spark actions that follow reads from memory rather
         # than re-scanning and re-joining the source data from disk each time.
-        cache(required_assoc)
-        cache(assoc_by_data)
+        required_assoc = cache(required_assoc)
+        assoc_by_data = cache(assoc_by_data)
         try:
             if not expected_dimension_associations:
                 # This first check is redundant with the except_all below. But, it is
@@ -267,12 +277,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # Performed after missing-association subtraction so that a dimension value
                 # that is entirely absent due to declared missing combinations does not
                 # produce a false positive.
+                expected_per_col = get_unique_values_per_column(
+                    required_assoc, required_assoc.columns
+                )
+                actual_per_col = get_unique_values_per_column(
+                    assoc_by_data, required_assoc.columns
+                )
                 for column in required_assoc.columns:
-                    expected = get_unique_values(required_assoc, column)
-                    actual = get_unique_values(assoc_by_data, column)
+                    expected = expected_per_col[column]
+                    actual = actual_per_col[column]
                     if actual != expected:
-                        missing = sorted(expected.difference(actual))
-                        extra = sorted(actual.difference(expected))
+                        missing = sorted_with_nulls(expected.difference(actual))
+                        extra = sorted_with_nulls(actual.difference(expected))
                         num_matching = len(actual.intersection(expected))
                         msg = (
                             f"Dataset records for dimension type {column} do not match expected "
@@ -281,10 +297,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         raise DSGInvalidDataset(msg)
 
             cols = sorted(required_assoc.columns)
-            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-            cache(diff)
+            # diff is read twice below — the emptiness check and, if non-empty,
+            # the error handler — so cache the except_all to compute it once.
+            diff = cache(except_all(required_assoc.select(*cols), assoc_by_data.select(*cols)))
             try:
-                if not is_dataframe_empty(diff):
+                if not is_table_empty(diff):
                     expected_cardinalities = self._get_dimension_cardinalities()
                     handle_dimension_association_errors(
                         diff, assoc_by_data, self.dataset_id, expected_cardinalities
@@ -296,24 +313,23 @@ class DatasetSchemaHandlerBase(abc.ABC):
             unpersist(required_assoc)
             unpersist(assoc_by_data)
 
-    def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
+    def make_mapped_dimension_association_table(self, context: ScratchDirContext) -> ibis.Table:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use mapped dimensions.
         """
         assoc_df = self._make_actual_dimension_association_table_from_data()
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            df = (
-                self._remap_dimension_columns(assoc_df, mapping_manager)
-                .drop("fraction")
-                .distinct()
-            )
+            df = self._remap_dimension_columns(assoc_df, mapping_manager)
+            if "fraction" in df.columns:
+                df = drop_columns(df, "fraction")
+            df = df.distinct()
         check_for_nulls(df)
         return df
 
     def remove_expected_missing_mapped_associations(
-        self, store: DataStoreInterface, df: DataFrame, context: ScratchDirContext
-    ) -> DataFrame:
+        self, store: DataStoreInterface, df: ibis.Table, context: ScratchDirContext
+    ) -> ibis.Table:
         """Remove expected missing associations from the full join of expected associations."""
         missing_associations = store.read_missing_associations_tables(
             self._config.model.dataset_id, self._config.model.version
@@ -325,11 +341,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
             for missing_df in missing_associations.values():
-                mapped_df = (
-                    self._remap_dimension_columns(missing_df, mapping_manager)
-                    .drop("fraction")
-                    .distinct()
-                )
+                mapped_df = self._remap_dimension_columns(missing_df, mapping_manager)
+                if "fraction" in mapped_df.columns:
+                    mapped_df = drop_columns(mapped_df, "fraction")
+                mapped_df = mapped_df.distinct()
                 final_df = filter_out_expected_missing_associations(final_df, mapped_df)
         return final_df
 
@@ -363,7 +378,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return self._config
 
     @abc.abstractmethod
-    def make_project_dataframe(self, context, project_config) -> DataFrame:
+    def make_project_dataframe(self, context, project_config) -> ibis.Table:
         """Return a load_data dataframe with dimensions mapped to the project's with filters
         as specified by the QueryContext.
 
@@ -374,7 +389,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
 
         """
 
@@ -383,7 +398,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self,
         context: QueryContext,
         time_dimension: TimeDimensionBaseConfig | None = None,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Return a load_data dataframe with dimensions mapped as stored in the handler.
 
         Parameters
@@ -396,7 +411,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency(self, load_data_df: DataFrame):
+    def _check_dataset_time_consistency(self, load_data_df: ibis.Table):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
         2. all dimension combinations return the same set of time range(s).
@@ -454,17 +469,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     store.create_view_from_parquet(src_path, chronify_schema)
                     store.drop_view(chronify_schema.name)
             else:
-                # For CSV and JSON files, use in-memory store with ingest_table.
-                # This avoids the complexity of converting to parquet.
+                # For CSV and JSON files, use an Ibis view to avoid materializing the data
+                # in the driver before Chronify runs its checks.
                 with create_in_memory_store() as store:
-                    # ingest_table performs all of the time checks.
-                    store.ingest_table(load_data_df.toPandas(), chronify_schema)
-                    store.drop_table(chronify_schema.name)
+                    store.create_view(chronify_schema, load_data_df)
+                    check_timestamps(store._backend, chronify_schema.name, chronify_schema)
+                    store.drop_view(chronify_schema.name)
 
             self._check_model_year_time_consistency(load_data_df)
 
-    def get_chronify_schema(self, df: DataFrame):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+    def get_chronify_schema(self, df: ibis.Table):
+        time_dim = self._config.get_time_dimension()
+        assert time_dim is not None
         time_cols = time_dim.get_load_data_time_columns()
         time_array_id_columns = [
             x
@@ -485,12 +501,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
             value_column = VALUE_COLUMN
         return chronify.TableSchema(
             name=make_temp_view_name(),
-            time_config=time_dim.to_chronify(),
+            time_config=cast(Any, time_dim.to_chronify()),
             time_array_id_columns=time_array_id_columns,
             value_column=value_column,
         )
 
-    def _check_model_year_time_consistency(self, df: DataFrame):
+    def _check_model_year_time_consistency(self, df: ibis.Table):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if self._config.model.dataset_type == InputDatasetType.HISTORICAL and isinstance(
             time_dim, AnnualTimeDimensionConfig
@@ -502,27 +518,47 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 df, annual_col, DimensionType.MODEL_YEAR.value
             )
 
+    @staticmethod
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
-        """Check that each unique time array has the same timestamps."""
+    def _check_dataset_time_consistency_by_time_array(
+        time_cols: list[str], load_data_df: ibis.Table
+    ) -> None:
+        """Check that each unique time array has the same timestamps.
+
+        Two independent conditions must hold. Every timestamp must be repeated the same
+        number of times, and every combination of non-time dimensions must have the same
+        time array length. Neither implies the other: time arrays can be ragged while
+        each timestamp still repeats an equal number of times.
+        """
         logger.info("Check dataset time consistency by time array.")
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns
         )
-        counts = load_data_df.groupBy(*time_cols).count().select("count")
-        distinct_counts = counts.select("count").distinct().collect()
-        if len(distinct_counts) != 1:
+        # Combine the two distinct-count checks into a single round-trip. The
+        # prior code issued two two-deep aggregations (group-by + count, then
+        # distinct + count) over the load_data table back-to-back; each pair
+        # forced a full scan. The cross-join here lets the planner share the
+        # underlying scan where the optimizer can, and even when it can't, the
+        # round-trip overhead is halved.
+        time_counts = count_groups(load_data_df, list(time_cols))
+        array_counts = count_groups(load_data_df, list(unique_array_cols))
+        combined = (
+            time_counts.aggregate(time=time_counts["count"].nunique())
+            .cross_join(array_counts.aggregate(array=array_counts["count"].nunique()))
+            .execute()
+        )
+        num_distinct_counts = int(combined["time"].iloc[0])
+        num_distinct_ta_counts = int(combined["array"].iloc[0])
+        if num_distinct_counts != 1:
             msg = (
                 "All time arrays must be repeated the same number of times: "
-                f"unique timestamp repeats = {len(distinct_counts)}"
+                f"unique timestamp repeats = {num_distinct_counts}"
             )
             raise DSGInvalidDataset(msg)
-        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
-        distinct_ta_counts = ta_counts.select("count").distinct().collect()
-        if len(distinct_ta_counts) != 1:
+        if num_distinct_ta_counts != 1:
             msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
-                f"unique time array lengths = {len(distinct_ta_counts)}"
+                f"unique time array lengths = {num_distinct_ta_counts}"
             )
             raise DSGInvalidDataset(msg)
 
@@ -534,8 +570,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _convert_units(
         self,
-        df: DataFrame,
-        project_metric_records: DataFrame,
+        df: ibis.Table,
+        project_metric_records: ibis.Table,
         mapping_manager: DatasetMappingManager,
     ):
         if not self._config.model.enable_unit_conversion:
@@ -557,6 +593,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 break
 
         dataset_dim = self._config.get_dimension_with_records(DimensionType.METRIC)
+        assert dataset_dim is not None
         dataset_records = dataset_dim.get_records_dataframe()
         df = convert_units_unpivoted(
             df,
@@ -569,7 +606,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
             df = mapping_manager.persist_table(df, op)
         return df
 
-    def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
+    def _finalize_table(
+        self, context: QueryContext, df: ibis.Table, project_config: ProjectConfig
+    ):
         # TODO: remove ProjectConfig so that dataset queries can use this.
         # Issue #370
         table_handler = make_table_format_handler(
@@ -640,7 +679,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             config.model.to_dimension.dimension_id, conn=self._conn
         )
 
-    def _get_project_metric_records(self, project_config: ProjectConfig) -> DataFrame:
+    def _get_project_metric_records(self, project_config: ProjectConfig) -> ibis.Table:
         metric_dim_query_name = getattr(
             project_config.get_dataset_base_dimension_names(self._config.model.dataset_id),
             DimensionType.METRIC.value,
@@ -660,7 +699,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return project_config.get_dimension_records(metric_dim_query_name)
 
     def _get_time_dimension_columns(self):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_time_dimension()
+        assert time_dim is not None
         time_cols = time_dim.get_load_data_time_columns()
         return time_cols
 
@@ -670,25 +710,23 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dataset_mapping is None:
                 dataset_record_ids = project_record_ids
             else:
-                dataset_record_ids = (
-                    join(
-                        dataset_mapping.withColumnRenamed("from_id", "dataset_record_id"),
-                        project_record_ids,
-                        "to_id",
-                        "id",
-                    )
-                    .select("dataset_record_id")
-                    .withColumnRenamed("dataset_record_id", "id")
-                    .distinct()
+                dataset_record_ids = join(
+                    rename_columns(dataset_mapping, {"from_id": "dataset_record_id"}),
+                    project_record_ids,
+                    "to_id",
+                    "id",
                 )
+                dataset_record_ids = rename_columns(
+                    dataset_record_ids.select("dataset_record_id"), {"dataset_record_id": "id"}
+                ).distinct()
             yield dim_type, dataset_record_ids
 
     @staticmethod
-    def _list_dimension_columns(df: DataFrame) -> list[str]:
+    def _list_dimension_columns(df: ibis.Table) -> list[str]:
         columns = DimensionType.get_allowed_dimension_column_names()
         return [x for x in df.columns if x in columns]
 
-    def _list_dimension_types_in_load_data(self, df: DataFrame) -> list[DimensionType]:
+    def _list_dimension_types_in_load_data(self, df: ibis.Table) -> list[DimensionType]:
         dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
         if self._config.get_value_format() == ValueFormat.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()
@@ -700,23 +738,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
             if dim_type == self._config.get_pivoted_dimension_type():
                 # Drop columns that don't match requested project record IDs.
-                cols_to_keep = {x.id for x in dataset_record_ids.collect()}
+                cols_to_keep = set(table_column_to_list(dataset_record_ids, "id"))
                 cols_to_drop = set(self._config.get_pivoted_dimension_columns()).difference(
                     cols_to_keep
                 )
                 if cols_to_drop:
-                    df = df.drop(*cols_to_drop)
+                    df = drop_columns(df, *cols_to_drop)
 
         return df
 
     def _prefilter_stacked_dimensions(self, context: QueryContext, df):
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
             # Drop rows that don't match requested project record IDs.
-            tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
+            tmp = rename_columns(dataset_record_ids, {"id": "dataset_record_id"})
             if dim_type.value not in df.columns:
                 # This dimensions is stored in another table (e.g., lookup or load_data)
                 continue
-            df = join(df, tmp, dim_type.value, "dataset_record_id").drop("dataset_record_id")
+            df = drop_columns(
+                join(df, tmp, dim_type.value, "dataset_record_id"), "dataset_record_id"
+            )
 
         return df
 
@@ -773,6 +813,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 raise DSGInvalidDimensionMapping(msg)
 
             from_dim = self._config.get_dimension(to_dim.model.dimension_type)
+            assert from_dim is not None
             supp_dim_names = {
                 x.model.name
                 for x in project_config.list_supplemental_dimensions(to_dim.model.dimension_type)
@@ -783,9 +824,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # aggregrations. As it stands, we can are only using this within our
                 # project query process. We need much more handling to make that work.
                 msg = (
-                    "DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
                     f"a supplemental dimension: {mapping.name}"
                 )
+                raise DSGInvalidDimensionMapping(msg)
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
                     f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
@@ -797,6 +839,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             mapping_config = self._dimension_mapping_mgr.get_by_id(
                 ref.mapping_id, version=ref.version, conn=self.connection
             )
+            mapping_config = cast(Any, mapping_config)
             if (
                 from_dim.model.dimension_id == mapping_config.model.from_dimension.dimension_id
                 and to_dim.model.dimension_id == mapping_config.model.to_dimension.dimension_id
@@ -821,10 +864,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _remap_dimension_columns(
         self,
-        df: DataFrame,
+        df: ibis.Table,
         mapping_manager: DatasetMappingManager,
-        filtered_records: dict[DimensionType, DataFrame] | None = None,
-    ) -> DataFrame:
+        filtered_records: dict[DimensionType, ibis.Table] | None = None,
+    ) -> ibis.Table:
         """Map the table's dimensions according to the plan.
 
         Parameters
@@ -846,7 +889,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     dim_mapping.name,
                 )
                 continue
-            assert dim_mapping.mapping_reference is not None
+            if dim_mapping.mapping_reference is None:
+                msg = (
+                    f"Mapping operation '{dim_mapping.name}' has no mapping reference. "
+                    "This can occur when the dimension named by the mapping plan does not "
+                    "match any registered dataset-to-project dimension mapping."
+                )
+                raise DSGInvalidDimensionMapping(msg)
             ref = dim_mapping.mapping_reference
             dim_type = ref.from_dimension_type
             column = dim_type.value
@@ -860,7 +909,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
             records = mapping_config.get_records_dataframe()
             if filtered_records is not None and dim_type in filtered_records:
-                records = join(records, filtered_records[dim_type], "to_id", "id").drop("id")
+                records = drop_columns(
+                    join(records, filtered_records[dim_type], "to_id", "id"), "id"
+                )
 
             if is_noop_mapping(records):
                 logger.info("Skip no-op mapping %s.", ref.mapping_id)
@@ -886,22 +937,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df,
         value_columns,
         mapping_manager: DatasetMappingManager,
-        agg_func=None,
     ):
         op = mapping_manager.plan.apply_fraction_op
         if "fraction" not in df.columns:
             return df
         if mapping_manager.has_completed_operation(op):
             return df
-        agg_func = agg_func or F.sum
-        # Maintain column order.
-        agg_ops = [
-            agg_func(F.col(x) * F.col("fraction")).alias(x)
-            for x in [y for y in df.columns if y in value_columns]
-        ]
         gcols = set(df.columns) - value_columns - {"fraction"}
-        df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
-        df = df.drop("fraction")
+        group_by_cols = ordered_subset_columns(df, gcols)
+        value_cols = [y for y in df.columns if y in value_columns]
+        df = _apply_fraction_sql(df, group_by_cols, value_cols)
         if op.persist:
             df = mapping_manager.persist_table(df, op)
         return df
@@ -909,7 +954,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
         self,
-        load_data_df: DataFrame,
+        load_data_df: ibis.Table,
         to_time_dim: TimeDimensionBaseConfig,
         value_column: str,
         mapping_manager: DatasetMappingManager,
@@ -923,17 +968,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_time_dimension()
         assert time_dim is not None
-        if time_dim.model.is_time_zone_required_in_geography():
-            if self._config.model.use_project_geography_time_zone:
-                if to_geo_dim is None:
-                    msg = "Bug: to_geo_dim must be provided if time zone is required in geography."
-                    raise Exception(msg)
-                logger.info("Add time zone from project geography dimension.")
-                geography_dim = to_geo_dim
-            else:
-                logger.info("Add time zone from dataset geography dimension.")
-                geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
-            load_data_df = add_time_zone(load_data_df, geography_dim)
 
         if isinstance(time_dim, AnnualTimeDimensionConfig):
             if not isinstance(to_time_dim, DateTimeDimensionConfig):
@@ -955,27 +989,26 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
             return load_data_df
-        match (config.backend_engine, config.use_hive_metastore):
-            case (BackendEngine.SPARK, True):
-                table_name = make_temp_view_name()
-                load_data_df = map_time_dimension_with_chronify_spark_hive(
-                    df=save_to_warehouse(load_data_df, table_name),
-                    table_name=table_name,
-                    from_time_dim=time_dim,
-                    to_time_dim=to_time_dim,
-                    scratch_dir_context=mapping_manager.scratch_dir_context,
-                    value_column=value_column,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                    wrap_time_allowed=wrap_time_allowed,
-                )
 
-            case (BackendEngine.SPARK, False):
+        needs_time_zone = (
+            time_dim.model.is_time_zone_required_in_geography()
+            or to_time_dim.model.is_time_zone_required_in_geography()
+        )
+        if needs_time_zone and TIME_ZONE_COLUMN not in load_data_df.columns:
+            # The table already carries the column when the dataset supplied it or when
+            # registration-time localization joined it in and left it behind. Joining
+            # again would collide on the column name.
+            geography_dim = self._get_time_zone_geography_dimension(to_geo_dim)
+            load_data_df = add_time_zone(load_data_df, geography_dim)
+
+        match config.backend_engine:
+            case BackendEngine.SPARK:
                 filename = persist_table(
                     load_data_df,
                     mapping_manager.scratch_dir_context,
                     tag="query before time mapping",
                 )
-                load_data_df = map_time_dimension_with_chronify_spark_path(
+                load_data_df = map_time_dimension_with_chronify_runtime_path(
                     df=read_dataframe(filename),
                     filename=filename,
                     from_time_dim=time_dim,
@@ -985,7 +1018,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
-            case (BackendEngine.DUCKDB, _):
+            case BackendEngine.DUCKDB:
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     from_time_dim=time_dim,
@@ -996,12 +1029,73 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     wrap_time_allowed=wrap_time_allowed,
                 )
 
-        if time_dim.model.is_time_zone_required_in_geography():
-            load_data_df = load_data_df.drop("time_zone")
+        if needs_time_zone:
+            load_data_df = drop_columns(load_data_df, TIME_ZONE_COLUMN)
 
         if op.persist:
             load_data_df = mapping_manager.persist_table(load_data_df, op)
         return load_data_df
+
+    def _get_time_zone_geography_dimension(
+        self, to_geo_dim: DimensionBaseConfigWithFiles | None
+    ) -> DimensionBaseConfigWithFiles:
+        """Return the geography dimension that supplies time zones for time mapping.
+
+        Time mapping is the last operation in a dataset mapping plan, so every dimension
+        mapping has already been applied when this runs. :func:`add_time_zone` joins the
+        geography records on the ``geography`` column, so the dimension used must be the one
+        that owns the ids currently in that column.
+
+        A project query always supplies the project's base geography, whether or not the
+        dataset's geography was mapped, because an unmapped dataset geography is already in
+        the project's id space. A standalone dataset query supplies the target of the
+        geography mapping its query names, and nothing when it names none; only then does the
+        dataset's own geography own those ids.
+
+        Parameters
+        ----------
+        to_geo_dim : DimensionBaseConfigWithFiles | None
+            Geography dimension the data has been mapped into, or None when the geography
+            column still holds the dataset's own record ids.
+
+        Returns
+        -------
+        DimensionBaseConfigWithFiles
+
+        Raises
+        ------
+        DSGInvalidDataset
+            If there is no geography dimension with records, or if the selected dimension's
+            records do not provide a usable time_zone column.
+        """
+        if to_geo_dim is None:
+            geography_dim = self._config.get_dimension_with_records(DimensionType.GEOGRAPHY)
+            source = "the dataset's own geography dimension"
+        else:
+            geography_dim = to_geo_dim
+            source = "the geography dimension the data has been mapped into"
+
+        if geography_dim is None:
+            msg = (
+                "Time mapping requires time zone information from a geography dimension, but "
+                f"dataset {self.dataset_id} has no geography dimension with records."
+            )
+            raise DSGInvalidDataset(msg)
+        assert isinstance(geography_dim, DimensionBaseConfigWithFiles), geography_dim
+
+        if not _has_time_zone_column(geography_dim):
+            msg = (
+                "Time mapping requires time zone information from a geography dimension. "
+                f"dsgrid selected {source}, {geography_dim.model.name!r}, because the "
+                "geography column holds its record ids at this point in the mapping. Those "
+                "records do not provide a 'time_zone' column with valid IANA time zone "
+                "values (e.g., 'Etc/GMT+5'). Add that column to the records file for that "
+                "dimension."
+            )
+            raise DSGInvalidDataset(msg)
+
+        logger.info("Add time zone from %s: %s", source, geography_dim.model.name)
+        return geography_dim
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):
         if (
@@ -1015,6 +1109,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
             msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
-    def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:
+    def _remove_non_dimension_columns(self, df: ibis.Table) -> ibis.Table:
         allowed_columns = self._list_dimension_columns(df)
         return df.select(*allowed_columns)
+
+
+def _apply_fraction_sql(
+    df: ibis.Table,
+    group_by_columns: list[str],
+    value_columns: list[str],
+) -> ibis.Table:
+    aggs = {col: (df[col] * df["fraction"]).sum() for col in value_columns}
+    if group_by_columns:
+        return df.group_by(*group_by_columns).aggregate(**aggs)
+    return df.aggregate(**aggs)

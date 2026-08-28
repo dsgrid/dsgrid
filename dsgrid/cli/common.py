@@ -66,6 +66,8 @@ def handle_dsgrid_exception(ctx, func, *args, **kwargs) -> tuple[Any, int]:
         return res, 0
     except DSGBaseException:
         exc_type, exc_value, exc_tb = sys.exc_info()
+        assert exc_type is not None
+        assert exc_tb is not None
         filename = exc_tb.tb_frame.f_code.co_filename
         line = exc_tb.tb_lineno
         msg = f'{func.__name__} failed: exception={exc_type.__name__} message="{exc_value}" {filename=} {line=}'
@@ -104,7 +106,7 @@ class OptionPromptPassword(click.Option):
     """Custom class that only prompts for the password if the user set a different username value
     than what is in the runtime config file."""
 
-    def get_default(self, ctx, **kwargs):
+    def get_default(self, ctx, call: bool = True):
         config = DsgridRuntimeConfig.load()
         username = ctx.find_root().params.get("username")
         if username != config.database_user:

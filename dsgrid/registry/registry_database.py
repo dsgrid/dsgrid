@@ -1,6 +1,7 @@
 import getpass
 import logging
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Generator
@@ -210,7 +211,7 @@ class RegistryDatabase:
 
         cls.delete(dst_conn)
         dst = cls.create(dst_conn, dst_data_path)
-        with sqlite3.connect(src_conn.url.replace("sqlite:///", "")) as src:
+        with closing(sqlite3.connect(src_conn.url.replace("sqlite:///", ""))) as src:
             with dst.engine.begin() as dst_conn_:
                 # The backup below will overwrite the data_path value.
                 table = dst.get_table(RegistryTables.KEY_VALUE)

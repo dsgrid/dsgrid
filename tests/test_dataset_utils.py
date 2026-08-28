@@ -7,82 +7,59 @@ from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset
+from dsgrid.exceptions import DSGFileInputError, DSGInvalidDataset, DSGInvalidOperation
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     aggregate_single_value,
     cache,
-    get_spark_session,
+    get_runtime_session,
     is_dataframe_empty,
     unpersist,
 )
-from dsgrid.spark.types import (
-    StructField,
-    StructType,
+from dsgrid.ibis.session import (
     DoubleType,
     IntegerType,
-    ShortType,
     LongType,
+    ShortType,
+    StructField,
+    StructType,
     StringType,
+    create_dataframe_from_dicts,
     use_duckdb,
 )
+from dsgrid.ibis.operations import filter_sql
+from dsgrid.utils import dataset as dataset_module
 from dsgrid.utils.dataset import (
     add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
     convert_types_if_necessary,
     is_noop_mapping,
+    map_stacked_dimension,
+    merge_expected_associations_tables,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import create_dataframe_from_dicts
+
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect, make_table, spark_physical_plan
 
 
 @pytest.fixture(scope="module")
-def dataframes():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "county": "Jefferson",
-                "sector": "com",
-                "com_elec": 2.1,
-                "res_elec": None,
-                "common_elec": 7.8,
-            },
-            {
-                "county": "Boulder",
-                "sector": "com",
-                "com_elec": 3.5,
-                "res_elec": None,
-                "common_elec": 6.8,
-            },
-            {
-                "county": "Denver",
-                "sector": "res",
-                "com_elec": None,
-                "res_elec": 4.2,
-                "common_elec": 5.8,
-            },
-            {
-                "county": "Adams",
-                "sector": "res",
-                "com_elec": None,
-                "res_elec": 1.3,
-                "common_elec": 4.8,
-            },
-        ]
+def tables():
+    df = make_table(
+        ["county", "sector", "com_elec", "res_elec", "common_elec"],
+        ("Jefferson", "com", 2.1, None, 7.8),
+        ("Boulder", "com", 3.5, None, 6.8),
+        ("Denver", "res", None, 4.2, 5.8),
+        ("Adams", "res", None, 1.3, 4.8),
     )
-    records = create_dataframe_from_dicts(
-        [
-            {"from_id": "res_elec", "to_id": "all_electricity", "from_fraction": 1.0},
-            {"from_id": "com_elec", "to_id": "all_electricity", "from_fraction": 1.0},
-            {
-                "from_id": "common_elec",
-                "to_id": "all_electricity",
-                "from_fraction": 1.0,
-            },
-        ]
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("res_elec", "all_electricity", 1.0),
+        ("com_elec", "all_electricity", 1.0),
+        ("common_elec", "all_electricity", 1.0),
     )
     pivoted_columns = {"com_elec", "res_elec", "common_elec"}
     yield df, records, pivoted_columns
@@ -90,151 +67,59 @@ def dataframes():
 
 @pytest.fixture(scope="module")
 def pivoted_dataframe_with_time():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "time_index": 0,
-                "county": "Jefferson",
-                "cooling": 2.1,
-                "heating": 1.3,
-            },
-            {
-                "time_index": 1,
-                "county": "Jefferson",
-                "cooling": 2.2,
-                "heating": 1.4,
-            },
-            {
-                "time_index": 3,
-                "county": "Jefferson",
-                "cooling": 2.3,
-                "heating": 1.5,
-            },
-            {
-                "time_index": 0,
-                "county": "Boulder",
-                "cooling": 1.1,
-                "heating": None,
-            },
-            {
-                "time_index": 1,
-                "county": "Boulder",
-                "cooling": 1.2,
-                "heating": None,
-            },
-            {
-                "time_index": 3,
-                "county": "Boulder",
-                "cooling": 1.3,
-                "heating": None,
-            },
-        ]
+    df = make_table(
+        ["time_index", "county", "cooling", "heating"],
+        (0, "Jefferson", 2.1, 1.3),
+        (1, "Jefferson", 2.2, 1.4),
+        (3, "Jefferson", 2.3, 1.5),
+        (0, "Boulder", 1.1, None),
+        (1, "Boulder", 1.2, None),
+        (3, "Boulder", 1.3, None),
     )
-    yield cache(df), ["time_index"], ["cooling", "heating"]
+    df = cache(df)
+    yield df, ["time_index"], ["cooling", "heating"]
     unpersist(df)
 
 
 def test_is_noop_mapping_true():
-    df = create_dataframe_from_dicts(
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ]
+    df = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("elec_cooling", "elec_cooling", 1.0),
+        ("elec_heating", "elec_heating", 1.0),
     )
     assert is_noop_mapping(df)
 
 
 def test_is_noop_mapping_false():
-    for records in (
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "electricity_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "electricity_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 2.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_heating",
-                "to_id": "elec_heating",
-                "from_fraction": 2.0,
-            },
-        ],
-        [
-            # NULLs are ignored
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": "elec_cooling",
-                "to_id": None,
-                "from_fraction": 1.0,
-            },
-        ],
-        [
-            # NULLs are ignored
-            {
-                "from_id": "elec_cooling",
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-            {
-                "from_id": None,
-                "to_id": "elec_cooling",
-                "from_fraction": 1.0,
-            },
-        ],
+    cols = ["from_id", "to_id", "from_fraction"]
+    for df in (
+        # a from_id differs from its to_id
+        make_table(
+            cols,
+            ("elec_cooling", "elec_cooling", 1.0),
+            ("electricity_heating", "elec_heating", 1.0),
+        ),
+        make_table(
+            cols,
+            ("elec_cooling", "electricity_cooling", 1.0),
+            ("elec_heating", "elec_heating", 1.0),
+        ),
+        # a from_fraction is not 1.0
+        make_table(
+            cols, ("elec_cooling", "elec_cooling", 2.0), ("elec_heating", "elec_heating", 1.0)
+        ),
+        make_table(
+            cols, ("elec_cooling", "elec_cooling", 1.0), ("elec_heating", "elec_heating", 2.0)
+        ),
+        # NULLs are ignored
+        make_table(cols, ("elec_cooling", "elec_cooling", 1.0), ("elec_cooling", None, 1.0)),
+        make_table(cols, ("elec_cooling", "elec_cooling", 1.0), (None, "elec_cooling", 1.0)),
     ):
-        df = create_dataframe_from_dicts(records)
         assert not is_noop_mapping(df)
 
 
 def test_add_null_rows_from_load_data_lookup():
-    spark = get_spark_session()
+    spark = get_runtime_session()
     df = spark.createDataFrame(
         [
             ("2018-01-01 01:00:00", 2030, "Jefferson", 1.0),
@@ -264,68 +149,32 @@ def test_add_null_rows_from_load_data_lookup():
         ),
     )
     result = add_null_rows_from_load_data_lookup(df, lookup)
-    assert result.count() == 4
-    null_rows = result.filter("timestamp is NULL").collect()
+    assert count_rows(result) == 4
+    null_rows = _collect(filter_sql(result, "timestamp is NULL"))
     assert len(null_rows) == 1
     assert null_rows[0].geography == "Boulder"
 
 
 def test_remove_invalid_null_timestamps():
-    df = create_dataframe_from_dicts(
-        [
-            # No nulls
-            {
-                "timestamp": 1,
-                "county": "Jefferson",
-                "subsector": "warehouse",
-                "value": 4,
-            },
-            {
-                "timestamp": 2,
-                "county": "Jefferson",
-                "subsector": "warehouse",
-                "value": 5,
-            },
-            # Nulls and valid values
-            {
-                "timestamp": None,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 0,
-            },
-            {
-                "timestamp": 1,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 4,
-            },
-            {
-                "timestamp": 2,
-                "county": "Boulder",
-                "subsector": "large_office",
-                "value": 5,
-            },
-            # Only nulls
-            {
-                "timestamp": None,
-                "county": "Adams",
-                "subsector": "retail_stripmall",
-                "value": 0,
-            },
-            {
-                "timestamp": None,
-                "county": "Denver",
-                "subsector": "hospital",
-                "value": 0,
-            },
-        ]
+    df = make_table(
+        ["timestamp", "county", "subsector", "value"],
+        # No nulls
+        (1, "Jefferson", "warehouse", 4),
+        (2, "Jefferson", "warehouse", 5),
+        # Nulls and valid values
+        (None, "Boulder", "large_office", 0),
+        (1, "Boulder", "large_office", 4),
+        (2, "Boulder", "large_office", 5),
+        # Only nulls
+        (None, "Adams", "retail_stripmall", 0),
+        (None, "Denver", "hospital", 0),
     )
     stacked = ["county", "subsector"]
     time_col = "timestamp"
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
-    assert result.count() == 6
-    assert result.filter("county == 'Boulder'").count() == 2
-    assert is_dataframe_empty(result.filter(f"county == 'Boulder' and {time_col} is NULL"))
+    assert count_rows(result) == 6
+    assert count_rows(filter_sql(result, "county == 'Boulder'")) == 2
+    assert is_dataframe_empty(filter_sql(result, f"county == 'Boulder' and {time_col} is NULL"))
 
 
 def test_apply_scaling_factor(tmp_path):
@@ -349,8 +198,8 @@ def test_apply_scaling_factor(tmp_path):
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
-def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
-    df = dataframes[0]
+def test_repartition_if_needed_by_mapping(tmp_path, caplog, tables):
+    df = tables[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.INFO):
         df, _ = repartition_if_needed_by_mapping(
@@ -362,8 +211,41 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
-def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframes):
-    df = dataframes[0]
+def test_repartition_if_needed_by_mapping_shuffles_on_salted_key(tmp_path, monkeypatch, tables):
+    """The salted column exists only to force a shuffle, so assert the shuffle happens.
+
+    Neither the log message nor the returned rows can catch a regression here: an
+    implementation that adds the salted column, writes without repartitioning, and
+    drops the column again produces identical output and identical logs. Only the
+    plan handed to the writer shows whether the skew mitigation is still there.
+    """
+    df = tables[0]
+    context = ScratchDirContext(tmp_path)
+    written: list[Any] = []
+    real_write_dataframe = dataset_module.write_dataframe
+
+    def capture_write_dataframe(table, filename, **kwargs):
+        written.append(table)
+        real_write_dataframe(table, filename, **kwargs)
+
+    monkeypatch.setattr(dataset_module, "write_dataframe", capture_write_dataframe)
+    result, filename = repartition_if_needed_by_mapping(
+        df,
+        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+        context,
+    )
+
+    assert len(written) == 1
+    plan = spark_physical_plan(written[0])
+    assert "hashpartitioning(salted_key" in plan, plan
+    assert filename is not None
+    assert "salted_key" not in result.columns
+    assert _collect(result.order_by("county")) == _collect(df.order_by("county"))
+
+
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
+def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, tables):
+    df = tables[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.DEBUG):
         df, _ = repartition_if_needed_by_mapping(
@@ -379,11 +261,12 @@ def test_unpivot(pivoted_dataframe_with_time):
     df, time_columns, value_columns = pivoted_dataframe_with_time
     unpivoted = unpivot_dataframe(df, value_columns, "end_use", time_columns)
     expected_columns = [*time_columns, "county", "end_use", VALUE_COLUMN]
-    assert unpivoted.columns == expected_columns
-    null_data = unpivoted.filter("county = 'Boulder' and end_use = 'heating'").collect()
+    assert list(unpivoted.columns) == expected_columns
+    null_data = _collect(filter_sql(unpivoted, "county = 'Boulder' and end_use = 'heating'"))
     assert len(null_data) == 1
     assert null_data[0].time_index is None
-    assert null_data[0][VALUE_COLUMN] is None
+    value = getattr(null_data[0], VALUE_COLUMN)
+    assert value is None or value != value
 
 
 @pytest.mark.parametrize("data_type", [IntegerType(), ShortType(), LongType()])
@@ -395,9 +278,9 @@ def test_convert_types_if_necessary(data_type):
             StructField("bystander", IntegerType(), False),
         ]
     )
-    df1 = get_spark_session().createDataFrame([(2030, 2018, 2040)], schema)
+    df1 = get_runtime_session().createDataFrame([(2030, 2018, 2040)], schema)
     df2 = convert_types_if_necessary(df1)
-    row = df2.collect()[0]
+    row = _first(df2)
     assert row.model_year == "2030"
     assert row.weather_year == "2018"
     assert row.bystander == 2040
@@ -423,9 +306,14 @@ def _make_df(rows: list[dict[str, str]]):
 
 
 def _sorted_rows(df) -> list[Any]:
-    """Collect a DataFrame into a sorted list of tuples for easy comparison."""
+    """Collect an Ibis table into a sorted list of tuples for easy comparison."""
     cols = sorted(df.columns)
-    return sorted(df.select(*cols).distinct().collect(), key=lambda r: tuple(r))
+    return sorted(_collect(df.select(*cols).distinct()), key=lambda r: tuple(r))
+
+
+def _first(df):
+    rows = _collect(df.limit(1))
+    return rows[0]
 
 
 class TestMergeExpectedAssociationsTables:
@@ -433,8 +321,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_single_full_table(self, tmp_path, dim_records):
         """A single table covering all dimensions is returned as-is (minus dups)."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "all": _make_df(
                 [
@@ -453,8 +339,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_identical_columns_union(self, tmp_path, dim_records):
         """Two tables with the same column set are unioned."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "part1": _make_df(
                 [
@@ -477,8 +361,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_disjoint_columns_cross_join(self, tmp_path, dim_records):
         """Disjoint column sets are cross-joined, remaining dims filled in."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         # Each table must include all records for its dimension columns.
         dfs = {
             "geo": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
@@ -493,8 +375,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_overlapping_columns_inner_join(self, tmp_path, dim_records):
         """Overlapping-but-not-identical column sets are inner-joined on shared columns."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -524,8 +404,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_partial_table_fills_remaining_dims(self, tmp_path, dim_records):
         """A single-column table cross-joins with full records of all other dims."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         # Table must have all geography records.
         dfs = {
             "geo_only": _make_df([{"geography": "A"}, {"geography": "B"}, {"geography": "C"}]),
@@ -538,8 +416,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_fails_on_missing_record(self, tmp_path, dim_records):
         """A table missing a dimension record is caught at entry validation."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -561,8 +437,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_fails_on_missing_shared_value(self, tmp_path, dim_records):
         """A table missing a shared-column value is caught before the inner join."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -585,8 +459,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_entry_check_on_single_table(self, tmp_path, dim_records):
         """A single full-dim table missing a record is caught (first group)."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "all": _make_df(
                 [
@@ -603,8 +475,6 @@ class TestMergeExpectedAssociationsTables:
     def test_union_partners_complement_each_other(self, tmp_path, dim_records):
         """Two tables with identical columns can individually be incomplete
         as long as their union covers all dimension records."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "part1": _make_df(
                 [
@@ -627,8 +497,6 @@ class TestMergeExpectedAssociationsTables:
 
     def test_three_groups_with_remaining_dims(self, tmp_path, dim_records):
         """Two overlapping groups + a remaining uncovered dimension."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dfs = {
             "geo_sector": _make_df(
                 [
@@ -681,8 +549,6 @@ class TestMergeExpectedAssociationsTables:
         Inner join on {sector, subsector} finds no match for (s1, p) or
         (s1, q), so sector=s1 is dropped entirely.
         """
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dim_records = {
             "geography": ["A", "B"],
             "sector": ["s1", "s2"],
@@ -713,10 +579,46 @@ class TestMergeExpectedAssociationsTables:
             with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped"):
                 merge_expected_associations_tables(dfs, dim_records, ctx)
 
+    def test_inner_join_drops_null_shared_column_value(self, tmp_path):
+        """A NULL in a shared column is reported, not silently dropped.
+
+        An expected-associations file with an empty cell reads back as NULL.
+        The inner join drops those rows because ``NULL = NULL`` is never true,
+        so the merged table would silently cover fewer associations than the
+        file declared. The post-join check must name the lost NULL.
+        """
+        dim_records = {
+            "geography": ["A", "B"],
+            "sector": ["s1", "s2"],
+            "subsector": ["p", "q"],
+        }
+
+        dfs = {
+            "geo_sector": _make_df(
+                [
+                    {"geography": "A", "sector": "s1"},
+                    {"geography": "A", "sector": "s2"},
+                    {"geography": "B", "sector": "s1"},
+                    {"geography": "B", "sector": "s2"},
+                    # Empty cell in the shared 'sector' column.
+                    {"geography": "B", "sector": None},
+                ]
+            ),
+            "sector_sub": _make_df(
+                [
+                    {"sector": "s1", "subsector": "p"},
+                    {"sector": "s1", "subsector": "q"},
+                    {"sector": "s2", "subsector": "p"},
+                    {"sector": "s2", "subsector": "q"},
+                ]
+            ),
+        }
+        with ScratchDirContext(tmp_path) as ctx:
+            with pytest.raises(DSGInvalidDataset, match="Inner join.*dropped.*None"):
+                merge_expected_associations_tables(dfs, dim_records, ctx)
+
     def test_column_not_in_dim_records(self, tmp_path):
         """A table column not in all_dim_records raises DSGFileInputError."""
-        from dsgrid.utils.dataset import merge_expected_associations_tables
-
         dim_records = {
             "geography": ["A", "B"],
         }
@@ -731,3 +633,126 @@ class TestMergeExpectedAssociationsTables:
         with ScratchDirContext(tmp_path) as ctx:
             with pytest.raises(DSGFileInputError, match="Unexpected dimension type"):
                 merge_expected_associations_tables(dfs, dim_records, ctx)
+
+
+# ---------------------------------------------------------------------------
+# map_stacked_dimension: fraction-multiplier dimension mapping.
+#
+# Records are (from_id -> to_id, from_fraction). The function inner-joins the df
+# on column == from_id, drops records whose to_id IS NULL, renames to_id back to
+# the mapped column, and sets fraction = existing_fraction * from_fraction (the
+# existing fraction defaults to 1.0 when the df has no fraction column). Each
+# test below uses a hand-verifiable table so the expected output is obvious.
+# ---------------------------------------------------------------------------
+
+
+def test_map_stacked_dimension_one_to_many_split():
+    """A single from_id fanning out to two to_ids yields one row per to_id, each
+    carrying the source value and its own from_fraction (0.3 / 0.7)."""
+    df = make_table(
+        ["subsector", "value"],
+        ("A", 10.0),
+        ("B", 20.0),
+    )
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("A", "X", 0.3),
+        ("A", "Y", 0.7),
+        ("B", "Z", 1.0),
+    )
+    result = map_stacked_dimension(df, records, "subsector")
+    # The join's from_id/from_fraction are consumed, and to_id is renamed back to the
+    # mapped column -- no record columns leak into the output.
+    assert set(result.columns) == {"value", "subsector", "fraction"}
+    rows = {row.subsector: row for row in _collect(result)}
+    assert set(rows) == {"X", "Y", "Z"}
+    assert len(rows) == 3
+    assert rows["X"].value == 10.0
+    assert rows["X"].fraction == pytest.approx(0.3)
+    assert rows["Y"].value == 10.0
+    assert rows["Y"].fraction == pytest.approx(0.7)
+    assert rows["Z"].value == 20.0
+    assert rows["Z"].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_drops_row_with_no_matching_record():
+    """A df row whose column value has no from_id in the records is dropped by the
+    inner join; only the mapped row survives."""
+    df = make_table(["subsector", "value"], ("A", 10.0), ("B", 20.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 1.0))
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_drops_row_with_null_to_id():
+    """A from_id that maps to a NULL to_id is filtered out before the join, so its
+    df row is dropped even though a mapping record exists for it."""
+    df = make_table(["subsector", "value"], ("A", 10.0), ("B", 20.0))
+    records = make_table(
+        ["from_id", "to_id", "from_fraction"],
+        ("A", "X", 1.0),
+        ("B", None, 1.0),
+    )
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(1.0)
+
+
+def test_map_stacked_dimension_multiplies_existing_fraction():
+    """When the df already carries a fraction, the result is the product with
+    from_fraction (0.5 * 0.4 = 0.2), not an overwrite."""
+    df = make_table(["subsector", "value", "fraction"], ("A", 10.0, 0.5))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = _collect(map_stacked_dimension(df, records, "subsector"))
+    assert len(result) == 1
+    assert result[0].subsector == "X"
+    assert result[0].value == 10.0
+    assert result[0].fraction == pytest.approx(0.2)
+
+
+def test_map_stacked_dimension_to_column_renames_target():
+    """to_column places the mapped ids in a differently-named column and, with the
+    default drop_column=True, removes the source column."""
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = map_stacked_dimension(df, records, "subsector", to_column="new_dim")
+    assert set(result.columns) == {"value", "new_dim", "fraction"}
+    rows = _collect(result)
+    assert len(rows) == 1
+    assert rows[0].new_dim == "X"
+    assert rows[0].value == 10.0
+    assert rows[0].fraction == pytest.approx(0.4)
+
+
+def test_map_stacked_dimension_keeps_source_column_when_not_dropped():
+    """drop_column=False retains the original column alongside the mapped to_column.
+
+    Mirrors the base-to-supplemental callsite (table_format_handler_base.py) that
+    adds a derived dimension beside its base column.
+    """
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 0.4))
+    result = map_stacked_dimension(
+        df, records, "subsector", drop_column=False, to_column="new_dim"
+    )
+    assert set(result.columns) == {"subsector", "value", "new_dim", "fraction"}
+    rows = _collect(result)
+    assert len(rows) == 1
+    assert rows[0].subsector == "A"  # original preserved
+    assert rows[0].new_dim == "X"  # mapped target
+    assert rows[0].value == 10.0
+    assert rows[0].fraction == pytest.approx(0.4)
+
+
+def test_map_stacked_dimension_rejects_in_place_keep():
+    """drop_column=False without a distinct to_column would rename to_id onto the
+    still-present source column and clobber it, so it raises instead."""
+    df = make_table(["subsector", "value"], ("A", 10.0))
+    records = make_table(["from_id", "to_id", "from_fraction"], ("A", "X", 1.0))
+    with pytest.raises(DSGInvalidOperation, match="drop_column"):
+        map_stacked_dimension(df, records, "subsector", drop_column=False)

@@ -1,0 +1,154 @@
+"""Compatibility helpers for table operations during the Ibis migration."""
+
+import shutil
+from pathlib import Path
+
+import ibis
+
+from dsgrid.ibis.io import write_table, read_csv
+from dsgrid.ibis.operations import (
+    aggregate_single_value,
+    coalesce,
+    count_distinct_on_group_by,
+    create_temp_view,
+    cross_join,
+    except_all,
+    filter_sql,
+    handle_column_spaces,
+    intersect,
+    join,
+    join_multiple_columns,
+    make_temp_view_name,
+    pivot,
+    sql_from_df,
+    unpivot,
+)
+from dsgrid.ibis.table_utils import is_table_empty
+from dsgrid.ibis.temp import drop_temp_tables_and_views
+from dsgrid.ibis.types import use_duckdb
+from dsgrid.ibis.session import (
+    init_runtime_session,
+    get_runtime_session,
+)
+from dsgrid.ibis.tz import get_current_time_zone, set_current_time_zone
+
+__all__ = [
+    "aggregate",
+    "aggregate_single_value",
+    "cache",
+    "coalesce",
+    "collect_list",
+    "count_distinct_on_group_by",
+    "create_temp_view",
+    "cross_join",
+    "drop_temp_tables_and_views",
+    "except_all",
+    "filter_sql",
+    "get_current_time_zone",
+    "handle_column_spaces",
+    "init_runtime_session",
+    "intersect",
+    "is_dataframe_empty",
+    "join",
+    "join_multiple_columns",
+    "make_temp_view_name",
+    "pivot",
+    "read_csv",
+    "select_expr",
+    "set_current_time_zone",
+    "sql_from_df",
+    "unpersist",
+    "unpivot",
+    "write_csv",
+]
+
+
+def aggregate(df: ibis.Table, agg_func: str, column: str, alias: str) -> ibis.Table:
+    value = getattr(df[column], agg_func)()
+    return df.aggregate(**{alias: value})
+
+
+def cache(df: ibis.Table) -> ibis.Table:
+    """Materialize and cache a table for repeated reads.
+
+    On DuckDB this is a no-op (queries execute against in-memory data
+    already). On Spark, the returned table is an Ibis CachedTable whose
+    cached data lives until ``unpersist`` is called or the reference is
+    garbage collected. Callers must rebind: ``df = cache(df)``.
+    """
+    if use_duckdb():
+        return df
+    return df.cache()
+
+
+def unpersist(df: ibis.Table) -> None:
+    """Release a cached table previously returned by :func:`cache`.
+
+    Safe to call on tables that were never cached — the call is a no-op
+    when the input has no ``release`` method (e.g. when running on DuckDB).
+    """
+    release = getattr(df, "release", None)
+    if release is not None:
+        release()
+
+
+def collect_list(df: ibis.Table, column: str) -> list:
+    return df.select(column).execute()[column].tolist()
+
+
+def is_dataframe_empty(df: ibis.Table) -> bool:
+    return is_table_empty(df)
+
+
+def select_expr(df: ibis.Table, exprs: list[str]) -> ibis.Table:
+    view = create_temp_view(df)
+    cols = ",".join(exprs)
+    return get_runtime_session().sql(f"SELECT {cols} FROM {view}")
+
+
+def write_csv(
+    df: ibis.Table,
+    path: Path | str,
+    overwrite: bool = False,
+) -> None:
+    """Write an Ibis table to a single CSV file on both backends.
+
+    dsgrid's CSV callers (dimension records, lookup tables, query
+    results) consistently want a single file: pydantic validators check
+    that the file path is a file, and human consumers read one CSV.
+    Spark's default distributed-write semantic (a directory of part
+    files) is the wrong shape, so this function explicitly collects on
+    Spark to materialize a single file.
+
+    For very large query results where a driver collect would be a
+    memory issue, callers should write Parquet via
+    :func:`dsgrid.ibis.io.write_dataframe` and post-process.
+
+    Parameters
+    ----------
+    df : ibis.Table
+    path : Path or str
+    overwrite : bool, optional
+        If True, replace any existing path. Defaults to False.
+
+    The header row is always written; dsgrid's column model is name-based
+    and there is no ``header=False`` option.
+    """
+    path_obj = path if isinstance(path, Path) else Path(path)
+    if path_obj.exists():
+        if not overwrite:
+            raise FileExistsError(str(path_obj))
+        if path_obj.is_dir():
+            shutil.rmtree(path_obj)
+        else:
+            path_obj.unlink()
+
+    if use_duckdb():
+        # DuckDB's COPY ... TO produces a single file natively.
+        write_table(df, path_obj.as_posix(), "csv")
+        return
+
+    # Spark: distributed write produces a directory of part files, which
+    # downstream validators (pydantic file checks) and CSV consumers
+    # don't accept. Collect to pandas and emit a single file.
+    df.execute().to_csv(path_obj, index=False, header=True)

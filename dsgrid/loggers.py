@@ -4,6 +4,7 @@ import logging
 import logging.config
 import os
 from contextlib import contextmanager
+from typing import cast
 
 import chronify.loggers
 
@@ -70,6 +71,10 @@ def setup_logging(
     packages = packages or []
     packages = set(packages)
     packages.add("dsgrid")
+    # ``logging.captureWarnings`` below routes warnings.warn() messages to this logger.
+    # The two go together: without this handler configuration the logging module attaches
+    # a NullHandler to ``py.warnings`` and the captured warnings are dropped entirely.
+    packages.add("py.warnings")
     for package in packages:
         log_config["loggers"][package] = {
             "handlers": ["console"],
@@ -77,7 +82,7 @@ def setup_logging(
             "propagate": True,
         }
         if filename is not None:
-            log_config["loggers"][package]["handlers"].append("file")
+            cast(list[str], log_config["loggers"][package]["handlers"]).append("file")
 
     # ETH@20210325 - This logic should be applied to packages as well? This makes
     # me think that this should really be two functions--one for setting up a
@@ -87,6 +92,7 @@ def setup_logging(
         log_config["handlers"].pop("file")
 
     logging.config.dictConfig(log_config)
+    logging.captureWarnings(True)
     logger = logging.getLogger(name)
 
     # TODO: more consideration is warranted, but this is usually what we want.

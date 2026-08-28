@@ -1,5 +1,6 @@
 import pandas as pd
 import requests
+from typing import Any, cast
 from dash import Dash, dash_table, dcc, html, Input, Output, State
 import dash_bootstrap_components as dbc
 
@@ -146,7 +147,7 @@ def on_list_dimensions(n_clicks, project_id, url):
         style_table=STYLE_TABLE,
         style_header=STYLE_HEADER,
         style_cell=STYLE_CELL,
-        style_data_conditional=STYLE_DATA_CONDITIONAL,
+        style_data_conditional=cast(Any, STYLE_DATA_CONDITIONAL),
     )
 
 
@@ -176,7 +177,7 @@ def on_list_dimension_records(row_indexes, row_data, url):
     return (
         dash_table.DataTable(
             records,
-            columns,
+            cast(Any, columns),
             id="dimension_records_table",
             editable=False,
             filter_action="native",
@@ -184,7 +185,7 @@ def on_list_dimension_records(row_indexes, row_data, url):
             style_table=STYLE_TABLE,
             style_header=STYLE_HEADER,
             style_cell=STYLE_CELL,
-            style_data_conditional=STYLE_DATA_CONDITIONAL,
+            style_data_conditional=cast(Any, STYLE_DATA_CONDITIONAL),
         ),
         row_data[row_index]["name"],
     )

@@ -1,7 +1,8 @@
+import ibis
 import logging
-from typing import Self
+from typing import Any, Self, cast
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -10,28 +11,27 @@ from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import DatasetQueryModel
+from dsgrid.query.models import DatasetQueryModel, ProjectQueryModel
 from dsgrid.query.query_context import QueryContext
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.functions import (
-    cache,
+from dsgrid.ibis.functions import cache, unpersist
+from dsgrid.ibis.operations import (
     coalesce,
-    collect_list,
+    drop_columns,
     except_all,
     intersect,
-    unpersist,
+    join_multiple_columns,
+    union_all,
 )
-from dsgrid.spark.types import (
-    DataFrame,
-    StringType,
-)
+from dsgrid.ibis.table_utils import count_distinct, count_rows, table_to_records
+from dsgrid.ibis.types import is_string_column
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
 )
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.ibis.null_checks import check_for_nulls
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
 
@@ -82,8 +82,8 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -107,13 +107,13 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         else:
             self._check_dataset_time_consistency(self._get_load_data_table())
 
-    def get_base_load_data_table(self) -> DataFrame:
+    def get_base_load_data_table(self) -> ibis.Table:
         return self._load_data
 
-    def _get_load_data_table(self) -> DataFrame:
-        return self._load_data.join(self._load_data_lookup, on="id")
+    def _get_load_data_table(self) -> ibis.Table:
+        return join_multiple_columns(self._load_data, self._load_data_lookup, ["id"])
 
-    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
+    def _make_actual_dimension_association_table_from_data(self) -> ibis.Table:
         """Override base implementation to avoid joining all time-series rows.
 
         The base class joins the full load_data (potentially billions of time-step rows)
@@ -131,16 +131,17 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lkp_dim_cols = self._list_dimension_columns(self._load_data_lookup)
         distinct_lkp = self._load_data_lookup.select("id", *lkp_dim_cols).distinct()
 
-        joined = distinct_ld.join(distinct_lkp, on="id")
+        joined = join_multiple_columns(distinct_ld, distinct_lkp, ["id"])
         return joined.select(*ld_dim_cols, *lkp_dim_cols).distinct()
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
-    ) -> DataFrame:
+    ) -> ibis.Table:
         lk_df = self._load_data_lookup
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
 
-        plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
+        query = cast(ProjectQueryModel, context.model)
+        plan = query.project.get_dataset_mapping_plan(self.dataset_id)
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
         with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
@@ -149,7 +150,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ld_df = self._load_data
                 ld_df = self._prefilter_stacked_dimensions(context, ld_df)
                 ld_df = self._prefilter_time_dimension(context, ld_df)
-                ld_df = ld_df.join(lk_df, on="id").drop("id")
+                ld_df = drop_columns(join_multiple_columns(ld_df, lk_df, ["id"]), "id")
 
             ld_df = self._remap_dimension_columns(
                 ld_df,
@@ -178,7 +179,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self,
         context: QueryContext,
         time_dimension: TimeDimensionBaseConfig | None = None,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
         plan = query.mapping_plan
@@ -191,7 +192,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if ld_df is None:
                 ld_df = self._load_data
                 lk_df = self._load_data_lookup
-                ld_df = ld_df.join(lk_df, on="id").drop("id")
+                ld_df = drop_columns(join_multiple_columns(ld_df, lk_df, ["id"]), "id")
 
             ld_df = self._remap_dimension_columns(
                 ld_df,
@@ -202,6 +203,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
             ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
             if metric_dimension is not None:
+                metric_dimension = cast(Any, metric_dimension)
                 metric_records = metric_dimension.get_records_dataframe()
                 ld_df = self._convert_units(ld_df, metric_records, mapping_manager)
             if time_dimension is not None:
@@ -232,9 +234,9 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if col == "id":
                 found_id = True
                 continue
-            if col == SCALING_FACTOR_COLUMN:
+            if col in (SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN):
                 continue
-            if self._load_data_lookup.schema[col].dataType != StringType():
+            if not is_string_column(self._load_data_lookup, col):
                 msg = f"dimension column {col} must have data type = StringType"
                 raise DSGInvalidDataset(msg)
             dimension_types.add(DimensionType.from_column(col))
@@ -273,7 +275,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         allowed_columns = (
             DimensionType.get_allowed_dimension_column_names()
             .union(time_columns)
-            .union({VALUE_COLUMN, "id", "scaling_factor"})
+            .union({VALUE_COLUMN, TIME_ZONE_COLUMN, "id", "scaling_factor"})
         )
 
         found_id = False
@@ -291,19 +293,19 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_for_nulls(self._load_data)
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
-        ldl_id_count = ldl_ids.count()
-        data_id_count = ld_ids.count()
-        joined = ld_ids.join(ldl_ids, on="id")
-        count = joined.count()
+        ldl_id_count = count_rows(ldl_ids)
+        data_id_count = count_rows(ld_ids)
+        joined = join_multiple_columns(ld_ids, ldl_ids, ["id"])
+        count = count_rows(joined)
 
         if data_id_count != count or ldl_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                diff = except_all(ld_ids.unionAll(ldl_ids), intersect(ld_ids, ldl_ids))
-                # Only run the query once (with Spark). Number of rows shouldn't be a problem.
-                cache(diff)
-                diff_count = diff.count()
+                # Cache so the diff is computed once and reused by the count and
+                # sample below. The number of rows shouldn't be a problem.
+                diff = cache(except_all(union_all(ld_ids, ldl_ids), intersect(ld_ids, ldl_ids)))
+                diff_count = count_rows(diff)
                 limit = 100
-                diff_list = diff.limit(limit).collect()
+                diff_list = table_to_records(diff.limit(limit))
                 unpersist(diff)
                 logger.error(
                     "load_data and load_data_lookup have %s different IDs. Limited to %s: %s",
@@ -317,7 +319,6 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         lookup = self._load_data_lookup
-        cache(lookup)
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
@@ -325,18 +326,24 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if column in lookup_columns:
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
 
-        drop_columns = []
+        # Cache while running one count per trivial dimension; the CachedTable is
+        # garbage-collected after the loop and Ibis releases the cached data.
+        cached_lookup = cache(lookup)
+        columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = lookup.select(col).distinct().count()
+            count = count_distinct(cached_lookup, col)
             assert count == 1, f"{dim}: count"
-            drop_columns.append(col)
-        lookup = lookup.drop(*drop_columns)
+            columns_to_drop.append(col)
+        del cached_lookup
+        lookup = drop_columns(lookup, *columns_to_drop)
 
         lookup2 = coalesce(lookup, 1)
         store.replace_lookup_table(lookup2, self.dataset_id, self._config.model.version)
-        ids = collect_list(lookup2.select("id").distinct(), "id")
-        load_df = self._load_data.filter(self._load_data.id.isin(ids))
+        # Re-read the lookup after the replace so that subsequent operations do not reference
+        # the previous on-disk part files, which have been deleted.
+        lookup2 = store.read_lookup_table(self.dataset_id, self._config.model.version)
+        load_df = join_multiple_columns(load_df, lookup2.select("id").distinct(), ["id"])
         ld_columns = set(load_df.columns)
         for dim in dimensions:
             column = dim.dimension_type.value

@@ -8,10 +8,13 @@ name = "minimal_patterns"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.24.1", features = ["extension-module"] }
+pyo3 = { version = "0.29.0", features = ["extension-module"] }
 arrow2 = { version = "0.18", features = ["io_parquet"] }
 parquet2 = "0.17"
 roaring = "0.10"
 rayon = "1.8"
 ahash = "0.8"
 anyhow = "1.0"
+# Not used directly; pulled in via arrow2. Versions before 1.5.3 fail to compile
+# on rustc where TryFromIntError is no longer zero-sized.
+ethnum = "1.5.3"

@@ -1,12 +1,16 @@
+"""File-size and partition-count estimation for sharding Ibis tables to disk."""
+
 import logging
 import math
 
+from dsgrid.ibis.operations import count_groups
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import timed_info
 
 logger = logging.getLogger(__name__)
 
 
-class SparkPartition:
+class TablePartition:
     def __init__(self):
         return
 
@@ -15,11 +19,11 @@ class SparkPartition:
 
         Parameters
         ----------
-        df : DataFrame
+        df : Ibis table
         bytes_per_cell : [float, int]
             Estimated number of bytes per cell in a dataframe.
-            * 4-bytes = 32-bit = Single-precision Float = pyspark.sql.types.FloatType,
-            * 8-bytes = 64-bit = Double-precision float = pyspark.sql.types.DoubleType,
+            * 4-bytes = 32-bit = single-precision float.
+            * 8-bytes = 64-bit = double-precision float.
 
         Returns
         -------
@@ -31,7 +35,7 @@ class SparkPartition:
             Estimated size of df in memory in MB
 
         """
-        n_rows = df.count()
+        n_rows = count_rows(df)
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
         return n_rows, n_cols, data_MB
@@ -41,7 +45,7 @@ class SparkPartition:
         """calculate *optimal* number of files
         Parameters
         ----------
-        df : DataFrame
+        df : Ibis table
         MB_per_cmp_file : float
             Desired size of compressed file on disk in MB
         cmp_ratio : float
@@ -67,11 +71,20 @@ class SparkPartition:
     def file_size_if_partition_by(self, df, key):
         """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
-        n_partitions = df.select(key).distinct().count()
+        counts = count_groups(df, [key])
+        # Single aggregation round-trip instead of three (n_partitions / max /
+        # min). Each `.execute()` on the per-key counts re-plans the underlying
+        # group-by; collecting all three reducers in one query is significantly
+        # cheaper on Spark and DuckDB alike.
+        summary = counts.aggregate(
+            n_partitions=counts.count(),
+            max_count=counts["count"].max(),
+            min_count=counts["count"].min(),
+        ).execute()
+        n_partitions = int(summary["n_partitions"].iloc[0])
+        n_rows_largest_part = int(summary["max_count"].iloc[0])
+        n_rows_smallest_part = int(summary["min_count"].iloc[0])
         avg_MB = round(data_MB / n_partitions, 2)
-
-        n_rows_largest_part = df.groupBy(key).count().orderBy("count", ascending=False).first()[1]
-        n_rows_smallest_part = df.groupBy(key).count().orderBy("count", ascending=True).first()[1]
 
         largest_MB = round(data_MB / n_rows * n_rows_largest_part, 2)
         smallest_MB = round(data_MB / n_rows * n_rows_smallest_part, 2)

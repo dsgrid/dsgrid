@@ -5,9 +5,13 @@ import pytest
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns
+from dsgrid.ibis.table_utils import get_unique_values
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
+
+from tests._helpers import collect as _collect
 
 
 PROJECT_ID = "test_efs"
@@ -67,17 +71,18 @@ def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> No
             dataset = project.get_dataset(DATASET_ID)
             load_data_df = dataset._handler._load_data
             load_data_lookup_df = dataset._handler._load_data_lookup
-            df = load_data_df.join(load_data_lookup_df, on="id").drop("id")
-            dataset_geos = df.select("geography").distinct().collect()
-            assert len(dataset_geos) == 1
-            assert dataset_geos[0].geography == COUNTY_ID
+            df = drop_columns(
+                join_multiple_columns(load_data_df, load_data_lookup_df, ["id"]), "id"
+            )
+            dataset_geos = get_unique_values(df, "geography")
+            assert dataset_geos == {COUNTY_ID}
 
             base_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)
-            records = base_dim.get_records_dataframe().collect()
+            records = _collect(base_dim.get_records_dataframe())
             assert len(records) == 1
             assert records[0].id == COUNTY_ID
 
-            supp_dim = project.config.get_dimension_records(DIMENSION_NAME).collect()
+            supp_dim = _collect(project.config.get_dimension_records(DIMENSION_NAME))
             assert len(supp_dim) == 1
             assert supp_dim[0].id == STATE_ID
 
@@ -90,7 +95,7 @@ def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> No
                         DimensionType.GEOGRAPHY
                     ):
                         if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
-                            records = mapping.get_records_dataframe().collect()
+                            records = _collect(mapping.get_records_dataframe())
                             assert len(records) == 1
                             assert records[0].from_id == COUNTY_ID and records[0].to_id == STATE_ID
                             found_mapping_records = True

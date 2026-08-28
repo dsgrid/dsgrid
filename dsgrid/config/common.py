@@ -93,7 +93,7 @@ def make_base_dimension_template(
 
 
 def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str, Any]:
-    time_dim = {
+    time_dim: dict[str, Any] = {
         "type": DimensionType.TIME.value,
         "time_type": time_type.value,
         "time_interval_type": TimeIntervalType.PERIOD_BEGINNING.value,

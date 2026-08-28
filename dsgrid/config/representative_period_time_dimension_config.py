@@ -69,7 +69,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         raise NotImplementedError(msg)
 
     @staticmethod
-    def model_class() -> RepresentativePeriodTimeDimensionModel:
+    def model_class() -> Type[RepresentativePeriodTimeDimensionModel]:
         return RepresentativePeriodTimeDimensionModel
 
     def get_frequency(self) -> timedelta:
@@ -128,7 +128,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
     @staticmethod
-    def get_representative_time_type() -> OneWeekPerMonthByHourType:
+    def get_representative_time_type() -> Type[OneWeekPerMonthByHourType]:
         return OneWeekPerMonthByHourType
 
     def get_frequency(self) -> timedelta:
@@ -162,7 +162,7 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
     """
 
     @staticmethod
-    def get_representative_time_type() -> OneWeekdayDayAndOneWeekendDayPerMonthByHourType:
+    def get_representative_time_type() -> Type[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
         return OneWeekdayDayAndOneWeekendDayPerMonthByHourType
 
     def get_frequency(self) -> timedelta:

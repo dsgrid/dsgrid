@@ -1,7 +1,13 @@
 """Tests for dsgrid.utils.utilities module."""
 
+import pytest
 
-from dsgrid.utils.utilities import make_unique_key
+from dsgrid.config.mapping_tables import MappingTableRecordModel
+from dsgrid.utils.utilities import (
+    convert_record_dicts_to_classes,
+    make_unique_key,
+    sorted_with_nulls,
+)
 
 
 def test_make_unique_key_new_name():
@@ -67,3 +73,61 @@ def test_make_unique_key_similar_names():
 
     result2 = make_unique_key("file_name", existing)
     assert result2 == "file_name_1"
+
+
+def test_sorted_with_nulls_no_nulls():
+    """Test that values without None sort normally."""
+    assert sorted_with_nulls({"b", "a", "c"}) == ["a", "b", "c"]
+
+
+def test_sorted_with_nulls_none_first():
+    """Test that None sorts before all other values."""
+    assert sorted_with_nulls({"b", None, "a"}) == [None, "a", "b"]
+
+
+def test_sorted_with_nulls_only_none():
+    """Test a collection containing only None."""
+    assert sorted_with_nulls([None, None]) == [None]
+
+
+def test_sorted_with_nulls_empty():
+    """Test an empty collection."""
+    assert sorted_with_nulls(set()) == []
+
+
+def test_sorted_with_nulls_ints():
+    """Test that non-string values sort by value."""
+    assert sorted_with_nulls({3, None, 1, 2}) == [None, 1, 2, 3]
+
+
+def test_sorted_with_nulls_mixed_types():
+    """Test that mutually incomparable values fall back to a stable order."""
+    assert sorted_with_nulls({6037, "6037", None}) == [None, 6037, "6037"]
+
+
+def test_convert_record_dicts_to_classes_reports_record_number():
+    """Test that a validation failure names the failing record and its content."""
+    rows = [
+        {"from_id": "a", "from_fraction": 1.0},
+        {"from_id": "b", "from_fraction": "not-a-float"},
+    ]
+    with pytest.raises(ValueError, match="record 2") as exc:
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)
+    assert "not-a-float" in str(exc.value)
+
+
+def test_convert_record_dicts_to_classes_reports_inconsistent_length():
+    """Test that a ragged record reports its record number and both lengths."""
+    rows = [
+        {"from_id": "a", "from_fraction": 1.0},
+        {"from_id": "b"},
+    ]
+    with pytest.raises(ValueError, match="Record 2 has 1 columns; expected 2"):
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)
+
+
+def test_convert_record_dicts_to_classes_reports_none_key():
+    """Test that a None key reports the record number."""
+    rows = [{"from_id": "a", None: 1.0}]
+    with pytest.raises(ValueError, match="record 1 has a key that is None"):
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)

@@ -1,12 +1,13 @@
 """Manages the registry for dimension projects"""
 
+import ibis
 import logging
 import os
 import tempfile
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Type, Union
+from typing import Any, Type, Union, cast
 
 from dsgrid.utils.dataset import handle_dimension_association_errors
 import json5
@@ -14,11 +15,13 @@ import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
+from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
 from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.noop_time_dimension_config import NoOpTimeDimensionConfig
+from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimension,
@@ -29,7 +32,7 @@ from dsgrid.exceptions import (
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimensions import DimensionModel
+from dsgrid.config.dimensions import DimensionModel, DimensionsListModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionReferenceModel,
@@ -71,28 +74,21 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
     RegistryManagerParams,
 )
-from dsgrid.spark.functions import (
-    cache,
-    except_all,
-    is_dataframe_empty,
-    unpersist,
+from dsgrid.ibis.functions import cache, unpersist, write_csv
+from dsgrid.ibis.operations import except_all
+from dsgrid.ibis.table_utils import (
+    get_unique_values,
+    get_unique_values_per_column,
+    is_table_empty,
 )
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
-    use_duckdb,
-)
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
-    models_to_dataframe,
-    get_unique_values,
-    persist_table,
-    read_dataframe,
-)
-from dsgrid.utils.utilities import check_uniqueness, display_table
+from dsgrid.ibis.io import persist_table, read_dataframe
+from dsgrid.ibis.models import models_to_dataframe
+from dsgrid.utils.utilities import check_uniqueness, display_table, sorted_with_nulls
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
 from .common import (
     VersionUpdateType,
@@ -177,23 +173,22 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def get_by_id(
         self,
-        project_id: str,
+        config_id: str,
         version: str | None = None,
         conn: Connection | None = None,
     ) -> ProjectConfig:
         if version is None:
-            assert self._db is not None
-            version = self._db.get_latest_version(conn, project_id)
+            version = self.db.get_latest_version(conn, config_id)
 
-        key = ConfigKey(project_id, version)
+        key = ConfigKey(config_id, version)
         project = self._projects.get(key)
         if project is not None:
             return project
 
         if version is None:
-            model = self.db.get_latest(conn, project_id)
+            model = self.db.get_latest(conn, config_id)
         else:
-            model = self.db.get_by_version(conn, project_id, version)
+            model = self.db.get_by_version(conn, config_id, version)
 
         assert isinstance(model, ProjectConfigModel)
         config = ProjectConfig(model)
@@ -477,7 +472,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         conn = context.connection
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
-            dimensions = []
+            dimensions: DimensionsListModel = []
             subset_refs = {}
             for subset_dimension in subset_dimensions:
                 base_dim = None
@@ -491,14 +486,16 @@ class ProjectRegistryManager(RegistryManagerBase):
                 for selector in subset_dimension.selectors:
                     new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
-                    new_records.toPandas().to_csv(filename, index=False)
-                    dim = DimensionModel(
-                        file=str(filename),
-                        name=selector.name,
-                        type=subset_dimension.dimension_type,
-                        module=base_dim.model.module,
-                        class_name=base_dim.model.class_name,
-                        description=selector.description,
+                    write_csv(new_records, filename, overwrite=True)
+                    dim = DimensionModel.model_validate(
+                        {
+                            "file": str(filename),
+                            "name": selector.name,
+                            "type": subset_dimension.dimension_type,
+                            "module": base_dim.model.module,
+                            "class": base_dim.model.class_name,
+                            "description": selector.description,
+                        }
                     )
                     dimensions.append(dim)
                     key = (subset_dimension.dimension_type, selector.name)
@@ -525,7 +522,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _check_subset_dimension_consistency(
         self,
         subset_dimension: SubsetDimensionGroupModel,
-        base_records: DataFrame,
+        base_records: ibis.Table,
     ) -> None:
         base_record_ids = get_unique_values(base_records, "id")
         diff = subset_dimension.record_ids.difference(base_record_ids)
@@ -571,7 +568,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                             subset_dimension_group.base_dimension_name is None
                             or base_dim.model.name == subset_dimension_group.base_dimension_name
                         ):
-                            base_dims.append(base_dim)
+                            base_dims.append(cast(DimensionBaseConfigWithFiles, base_dim))
                             break
                 if len(base_dims) == 0:
                     msg = f"Did not find a base dimension for {subset_dimension_group=}"
@@ -607,19 +604,21 @@ class ProjectRegistryManager(RegistryManagerBase):
                 map_record_file = tmp_path / f"{subset_dimension_group.name}_mapping.csv"
                 pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
 
-                dim = SupplementalDimensionModel(
-                    file=str(filename),
-                    name=subset_dimension_group.name,
-                    type=dimension_type,
-                    module=base_dim.model.module,
-                    class_name=base_dim.model.class_name,
-                    description=subset_dimension_group.description,
-                    mapping=MappingTableByNameModel(
-                        file=str(map_record_file),
-                        mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
-                        description=f"Aggregation map for {subset_dimension_group.name}",
-                        project_base_dimension_name=base_dim.model.name,
-                    ),
+                dim = SupplementalDimensionModel.model_validate(
+                    {
+                        "file": str(filename),
+                        "name": subset_dimension_group.name,
+                        "type": dimension_type,
+                        "module": base_dim.model.module,
+                        "class": base_dim.model.class_name,
+                        "description": subset_dimension_group.description,
+                        "mapping": MappingTableByNameModel(
+                            file=str(map_record_file),
+                            mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
+                            description=f"Aggregation map for {subset_dimension_group.name}",
+                            project_base_dimension_name=base_dim.model.name,
+                        ),
+                    }
                 )
                 dimensions.append(dim)
 
@@ -672,18 +671,20 @@ class ProjectRegistryManager(RegistryManagerBase):
                         f_out.write("\n")
 
                 with in_other_dir(src_dir):
-                    new_dim = SupplementalDimensionModel(
-                        file=str(dim_record_file),
-                        name=dim_name,
-                        type=dimension_type,
-                        module="dsgrid.dimension.base_models",
-                        class_name="DimensionRecordBaseModel",
-                        description=dim_name_formal,
-                        mapping=MappingTableByNameModel(
-                            file=str(map_record_file),
-                            mapping_type=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
-                            description=f"Aggregation map for all {dt_str}s",
-                        ),
+                    new_dim = SupplementalDimensionModel.model_validate(
+                        {
+                            "file": str(dim_record_file),
+                            "name": dim_name,
+                            "type": dimension_type,
+                            "module": "dsgrid.dimension.base_models",
+                            "class": "DimensionRecordBaseModel",
+                            "description": dim_name_formal,
+                            "mapping": MappingTableByNameModel(
+                                file=str(map_record_file),
+                                mapping_type=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
+                                description=f"Aggregation map for all {dt_str}s",
+                            ),
+                        }
                     )
                 new_dimensions.append(new_dim)
 
@@ -1005,7 +1006,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                             found = True
                             break
                 if not found:
-                    msg = f"{dataset.dataset_type} is not present in the project config"
+                    msg = f"{dataset.dataset_id} is not present in the project config"
                     raise DSGInvalidParameter(msg)
 
             self._make_new_config(config, context)
@@ -1203,14 +1204,9 @@ class ProjectRegistryManager(RegistryManagerBase):
                         f"has values of 1.0: {p_mapping.model.mapping_id} - {fraction_vals}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
-                reverse_records = (
-                    records.drop("from_fraction")
-                    .select(F.col("to_id").alias("from_id"), F.col("from_id").alias("to_id"))
-                    .toPandas()
-                )
+                reverse_records = records.select(from_id=records.to_id, to_id=records.from_id)
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
-                # Use pandas because spark creates a CSV directory.
-                reverse_records.to_csv(dst, index=False)
+                write_csv(reverse_records, dst, overwrite=True)
                 dimension_type = to_dim.model.dimension_type.value
                 new_mappings.append(
                     {
@@ -1283,6 +1279,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_references: list[DimensionMappingReferenceModel],
         context: RegistrationContext,
     ):
+        self._check_time_zone_for_mapping(project_config, dataset_config)
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
         project_config.add_dataset_base_dimension_names(
             dataset_config.model.dataset_id,
@@ -1310,7 +1307,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             new_status = ProjectRegistryStatus.IN_PROGRESS
         project_config.set_status(new_status)
         config = self.update_with_context(project_config, context)
-        self._db.add_contains_dataset(context.connection, config.model, dataset_config.model)
+        self.db.add_contains_dataset(context.connection, config.model, dataset_config.model)
 
         logger.info(
             "%s Registered dataset %s with version=%s in project %s",
@@ -1319,6 +1316,55 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.version,
             config.model.project_id,
         )
+
+    @staticmethod
+    def _check_time_zone_for_mapping(
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+    ):
+        """Check that time_zone is available when time mapping requires it.
+
+        Time mapping runs after every dimension mapping, so it reads time zones from the
+        geography dimension that owns the ids in the geography column at that point.  A
+        project query always passes the project's base geography, whether or not the
+        dataset's geography was mapped, so that is the dimension that must provide a
+        ``time_zone`` column.  The dataset's own geography is what registration uses, and
+        :meth:`DatasetConfigModel.check_time_zone` covers that.
+
+        Raises
+        ------
+        DSGInvalidDataset
+            If time_zone is needed for mapping but not available.
+        """
+        dataset_time_dim = dataset_config.get_time_dimension()
+        if dataset_time_dim is None:
+            return
+
+        # Annual and NoOp time dimensions do not go through chronify-based
+        # mapping, so they never need time_zone from geography.
+        if isinstance(dataset_time_dim, (AnnualTimeDimensionConfig, NoOpTimeDimensionConfig)):
+            return
+
+        project_time_dim = project_config.get_base_time_dimension()
+        needs_time_zone = (
+            dataset_time_dim.model.is_time_zone_required_in_geography()
+            or project_time_dim.model.is_time_zone_required_in_geography()
+        )
+        if not needs_time_zone:
+            return
+
+        geo_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+        try:
+            check_timezone_in_geography(geo_dim.model)
+        except (ValueError, DSGInvalidDimension) as exc:
+            msg = (
+                f"Time mapping for dataset {dataset_config.config_id!r} requires time zone "
+                "information from a geography dimension. A project query reads it from the "
+                f"project's base geography dimension, {geo_dim.model.name!r}, whose records "
+                "do not provide a valid 'time_zone' column. Add that column to the project's "
+                "geography dimension records."
+            )
+            raise DSGInvalidDataset(msg) from exc
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(
@@ -1348,17 +1394,18 @@ class ProjectRegistryManager(RegistryManagerBase):
                 data_store, project_table, scontext
             )
             cols = sorted(project_table.columns)
-            cache(mapped_dataset_table)
-            diff: DataFrame | None = None
+            mapped_dataset_table = cache(mapped_dataset_table)
+            diff: ibis.Table | None = None
 
             try:
                 # This check is relatively short and will show the user clear errors.
                 _check_distinct_column_values(project_table, mapped_dataset_table)
                 # This check is long and will produce a full table of differences.
                 # It may require some effort from the user.
-                diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
-                cache(diff)
-                if not is_dataframe_empty(diff):
+                diff = cache(
+                    except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
+                )
+                if not is_table_empty(diff):
                     dataset_id = dataset_config.model.dataset_id
                     handle_dimension_association_errors(diff, mapped_dataset_table, dataset_id)
             finally:
@@ -1434,7 +1481,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         config: ProjectConfig,
         dataset_id: str,
         context: ScratchDirContext,
-    ) -> DataFrame:
+    ) -> ibis.Table:
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
         if use_duckdb():
@@ -1589,30 +1636,37 @@ class ProjectRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table
         display_table(table)
 
 
-def _check_distinct_column_values(project_table: DataFrame, mapped_dataset_table: DataFrame):
+def _check_distinct_column_values(project_table: ibis.Table, mapped_dataset_table: ibis.Table):
     """Ensure that the mapped dataset has the same distinct values as the project for all
     columns. This should be called before running a full comparison of the two tables.
+
+    The diff is computed in Python because dimension columns are
+    bounded-cardinality (geographies, subsectors, etc.) and the post-mapping
+    comparison is typically a few hundred values per column at most.
     """
     has_mismatch = False
-    for column in project_table.columns:
-        project_distinct = {x[column] for x in project_table.select(column).distinct().collect()}
-        dataset_distinct = {
-            x[column] for x in mapped_dataset_table.select(column).distinct().collect()
-        }
-        if diff_values := project_distinct.difference(dataset_distinct):
+    columns = project_table.columns
+    project_values_per_column = get_unique_values_per_column(project_table, columns)
+    mapped_values_per_column = get_unique_values_per_column(mapped_dataset_table, columns)
+    for column in columns:
+        project_values = project_values_per_column[column]
+        mapped_values = mapped_values_per_column[column]
+        diff = project_values.difference(mapped_values)
+        if diff:
             has_mismatch = True
+            sample = set(sorted_with_nulls(diff)[:100])
             logger.error(
                 "The mapped dataset has different distinct values than the project "
-                "for column=%s: diff=%s",
+                "for column=%s. Showing at most 100 values: diff=%s",
                 column,
-                diff_values,
+                sample,
             )
 
     if has_mismatch:

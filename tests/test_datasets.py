@@ -20,6 +20,7 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_names_with_current_ids,
 )
 from dsgrid.utils.files import (
+    dump_data,
     dump_json_file,
     dump_line_delimited_json,
     load_json_file,
@@ -116,8 +117,6 @@ def register_dataset(setup_registry):
             ts["expected_associations"] = [str(dataset_path / "expected_associations")]
         if "missing_associations" in ts and ts["missing_associations"]:
             ts["missing_associations"] = [str(dataset_path / "missing_associations")]
-    from dsgrid.utils.files import dump_data
-
     dump_data(test_config, test_config_file)
 
     # This dict must get filled in by each test.
@@ -195,13 +194,20 @@ def test_invalid_load_data_lookup_column_name(register_dataset):
 
 
 def test_invalid_load_data_lookup_integer_column(register_dataset):
-    _, dataset_path, expected_errors = register_dataset
+    config_file, dataset_path, expected_errors = register_dataset
     lookup_file = dataset_path / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
     # Convert geography values from strings to integers to trigger the type validation error
     for item in data:
         item["geography"] = int(item["geography"])
     dump_line_delimited_json(data, lookup_file)
+    # A declared string type would coerce the integers back to strings, so remove the
+    # declaration and let the inferred integer type reach the consistency check.
+    config = load_data(config_file)
+    for column in config["data_layout"]["lookup_data_file"]["columns"]:
+        if column["name"] == "geography":
+            column.pop("data_type")
+    dump_data(config, config_file)
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"geography.*must have data type.*StringType"
 
@@ -289,7 +295,7 @@ def test_invalid_load_data_null_id(register_dataset):
     lines.append(",".join(new_line_fields))
     data_file.write_text("\n".join(lines))
     expected_errors["exception"] = DSGInvalidField
-    expected_errors["match_msg"] = r"DataFrame contains NULL value.*id"
+    expected_errors["match_msg"] = r"Ibis table contains NULL value.*id"
 
 
 def test_invalid_load_data_lookup_mismatched_ids(register_dataset):
@@ -313,7 +319,7 @@ def test_invalid_load_data_lookup_null_id(register_dataset):
     data.append(item)
     dump_line_delimited_json(data, lookup_file)
     expected_errors["exception"] = DSGInvalidField
-    expected_errors["match_msg"] = r"DataFrame contains NULL value.*geography"
+    expected_errors["match_msg"] = r"Ibis table contains NULL value.*geography"
 
 
 def test_invalid_load_data_extra_column(register_dataset):

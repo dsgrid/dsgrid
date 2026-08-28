@@ -3,23 +3,77 @@ from pathlib import Path
 from typing import Iterable
 
 from chronify.utils.path_utils import check_overwrite
+from pydantic import Field
 
 from dsgrid.config.dataset_config import (
     get_unique_dimension_record_ids,
     make_unvalidated_dataset_config,
 )
+from dsgrid.config.file_schema import Column
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.dataset.models import TableFormat
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.files import dump_data
+from dsgrid.utils.files import dump_data, load_data
 from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 
 
 logger = logging.getLogger(__name__)
+
+
+class DataFileColumns(DSGBaseModel):
+    """User-declared columns for the data files scanned by ``generate-config``.
+
+    The CLI reads raw on-disk files before a dataset config exists, so dsgrid
+    cannot derive column types from a registered schema. Users declare columns
+    here per file role to give the readers an authoritative schema.
+
+    - ``one_table`` layouts only need ``load_data``.
+    - ``two_table`` layouts may declare ``load_data`` and/or ``load_data_lookup``.
+
+    Columns omitted from these lists keep whatever type the backend's default
+    reader infers. Declared columns are cast to the requested type after read,
+    so the same schema applies uniformly to CSV, JSON, and Parquet inputs.
+    """
+
+    load_data: list[Column] = Field(
+        default_factory=list,
+        description="Columns for the load_data file.",
+    )
+    load_data_lookup: list[Column] = Field(
+        default_factory=list,
+        description="Columns for the load_data_lookup file (two_table only).",
+    )
+
+
+def load_data_file_columns(path: Path) -> DataFileColumns:
+    """Load a ``--schema-file`` JSON5 document into a :class:`DataFileColumns`.
+
+    Parameters
+    ----------
+    path : Path
+        JSON5 file shaped like ``{"load_data": [...], "load_data_lookup": [...]}``.
+        Each list element is a :class:`Column` (``name`` and ``data_type``).
+
+    Returns
+    -------
+    DataFileColumns
+
+    Raises
+    ------
+    DSGInvalidParameter
+        If the file cannot be parsed into the model.
+    """
+    try:
+        return DataFileColumns.model_validate(load_data(path))
+    except Exception as exc:
+        msg = f"Failed to parse schema file {path}: {exc}"
+        raise DSGInvalidParameter(msg) from exc
 
 
 def generate_config_from_dataset(
@@ -35,6 +89,7 @@ def generate_config_from_dataset(
     project_id: str | None = None,
     overwrite: bool = False,
     no_prompts: bool = False,
+    data_file_columns: DataFileColumns | None = None,
 ):
     """Generate dataset config files from a dataset table.
 
@@ -43,6 +98,16 @@ def generate_config_from_dataset(
     Look for matches for dimensions in the registry, checking for project base dimensions
     first. Prompt the user for confirmation unless --no-prompts is set. If --no-prompts is
     set, the first match is automatically accepted.
+
+    Parameters
+    ----------
+    data_file_columns : DataFileColumns | None
+        Optional user-declared columns for the input files. See
+        :class:`DataFileColumns`. When omitted, dsgrid relies on each
+        backend's default reader, which can disagree across CSV and JSON (e.g.
+        DuckDB's CSV reader returns all columns as VARCHAR while its JSON
+        reader infers types). Pass this when the input files include a shared
+        join key whose type would otherwise be inferred inconsistently.
     """
     project_config = (
         None if project_id is None else registry_manager.project_manager.get_by_id(project_id)
@@ -55,9 +120,21 @@ def generate_config_from_dataset(
     dataset_file = output_dir / "dataset.json5"
     time_cols = time_columns or {"timestamp"}
 
+    load_data_columns = (
+        list(data_file_columns.load_data) if data_file_columns is not None else None
+    )
+    load_data_lookup_columns = (
+        list(data_file_columns.load_data_lookup) if data_file_columns is not None else None
+    )
+
     dimension_references: list[DimensionReferenceModel] = []
     for dim_type, ids in get_unique_dimension_record_ids(
-        dataset_path, table_format, pivoted_dimension_type, time_cols
+        dataset_path,
+        table_format,
+        pivoted_dimension_type,
+        time_cols,
+        load_data_columns=load_data_columns,
+        load_data_lookup_columns=load_data_lookup_columns,
     ).items():
         ref, checked_project_dim_ids = find_matching_project_base_dimension(
             project_config, ids, dim_type, no_prompts=no_prompts

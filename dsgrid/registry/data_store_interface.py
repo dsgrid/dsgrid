@@ -1,8 +1,7 @@
+import ibis
 import abc
 from pathlib import Path
 from typing import Self
-
-from dsgrid.spark.types import DataFrame
 
 
 class DataStoreInterface(abc.ABC):
@@ -27,48 +26,48 @@ class DataStoreInterface(abc.ABC):
         return self._base_path
 
     @abc.abstractmethod
-    def read_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_table(self, dataset_id: str, version: str) -> ibis.Table:
         """Read a table from the data store."""
 
     @abc.abstractmethod
-    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_table(self, df: ibis.Table, dataset_id: str, version: str) -> None:
         """Replace a table in the data store."""
 
     @abc.abstractmethod
-    def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
+    def read_lookup_table(self, dataset_id: str, version: str) -> ibis.Table:
         """Read a lookup table from the data store."""
 
     @abc.abstractmethod
     def read_expected_associations_tables(
         self, dataset_id: str, version: str
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ibis.Table]:
         """Read expected dimensions association tables from the data store."""
 
     @abc.abstractmethod
     def read_missing_associations_tables(
         self, dataset_id: str, version: str
-    ) -> dict[str, DataFrame]:
+    ) -> dict[str, ibis.Table]:
         """Read a missing dimensions association tables from the data store."""
 
     @abc.abstractmethod
-    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+    def replace_lookup_table(self, df: ibis.Table, dataset_id: str, version: str) -> None:
         """Replace a lookup table in the data store."""
 
     @abc.abstractmethod
     def write_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ibis.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         """Write a table to the data store."""
 
     @abc.abstractmethod
     def write_lookup_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+        self, df: ibis.Table, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         """Write a lookup table to the data store."""
 
     @abc.abstractmethod
     def write_expected_associations_tables(
-        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+        self, dfs: dict[str, ibis.Table], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         """Write a set of tables of expected dimension associations to the data store.
         The dictionary keys of the dfs argument should be human-readable tags for the contents of
@@ -79,7 +78,7 @@ class DataStoreInterface(abc.ABC):
 
     @abc.abstractmethod
     def write_missing_associations_tables(
-        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
+        self, dfs: dict[str, ibis.Table], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         """Write a set of tables of missing dimension associations to the data store.
         The dictionary keys of the dfs argument should human-readable tags for the contents of

@@ -1,3 +1,4 @@
+import ibis
 import abc
 import logging
 from enum import Enum
@@ -7,8 +8,12 @@ from pydantic import field_validator, model_validator, Field
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.filter_operators import (
+    FILTER_OPERATOR_NAMES,
+    apply_filter_operator,
+)
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
-from dsgrid.spark.types import DataFrame, F
+from dsgrid.ibis.operations import filter_sql
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +40,7 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
     @abc.abstractmethod
     def apply_filter(self, df, column=None):
-        """Apply the filter to a DataFrame"""
+        """Apply the filter to an Ibis table"""
 
     @model_validator(mode="before")
     @classmethod
@@ -43,17 +48,8 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
         values.pop("filter_type", None)
         return values
 
-    def _make_value_str(self, value):
-        if isinstance(value, str):
-            return f"'{value}'"
-        elif isinstance(value, int) or isinstance(value, float):
-            return str(value)
-        else:
-            msg = f"Unsupported type: {type(value)}"
-            raise DSGInvalidField(msg)
-
     def _make_values_str(self, values):
-        return ", ".join((f"{self._make_value_str(x)}" for x in values))
+        return ", ".join((f"{_make_sql_value(x)}" for x in values))
 
 
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
@@ -70,7 +66,7 @@ class DimensionFilterMultipleQueryNameBaseModel(DimensionFilterBaseModel, abc.AB
 
 class _DimensionFilterWithWhereClauseModel(DimensionFilterSingleQueryNameBaseModel, abc.ABC):
     def apply_filter(self, df, column=None):
-        return df.filter(self.where_clause(column=column))
+        return filter_sql(df, self.where_clause(column=column))
 
     @abc.abstractmethod
     def where_clause(self, column=None):
@@ -109,7 +105,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
 
     def where_clause(self, column=None):
         column = column or self.column
-        value = self._make_value_str(self.value)
+        value = _make_sql_value(self.value)
         text = f"({column} {self.operator} {value})"
         return text
 
@@ -141,37 +137,39 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
         return text
 
 
-DIMENSION_COLUMN_FILTER_OPERATORS = {
-    "contains",
-    "endswith",
-    "isNotNull",
-    "isNull",
-    "isin",
-    "like",
-    "rlike",
-    "startswith",
-}
+# Derived from the registry in dsgrid.ibis.filter_operators; kept under
+# its historical name for backward compatibility.
+DIMENSION_COLUMN_FILTER_OPERATORS = FILTER_OPERATOR_NAMES
 
 
 def check_operator(operator):
     if operator not in DIMENSION_COLUMN_FILTER_OPERATORS:
-        msg = f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
+        msg = (
+            f"operator={operator} is not supported. "
+            f"Allowed={sorted(DIMENSION_COLUMN_FILTER_OPERATORS)}"
+        )
         raise ValueError(msg)
     return operator
 
 
+def _make_sql_value(value: Any) -> str:
+    if isinstance(value, str):
+        return "'" + value.replace("'", "''") + "'"
+    if isinstance(value, int | float):
+        return str(value)
+    msg = f"Unsupported type: {type(value)}"
+    raise DSGInvalidField(msg)
+
+
 class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
-    """Filters a table where a dimension column matches a Spark SQL operator.
+    """Filters a table where a dimension column matches a SQL operator.
 
     Examples:
-    import pyspark.sql.functions as F
-    df.filter(F.col("geography").like("abc%"))
-    df.filter(~F.col("sector").startswith("com"))
+    df.filter("geography LIKE 'abc%'")
+    df.filter("NOT (sector LIKE 'com%')")
     """
 
-    operator: str = Field(
-        title="operator", description="Method on pyspark.sql.functions.col to invoke"
-    )
+    operator: str = Field(title="operator", description="SQL-style column operator to invoke")
     value: Any = Field(
         default=None,
         title="value",
@@ -191,11 +189,7 @@ class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        col = F.col(column)
-        method = getattr(col, self.operator)
-        if self.negate:
-            return df.filter(~method(self.value))
-        return df.filter(method(self.value))
+        return apply_filter_operator(df, column, self.operator, self.value, self.negate)
 
 
 class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
@@ -203,8 +197,7 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
     inclusive.
 
     Examples:
-    import pyspark.sql.functions as F
-    df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
+    df.filter("timestamp BETWEEN '2012-07-01 00:00:00' AND '2012-08-01 00:00:00'")
     """
 
     lower_bound: Any = Field(
@@ -224,9 +217,9 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        if self.negate:
-            return df.filter(~F.col(column).between(self.lower_bound, self.upper_bound))
-        return df.filter(F.col(column).between(self.lower_bound, self.upper_bound))
+        return apply_filter_operator(
+            df, column, "between", (self.lower_bound, self.upper_bound), self.negate
+        )
 
 
 class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
@@ -247,7 +240,7 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
         msg = f"apply_filter must not be called on {self.__class__.__name__}"
         raise NotImplementedError(msg)
 
-    def get_filtered_records_dataframe(self, dimension_accessor) -> DataFrame:
+    def get_filtered_records_dataframe(self, dimension_accessor) -> ibis.Table:
         """Return a dataframe containing the filter records."""
         df = None
         dim_type = None
@@ -282,7 +275,7 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryN
     value: Any = Field(title="value", description="Value to filter on", default="%")
     operator: str = Field(
         title="operator",
-        description="Method on pyspark.sql.functions.col to invoke",
+        description="SQL-style column operator to invoke",
         default="like",
     )
     negate: bool = Field(
@@ -301,8 +294,4 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryN
 
     def apply_filter(self, df, column=None):
         column = column or self.column
-        col = F.col(column)
-        method = getattr(col, self.operator)
-        if self.negate:
-            return df.filter(~method(self.value))
-        return df.filter(method(self.value))
+        return apply_filter_operator(df, column, self.operator, self.value, self.negate)

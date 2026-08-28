@@ -1,5 +1,6 @@
+import ibis
 import logging
-from typing import Self
+from typing import Any, Self, cast
 
 from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
@@ -7,18 +8,17 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import ValueFormat
-from dsgrid.query.models import DatasetQueryModel
+from dsgrid.query.models import DatasetQueryModel, ProjectQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import (
-    DataFrame,
-    StringType,
-)
+from dsgrid.ibis.types import is_string_column
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
 from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.ibis.null_checks import check_for_nulls
+from dsgrid.ibis.table_utils import count_distinct
+from dsgrid.ibis.operations import drop_columns
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DatasetDimensionRequirements, DimensionType
@@ -58,8 +58,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self,
-        expected_dimension_associations: dict[str, DataFrame],
-        missing_dimension_associations: dict[str, DataFrame],
+        expected_dimension_associations: dict[str, ibis.Table],
+        missing_dimension_associations: dict[str, ibis.Table],
         scratch_dir_context: ScratchDirContext,
         requirements: DatasetDimensionRequirements,
     ) -> None:
@@ -101,7 +101,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         allowed_columns.add(VALUE_COLUMN)
         allowed_columns.add(TIME_ZONE_COLUMN)
 
-        schema = self._load_data.schema
         for column in self._load_data.columns:
             if column not in allowed_columns:
                 msg = f"{column=} is not expected in load_data"
@@ -110,16 +109,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 column in time_columns or column == VALUE_COLUMN or column == TIME_ZONE_COLUMN
             ):
                 dim_type = DimensionType.from_column(column)
-                if schema[column].dataType != StringType():
+                if not is_string_column(self._load_data, column):
                     msg = f"dimension column {column} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
         check_for_nulls(self._load_data)
 
-    def get_base_load_data_table(self) -> DataFrame:
+    def get_base_load_data_table(self) -> ibis.Table:
         return self._load_data
 
-    def _get_load_data_table(self) -> DataFrame:
+    def _get_load_data_table(self) -> ibis.Table:
         return self._load_data
 
     @track_timing(timer_stats_collector)
@@ -136,21 +135,22 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
                 stacked_columns.add(column)
 
-        drop_columns = []
+        columns_to_drop = []
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
-            count = load_df.select(col).distinct().count()
+            count = count_distinct(load_df, col)
             assert count == 1, f"{dim}: {count}"
-            drop_columns.append(col)
-        load_df = load_df.drop(*drop_columns)
+            columns_to_drop.append(col)
+        load_df = drop_columns(load_df, *columns_to_drop)
 
         store.replace_table(load_df, self.dataset_id, self._config.model.version)
         logger.info("Rewrote simplified %s", self._config.model.dataset_id)
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
-    ) -> DataFrame:
-        plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
+    ) -> ibis.Table:
+        query = cast(ProjectQueryModel, context.model)
+        plan = query.project.get_dataset_mapping_plan(self.dataset_id)
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
         with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
@@ -182,7 +182,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_mapped_dataframe(
         self, context: QueryContext, time_dimension: TimeDimensionBaseConfig | None = None
-    ) -> DataFrame:
+    ) -> ibis.Table:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
         plan = query.mapping_plan
@@ -198,6 +198,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._remap_dimension_columns(ld_df, mapping_manager)
             ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
             if metric_dimension is not None:
+                metric_dimension = cast(Any, metric_dimension)
                 metric_records = metric_dimension.get_records_dataframe()
                 ld_df = self._convert_units(ld_df, metric_records, mapping_manager)
             if time_dimension is not None:

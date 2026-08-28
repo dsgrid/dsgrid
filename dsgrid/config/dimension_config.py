@@ -28,7 +28,7 @@ class DimensionBaseConfigWithFiles(ConfigWithRecordFileBase, abc.ABC):
             set of str
 
         """
-        return {x.id for x in self.model.records}
+        return {str(x.id) for x in self.model.records}
 
 
 class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):

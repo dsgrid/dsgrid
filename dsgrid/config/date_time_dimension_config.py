@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta, tzinfo
+from typing import Any, Type, cast
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -19,13 +20,13 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to a DateTimeDimensionModel."""
 
     @staticmethod
-    def model_class() -> DateTimeDimensionModel:
+    def model_class() -> Type[DateTimeDimensionModel]:
         return DateTimeDimensionModel
 
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.DatetimeRange:
+    def to_chronify(self) -> chronify.DatetimeRange | chronify.DatetimeRangeWithTZColumn:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1
@@ -38,7 +39,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         match self.model.time_zone_format.format_type:
             case TimeZoneFormat.ALIGNED_IN_ABSOLUTE_TIME:
                 return chronify.DatetimeRange(
-                    dtype=col_dtype,
+                    dtype=cast(Any, col_dtype),
                     time_column=time_cols[0],
                     start=start,
                     length=self.get_lengths()[0],
@@ -48,13 +49,13 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 )
             case TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME:
                 return chronify.DatetimeRangeWithTZColumn(
-                    dtype=col_dtype,
+                    dtype=cast(Any, col_dtype),
                     time_column=time_cols[0],
                     start=start,
                     length=self.get_lengths()[0],
                     resolution=self.get_frequency(),
                     time_zone_column=TIME_ZONE_COLUMN,
-                    time_zones=self.get_chronify_time_zones(),
+                    time_zones=cast(Any, self.get_chronify_time_zones()),
                     measurement_type=self._model.measurement_type,
                     interval_type=self._model.time_interval_type,
                 )

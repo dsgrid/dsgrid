@@ -26,7 +26,10 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     VersionUpdateType,
 )
-from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
+from dsgrid.registry.dataset_config_generator import (
+    generate_config_from_dataset,
+    load_data_file_columns,
+)
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.project_config_generator import generate_project_config
 from dsgrid.utils.filters import ACCEPTED_OPS
@@ -1613,11 +1616,18 @@ def update_dataset(
 
 _generate_dataset_config_from_dataset_epilog = """
 Examples:\n
-$ dsgrid registry datasets generate-config-from-dataset \\ \n
+$ dsgrid registry datasets generate-config \\ \n
     -o "./my-dataset-dir" \\ \n
     -P my-project-id \\ \n
     my-dataset-id \\ \n
     /path/to/table.parquet\n
+\n
+$ dsgrid registry datasets generate-config \\ \n
+    -o "./my-dataset-dir" \\ \n
+    -P my-project-id \\ \n
+    -S schema.json5 \\ \n
+    my-dataset-id \\ \n
+    /path/to/load_data.csv\n
 """
 
 
@@ -1625,7 +1635,7 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
 @click.argument("dataset-id")
 @click.argument("dataset-path")
 @click.option(
-    "-s",
+    "-F",
     "--table-format",
     type=click.Choice([x.value for x in TableFormat]),
     default=TableFormat.ONE_TABLE.value,
@@ -1696,6 +1706,21 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     show_default=True,
     help="Overwrite files if they exist.",
 )
+@click.option(
+    "-S",
+    "--schema-file",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Optional json5 file declaring column types for the input files, so the "
+        "readers don't infer mismatched types across csv and json inputs (e.g. an "
+        "integer 'id' read as a string from csv but a 64-bit integer from json). "
+        "Maps each file role to a list of column definitions: "
+        "{load_data: [...], load_data_lookup: [...]}. See the DataFileColumns "
+        "and Column data models in the dsgrid documentation for the field shape and "
+        "supported data_type values."
+    ),
+)
 @click.pass_obj
 @click.pass_context
 def generate_dataset_config_from_dataset(
@@ -1712,6 +1737,7 @@ def generate_dataset_config_from_dataset(
     project_id: str | None,
     no_prompts: bool,
     overwrite: bool,
+    schema_file: Path | None,
 ):
     """Generate dataset config files from a dataset table.
 
@@ -1720,6 +1746,7 @@ def generate_dataset_config_from_dataset(
     Look for matches for dimensions in the registry. Prompt the user for confirmation unless
     --no-prompts is set. If --no-prompts is set, the first match is automatically accepted.
     """
+    data_file_columns = load_data_file_columns(schema_file) if schema_file is not None else None
     res = handle_dsgrid_exception(
         ctx,
         generate_config_from_dataset,
@@ -1735,6 +1762,7 @@ def generate_dataset_config_from_dataset(
         project_id=project_id,
         no_prompts=no_prompts,
         overwrite=overwrite,
+        data_file_columns=data_file_columns,
     )
     if res[1] != 0:
         ctx.exit(res[1])

@@ -30,7 +30,12 @@ MODELS = [
         "Dataset Config",
         "dsgrid.config.dataset_config.DatasetConfigModel",
         "source/software_reference/data_models/dataset_model.md",
-        [],
+        [
+            # CLI ``generate-config --schema-file`` input. Not nested under
+            # DatasetConfigModel, but its ``Column`` entries are (via FileSchema),
+            # so documenting it here lets those link instead of duplicating.
+            "dsgrid.registry.dataset_config_generator.DataFileColumns",
+        ],
     ),
     (
         "Dimension Mappings",

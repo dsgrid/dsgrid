@@ -4,7 +4,7 @@ import importlib
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Union, Literal
+from typing import Any, Union, Literal, cast
 import copy
 from zoneinfo import ZoneInfo
 
@@ -255,6 +255,10 @@ class TimeFormatDateTimeTZModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("dtype") == "TIMESTAMP_TZ":
             logger.warning(
                 "Renaming legacy dtype 'TIMESTAMP_TZ' to 'timestamp_tz' within TimeFormatDateTimeTZModel."
@@ -279,6 +283,10 @@ class TimeFormatDateTimeNTZModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("dtype") == "TIMESTAMP_NTZ":
             logger.warning(
                 "Renaming legacy dtype 'TIMESTAMP_NTZ' to 'timestamp_ntz' within TimeFormatDateTimeNTZModel."
@@ -499,6 +507,10 @@ class AlignedTimeSingleTimeZone(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if values.get("format_type") == "aligned":
             logger.warning(
                 "Renaming legacy format_type 'aligned' to 'aligned_in_absolute_time' within the datetime config time_zone_format parameter."
@@ -595,7 +607,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         title="column_format",
         description="Specifies the format of the timestamps in the dataset.",
     )
-    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+    time_zone_format: AlignedTimeSingleTimeZone | LocalTimeMultipleTimeZones = Field(
         title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local standard time when adjusted for time zone.",
@@ -628,6 +640,24 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
+        # Normalize column_format.dtype to lowercase before the discriminated union
+        # resolves, because Pydantic reads the discriminator tag before running
+        # per-member validators.
+        column_format = values.get("column_format")
+        if isinstance(column_format, dict) and isinstance(column_format.get("dtype"), str):
+            dtype = column_format["dtype"]
+            if dtype != dtype.lower():
+                logger.warning(
+                    "Renaming legacy dtype '%s' to '%s' within the datetime config.",
+                    dtype,
+                    dtype.lower(),
+                )
+                column_format["dtype"] = dtype.lower()
+
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
                 msg = f"Unknown data_schema format: {values=}"
@@ -757,7 +787,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         """
         is_tz_naive = self.column_format.dtype == "timestamp_ntz" or (
             self.column_format.dtype == "time_format_in_parts"
-            and self.column_format.offset_column is None
+            and cast(Any, self.column_format).offset_column is None
         )
         if not is_tz_naive:
             return self
@@ -810,6 +840,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if "str_format" in values:
             logger.warning(
                 "Moving legacy str_format field to ranges struct within the annual time config."
@@ -892,6 +926,12 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             "options": MeasurementType.format_for_docs(),
         },
     )
+    time_zone_format: AlignedTimeSingleTimeZone | LocalTimeMultipleTimeZones = Field(
+        title="time_zone_format",
+        discriminator="format_type",
+        description="Specifies whether all geographies share a single time zone or each "
+        "geography has its own.",
+    )
     ranges: list[IndexRangeModel] = Field(
         title="ranges",
         description="Defines the continuous ranges of indices of the data, inclusive of start and end index.",
@@ -907,6 +947,10 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if not isinstance(values, dict):
+            # values is an already-constructed and validated model instance.
+            return values
+
         if "starting_timestamps" in values:
             logger.warning(
                 "Moving legacy starting_timestamps field to ranges struct within the index time config."
@@ -932,6 +976,18 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             for trange in values.get("ranges", []):
                 trange["frequency"] = frequency
 
+        # Legacy configs without time_zone_format default to local time with
+        # per-geography time zones (the previous unconditional behavior).
+        if "time_zone_format" not in values:
+            logger.warning(
+                "Index time config missing time_zone_format. Defaulting to "
+                "aligned_in_std_clock_time (per-geography time zones from geography records)."
+            )
+            values["time_zone_format"] = {
+                "format_type": TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME.value,
+                "time_zones": [],
+            }
+
         return values
 
     @field_validator("ranges")
@@ -940,7 +996,7 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
         return _check_index_ranges(ranges)
 
     def is_time_zone_required_in_geography(self) -> bool:
-        return True
+        return self.time_zone_format.format_type == TimeZoneFormat.ALIGNED_IN_STD_CLOCK_TIME
 
 
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):

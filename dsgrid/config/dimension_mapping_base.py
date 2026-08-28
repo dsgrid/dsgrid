@@ -150,7 +150,7 @@ class DimensionMappingBaseModel(DSGBaseDatabaseModel):
     mapping_type: DimensionMappingType = Field(
         title="mapping_type",
         description="Type/purpose of the dimension mapping",
-        default="many_to_one_aggregation",
+        default=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
         json_schema_extra={
             "options": DimensionMappingType.format_for_docs(),
         },
@@ -247,7 +247,7 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
     mapping_type: DimensionMappingType = Field(
         title="mapping_type",
         description="Type/purpose of the dimension mapping",
-        default="many_to_one_aggregation",
+        default=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
         json_schema_extra={
             "options": DimensionMappingType.format_for_docs(),
         },

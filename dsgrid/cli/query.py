@@ -6,7 +6,6 @@ from pathlib import Path
 
 import rich_click as click
 from chronify.utils.path_utils import check_overwrite
-from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.cli.common import (
@@ -25,7 +24,9 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -124,7 +125,9 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     "--aggregation-function",
     default="sum",
     show_default=True,
-    help="Aggregation function for any included default aggregations.",
+    help="Aggregation function for any included default aggregations. "
+    f"Registered: {', '.join(sorted(SUPPORTED_AGGREGATIONS))}. Other names are "
+    "uppercased and forwarded to the backend.",
 )
 @click.option(
     "-f",
@@ -278,7 +281,7 @@ def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
         print(f"Validated {query_file}", file=sys.stderr)
-    except ValidationError:
+    except DSGInvalidParameter:
         print(f"Failed to validate query file {query_file}", file=sys.stderr)
         raise
 

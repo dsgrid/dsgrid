@@ -461,6 +461,7 @@ Defines a time dimension where timestamps are indices and requires converting to
 | `description` | `str` \| None | `None` | A description of the dimension records that is helpful, memorable, and identifiable |
 | `time_type` | [TimeDimensionType](enums.md#timedimensiontype) | `TimeDimensionType.INDEX` |  |
 | `measurement_type` | [MeasurementType](enums.md#measurementtype) | `MeasurementType.TOTAL` | The type of measurement represented by a value associated with a timestamp: e.g., mean, total |
+| `time_zone_format` | [AlignedTimeSingleTimeZone](dimension_model.md#alignedtimesingletimezone) \| [LocalTimeMultipleTimeZones](dimension_model.md#localtimemultipletimezones) | *(required)* | Specifies whether all geographies share a single time zone or each geography has its own. |
 | `ranges` | list[[IndexRangeModel](dimension_model.md#indexrangemodel)] | *(required)* | Defines the continuous ranges of indices of the data, inclusive of start and end index. |
 | `time_interval_type` | [TimeIntervalType](enums.md#timeintervaltype) | *(required)* | The range of time that the value associated with a timestamp represents, e.g., period-beginning |
 

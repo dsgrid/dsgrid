@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Generator, Sequence, Union
+from typing import Any, Generator, Sequence, Union, cast
 from uuid import uuid4
 
 from prettytable import PrettyTable
@@ -209,11 +209,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def _register(self, config, context: RegistrationContext) -> list[str]:
         existing_ids = self._replace_duplicates(config, context)
-        registered_dimension_ids = []
+        registered_dimension_ids: list[str] = []
 
         # This function will either register the dimension specified by each model or re-use an
         # existing ID. The returned list must be in the same order as the list of models.
-        final_dimension_ids = []
+        final_dimension_ids: list[str] = []
         for dim in config.model.dimensions:
             if dim.id is None:
                 assert dim.dimension_id is None
@@ -221,6 +221,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 dim.version = "1.0.0"
                 dim = self.db.insert(context.connection, dim, context.registration)
                 assert isinstance(dim, DimensionBaseModel)
+                assert dim.dimension_id is not None
                 final_dimension_ids.append(dim.dimension_id)
                 registered_dimension_ids.append(dim.dimension_id)
                 logger.info(
@@ -235,6 +236,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 if dim.dimension_id not in existing_ids:
                     msg = f"Bug: {dim.dimension_id=} should have been in existing_ids"
                     raise Exception(msg)
+                assert dim.dimension_id is not None
                 final_dimension_ids.append(dim.dimension_id)
 
         logger.info("Registered %s dimensions", len(config.model.dimensions))
@@ -273,7 +275,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             filter_config = {"dimension_type": dimension_type}
             for model in self.db.iter_models(filter_config=filter_config, conn=conn):
                 assert isinstance(model, DimensionBaseModel)
+                assert model.dimension_id is not None
                 config = self.get_by_id(model.dimension_id, conn=conn)
+                assert isinstance(config, DimensionBaseConfigWithFiles)
                 if sorted_record_ids == sorted(config.get_unique_ids()):
                     yield config
 
@@ -334,6 +338,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for model in self.db.iter_models(conn):
+            model = cast(Any, model)
             registration = self.db.get_registration(conn, model)
             if dimension_ids and model.dimension_id not in dimension_ids:
                 continue
@@ -358,7 +363,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table
@@ -405,9 +410,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             for key in [x for x in self._dimensions if x.id in config_ids]:
                 self._dimensions.pop(key)
 
-    def remove(self, dimension_id, conn: Connection | None = None):
-        self.db.delete_all(conn, dimension_id)
-        for key in [x for x in self._dimensions if x.id == dimension_id]:
+    def remove(self, config_id: str, conn: Connection | None = None):
+        self.db.delete_all(conn, config_id)
+        for key in [x for x in self._dimensions if x.id == config_id]:
             self._dimensions.pop(key)
 
-        logger.info("Removed %s from the registry.", dimension_id)
+        logger.info("Removed %s from the registry.", config_id)

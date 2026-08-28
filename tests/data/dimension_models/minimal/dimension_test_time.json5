@@ -133,6 +133,10 @@
       ],
       time_interval_type: "period_beginning",
       measurement_type: "total",
+      time_zone_format: {
+        format_type: "aligned_in_std_clock_time",
+        time_zones: ["America/Denver", "America/Los_Angeles", "America/Phoenix"],
+      },
       description: "Industrial time, index, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
     },
     { // #[7] - datetime form of [6] - multiple time zones
@@ -155,6 +159,28 @@
         time_zones: ["EasternPrevailing", "CentralPrevailing", "MountainPrevailing", "PacificPrevailing"]
         },
       measurement_type: "total",
+    },
+    { // #[8] - index time with a single time zone
+      "class": "Time",
+      type: "time",
+      name: "Single-tz-model-time-2012-index",
+      time_type: "index",
+      ranges: [
+        {
+          start: 0,
+          end: 8783,
+          starting_timestamp: "2012-01-01 00:00:00",
+          str_format: "%Y-%m-%d %H:%M:%S",
+          frequency: "P0DT1H0M0.000000S",
+        },
+      ],
+      time_interval_type: "period_beginning",
+      measurement_type: "total",
+      time_zone_format: {
+        format_type: "aligned_in_absolute_time",
+        time_zone: "Etc/GMT+5",
+      },
+      description: "Index time with all geographies sharing a single time zone.",
     },
   ],
 }

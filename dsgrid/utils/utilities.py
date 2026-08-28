@@ -4,17 +4,23 @@ Helpful utility functions for dsgrid
 
 import logging
 import inspect
+import importlib
 import json
 import os
 from enum import Enum
-from typing import Iterable
+from typing import Any, Iterable, Type, cast
 
 from prettytable import PrettyTable
+from pydantic import ValidationError
 
 try:
-    from IPython.display import display, HTML
-    from IPython import get_ipython
-    from ipykernel.zmqshell import ZMQInteractiveShell
+    _ipython_display = cast(Any, importlib.import_module("IPython.display"))
+    display = _ipython_display.display
+    HTML = _ipython_display.HTML
+    get_ipython = cast(Any, importlib.import_module("IPython")).get_ipython
+    ZMQInteractiveShell = cast(
+        Any, importlib.import_module("ipykernel.zmqshell")
+    ).ZMQInteractiveShell
 
     _IPYTHON_INSTALLED = True
 except ImportError:
@@ -110,6 +116,46 @@ def check_uniqueness(iterable: Iterable, tag: str) -> set[str]:
     return values
 
 
+def sorted_with_nulls(values: Iterable) -> list:
+    """Sort values that may contain ``None``, ordering ``None`` first.
+
+    ``sorted`` raises TypeError when a collection mixes ``None`` with other types.
+    Distinct-value sets read from a table can contain NULL, so use this whenever
+    such a set is sorted for display in a log or error message.
+
+    Parameters
+    ----------
+    values : Iterable
+        Values to sort. Mutually incomparable non-null values (e.g. ``6037``
+        and ``"6037"`` from sources that disagree on a column's type) fall
+        back to ordering by type name and string form rather than raising.
+
+    Returns
+    -------
+    list
+        Sorted values, with ``None`` first if present.
+
+    Examples
+    --------
+    >>> sorted_with_nulls({"b", None, "a"})
+    [None, 'a', 'b']
+    """
+    non_null = []
+    has_null = False
+    for value in values:
+        if value is None:
+            has_null = True
+        else:
+            non_null.append(value)
+    try:
+        non_null.sort()
+    except TypeError:
+        # This sorts for display in an error message; a crash here would mask
+        # the error being reported.
+        non_null.sort(key=lambda value: (type(value).__name__, str(value)))
+    return [None, *non_null] if has_null else non_null
+
+
 def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list[str] = None):
     """Convert an iterable of dicts to instances of a data class.
 
@@ -130,16 +176,22 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     check_duplicates = check_duplicates or []
     values = {x: set() for x in check_duplicates}
     length = None
-    for row in iterable:
+    for i, row in enumerate(iterable, start=1):
         if None in row:
-            msg = f"row has a key that is None: {row=}"
+            msg = f"record {i} has a key that is None: {row=}"
             raise ValueError(msg)
         if length is None:
             length = len(row)
         elif len(row) != length:
-            msg = f"Rows have inconsistent length: first_row_length={length} {row=}"
+            msg = f"Record {i} has {len(row)} columns; expected {length}: {row}"
             raise ValueError(msg)
-        record = cls(**row)
+        try:
+            record = cls(**row)
+        except ValidationError as e:
+            # ValueError, not a DSG exception: callers are pydantic field validators,
+            # which convert ValueError into a ValidationError with field context.
+            msg = f"Validation error in record {i}: {row}\n{e}"
+            raise ValueError(msg) from e
         for name in check_duplicates:
             val = getattr(record, name)
             if val in values[name]:
@@ -151,7 +203,7 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     return records
 
 
-def list_enum_values(enum: Enum):
+def list_enum_values(enum: Type[Enum]):
     """Returns list enum values."""
     return [e.value for e in enum]
 

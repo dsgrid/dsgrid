@@ -1,17 +1,21 @@
 import logging
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, cast
 from datetime import tzinfo
 
 import chronify
+import ibis
+import ibis.expr.datatypes as dt
+import ibis.expr.types as ir
+import pandas as pd
 from chronify.models import TableSchema
 
 import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -28,67 +32,184 @@ from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidOperation,
 )
-from dsgrid.spark.functions import (
+from dsgrid.ibis.backend import create_chronify_store, get_runtime_backend
+from dsgrid.ibis.io import read_parquet
+from dsgrid.ibis.operations import (
     coalesce,
     count_distinct_on_group_by,
     create_temp_view,
     cross_join,
+    drop_columns,
+    except_all,
+    filter_sql,
     handle_column_spaces,
-    make_temp_view_name,
-    read_parquet,
-    is_dataframe_empty,
     join,
     join_multiple_columns,
+    rename_columns,
+    # Aliased because repartition_if_needed_by_mapping has a ``repartition`` parameter
+    # that would otherwise shadow this function inside its body.
+    repartition as repartition_table,
+    union_all,
     unpivot,
+    with_literal_column,
 )
-from dsgrid.spark.functions import except_all, get_spark_session
-from dsgrid.spark.types import (
-    DataFrame,
-    F,
-    IntegerType,
-    LongType,
-    ShortType,
-    StringType,
-    use_duckdb,
+from dsgrid.ibis.temp import make_temp_view_name
+from dsgrid.ibis.table_utils import (
+    get_unique_values,
+    get_unique_values_per_column,
+    is_table_empty,
+    table_to_records,
 )
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
-    check_for_nulls,
-    persist_table,
-    write_dataframe,
+from dsgrid.ibis.io import persist_table, write_dataframe
+from dsgrid.ibis.null_checks import check_for_nulls
+from dsgrid.ibis.session import (
+    create_dataframe_from_product,
+    get_runtime_session,
+    get_spark_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import sorted_with_nulls
 
 logger = logging.getLogger(__name__)
 
 
+def _create_shared_chronify_store() -> chronify.Store:
+    """Create a chronify Store that uses dsgrid's active runtime session through Ibis."""
+    if use_duckdb():
+        return create_chronify_store()
+    return create_chronify_store(session=get_spark_session())
+
+
+def _create_runtime_chronify_store() -> chronify.Store:
+    """Create a chronify Store using dsgrid's shared Ibis backend."""
+    return create_chronify_store()
+
+
+def _create_chronify_source(store: chronify.Store, df: ibis.Table, schema: TableSchema) -> None:
+    """Register ``df`` with ``store`` as a view.
+
+    Ingesting the rows into a chronify table is never necessary: every dsgrid
+    table is an Ibis table bound to the runtime backend, so chronify can read
+    it in place.
+    """
+    store.create_view(schema, df)
+
+
+def _drop_chronify_source(store: chronify.Store, schema: TableSchema) -> None:
+    store.drop_view(schema.name, if_exists=True)
+
+
+def _align_to_table_schema(df: ibis.Table, template: ibis.Table) -> ibis.Table:
+    schema = template.schema()
+    exprs = {}
+    for column in template.columns:
+        target_type = schema[column]
+        if column in df.columns:
+            exprs[column] = df[column].cast(target_type)
+        else:
+            exprs[column] = ibis.null().cast(target_type)
+    return df.select(**exprs)
+
+
+def _to_duckdb_sql_type(data_type: dt.DataType) -> str:
+    if data_type.is_boolean():
+        return "BOOLEAN"
+    if data_type.is_int8():
+        return "TINYINT"
+    if data_type.is_int16() or data_type.is_int32():
+        return "INTEGER"
+    if data_type.is_int64():
+        return "BIGINT"
+    if data_type.is_float32():
+        return "FLOAT"
+    if data_type.is_float64():
+        return "DOUBLE"
+    if data_type.is_string():
+        return "VARCHAR"
+    if data_type.is_timestamp():
+        return "TIMESTAMP"
+    msg = f"Unsupported data type for schema alignment: {data_type}"
+    raise NotImplementedError(msg)
+
+
+def _alias_expression(expr, alias: str):
+    return expr.name(alias) if isinstance(expr, ir.Value) else expr.alias(alias)
+
+
 def map_stacked_dimension(
-    df: DataFrame,
-    records: DataFrame,
+    df: ibis.Table,
+    records: ibis.Table,
     column: str,
     drop_column: bool = True,
     to_column: str | None = None,
-) -> DataFrame:
+) -> ibis.Table:
+    """Map a stacked (long-format) dimension column through a mapping table.
+
+    Inner-joins ``df`` to ``records`` on ``df[column] == records.from_id``: a df row
+    whose ``column`` value has no ``from_id`` is dropped, and a ``from_id`` that fans
+    out to several ``to_id`` rows splits the df row into one per ``to_id``. Records
+    whose ``to_id`` is NULL are removed first, dropping the df rows that map to them.
+
+    Fractions: ``records`` always carries ``from_fraction`` (default 1.0); ``df``
+    carries a running ``fraction`` that accumulates across chained mappings,
+    initialized to 1.0 when absent. Output ``fraction = fraction * from_fraction``.
+
+    Parameters
+    ----------
+    df : ibis.Table
+        Long-format table being mapped; contains ``column`` and may already carry
+        a ``fraction`` column from a prior mapping.
+    records : ibis.Table
+        Mapping records with ``from_id``, nullable ``to_id``, and ``from_fraction``.
+    column : str
+        The df column to map (matched against ``from_id``).
+    drop_column : bool, optional
+        Drop the source ``column`` after mapping (map in place). Pass False to keep
+        it alongside the mapped ``to_column``. False is only allowed when there is
+        a distinct ``to_column``.
+    to_column : str | None, optional
+        Name of the mapped (``to_id``) column; defaults to ``column`` (map in place).
+
+    Returns
+    -------
+    ibis.Table
+        ``df`` with ``column`` mapped and ``fraction`` updated; the ``from_id`` /
+        ``from_fraction`` join columns do not leak into the output.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If ``drop_column`` is False while ``to_column`` resolves to ``column``: the
+        mapped column would collide with the preserved source column.
+    """
     to_column_ = to_column or column
+    if not drop_column and to_column_ == column:
+        msg = (
+            f"map_stacked_dimension cannot keep the source column {column!r} "
+            "(drop_column=False) while mapping it in place; pass a distinct to_column."
+        )
+        raise DSGInvalidOperation(msg)
     if "fraction" not in df.columns:
-        df = df.withColumn("fraction", F.lit(1.0))
+        df = with_literal_column(df, "fraction", 1.0)
     # map and consolidate from_fraction only
-    records = records.filter("to_id IS NOT NULL")
-    df = join(df, records, column, "from_id", how="inner").drop("from_id")
+    records = filter_sql(records, "to_id IS NOT NULL")
+    df = drop_columns(join(df, records, column, "from_id", how="inner"), "from_id")
     if drop_column:
-        df = df.drop(column)
-    df = df.withColumnRenamed("to_id", to_column_)
+        df = drop_columns(df, column)
+    df = rename_columns(df, {"to_id": to_column_})
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.select(
         *nonfraction_cols,
-        (F.col("fraction") * F.col("from_fraction")).alias("fraction"),
+        _alias_expression(df["fraction"] * df["from_fraction"], "fraction"),
     )
     return df
 
 
 def add_time_zone(
-    load_data_df: DataFrame,
-    geography_dim: DimensionConfig,
+    load_data_df: ibis.Table,
+    geography_dim: DimensionBaseConfigWithFiles,
     df_key: str = "geography",
     dim_key: str = "id",
 ):
@@ -96,12 +217,12 @@ def add_time_zone(
 
     Parameters
     ----------
-    load_data_df : DataFrame
+    load_data_df : Ibis table
     geography_dim: DimensionConfig
 
     Returns
     -------
-    DataFrame
+    Ibis table
 
     """
     geo_records = geography_dim.get_records_dataframe()
@@ -118,15 +239,19 @@ def add_time_zone(
 def add_column_from_records(df, dimension_records, record_column, df_key, record_key: str = "id"):
     df = join(
         df1=df,
-        df2=dimension_records.select(F.col(record_key).alias("record_id"), record_column),
+        df2=dimension_records.select(
+            _alias_expression(dimension_records[record_key], "record_id"),
+            record_column,
+        ),
         column1=df_key,
         column2="record_id",
         how="inner",
-    ).drop("record_id")
+    )
+    df = drop_columns(df, "record_id")
     return df
 
 
-def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> DataFrame:
+def add_null_rows_from_load_data_lookup(df: ibis.Table, lookup: ibis.Table) -> ibis.Table:
     """Add null rows from the nulled load data lookup table to data table.
 
     Parameters
@@ -136,41 +261,42 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
     lookup
         load data lookup table that has been filtered for nulls.
     """
-    if not is_dataframe_empty(lookup):
+    if not is_table_empty(lookup):
         intersect_cols = set(lookup.columns).intersection(df.columns)
         null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
         for col in set(df.columns).difference(null_rows_to_add.columns):
-            null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
-        df = df.union(null_rows_to_add.select(*df.columns))
+            null_rows_to_add = with_literal_column(null_rows_to_add, col, None)
+        # union_all (not Ibis default .union) — load_data rows are not unique
+        # per dimension combination, so distinct semantics would silently drop
+        # legitimate duplicates from the original df. Matches the pre-Ibis
+        # Spark .union() semantics this code originally relied on.
+        df = union_all(df, _align_to_table_schema(null_rows_to_add, df))
 
     return df
 
 
 def apply_scaling_factor(
-    df: DataFrame,
+    df: ibis.Table,
     value_column: str,
     mapping_manager: DatasetMappingManager,
     scaling_factor_column: str = SCALING_FACTOR_COLUMN,
-) -> DataFrame:
+) -> ibis.Table:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
     op = mapping_manager.plan.apply_scaling_factor_op
     if mapping_manager.has_completed_operation(op):
         return df
 
-    func = _apply_scaling_factor_duckdb if use_duckdb() else _apply_scaling_factor_spark
-    df = func(df, value_column, scaling_factor_column)
+    df = _apply_scaling_factor_sql(df, value_column, scaling_factor_column)
     if mapping_manager.plan.apply_scaling_factor_op.persist:
         df = mapping_manager.persist_table(df, op)
     return df
 
 
-def _apply_scaling_factor_duckdb(
-    df: DataFrame,
+def _apply_scaling_factor_sql(
+    df: ibis.Table,
     value_column: str,
     scaling_factor_column: str,
 ):
-    # Workaround for the fact that duckdb doesn't support
-    # F.col(scaling_factor_column).isNotNull()
     cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
     cols_str = ",".join(cols)
     view = create_temp_view(df)
@@ -183,38 +309,24 @@ def _apply_scaling_factor_duckdb(
             ) AS {value_column}
         FROM {view}
     """
-    spark = get_spark_session()
-    return spark.sql(query)
-
-
-def _apply_scaling_factor_spark(
-    df: DataFrame,
-    value_column: str,
-    scaling_factor_column: str,
-):
-    return df.withColumn(
-        value_column,
-        F.when(
-            F.col(scaling_factor_column).isNotNull(),
-            F.col(value_column) * F.col(scaling_factor_column),
-        ).otherwise(F.col(value_column)),
-    ).drop(scaling_factor_column)
+    return get_runtime_backend().sql(query)
 
 
 def check_historical_annual_time_model_year_consistency(
-    df: DataFrame, time_column: str, model_year_column: str
+    df: ibis.Table, time_column: str, model_year_column: str
 ) -> None:
     """Check that the model year values match the time dimension years for a historical
     dataset with an annual time dimension.
     """
-    invalid = (
-        df.select(time_column, model_year_column)
-        .filter(f"{time_column} IS NOT NULL")
-        .distinct()
-        .filter(f"{time_column} != {model_year_column}")
-        .collect()
+    invalid_df = filter_sql(
+        filter_sql(
+            df.select(time_column, model_year_column),
+            f"{time_column} IS NOT NULL",
+        ).distinct(),
+        f"{time_column} != {model_year_column}",
     )
-    if invalid:
+    if not is_table_empty(invalid_df):
+        invalid = table_to_records(invalid_df.limit(100))
         msg = (
             "A historical dataset with annual time must have rows where the time years match the model years. "
             f"{invalid}"
@@ -245,8 +357,8 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
 
 
 def handle_dimension_association_errors(
-    diff: DataFrame,
-    dataset_table: DataFrame,
+    diff: ibis.Table,
+    dataset_table: ibis.Table,
     dataset_id: str,
     expected_cardinalities: dict[str, int] | None = None,
 ) -> None:
@@ -307,39 +419,58 @@ def handle_dimension_association_errors(
     raise DSGInvalidDataset(msg)
 
 
-def _look_for_error_contributors(diff: DataFrame, dataset_table: DataFrame) -> None:
-    diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-    for col in diff.columns:
-        dataset_count = dataset_table.select(col).distinct().count()
-        if dataset_count != diff_counts[col]:
+def _look_for_error_contributors(diff: ibis.Table, dataset_table: ibis.Table) -> None:
+    # Compute COUNT(DISTINCT col) for every column in a single aggregation
+    # query per table. The previous loop issued 2N .execute() calls; this
+    # version issues 2 regardless of column count, which matters because
+    # this runs on the error path against the full dataset table.
+    # Ibis's stub for Table.aggregate types **kwargs against the same Sequence
+    # type as the positional `having` parameter, so dict-spread aggregation
+    # exprs (which work fine at runtime) trip ty. Suppress per call below.
+    cols = list(diff.columns)
+    diff_aggs = {col: diff[col].nunique() for col in cols}
+    dataset_aggs = {col: dataset_table[col].nunique() for col in cols}
+    diff_counts = (
+        diff.aggregate(**diff_aggs)  # ty: ignore[invalid-argument-type]
+        .execute()
+        .iloc[0]
+    )
+    dataset_counts = (
+        dataset_table.aggregate(**dataset_aggs)  # ty: ignore[invalid-argument-type]
+        .execute()
+        .iloc[0]
+    )
+    for col in cols:
+        if dataset_counts[col] != diff_counts[col]:
             logger.error(
                 "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
                 col,
-                dataset_count,
-                diff_counts[col],
+                int(dataset_counts[col]),
+                int(diff_counts[col]),
             )
 
 
-def is_noop_mapping(records: DataFrame) -> bool:
+def is_noop_mapping(records: ibis.Table) -> bool:
     """Return True if the mapping is a no-op."""
-    return is_dataframe_empty(
-        records.filter(
+    return is_table_empty(
+        filter_sql(
+            records,
             "(to_id IS NULL and from_id IS NOT NULL) or "
             "(to_id IS NOT NULL and from_id IS NULL) or "
-            "(from_id != to_id) or (from_fraction != 1.0)"
+            "(from_id != to_id) or (from_fraction != 1.0)",
         )
     )
 
 
 def map_time_dimension_with_chronify_duckdb(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
     wrap_time_allowed: bool = False,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a time-mapped table with chronify and DuckDB.
     All operations are performed in memory.
     """
@@ -351,282 +482,134 @@ def map_time_dimension_with_chronify_duckdb(
     src_schema, dst_schema = _get_mapping_schemas(
         df, from_time_dim, to_time_dim, value_column=value_column
     )
-    store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    store.map_table_time_config(
-        src_schema.name,
-        dst_schema,
-        wrap_time_allowed=wrap_time_allowed,
-        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
-        scratch_dir=scratch_dir_context.scratch_dir,
-    )
-    pandas_df = store.read_table(dst_schema.name)
-    store.drop_table(dst_schema.name)
-    return df.session.createDataFrame(pandas_df)
+    store = _create_runtime_chronify_store()
+    _create_chronify_source(store, df, src_schema)
+    try:
+        store.map_table_time_config(
+            src_schema.name,
+            dst_schema,
+            wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+        )
+        return store.get_table(dst_schema.name)
+    finally:
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_with_chronify_duckdb(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a single time zone-converted table with chronify and DuckDB.
     All operations are performed in memory.
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with the specified time zone as a new column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    dst_schema = store.convert_time_zone(
-        src_schema.name,
-        time_zone,
-        scratch_dir=scratch_dir_context.scratch_dir,
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
     )
-    pandas_df = store.read_table(dst_schema.name)
-    store.drop_table(dst_schema.name)
-    return df.session.createDataFrame(pandas_df)
+    store = _create_runtime_chronify_store()
+    _create_chronify_source(store, df, src_schema)
+    try:
+        dst_schema = store.convert_time_zone(
+            src_schema.name,
+            time_zone,
+        )
+        return store.get_table(dst_schema.name)
+    finally:
+        _drop_chronify_source(store, src_schema)
 
 
 def convert_time_zone_by_column_with_chronify_duckdb(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
     time_zone_column: str = TIME_ZONE_COLUMN,
     wrap_time_allowed: bool = False,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and DuckDB.
     All operations are performed in memory.
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    dst_schema = store.convert_time_zone_by_column(
-        src_schema.name,
-        time_zone_column,
-        wrap_time_allowed=wrap_time_allowed,
-        scratch_dir=scratch_dir_context.scratch_dir,
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
     )
-    pandas_df = store.read_table(dst_schema.name)
-    store.drop_table(dst_schema.name)
-    return df.session.createDataFrame(pandas_df)
+    store = _create_runtime_chronify_store()
+    _create_chronify_source(store, df, src_schema)
+    try:
+        dst_schema = store.convert_time_zone_by_column(
+            src_schema.name,
+            time_zone_column,
+            wrap_time_allowed=wrap_time_allowed,
+        )
+        return store.get_table(dst_schema.name)
+    finally:
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_with_chronify_duckdb(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a single time zone-localized table with chronify and DuckDB.
     All operations are performed in memory.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-
-    store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    dst_schema = store.localize_time_zone(
-        src_schema.name,
-        time_zone,
-        scratch_dir=scratch_dir_context.scratch_dir,
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
     )
-    pandas_df = store.read_table(dst_schema.name)
-    store.drop_table(dst_schema.name)
-    return df.session.createDataFrame(pandas_df)
+
+    store = _create_runtime_chronify_store()
+    _create_chronify_source(store, df, src_schema)
+    try:
+        dst_schema = store.localize_time_zone(
+            src_schema.name,
+            time_zone,
+        )
+        return store.get_table(dst_schema.name)
+    finally:
+        _drop_chronify_source(store, src_schema)
 
 
 def localize_time_zone_by_column_with_chronify_duckdb(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
     time_zone_column: str = TIME_ZONE_COLUMN,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a multiple time zone-localized table (based on a time_zone_column)
     using chronify and DuckDB.
     All operations are performed in memory.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
     the time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
-    dst_schema = store.localize_time_zone_by_column(
-        src_schema.name,
-        time_zone_column,
-        scratch_dir=scratch_dir_context.scratch_dir,
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
     )
-    pandas_df = store.read_table(dst_schema.name)
-    store.drop_table(dst_schema.name)
-    return df.session.createDataFrame(pandas_df)
-
-
-def map_time_dimension_with_chronify_spark_hive(
-    df: DataFrame,
-    table_name: str,
-    from_time_dim: TimeDimensionBaseConfig,
-    to_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
-    wrap_time_allowed: bool = False,
-) -> DataFrame:
-    """Create a time-mapped table with chronify and Spark and a Hive Metastore.
-    The source data must already be stored in the metastore.
-    Chronify will store the mapped table in the metastore.
-    """
-    src_schema, dst_schema = _get_mapping_schemas(
-        df, from_time_dim, to_time_dim, src_name=table_name, value_column=value_column
-    )
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    with store.engine.begin() as conn:
-        # This bypasses checks because the table should already be valid.
-        store.schema_manager.add_schema(conn, src_schema)
+    store = _create_runtime_chronify_store()
+    _create_chronify_source(store, df, src_schema)
     try:
-        store.map_table_time_config(
-            src_schema.name,
-            dst_schema,
-            check_mapped_timestamps=False,
-            scratch_dir=scratch_dir_context.scratch_dir,
-            wrap_time_allowed=wrap_time_allowed,
-            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
-        )
-    finally:
-        with store.engine.begin() as conn:
-            store.schema_manager.remove_schema(conn, src_schema.name)
-
-    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
-
-
-def convert_time_zone_with_chronify_spark_hive(
-    df: DataFrame,
-    from_time_dim: TimeDimensionBaseConfig,
-    time_zone: tzinfo | None,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark and a Hive Metastore.
-    Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps with the specified time zone as a new column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.convert_time_zone(
-            src_schema.name,
-            time_zone,
-            scratch_dir=scratch_dir_context.scratch_dir,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return df.sparkSession.read.load(str(output_file))
-
-
-def convert_time_zone_by_column_with_chronify_spark_hive(
-    df: DataFrame,
-    from_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_zone_column: str = TIME_ZONE_COLUMN,
-    wrap_time_allowed: bool = False,
-) -> DataFrame:
-    """Create a multiple time zone-converted table (based on a time_zone_column)
-    using chronify and Spark and a Hive Metastore.
-    Time zone conversion converts from tz-aware timestamps to
-    tz-naive timestamps with time zones specified in the time_zone_column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    filename = persist_table(df, scratch_dir_context, tag="convert_time_zone_by_column hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.convert_time_zone_by_column(
+        dst_schema = store.localize_time_zone_by_column(
             src_schema.name,
             time_zone_column,
-            wrap_time_allowed=wrap_time_allowed,
-            scratch_dir=scratch_dir_context.scratch_dir,
-            output_file=output_file,
         )
+        return store.get_table(dst_schema.name)
     finally:
-        store.drop_view(src_schema.name)
-
-    return df.sparkSession.read.load(str(output_file))
+        _drop_chronify_source(store, src_schema)
 
 
-def localize_time_zone_with_chronify_spark_hive(
-    df: DataFrame,
-    from_time_dim: TimeDimensionBaseConfig,
-    time_zone: tzinfo | None,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-) -> DataFrame:
-    """Create a single time zone-localized table with chronify and Spark and a Hive Metastore.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.localize_time_zone(
-            src_schema.name,
-            time_zone,
-            scratch_dir=scratch_dir_context.scratch_dir,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return df.sparkSession.read.load(str(output_file))
-
-
-def localize_time_zone_by_column_with_chronify_spark_hive(
-    df: DataFrame,
-    from_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
-    value_column: str = VALUE_COLUMN,
-    time_zone_column: str = TIME_ZONE_COLUMN,
-) -> DataFrame:
-    """Create a multiple time zone-localized table (based on a time_zone_column)
-    using chronify and Spark and a Hive Metastore.
-    Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
-    the time zones specified in the time_zone_column.
-    """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
-    filename = persist_table(df, scratch_dir_context, tag="localize_time_zone_by_column hive src")
-    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    try:
-        output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.localize_time_zone_by_column(
-            src_schema.name,
-            time_zone_column=time_zone_column,
-            scratch_dir=scratch_dir_context.scratch_dir,
-            output_file=output_file,
-        )
-    finally:
-        store.drop_view(src_schema.name)
-
-    return df.sparkSession.read.load(str(output_file))
-
-
-def map_time_dimension_with_chronify_spark_path(
-    df: DataFrame,
+def map_time_dimension_with_chronify_runtime_path(
+    df: ibis.Table,
     filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
@@ -634,129 +617,156 @@ def map_time_dimension_with_chronify_spark_path(
     value_column: str = VALUE_COLUMN,
     wrap_time_allowed: bool = False,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
-) -> DataFrame:
-    """Create a time-mapped table with chronify and Spark using the local filesystem.
+) -> ibis.Table:
+    """Create a time-mapped table with chronify and the runtime backend using the local filesystem.
     Chronify will store the mapped table in a Parquet file within scratch_dir_context.
     """
     src_schema, dst_schema = _get_mapping_schemas(
         df, from_time_dim, to_time_dim, value_column=value_column
     )
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.map_table_time_config(
-        src_schema.name,
-        dst_schema,
-        check_mapped_timestamps=False,
-        scratch_dir=scratch_dir_context.scratch_dir,
-        output_file=output_file,
-        wrap_time_allowed=wrap_time_allowed,
-        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
-    )
-    return df.sparkSession.read.load(str(output_file))
+    try:
+        store.map_table_time_config(
+            src_schema.name,
+            dst_schema,
+            check_mapped_timestamps=False,
+            output_file=output_file,
+            wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+        )
+    finally:
+        # Drop the source view even if the operation raises, mirroring the DuckDB
+        # dispatchers. chronify's view is not dsgrid-owned temp state, so the sweep in
+        # QueryContext.finalize() is the only thing that would otherwise remove it, and
+        # callers without a QueryContext (a direct unit test, say) leave it in the
+        # session for good.
+        _drop_chronify_source(store, src_schema)
+    return read_parquet(output_file)
 
 
-def convert_time_zone_with_chronify_spark_path(
-    df: DataFrame,
+def convert_time_zone_with_chronify_runtime_path(
+    df: ibis.Table,
     filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
-) -> DataFrame:
-    """Create a single time zone-converted table with chronify and Spark using the local filesystem.
+) -> ibis.Table:
+    """Create a single time zone-converted table with chronify and the runtime backend using the local filesystem.
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with the specified time zone as a new column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
+    store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.convert_time_zone(
-        src_schema.name,
-        time_zone,
-        scratch_dir=scratch_dir_context.scratch_dir,
-        output_file=output_file,
-    )
-    return df.sparkSession.read.load(str(output_file))
+    try:
+        store.convert_time_zone(
+            src_schema.name,
+            time_zone,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
+    return read_parquet(output_file)
 
 
-def convert_time_zone_by_column_with_chronify_spark_path(
-    df: DataFrame,
+def convert_time_zone_by_column_with_chronify_runtime_path(
+    df: ibis.Table,
     filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
     time_zone_column: str = TIME_ZONE_COLUMN,
     wrap_time_allowed: bool = False,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a multiple time zone-converted table (based on a time_zone_column)
-    using chronify and Spark using the local filesystem.
+    using chronify and the runtime backend using the local filesystem.
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
+    store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.convert_time_zone_by_column(
-        src_schema.name,
-        time_zone_column,
-        wrap_time_allowed=wrap_time_allowed,
-        scratch_dir=scratch_dir_context.scratch_dir,
-        output_file=output_file,
-    )
-    return df.sparkSession.read.load(str(output_file))
+    try:
+        store.convert_time_zone_by_column(
+            src_schema.name,
+            time_zone_column,
+            wrap_time_allowed=wrap_time_allowed,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
+    return read_parquet(output_file)
 
 
-def localize_time_zone_with_chronify_spark_path(
-    df: DataFrame,
+def localize_time_zone_with_chronify_runtime_path(
+    df: ibis.Table,
     filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     time_zone: tzinfo | None,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
-) -> DataFrame:
-    """Create a single time zone-localized table with chronify and Spark using the local filesystem.
+) -> ibis.Table:
+    """Create a single time zone-localized table with chronify and the runtime backend using the local filesystem.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
+    store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.localize_time_zone(
-        src_schema.name,
-        time_zone,
-        scratch_dir=scratch_dir_context.scratch_dir,
-        output_file=output_file,
-    )
-    return df.sparkSession.read.load(str(output_file))
+    try:
+        store.localize_time_zone(
+            src_schema.name,
+            time_zone,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
+    return read_parquet(output_file)
 
 
-def localize_time_zone_by_column_with_chronify_spark_path(
-    df: DataFrame,
+def localize_time_zone_by_column_with_chronify_runtime_path(
+    df: ibis.Table,
     filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     value_column: str = VALUE_COLUMN,
     time_zone_column: str = TIME_ZONE_COLUMN,
-) -> DataFrame:
+) -> ibis.Table:
     """Create a multiple time zone-localized table (based on a time_zone_column)
-    using chronify and Spark using the local filesystem.
+    using chronify and the runtime backend using the local filesystem.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
     the time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
-    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
+    store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.localize_time_zone_by_column(
-        src_schema.name,
-        time_zone_column=time_zone_column,
-        scratch_dir=scratch_dir_context.scratch_dir,
-        output_file=output_file,
-    )
-    return df.sparkSession.read.load(str(output_file))
+    try:
+        store.localize_time_zone_by_column(
+            src_schema.name,
+            time_zone_column=time_zone_column,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
+    return read_parquet(output_file)
 
 
 def _to_chronify_time_based_data_adjustment(
@@ -788,20 +798,84 @@ def _to_chronify_time_based_data_adjustment(
         raise NotImplementedError(msg)
 
     return chronify.TimeBasedDataAdjustment(
-        leap_day_adjustment=adj.leap_day_adjustment.value,
+        leap_day_adjustment=chronify.time.LeapDayAdjustmentType[adj.leap_day_adjustment.name],
         daylight_saving_adjustment=chronify_dst_adjustment,
     )
 
 
+def _adjust_time_config_for_post_localization(
+    time_config: chronify.TimeBaseModel,
+    time_dim: TimeDimensionBaseConfig,
+) -> chronify.TimeBaseModel:
+    """Return ``time_config`` adjusted to match a time column that was already localized.
+
+    ``to_chronify()`` always reports the original datetime shape, which doesn't match
+    the actual data with a ``localize_to_single_tz`` plan: the pre-localization shape
+    has an NTZ dtype and a naive start, but registration localizes the data and only
+    updates the dimension config in memory, so the persisted record stays stale (#427).
+    Rebuild the config as ``TIMESTAMP_TZ`` with a localized start so chronify's mapping
+    table lines up with the instants actually stored.
+
+    Callers say whether the data has been localized rather than having this function
+    infer it from the column dtype. Only DuckDB can answer that question: Spark's
+    ``TimestampType`` is instant-only, so ibis reports ``Timestamp(timezone=None)`` for
+    tz-aware and naive data alike. Inferring from the dtype therefore silently skipped
+    the adjustment on Spark, and the resulting offset between the mapping table and the
+    data dropped rows with no error -- everything for a short range, and ``offset``
+    hours' worth for a realistic one.
+    """
+    if not isinstance(time_dim, DateTimeDimensionConfig):
+        return time_config
+    if time_dim.get_localization_plan() != "localize_to_single_tz":
+        return time_config
+    # localize_to_single_tz requires ALIGNED_IN_ABSOLUTE_TIME, whose to_chronify()
+    # branch always returns DatetimeRange.
+    assert isinstance(time_config, chronify.DatetimeRange), time_config
+
+    if len(time_dim.get_load_data_time_columns()) != 1:
+        return time_config
+
+    tz = time_dim.get_chronify_time_zone()
+    new_start = pd.Timestamp(time_config.start)
+    if new_start.tzinfo is None:
+        new_start = new_start.tz_localize(tz)
+    return chronify.DatetimeRange(
+        dtype=chronify.TimeDataType.TIMESTAMP_TZ,
+        time_column=time_config.time_column,
+        start=new_start,
+        length=time_config.length,
+        resolution=time_config.resolution,
+        measurement_type=time_config.measurement_type,
+        interval_type=time_config.interval_type,
+    )
+
+
 def _get_src_schema(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
+    *,
+    data_is_localized: bool,
     src_name: str | None = None,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
+    """Build the chronify source schema for ``df``.
+
+    Parameters
+    ----------
+    data_is_localized : bool
+        Whether ``df``'s time column has already been localized at this point in the
+        pipeline. True for mapping and time zone conversion, whose input is registered
+        data that registration localized; a ``localize_to_single_tz`` config then
+        describes the pre-localization shape and must be corrected (see
+        :func:`_adjust_time_config_for_post_localization`). False for the localization
+        operations themselves, whose input is pre-localization by definition and whose
+        config is therefore already accurate.
+    """
     src = src_name or "src_" + make_temp_view_name()
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_config = from_time_dim.to_chronify()
+    if data_is_localized:
+        time_config = _adjust_time_config_for_post_localization(time_config, from_time_dim)
     time_array_id_columns = [
         x
         for x in df.columns
@@ -809,7 +883,7 @@ def _get_src_schema(
     ]
     src_schema = chronify.TableSchema(
         name=src,
-        time_config=time_config,
+        time_config=cast(Any, time_config),
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,
     )
@@ -817,12 +891,17 @@ def _get_src_schema(
 
 
 def _get_dst_schema(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    *,
+    data_is_localized: bool,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
+    """Build the chronify destination schema. See :func:`_get_src_schema` for the flag."""
     time_config = to_time_dim.to_chronify()
+    if data_is_localized:
+        time_config = _adjust_time_config_for_post_localization(time_config, to_time_dim)
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_array_id_columns = [
         x
@@ -831,7 +910,7 @@ def _get_dst_schema(
     ]
     dst_schema = chronify.TableSchema(
         name="dst_" + make_temp_view_name(),
-        time_config=time_config,
+        time_config=cast(Any, time_config),
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,
     )
@@ -839,14 +918,27 @@ def _get_dst_schema(
 
 
 def _get_mapping_schemas(
-    df: DataFrame,
+    df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
     src_name: str | None = None,
     value_column: str = VALUE_COLUMN,
 ) -> tuple[TableSchema, TableSchema]:
-    src_schema = _get_src_schema(df, from_time_dim, src_name=src_name, value_column=value_column)
-    dst_schema = _get_dst_schema(df, from_time_dim, to_time_dim, value_column=value_column)
+    """Build both chronify schemas for a time-dimension mapping.
+
+    Mapping only ever runs on registered data, which registration has already localized,
+    so both schemas are built with ``data_is_localized=True``.
+    """
+    src_schema = _get_src_schema(
+        df,
+        from_time_dim,
+        data_is_localized=True,
+        src_name=src_name,
+        value_column=value_column,
+    )
+    dst_schema = _get_dst_schema(
+        df, from_time_dim, to_time_dim, data_is_localized=True, value_column=value_column
+    )
     return src_schema, dst_schema
 
 
@@ -863,29 +955,28 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     time_column = next(iter(time_columns))
     orig_columns = df.columns
     stacked = list(stacked_columns)
-    return (
-        join_multiple_columns(
-            df,
-            count_distinct_on_group_by(df, stacked, time_column, "count_time"),
-            stacked,
-        )
-        .filter(f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0")
-        .select(orig_columns)
+    joined = join_multiple_columns(
+        df,
+        count_distinct_on_group_by(df, stacked, time_column, "count_time"),
+        stacked,
     )
+    return filter_sql(
+        joined, f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0"
+    ).select(orig_columns)
 
 
 @track_timing(timer_stats_collector)
 def repartition_if_needed_by_mapping(
-    df: DataFrame,
+    df: ibis.Table,
     mapping_type: DimensionMappingType,
     scratch_dir_context: ScratchDirContext,
     repartition: bool | None = None,
-) -> tuple[DataFrame, Path | None]:
+) -> tuple[ibis.Table, Path | None]:
     """Repartition the dataframe if the mapping might cause data skew.
 
     Parameters
     ----------
-    df : DataFrame
+    df : Ibis table
         The dataframe to repartition.
     mapping_type : DimensionMappingType
     scratch_dir_context : ScratchDirContext
@@ -927,12 +1018,18 @@ def repartition_if_needed_by_mapping(
         # could be many instances of zero or null. So, add a new column with random values.
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
-        spark = get_spark_session()
-        num_partitions = int(spark.conf.get("spark.sql.shuffle.partitions"))
-        df.withColumn(
-            salted_column, (F.rand() * num_partitions).cast(IntegerType()) + 1
-        ).repartition(salted_column).write.parquet(filename.as_posix())
-        df = read_parquet(filename).drop(salted_column)
+        # This is Spark-only code (DuckDB returned above), so spark.sql.shuffle.partitions
+        # is the partition count that a bare df.repartition(col) would use.
+        num_partitions = int(get_spark_session().conf.get("spark.sql.shuffle.partitions"))
+        view = create_temp_view(df)
+        salted = get_runtime_session().sql(
+            f"SELECT *, CAST(rand() * {num_partitions} AS INTEGER) + 1 "
+            f"AS {salted_column} FROM {view}"
+        )
+        # repartition_table hash-partitions the underlying PySpark DataFrame on the
+        # salted column; the shuffle it forces is the entire point of the salting.
+        write_dataframe(repartition_table(salted, num_partitions, salted_column), filename)
+        df = drop_columns(read_parquet(filename), salted_column)
         logger.info("Completed repartition.")
         return df, filename
 
@@ -941,47 +1038,50 @@ def repartition_if_needed_by_mapping(
 
 
 def unpivot_dataframe(
-    df: DataFrame,
+    df: ibis.Table,
     value_columns: Iterable[str],
     variable_column: str,
     time_columns: list[str],
-) -> DataFrame:
+) -> ibis.Table:
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
     ids = [x for x in df.columns if x != VALUE_COLUMN and x not in values]
     df = unpivot(df, value_columns, variable_column, VALUE_COLUMN)
     cols = set(df.columns).difference(time_columns)
-    new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
+    new_rows = filter_sql(df, f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:
-        new_rows = new_rows.withColumn(col, F.lit(None))
+        new_rows = with_literal_column(new_rows, col, None)
+    new_rows = _align_to_table_schema(new_rows, df)
 
-    return (
-        df.filter(f"{VALUE_COLUMN} IS NOT NULL")
-        .union(new_rows.select(*df.columns))
-        .select(*ids, variable_column, VALUE_COLUMN)
-    )
+    non_null_rows = filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL")
+    # union_all preserves the pre-Ibis explicit ``SELECT … UNION ALL SELECT …``
+    # SQL that this function was migrated from; non_null_rows can have legitimate
+    # duplicate value rows (same dimensions, different time slices) and distinct
+    # semantics would silently drop them.
+    unioned = union_all(non_null_rows, new_rows)
+    return unioned.select(*ids, variable_column, VALUE_COLUMN)
 
 
-def convert_types_if_necessary(df: DataFrame) -> DataFrame:
+def convert_types_if_necessary(df: ibis.Table) -> ibis.Table:
     """Convert the types of the dataframe if necessary."""
     allowed_int_columns = (
         DimensionType.MODEL_YEAR.value,
         DimensionType.WEATHER_YEAR.value,
     )
-    int_types = {IntegerType(), LongType(), ShortType()}
     existing_columns = set(df.columns)
-    for column in allowed_int_columns:
-        if column in existing_columns and df.schema[column].dataType in int_types:
-            df = df.withColumn(column, F.col(column).cast(StringType()))
-    return df
+    columns_to_cast = [column for column in allowed_int_columns if column in existing_columns]
+    if not columns_to_cast:
+        return df
+
+    return df.mutate(**{col: df[col].cast("string") for col in columns_to_cast})
 
 
 def merge_expected_associations_tables(
-    expected_dfs: dict[str, DataFrame],
+    expected_dfs: dict[str, ibis.Table],
     all_dim_records: dict[str, list[str]],
     context: ScratchDirContext,
-) -> DataFrame:
-    """Merge user-provided expected association tables into a single DataFrame.
+) -> ibis.Table:
+    """Merge user-provided expected association tables into a single Ibis table.
 
     Tables are combined according to their column sets:
 
@@ -1002,7 +1102,7 @@ def merge_expected_associations_tables(
     Parameters
     ----------
     expected_dfs
-        Dictionary of DataFrames with expected dimension combinations.
+        Dictionary of Ibis tables with expected dimension combinations.
     all_dim_records
         Mapping from dimension column name to the complete list of record
         ids for that dimension (excluding TIME).
@@ -1011,22 +1111,24 @@ def merge_expected_associations_tables(
 
     Returns
     -------
-    DataFrame
-        A single DataFrame with one row per expected dimension combination.
+    Ibis table
+        A single Ibis table with one row per expected dimension combination.
 
     Raises
     ------
     DSGInvalidDataset
         If a dimension column loses records during the merge.
     """
-    from dsgrid.utils.spark import create_dataframe_from_product, get_unique_values
-
     # Step 1: Group by column set; union tables with identical columns.
-    groups: dict[frozenset[str], DataFrame] = {}
+    groups: dict[frozenset[str], ibis.Table] = {}
     for df in expected_dfs.values():
         key = frozenset(df.columns)
         if key in groups:
-            groups[key] = groups[key].union(df)
+            # union_all matches the pre-Ibis Spark .union() (UNION ALL) used
+            # before this branch was migrated; expected-association tables
+            # with identical column sets are supposed to be appended, and
+            # any dedup happens later via cross-join expansion.
+            groups[key] = union_all(groups[key], df)
         else:
             groups[key] = df
 
@@ -1038,7 +1140,7 @@ def merge_expected_associations_tables(
     # Each group is checked on entry: every column that corresponds to a
     # known dimension must contain all of that dimension's records.
     # After each inner join, shared columns are re-checked to catch losses.
-    merged: DataFrame | None = None
+    merged: ibis.Table | None = None
     covered_columns: set[str] = set()
     merged_label: str = ""
     for col_set, df in groups.items():
@@ -1046,13 +1148,16 @@ def merge_expected_associations_tables(
         group_label = "{" + ", ".join(sorted(col_set)) + "}"
 
         # Validate that this group covers every record for its dimensions.
-        for col in sorted(col_set):
+        df_cols = sorted(col_set)
+        for col in df_cols:
             if col not in all_dim_records:
                 msg = f"Unexpected dimension type in expected associations table with columns {group_label}: '{col}'"
                 raise DSGFileInputError(msg)
-            actual_ids = get_unique_values(df, col)
+        actual_ids_per_col = get_unique_values_per_column(df, df_cols)
+        for col in df_cols:
+            actual_ids = actual_ids_per_col[col]
             expected_ids = set(all_dim_records[col])
-            missing = sorted(expected_ids - actual_ids)
+            missing = sorted_with_nulls(expected_ids - actual_ids)
             if missing:
                 msg = (
                     f"Expected associations table with columns {group_label} is missing "
@@ -1069,25 +1174,23 @@ def merge_expected_associations_tables(
         else:
             overlap = covered_columns & set(col_set)
             if overlap:
-                pre_join_values: dict[str, set[str]] = {}
-                all_cols = covered_columns | set(col_set)
-                for col in sorted(all_cols):
-                    if col in all_dim_records:
-                        if col in covered_columns:
-                            pre_join_values[col] = get_unique_values(merged, col)
-                        if col in col_set:
-                            pre_join_values.setdefault(col, set()).update(
-                                get_unique_values(df, col)
-                            )
+                # Collect pre-join distinct values for each side.
+                covered_dim_cols = sorted(c for c in covered_columns if c in all_dim_records)
+                set_dim_cols = sorted(c for c in col_set if c in all_dim_records)
+                pre_join_values: dict[str, set] = {}
+                for col, values in get_unique_values_per_column(merged, covered_dim_cols).items():
+                    pre_join_values[col] = values
+                for col, values in get_unique_values_per_column(df, set_dim_cols).items():
+                    pre_join_values.setdefault(col, set()).update(values)
 
                 merged = join_multiple_columns(merged, df, sorted(overlap), how="inner")
 
-                # Check for values lost by the inner join.
-                for col in sorted(overlap):
-                    if col not in all_dim_records:
-                        continue
-                    post_ids = get_unique_values(merged, col)
-                    lost = sorted(pre_join_values.get(col, set()) - post_ids)
+                overlap_dim_cols = sorted(c for c in overlap if c in all_dim_records)
+                post_join_values = get_unique_values_per_column(merged, overlap_dim_cols)
+                for col in overlap_dim_cols:
+                    lost = sorted_with_nulls(
+                        pre_join_values.get(col, set()) - post_join_values[col]
+                    )
                     if lost:
                         msg = (
                             f"Inner join of expected associations tables with columns "
@@ -1116,17 +1219,13 @@ def merge_expected_associations_tables(
 
 
 def filter_out_expected_missing_associations(
-    main_df: DataFrame, missing_df: DataFrame
-) -> DataFrame:
+    main_df: ibis.Table, missing_df: ibis.Table
+) -> ibis.Table:
     """Filter out rows that are expected to be missing from the main dataframe."""
     missing_columns = [DimensionType.from_column(x).value for x in missing_df.columns]
-    spark = get_spark_session()
-    main_view = make_temp_view_name()
-    assoc_view = make_temp_view_name()
+    main_view = create_temp_view(main_df)
+    assoc_view = create_temp_view(missing_df)
     main_columns = ",".join((f"{main_view}.{x}" for x in main_df.columns))
-
-    main_df.createOrReplaceTempView(main_view)
-    missing_df.createOrReplaceTempView(assoc_view)
     join_str = " AND ".join((f"{main_view}.{x} = {assoc_view}.{x}" for x in missing_columns))
     query = f"""
         SELECT {main_columns}
@@ -1134,33 +1233,75 @@ def filter_out_expected_missing_associations(
         ANTI JOIN {assoc_view}
         ON {join_str}
     """
-    res = spark.sql(query)
-    return res
+    return get_runtime_backend().sql(query)
 
 
 def split_expected_missing_rows(
-    df: DataFrame, time_columns: list[str]
-) -> tuple[DataFrame, DataFrame | None]:
-    """Split a DataFrame into two if it contains expected missing data."""
-    null_df = df.filter(f"{VALUE_COLUMN} IS NULL")
-    if is_dataframe_empty(null_df):
+    df: ibis.Table, time_columns: list[str]
+) -> tuple[ibis.Table, ibis.Table | None]:
+    """Split an Ibis table into two if it contains expected missing data."""
+    null_df = filter_sql(df, f"{VALUE_COLUMN} IS NULL")
+    if is_table_empty(null_df):
         return df, None
 
-    drop_columns = time_columns + [VALUE_COLUMN]
-    missing_associations = null_df.drop(*drop_columns)
-    return df.filter(f"{VALUE_COLUMN} IS NOT NULL"), missing_associations
+    columns_to_drop = time_columns + [VALUE_COLUMN]
+    missing_associations = drop_columns(null_df, *columns_to_drop)
+    return filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL"), missing_associations
+
+
+def _check_time_zones_are_declared(df: ibis.Table, time_dim: DateTimeDimensionConfig) -> None:
+    """Reject time zones in the data that the time dimension does not declare.
+
+    chronify localizes each row against the ``time_zones`` list in the time config and
+    silently drops rows carrying any other zone, so an undeclared zone is data loss with
+    no error. Catch it here instead.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If the ``time_zone`` column holds a value missing from the config's time zones.
+    """
+    declared = set(time_dim.get_time_zones())
+    found = {tz for tz in get_unique_values(df, TIME_ZONE_COLUMN) if tz is not None}
+    undeclared = found - declared
+    if undeclared:
+        msg = (
+            f"The '{TIME_ZONE_COLUMN}' column holds time zone(s) {sorted(undeclared)} that the "
+            f"time dimension does not declare. Its 'time_zones' list is {sorted(declared)}, and "
+            "rows carrying any other zone would be dropped during localization. Add the missing "
+            "zone(s) to 'time_zones', or correct the geography dimension records."
+        )
+        raise DSGInvalidOperation(msg)
 
 
 def localize_timestamps_if_necessary(
-    df: DataFrame,
+    df: ibis.Table,
     config: DatasetConfig,
     scratch_dir_context: ScratchDirContext,
-) -> tuple[DataFrame, bool]:
+) -> tuple[ibis.Table, bool]:
     """Localize tz-naive timestamps to time zone(s) in the dataframe if necessary using Chronify.
+
     Timestamps will be localized if the time dimension has a localization plan.
     The localization plan will specify whether to localize to a single time zone
     or multiple time zones based on a time zone column for tz-naive timestamps.
     If the time dimension doesn't have a localization plan, the dataframe will be returned unchanged.
+
+    Cross-backend contract
+    ----------------------
+    The shape of the localized time column differs by backend:
+
+    - **DuckDB**: the time column becomes ``TIMESTAMP WITH TIME ZONE``
+      carrying an explicit per-row TZ tag.
+    - **Spark**: Spark's ``TIMESTAMP`` type cannot carry a per-row TZ tag.
+      The instant is preserved (UTC microseconds), but column extractions
+      such as ``.year()`` / ``.hour()`` interpret the timestamp in the
+      session TZ. The instant is correct on both backends; the *displayed*
+      time-of-day differs.
+
+    Downstream callers that depend on a specific render TZ must either
+    pin ``spark.sql.session.timeZone`` (e.g. via
+    :func:`~dsgrid.ibis.tz.custom_time_zone`) or cast the column to
+    ``timestamp('<tz>')`` before extracting.
     """
     time_dim = config.get_dimension(DimensionType.TIME)
     if not isinstance(time_dim, DateTimeDimensionConfig):
@@ -1176,26 +1317,17 @@ def localize_timestamps_if_necessary(
     assert len(value_columns) > 0, value_columns
     value_column = next(iter(value_columns))
 
-    runtime_config = dsgrid.runtime_config
     match localization_plan:
         case "localize_to_single_tz":
             to_time_zone = time_dim.get_chronify_time_zone()
-            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = localize_time_zone_with_chronify_spark_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        time_zone=to_time_zone,
-                        scratch_dir_context=scratch_dir_context,
-                        value_column=value_column,
-                    )
-                case (BackendEngine.SPARK, False):
+            match dsgrid.runtime_config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
                         tag="dataset query before time zone localization",
                     )
-                    df = localize_time_zone_with_chronify_spark_path(
+                    df = localize_time_zone_with_chronify_runtime_path(
                         df=df,
                         filename=filename,
                         from_time_dim=time_dim,
@@ -1203,7 +1335,7 @@ def localize_timestamps_if_necessary(
                         scratch_dir_context=scratch_dir_context,
                         value_column=value_column,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = localize_time_zone_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,
@@ -1214,30 +1346,38 @@ def localize_timestamps_if_necessary(
         case "localize_to_multi_tz":
             if TIME_ZONE_COLUMN not in df.columns:
                 geo_dim = config.get_dimension(DimensionType.GEOGRAPHY)
+                geo_dim = cast(DimensionBaseConfigWithFiles, geo_dim)
                 df = add_time_zone(df, geo_dim)
 
-            match (runtime_config.backend_engine, runtime_config.use_hive_metastore):
-                case (BackendEngine.SPARK, True):
-                    df = localize_time_zone_by_column_with_chronify_spark_hive(
-                        df=df,
-                        from_time_dim=time_dim,
-                        scratch_dir_context=scratch_dir_context,
-                        value_column=value_column,
-                    )
-                case (BackendEngine.SPARK, False):
+            if is_table_empty(filter_sql(df, f"{TIME_ZONE_COLUMN} IS NOT NULL")):
+                msg = (
+                    f"The '{TIME_ZONE_COLUMN}' column is all null, or no rows matched "
+                    f"the geography dimension records, after joining with them. The "
+                    f"geography dimension records file must include a 'time_zone' "
+                    f"column with valid IANA time zone values (e.g., 'Etc/GMT+5') for "
+                    f"'aligned_in_std_clock_time' localization during registration. "
+                    f"Registration always uses the dataset's own geography dimension, "
+                    f"because no dimension mapping has been applied yet."
+                )
+                raise DSGInvalidOperation(msg)
+
+            _check_time_zones_are_declared(df, time_dim)
+
+            match dsgrid.runtime_config.backend_engine:
+                case BackendEngine.SPARK:
                     filename = persist_table(
                         df,
                         scratch_dir_context,
                         tag="dataset query before time zone localization",
                     )
-                    df = localize_time_zone_by_column_with_chronify_spark_path(
+                    df = localize_time_zone_by_column_with_chronify_runtime_path(
                         df=df,
                         filename=filename,
                         from_time_dim=time_dim,
                         scratch_dir_context=scratch_dir_context,
                         value_column=value_column,
                     )
-                case (BackendEngine.DUCKDB, _):
+                case BackendEngine.DUCKDB:
                     df = localize_time_zone_by_column_with_chronify_duckdb(
                         df=df,
                         from_time_dim=time_dim,

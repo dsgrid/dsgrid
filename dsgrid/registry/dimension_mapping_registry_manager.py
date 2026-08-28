@@ -4,6 +4,7 @@ import logging
 from collections import Counter
 
 from pathlib import Path
+from typing import Any, cast
 from uuid import uuid4
 
 import networkx as nx
@@ -18,10 +19,11 @@ from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGInvalidParameter,
 )
-from dsgrid.spark.types import F
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.ibis.operations import filter_sql
+from dsgrid.ibis.table_utils import is_table_empty, table_column_to_list
+from dsgrid.ibis.models import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from .common import (
@@ -45,7 +47,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def __init__(self, path, params):
         super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingConfig
-        self._dimension_mgr = None
+        self._dimension_mgr: DimensionRegistryManager | None = None
 
     @classmethod
     def load(cls, path, params: RegistryManagerParams, dimension_manager, db):
@@ -71,7 +73,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return "Dimension Mappings"
 
     @property
-    def dimension_manager(self):
+    def dimension_manager(self) -> DimensionRegistryManager:
+        assert self._dimension_mgr is not None
         return self._dimension_mgr
 
     @dimension_manager.setter
@@ -88,6 +91,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         hashes = {}
         for model in self.db.iter_models(context.connection, all_versions=True):
+            model = cast(Any, model)
             key = make_key(model)
             if key in hashes:
                 msg = f"Bug: the same file_hash exists in multiple mappings: {model.mapping_id} {key}"
@@ -116,9 +120,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """
         for mapping in config.model.mappings:
             actual_from_records = {x.from_id for x in mapping.records}
-            from_dimension = self._dimension_mgr.get_by_id(
+            from_dimension = self.dimension_manager.get_by_id(
                 mapping.from_dimension.dimension_id, conn=conn
             )
+            from_dimension = cast(Any, from_dimension)
             allowed_from_records = from_dimension.get_unique_ids()
             diff = actual_from_records.difference(allowed_from_records)
             if diff:
@@ -133,9 +138,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             # mapping to a project's dimension for a specific data source, but that information
             # is not available here.
             actual_to_records = {x.to_id for x in mapping.records}
-            to_dimension = self._dimension_mgr.get_by_id(
+            to_dimension = self.dimension_manager.get_by_id(
                 mapping.to_dimension.dimension_id, conn=conn
             )
+            to_dimension = cast(Any, to_dimension)
             allowed_to_records = to_dimension.get_unique_ids()
             if None in actual_to_records:
                 actual_to_records.remove(None)
@@ -223,48 +229,58 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     ):
         mapping_df = models_to_dataframe(mapping_records)
         mapping_sum_df = (
-            mapping_df.groupBy(group_by)
-            .agg(F.sum("from_fraction").alias("sum_fraction"))
-            .sort("sum_fraction", group_by)
+            mapping_df.group_by(group_by)
+            .aggregate(sum_fraction=mapping_df.from_fraction.sum())
+            .order_by(["sum_fraction", group_by])
         )
-        fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
-        fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)
-        if fracs_greater_than_one.count() > 0:
-            id_greater_than_one = {
-                x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
-            }
+        fracs_greater_than_one = (
+            filter_sql(mapping_sum_df, f"sum_fraction - 1.0 > {tolerance}")
+            .select(group_by)
+            .distinct()
+        )
+        fracs_less_than_one = (
+            filter_sql(mapping_sum_df, f"1.0 - sum_fraction > {tolerance}")
+            .select(group_by)
+            .distinct()
+        )
+        if not is_table_empty(fracs_greater_than_one):
+            id_greater_than_one = _collect_limited_column_values(
+                fracs_greater_than_one, group_by, limit=100
+            )
             msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a "
                 f"tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
-                f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
+                "Mapping contains from_fraction sum greater than 1 for "
+                f"{group_by}={id_greater_than_one}. Limited to 100 IDs. "
             )
             raise DSGInvalidDimensionMapping(msg)
-        elif fracs_less_than_one.count() > 0:
-            id_less_than_one = {
-                x[group_by] for x in fracs_less_than_one[[group_by]].distinct().collect()
-            }
+        elif not is_table_empty(fracs_less_than_one):
+            id_less_than_one = _collect_limited_column_values(
+                fracs_less_than_one, group_by, limit=100
+            )
             msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"
                 f" tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
-                f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
+                "Mapping contains from_fraction sum less than 1 for "
+                f"{group_by}={id_less_than_one}. Limited to 100 IDs. "
             )
             raise DSGInvalidDimensionMapping(msg)
 
     def get_by_id(
-        self, mapping_id, version=None, conn: Connection | None = None
+        self, config_id: str, version: str | None = None, conn: Connection | None = None
     ) -> MappingTableConfig:
         if version is None:
-            version = self._db.get_latest_version(conn, mapping_id)
+            version = self.db.get_latest_version(conn, config_id)
 
-        key = ConfigKey(mapping_id, version)
+        key = ConfigKey(config_id, version)
         mapping = self._mappings.get(key)
         if mapping is not None:
             return mapping
 
         if version is None:
-            model = self.db.get_latest(conn, mapping_id)
+            model = self.db.get_latest(conn, config_id)
         else:
-            model = self.db.get_by_version(conn, mapping_id, version)
+            model = self.db.get_by_version(conn, config_id, version)
 
         config = MappingTableConfig(model)
         self._mappings[key] = config
@@ -281,6 +297,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def _build_graph(self, conn: Connection) -> nx.Graph:
         graph = nx.Graph()
         for model in self.db.iter_models(conn):
+            model = cast(Any, model)
             graph.add_edge(model.from_dimension.dimension_id, model.to_dimension.dimension_id)
         return graph
 
@@ -305,6 +322,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """
         valid_mappings: list[DimensionMappingReferenceModel] = []
         for mapping in self.db.iter_models(conn):
+            mapping = cast(Any, mapping)
             if (
                 mapping.from_dimension.dimension_id == from_dimension_id
                 and mapping.to_dimension.dimension_id == to_dimension_id
@@ -370,6 +388,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         refs = []
         for mapping_id in mapping_ids:
             mapping = self.db.get_latest(conn, mapping_id)
+            mapping = cast(Any, mapping)
             refs.append(
                 DimensionMappingReferenceModel(
                     from_dimension_type=mapping.from_dimension.dimension_type,
@@ -402,6 +421,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         dimension_mapping_ids = []
         for mapping in config.model.mappings:
+            mapping = cast(Any, mapping)
             from_id = mapping.from_dimension.dimension_id
             to_id = mapping.to_dimension.dimension_id
             if not self.dimension_manager.has_id(from_id, conn=conn):
@@ -415,7 +435,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 assert mapping.mapping_id is None
                 mapping.mapping_id = str(uuid4())
                 mapping.version = "1.0.0"
-                mapping = self.db.insert(conn, mapping, context.registration)
+                mapping = cast(Any, self.db.insert(conn, mapping, context.registration))
             else:
                 assert mapping.mapping_id in existing_ids
                 continue
@@ -471,7 +491,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings[new_key] = MappingTableConfig(model)
 
         if not self.offline_mode:
-            self.sync_push(self._path)
+            cast(Any, self).sync_push(self._path)
 
         return self._mappings[new_key]
 
@@ -480,9 +500,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             for key in [x for x in self._mappings if x.id in config_ids]:
                 self._mappings.pop(key)
 
-    def remove(self, mapping_id: str, conn: Connection | None = None):
-        self.db.delete_all(conn, mapping_id)
-        for key in [x for x in self._mappings if x.id == mapping_id]:
+    def remove(self, config_id: str, conn: Connection | None = None):
+        self.db.delete_all(conn, config_id)
+        for key in [x for x in self._mappings if x.id == config_id]:
             self._mappings.pop(key)
 
     def show(
@@ -544,6 +564,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for model in self.db.iter_models(conn):
+            model = cast(Any, model)
             registration = self.db.get_registration(conn, model)
             from_dim = model.from_dimension.dimension_type.value
             to_dim = model.to_dimension.dimension_type.value
@@ -568,8 +589,12 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 rows.append(row)
 
         rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
+        table.add_rows([list(r) for r in rows])
         table.align = "l"
         if return_table:
             return table
         display_table(table)
+
+
+def _collect_limited_column_values(df, column: str, limit: int) -> set:
+    return set(table_column_to_list(df.select(column).distinct().limit(limit), column))

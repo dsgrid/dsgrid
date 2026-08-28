@@ -1,3 +1,4 @@
+import ibis
 import abc
 import logging
 from datetime import tzinfo
@@ -16,9 +17,8 @@ from dsgrid.dimension.time_utils import (
 )
 from dsgrid.config.dimensions import TimeRangeModel
 
-from dsgrid.spark.types import (
-    DataFrame,
-)
+
+from dsgrid.ibis.operations import rename_columns
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """Return True if the config can be converted to chronify."""
         return False
 
-    # @abc.abstractmethod
     def to_chronify(self) -> chronify.TimeBaseModel:
         """Return the chronify version of the time model."""
         # This is likely temporary until we can use chronify models directly.
@@ -43,7 +42,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         Parameters
         ----------
-        load_data_df : pyspark.sql.DataFrame
+        load_data_df : ibis.Table
         time_columns : list[str]
 
         Raises
@@ -54,12 +53,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         msg = f"{type(self)}.check_dataset_time_consistency is not implemented"
         raise NotImplementedError(msg)
 
-    def build_time_dataframe(self) -> DataFrame:
-        """Build time dimension as specified in config in a spark dataframe.
+    def build_time_dataframe(self) -> ibis.Table:
+        """Build time dimension as specified in config in an Ibis table.
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
         """
         msg = f"{self.__class__.__name__}.build_time_dataframe is not implemented"
         raise NotImplementedError(msg)
@@ -83,16 +82,16 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         # This may need to be re-implemented by child classes.
         return [self.model.name]
 
-    def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
+    def map_timestamp_load_data_columns_for_query_name(self, df) -> ibis.Table:
         """Map the timestamp columns in the load data table to those specified by the query name.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.Table
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
@@ -105,7 +104,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_col = time_cols[0]
         if time_col not in df.columns:
             return df
-        return df.withColumnRenamed(time_col, self.model.name)
+        return rename_columns(df, {time_col: self.model.name})
 
     def get_time_ranges(self) -> list[Any]:
         """Return time ranges with time_zone applied.
@@ -144,8 +143,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     def get_time_zones(self) -> list[str]:
         """Return a list of time zones for this dimension."""
-        if self.get_time_zone():
-            return [self.get_time_zone()]
+        if time_zone := self.get_time_zone():
+            return [time_zone]
         return []
 
     @abc.abstractmethod
@@ -158,7 +157,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_time_interval_type(self) -> TimeIntervalType:
+    def get_time_interval_type(self) -> TimeIntervalType | None:
         """Return the time interval type for this dimension.
 
         Returns
@@ -169,7 +168,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def list_expected_dataset_timestamps(
         self,
         time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
-    ) -> list[tuple]:
+    ) -> list[tuple] | list:
         """Return a list of the timestamps expected in the load_data table.
         Parameters
         ----------

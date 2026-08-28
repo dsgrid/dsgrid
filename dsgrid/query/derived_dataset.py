@@ -277,7 +277,6 @@ def _make_dataset_config(
         "data_source": "",
         "source": "",
         "data_classification": data_classification,
-        "use_project_geography_time_zone": True,
         "dimensions": [],
         "dimension_references": dimension_references,
     }

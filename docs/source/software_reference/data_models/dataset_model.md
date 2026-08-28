@@ -34,7 +34,6 @@ Represents dataset configurations.
 | `tags` | list[`str`] \| None | `None` | List of data tags |
 | `data_classification` | [DataClassificationType](enums.md#dataclassificationtype) | *(required)* | Data security classification (e.g., low, moderate). |
 | `enable_unit_conversion` | `bool` | `True` | If the dataset uses its dimension mapping for the metric dimension to also perform unit conversion, then this value should be false. |
-| `use_project_geography_time_zone` | `bool` | `False` | If true, time zones will be applied from the project's geography dimension during query-time mapping. If false, the dataset's own geography dimension is used. Note: for timezone-naive data with aligned_in_std_clock_time, the dataset's geography records must include a time_zone column regardless of this setting, because dsgrid localizes timestamps during registration before any project mapping. |
 | `dimensions` | list[[DimensionModel](dimension_model.md#dimensionmodel) \| [DateTimeDimensionModel](dimension_model.md#datetimedimensionmodel) \| [AnnualTimeDimensionModel](dimension_model.md#annualtimedimensionmodel) \| [RepresentativePeriodTimeDimensionModel](dimension_model.md#representativeperiodtimedimensionmodel) \| [IndexTimeDimensionModel](dimension_model.md#indextimedimensionmodel) \| [NoOpTimeDimensionModel](dimension_model.md#nooptimedimensionmodel)] | `[]` | List of dimensions that make up the dimensions of dataset. They will be automatically registered during dataset registration and then converted to dimension_references. |
 | `dimension_references` | list[[DimensionReferenceModel](dimension_model.md#dimensionreferencemodel)] | `[]` | List of registered dimension references that make up the dimensions of dataset. |
 | `trivial_dimensions` | list[[DimensionType](enums.md#dimensiontype)] | `[]` | List of trivial dimensions (i.e., 1-element dimensions) that do not exist in the load_data_lookup. List the dimensions by dimension type. Trivial dimensions are 1-element dimensions that are not present in the parquet data columns. Instead they are added by dsgrid as an alias column. |
@@ -51,8 +50,9 @@ Represents dataset configurations.
 | `check_time_not_trivial` | `check_time_not_trivial` | No description |
 | `check_files` | `check_files` | Validate dimension files are unique across all dimensions |
 | `check_names` | `check_names` | Validate dimension names are unique across all dimensions. |
+| `handle_legacy_fields` | `*(model)*` | Drop fields that dsgrid no longer uses. |
 | `check_layout_fields` | `*(model)*` | Ensure data_layout and registry_data_layout are mutually exclusive. |
-| `check_time_zone` | `*(model)*` | Validate whether required time zone information is present. |
+| `check_time_zone` | `*(model)*` | Validate that time zone information needed during registration is present. |
 
 </div>
 

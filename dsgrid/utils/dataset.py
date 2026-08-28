@@ -55,6 +55,7 @@ from dsgrid.ibis.operations import (
 )
 from dsgrid.ibis.temp import make_temp_view_name
 from dsgrid.ibis.table_utils import (
+    get_unique_values,
     get_unique_values_per_column,
     is_table_empty,
     table_to_records,
@@ -1248,6 +1249,31 @@ def split_expected_missing_rows(
     return filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL"), missing_associations
 
 
+def _check_time_zones_are_declared(df: ibis.Table, time_dim: DateTimeDimensionConfig) -> None:
+    """Reject time zones in the data that the time dimension does not declare.
+
+    chronify localizes each row against the ``time_zones`` list in the time config and
+    silently drops rows carrying any other zone, so an undeclared zone is data loss with
+    no error. Catch it here instead.
+
+    Raises
+    ------
+    DSGInvalidOperation
+        If the ``time_zone`` column holds a value missing from the config's time zones.
+    """
+    declared = set(time_dim.get_time_zones())
+    found = {tz for tz in get_unique_values(df, TIME_ZONE_COLUMN) if tz is not None}
+    undeclared = found - declared
+    if undeclared:
+        msg = (
+            f"The '{TIME_ZONE_COLUMN}' column holds time zone(s) {sorted(undeclared)} that the "
+            f"time dimension does not declare. Its 'time_zones' list is {sorted(declared)}, and "
+            "rows carrying any other zone would be dropped during localization. Add the missing "
+            "zone(s) to 'time_zones', or correct the geography dimension records."
+        )
+        raise DSGInvalidOperation(msg)
+
+
 def localize_timestamps_if_necessary(
     df: ibis.Table,
     config: DatasetConfig,
@@ -1330,10 +1356,12 @@ def localize_timestamps_if_necessary(
                     f"geography dimension records file must include a 'time_zone' "
                     f"column with valid IANA time zone values (e.g., 'Etc/GMT+5') for "
                     f"'aligned_in_std_clock_time' localization during registration. "
-                    f"Note: 'use_project_geography_time_zone' only applies during "
-                    f"query-time mapping, not during registration."
+                    f"Registration always uses the dataset's own geography dimension, "
+                    f"because no dimension mapping has been applied yet."
                 )
                 raise DSGInvalidOperation(msg)
+
+            _check_time_zones_are_declared(df, time_dim)
 
             match dsgrid.runtime_config.backend_engine:
                 case BackendEngine.SPARK:

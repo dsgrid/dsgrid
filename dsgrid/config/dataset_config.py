@@ -447,15 +447,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="If the dataset uses its dimension mapping for the metric dimension to also "
         "perform unit conversion, then this value should be false.",
     )
-    # This field must be listed before dimensions.
-    use_project_geography_time_zone: bool = Field(
-        default=False,
-        description="If true, time zones will be applied from the project's geography dimension "
-        "during query-time mapping. If false, the dataset's own geography dimension is used. "
-        "Note: for timezone-naive data with aligned_in_std_clock_time, the dataset's geography "
-        "records must include a time_zone column regardless of this setting, because dsgrid "
-        "localizes timestamps during registration before any project mapping.",
-    )
     dimensions: DimensionsListModel = Field(
         title="dimensions",
         description="List of dimensions that make up the dimensions of dataset. They will be "
@@ -476,6 +467,24 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         "Trivial dimensions are 1-element dimensions that are not present in the parquet data "
         "columns. Instead they are added by dsgrid as an alias column.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values: dict) -> dict:
+        """Drop fields that dsgrid no longer uses."""
+        if not isinstance(values, dict):
+            return values
+
+        if "use_project_geography_time_zone" in values:
+            logger.warning(
+                "Dropping deprecated use_project_geography_time_zone field from the dataset "
+                "config. dsgrid now takes time zones from the geography dimension whose record "
+                "ids the data carries: the mapping target when geography is mapped, the "
+                "dataset's own geography otherwise."
+            )
+            values.pop("use_project_geography_time_zone")
+
+        return values
 
     @model_validator(mode="after")
     def check_layout_fields(self):
@@ -527,15 +536,18 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
     @model_validator(mode="after")
     def check_time_zone(self) -> "DatasetConfigModel":
-        """Validate whether required time zone information is present.
+        """Validate that time zone information needed during registration is present.
 
         Geography records must include a ``time_zone`` column whenever the time
         dimension uses ``aligned_in_std_clock_time`` *and* the timestamps are
         timezone-naive (``timestamp_ntz`` or ``time_format_in_parts`` without
-        ``offset_column``).  This is true even when
-        ``use_project_geography_time_zone`` is ``True``, because dsgrid
-        localizes timestamps during registration using the *dataset's* geography
-        — project geography is only consulted at query-time mapping.
+        ``offset_column``), because dsgrid localizes those timestamps during
+        registration using the dataset's own geography.
+
+        Time zones needed only for query-time mapping are not checked here.  Which
+        geography supplies them depends on whether the dataset's geography gets
+        mapped, which is known at dataset submission rather than at config load.
+        See :meth:`ProjectRegistryManager._check_time_zone_for_mapping`.
         """
         time_dim = None
         geo_requires_time_zone = False
@@ -560,34 +572,23 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
             elif isinstance(column_format, TimeFormatInPartsModel):
                 needs_registration_localization = column_format.offset_column is None
 
+        if not needs_registration_localization:
+            return self
+
         for dimension in self.dimensions:
             if dimension.dimension_type != DimensionType.GEOGRAPHY:
                 continue
 
-            if not self.use_project_geography_time_zone:
-                # Default path: dataset geography must have time_zone.
-                check_timezone_in_geography(
-                    dimension,
-                    err_msg=f"Dataset with time dimension {time_dim} requires that its "
-                    "geography dimension records include a time_zone column.",
-                )
-            elif needs_registration_localization:
-                # use_project_geography_time_zone=True, but registration still
-                # uses the dataset's geography for localization.
-                check_timezone_in_geography(
-                    dimension,
-                    err_msg=(
-                        "This dataset uses 'aligned_in_std_clock_time' with "
-                        "timezone-naive timestamps, which requires localization "
-                        "during registration. The dataset's geography dimension "
-                        "records must include a 'time_zone' column with valid "
-                        "IANA time zone values even when "
-                        "use_project_geography_time_zone=true. "
-                        "use_project_geography_time_zone only controls which "
-                        "geography provides time zones during query-time "
-                        "mapping to a project, not during registration."
-                    ),
-                )
+            check_timezone_in_geography(
+                dimension,
+                err_msg=(
+                    "This dataset uses 'aligned_in_std_clock_time' with timezone-naive "
+                    "timestamps, which dsgrid localizes during registration using the "
+                    "dataset's own geography. Its geography dimension records must "
+                    "include a 'time_zone' column with valid IANA time zone values "
+                    "(e.g., 'Etc/GMT+5')."
+                ),
+            )
 
         return self
 
@@ -600,7 +601,6 @@ def make_unvalidated_dataset_config(
     dataset_type=InputDatasetType.UNSPECIFIED,
     included_dimensions: list[DimensionType] | None = None,
     time_type: TimeDimensionType | None = None,
-    use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
     slim: bool = True,
@@ -642,7 +642,6 @@ def make_unvalidated_dataset_config(
             },
             "description": "",
             "data_classification": data_classification,
-            "use_project_geography_time_zone": use_project_geography_time_zone,
             "dimensions": dimensions,
             "dimension_references": [
                 x.model_dump(mode="json") for x in dimension_references or []
@@ -680,7 +679,6 @@ def make_unvalidated_dataset_config(
             "tags": [],
             "data_classification": data_classification,
             "enable_unit_conversion": True,
-            "use_project_geography_time_zone": use_project_geography_time_zone,
             "dimensions": dimensions,
             "dimension_references": [
                 x.model_dump(mode="json") for x in dimension_references or []

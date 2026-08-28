@@ -91,13 +91,20 @@ See [Dataset Submitters](../../getting_started/dataset_submitters) for the full 
 
 ## Configuration Options
 
-Most dataset config fields are self-explanatory or covered by the [schema reference](../../software_reference/data_models/dataset_model). Two boolean flags deserve additional explanation:
-
-`use_project_geography_time_zone`
-: When `true`, dsgrid derives each record's time zone from the **project's** geography dimension (which must include a `time_zone` column) rather than from the dataset's own geography records during query-time mapping. When `false` (the default), the dataset's own geography records are used. Note: if your time dimension uses `aligned_in_std_clock_time` with timezone-naive timestamps (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), the dataset's geography records must still include a `time_zone` column for registration-time localization. When `false` and either the dataset's or the project's time dimension requires time zone information (e.g., the project uses `aligned_in_std_clock_time`), the dataset's geography dimension records **must** include a `time_zone` column. dsgrid validates this requirement at dataset submission time and will reject the submission with an informative error if the column is missing. See [Time Formats](data_file_formats.md#time-formats) for details on how dsgrid handles time zones.
+Most dataset config fields are self-explanatory or covered by the [schema reference](../../software_reference/data_models/dataset_model). One boolean flag deserves additional explanation:
 
 `enable_unit_conversion`
 : When `true` (the default), dsgrid performs automatic unit conversion at query time by comparing the `unit` column in the dataset's metric dimension records with the corresponding project metric records. Set this to `false` only when the dataset's **dimension mapping** for the metric dimension already accounts for the unit difference through its mapping fractions. In that case, dsgrid's built-in conversion would double-count the scaling.
+
+### Where geographic time zones come from
+
+Some time dimensions require a per-row time zone. A dataset can supply a `time_zone` column in its own data files, and dsgrid uses it as-is. Otherwise dsgrid joins the column in from geography dimension records. See [Time Zone Column Sourcing](data_file_formats.md#time-zone-column-sourcing).
+
+You do not configure which geography dimension supplies it. dsgrid uses the one whose record IDs the data carries at that point in the pipeline:
+
+- **During registration**, no dimension mapping has been applied, so the dataset's own geography records are used. If your time dimension uses `aligned_in_std_clock_time` with timezone-naive timestamps (`timestamp_ntz` or `time_format_in_parts` without `offset_column`), those records must include a `time_zone` column. This is checked when the dataset config is loaded.
+- **During a project query**, time is mapped after every other dimension, so the project's base geography records supply the time zones, whether or not the dataset's geography is mapped. This is checked at dataset submission time, and the submission is rejected with an informative error if the column is missing.
+- **During a standalone dataset query**, the geography dimension the query maps to supplies them, or the dataset's own records when the query maps no geography.
 
 ## File Format
 

@@ -26,7 +26,7 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.common import VALUE_COLUMN, BackendEngine
+from dsgrid.common import TIME_ZONE_COLUMN, VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
@@ -994,40 +994,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             time_dim.model.is_time_zone_required_in_geography()
             or to_time_dim.model.is_time_zone_required_in_geography()
         )
-        if needs_time_zone:
-            if self._config.model.use_project_geography_time_zone:
-                if to_geo_dim is not None:
-                    logger.info("Add time zone from project geography dimension.")
-                    geography_dim = to_geo_dim
-                else:
-                    # Reachable from standalone dataset queries, which have no
-                    # dataset-to-project geography mapping.
-                    geography_dim = self._config.get_dimension_with_records(
-                        DimensionType.GEOGRAPHY
-                    )
-                    if geography_dim is not None and _has_time_zone_column(geography_dim):
-                        logger.info(
-                            "use_project_geography_time_zone is True but no target "
-                            "geography dimension is available. Falling back to the "
-                            "dataset's geography dimension for time zones."
-                        )
-                    else:
-                        msg = (
-                            "Time mapping requires time zone information from a "
-                            "geography dimension, and use_project_geography_time_zone "
-                            "is True, but no target geography dimension is available "
-                            "and the dataset's geography dimension does not include a "
-                            "time_zone column. Either set "
-                            "use_project_geography_time_zone=False and add a time_zone "
-                            "column to the dataset's geography dimension, or run the "
-                            "query through a project."
-                        )
-                        raise DSGInvalidDataset(msg)
-            else:
-                logger.info("Add time zone from dataset geography dimension.")
-                geography_dim = self._config.get_dimension_with_records(DimensionType.GEOGRAPHY)
-            assert geography_dim is not None
-            assert isinstance(geography_dim, DimensionBaseConfigWithFiles)
+        if needs_time_zone and TIME_ZONE_COLUMN not in load_data_df.columns:
+            # The table already carries the column when the dataset supplied it or when
+            # registration-time localization joined it in and left it behind. Joining
+            # again would collide on the column name.
+            geography_dim = self._get_time_zone_geography_dimension(to_geo_dim)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
         match config.backend_engine:
@@ -1059,11 +1030,72 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
 
         if needs_time_zone:
-            load_data_df = drop_columns(load_data_df, "time_zone")
+            load_data_df = drop_columns(load_data_df, TIME_ZONE_COLUMN)
 
         if op.persist:
             load_data_df = mapping_manager.persist_table(load_data_df, op)
         return load_data_df
+
+    def _get_time_zone_geography_dimension(
+        self, to_geo_dim: DimensionBaseConfigWithFiles | None
+    ) -> DimensionBaseConfigWithFiles:
+        """Return the geography dimension that supplies time zones for time mapping.
+
+        Time mapping is the last operation in a dataset mapping plan, so every dimension
+        mapping has already been applied when this runs. :func:`add_time_zone` joins the
+        geography records on the ``geography`` column, so the dimension used must be the one
+        that owns the ids currently in that column.
+
+        A project query always supplies the project's base geography, whether or not the
+        dataset's geography was mapped, because an unmapped dataset geography is already in
+        the project's id space. A standalone dataset query supplies the target of the
+        geography mapping its query names, and nothing when it names none; only then does the
+        dataset's own geography own those ids.
+
+        Parameters
+        ----------
+        to_geo_dim : DimensionBaseConfigWithFiles | None
+            Geography dimension the data has been mapped into, or None when the geography
+            column still holds the dataset's own record ids.
+
+        Returns
+        -------
+        DimensionBaseConfigWithFiles
+
+        Raises
+        ------
+        DSGInvalidDataset
+            If there is no geography dimension with records, or if the selected dimension's
+            records do not provide a usable time_zone column.
+        """
+        if to_geo_dim is None:
+            geography_dim = self._config.get_dimension_with_records(DimensionType.GEOGRAPHY)
+            source = "the dataset's own geography dimension"
+        else:
+            geography_dim = to_geo_dim
+            source = "the geography dimension the data has been mapped into"
+
+        if geography_dim is None:
+            msg = (
+                "Time mapping requires time zone information from a geography dimension, but "
+                f"dataset {self.dataset_id} has no geography dimension with records."
+            )
+            raise DSGInvalidDataset(msg)
+        assert isinstance(geography_dim, DimensionBaseConfigWithFiles), geography_dim
+
+        if not _has_time_zone_column(geography_dim):
+            msg = (
+                "Time mapping requires time zone information from a geography dimension. "
+                f"dsgrid selected {source}, {geography_dim.model.name!r}, because the "
+                "geography column holds its record ids at this point in the mapping. Those "
+                "records do not provide a 'time_zone' column with valid IANA time zone "
+                "values (e.g., 'Etc/GMT+5'). Add that column to the records file for that "
+                "dimension."
+            )
+            raise DSGInvalidDataset(msg)
+
+        logger.info("Add time zone from %s: %s", source, geography_dim.model.name)
+        return geography_dim
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):
         if (

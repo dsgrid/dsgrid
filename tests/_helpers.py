@@ -14,12 +14,21 @@ from typing import Any
 
 import ibis
 import pandas as pd
+import pytest
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import create_temp_view
 from dsgrid.ibis.session import get_runtime_session, get_spark_session
 from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.types import use_duckdb
+
+skip_unless_spark = pytest.mark.skipif(
+    use_duckdb(), reason="Spark routing tests only run when backend_engine is SPARK"
+)
+skip_unless_duckdb = pytest.mark.skipif(
+    not use_duckdb(), reason="DuckDB routing tests only run when backend_engine is DUCKDB"
+)
 
 
 def make_table(columns: list[str], *rows: tuple) -> ibis.Table:

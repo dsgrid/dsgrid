@@ -1,23 +1,28 @@
 """Tests for timezone validation improvements.
 
-Covers the layers of defense for the case where geography records are missing
-valid ``time_zone`` values but time mapping requires them:
+dsgrid takes geographic time zones from the geography dimension whose record IDs the
+data carries at that point in the pipeline: the dataset's own geography during
+registration, and the mapping target during query-time mapping when geography is mapped.
+These tests cover the layers of defense for the case where the selected geography records
+are missing valid ``time_zone`` values but time mapping requires them:
 
-- ``DatasetConfigModel.check_time_zone`` validator catches the problem at
-  config load time, including when ``use_project_geography_time_zone=True``.
-- ``ProjectRegistryManager._check_time_zone_for_mapping`` catches it at
-  dataset-submission time.
+- ``DatasetConfigModel.check_time_zone`` catches at config load time what registration
+  will need.
+- ``ProjectRegistryManager._check_time_zone_for_mapping`` catches at dataset-submission
+  time what query-time mapping will need.
+- ``DatasetSchemaHandlerBase._get_time_zone_geography_dimension`` selects the geography
+  at query time and raises when its records cannot supply time zones.
 - ``localize_timestamps_if_necessary`` raises on an all-null runtime join.
 - ``check_timezone_in_geography`` detects all-null ``time_zone`` values.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import chronify
 import pandas as pd
 import pytest
 
-from dsgrid.common import TIME_COLUMN, VALUE_COLUMN
+from dsgrid.common import TIME_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DataClassificationType, DatasetConfigModel
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.dimensions import (
@@ -30,10 +35,20 @@ from dsgrid.config.dimensions import (
     TimeFormatDateTimeTZModel,
     TimeRangeModel,
 )
+from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dataset.dataset_schema_handler_two_table import TwoTableDatasetSchemaHandler
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
-from dsgrid.dimension.time import MeasurementType, TimeIntervalType, TimeZoneFormat
+from dsgrid.dimension.time import (
+    MeasurementType,
+    TimeBasedDataAdjustmentModel,
+    TimeIntervalType,
+    TimeZoneFormat,
+)
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension, DSGInvalidOperation
+from dsgrid.ibis.operations import drop_columns
 from dsgrid.ibis.session import (
     DoubleType,
     StringType,
@@ -42,9 +57,15 @@ from dsgrid.ibis.session import (
     TimestampNTZType,
 )
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
-from dsgrid.utils.dataset import localize_timestamps_if_necessary
+from dsgrid.utils.dataset import add_time_zone, localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from tests._helpers import DummyDatasetConfig, DummyGeoDim
+from tests._helpers import (
+    DummyDatasetConfig,
+    DummyGeoDim,
+    make_table,
+    skip_unless_duckdb,
+)
+from tests.test_localize_timestamps_if_necessary import _make_multi_tz_dataframe
 
 
 def _make_geo_csv(tmp_path, *, with_time_zone: bool, filename="geography.csv"):
@@ -57,9 +78,9 @@ def _make_geo_csv(tmp_path, *, with_time_zone: bool, filename="geography.csv"):
     return str(path)
 
 
-def _make_geography_dimension(tmp_path, *, with_time_zone: bool):
+def _make_geography_dimension(tmp_path, *, with_time_zone: bool, filename="geography.csv"):
     """Build a DimensionModel for geography."""
-    geo_file = _make_geo_csv(tmp_path, with_time_zone=with_time_zone)
+    geo_file = _make_geo_csv(tmp_path, with_time_zone=with_time_zone, filename=filename)
     return DimensionModel(
         name="geography",
         type=DimensionType.GEOGRAPHY,
@@ -122,20 +143,14 @@ def _make_time_dimension_absolute():
     )
 
 
-def _build_dataset_config_model(
-    tmp_path,
-    *,
-    use_project_geography_time_zone: bool,
-    geo_has_tz: bool,
-    time_dim_model,
-):
+def _build_dataset_config_model(tmp_path, *, geo_has_tz: bool, time_dim_model, **extra):
     """Build a DatasetConfigModel with minimal required fields."""
     geo_dim = _make_geography_dimension(tmp_path, with_time_zone=geo_has_tz)
     return DatasetConfigModel(
         dataset_id="test_dataset",
         data_classification=DataClassificationType.LOW,
-        use_project_geography_time_zone=use_project_geography_time_zone,
         dimensions=[time_dim_model, geo_dim],
+        **extra,
     )
 
 
@@ -171,66 +186,50 @@ def test_check_timezone_in_geography_err_msg_override(tmp_path):
 
 
 def test_dataset_config_no_tz_in_geography_raises(tmp_path):
-    """use_project_geography_time_zone=False + NTZ + no time_zone raises."""
-    with pytest.raises((ValueError, DSGInvalidDimension)):
+    """Naive timestamps are localized at registration, so geography time_zone is required."""
+    with pytest.raises((ValueError, DSGInvalidDimension), match="registration"):
         _build_dataset_config_model(
             tmp_path,
-            use_project_geography_time_zone=False,
             geo_has_tz=False,
             time_dim_model=_make_time_dimension_ntz_multi_tz(),
         )
 
 
 def test_dataset_config_with_tz_in_geography_passes(tmp_path):
-    """use_project_geography_time_zone=False + NTZ + valid time_zone passes."""
+    """Naive timestamps plus a valid time_zone column passes."""
     config = _build_dataset_config_model(
         tmp_path,
-        use_project_geography_time_zone=False,
         geo_has_tz=True,
         time_dim_model=_make_time_dimension_ntz_multi_tz(),
     )
     assert config is not None
 
 
-def test_dataset_config_project_geo_flag_ntz_no_tz_raises(tmp_path):
-    """use_project_geography_time_zone=True + NTZ + no time_zone raises.
+def test_dataset_config_tz_aware_no_tz_passes(tmp_path):
+    """timestamp_tz needs no registration localization, so geography time_zone is optional.
 
-    This is the key case: even with the flag set, registration-time localization
-    needs time_zone from the dataset's geography.
-    """
-    with pytest.raises((ValueError, DSGInvalidDimension), match="registration"):
-        _build_dataset_config_model(
-            tmp_path,
-            use_project_geography_time_zone=True,
-            geo_has_tz=False,
-            time_dim_model=_make_time_dimension_ntz_multi_tz(),
-        )
-
-
-def test_dataset_config_project_geo_flag_ntz_with_tz_passes(tmp_path):
-    """use_project_geography_time_zone=True + NTZ + valid time_zone passes."""
-    config = _build_dataset_config_model(
-        tmp_path,
-        use_project_geography_time_zone=True,
-        geo_has_tz=True,
-        time_dim_model=_make_time_dimension_ntz_multi_tz(),
-    )
-    assert config is not None
-
-
-def test_dataset_config_project_geo_flag_tz_aware_no_tz_passes(tmp_path):
-    """use_project_geography_time_zone=True + timestamp_tz + no time_zone passes.
-
-    When timestamps are already timezone-aware, no localization is needed during
-    registration, so geography time_zone is not required.
+    Whether query-time mapping can find time zones is decided at submission, once the
+    geography mapping is known.
     """
     config = _build_dataset_config_model(
         tmp_path,
-        use_project_geography_time_zone=True,
         geo_has_tz=False,
         time_dim_model=_make_time_dimension_tz_multi_tz(),
     )
     assert config is not None
+
+
+def test_dataset_config_drops_deprecated_time_zone_flag(tmp_path, caplog):
+    """A config carrying the removed use_project_geography_time_zone field still loads."""
+    with caplog.at_level("WARNING"):
+        config = _build_dataset_config_model(
+            tmp_path,
+            geo_has_tz=True,
+            time_dim_model=_make_time_dimension_ntz_multi_tz(),
+            use_project_geography_time_zone=True,
+        )
+    assert not hasattr(config, "use_project_geography_time_zone")
+    assert "use_project_geography_time_zone" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -274,77 +273,67 @@ def test_localize_all_null_time_zone_raises(spark, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_dataset_config(
-    tmp_path,
-    *,
-    time_dim_model,
-    use_project_geography_time_zone,
-    geo_has_tz,
-):
+def _make_mock_dataset_config(tmp_path, *, time_dim_model, geo_has_tz):
     """Build a mock DatasetConfig for submission-time validation tests."""
     time_dim = DateTimeDimensionConfig.load_from_model(time_dim_model)
 
     geo_config = MagicMock()
-    geo_config.model = _make_geography_dimension(tmp_path, with_time_zone=geo_has_tz)
-
-    dataset_model = MagicMock()
-    dataset_model.use_project_geography_time_zone = use_project_geography_time_zone
+    geo_config.model = _make_geography_dimension(
+        tmp_path, with_time_zone=geo_has_tz, filename="dataset_geography.csv"
+    )
 
     config = MagicMock()
     config.get_time_dimension.return_value = time_dim
     config.get_dimension.return_value = geo_config
-    config.model = dataset_model
     config.config_id = "test_dataset"
     return config
 
 
-def _make_mock_project_config(time_dim_model):
+def _make_mock_project_config(tmp_path, time_dim_model, *, geo_has_tz=True):
     """Build a mock ProjectConfig for submission-time validation tests."""
+    geo_config = MagicMock()
+    geo_config.model = _make_geography_dimension(
+        tmp_path, with_time_zone=geo_has_tz, filename="project_geography.csv"
+    )
+
     config = MagicMock()
     config.get_base_time_dimension.return_value = DateTimeDimensionConfig.load_from_model(
         time_dim_model
     )
+    config.get_base_dimension.return_value = geo_config
     return config
 
 
-def test_submit_dataset_absolute_to_local_no_tz_raises(tmp_path):
-    """Dataset in absolute time, project in local time, no time_zone on geo raises."""
+def test_submit_dataset_project_geography_supplies_time_zones(tmp_path):
+    """A project query always reads time zones from the project's base geography.
+
+    The dataset's own geography has no time_zone column, which does not matter.
+    """
     dataset_config = _make_mock_dataset_config(
         tmp_path,
         time_dim_model=_make_time_dimension_absolute(),
-        use_project_geography_time_zone=False,
         geo_has_tz=False,
     )
-    project_config = _make_mock_project_config(_make_time_dimension_ntz_multi_tz())
+    project_config = _make_mock_project_config(
+        tmp_path, _make_time_dimension_ntz_multi_tz(), geo_has_tz=True
+    )
 
-    with pytest.raises(DSGInvalidDataset, match="time zone information"):
-        ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
+    ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
 
 
-def test_submit_dataset_absolute_to_local_with_tz_passes(tmp_path):
-    """Dataset in absolute time, project in local time, time_zone present passes."""
+def test_submit_dataset_project_geography_without_time_zone_raises(tmp_path):
+    """The dataset's time zones cannot stand in for the project's at mapping time."""
     dataset_config = _make_mock_dataset_config(
         tmp_path,
         time_dim_model=_make_time_dimension_absolute(),
-        use_project_geography_time_zone=False,
         geo_has_tz=True,
     )
-    project_config = _make_mock_project_config(_make_time_dimension_ntz_multi_tz())
-
-    ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
-
-
-def test_submit_dataset_absolute_to_local_project_geo_flag_passes(tmp_path):
-    """use_project_geography_time_zone=True defers to project geography at query time."""
-    dataset_config = _make_mock_dataset_config(
-        tmp_path,
-        time_dim_model=_make_time_dimension_absolute(),
-        use_project_geography_time_zone=True,
-        geo_has_tz=False,
+    project_config = _make_mock_project_config(
+        tmp_path, _make_time_dimension_ntz_multi_tz(), geo_has_tz=False
     )
-    project_config = _make_mock_project_config(_make_time_dimension_ntz_multi_tz())
 
-    ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
+    with pytest.raises(DSGInvalidDataset, match="project's base geography dimension"):
+        ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
 
 
 def test_submit_dataset_absolute_to_absolute_no_tz_passes(tmp_path):
@@ -352,10 +341,11 @@ def test_submit_dataset_absolute_to_absolute_no_tz_passes(tmp_path):
     dataset_config = _make_mock_dataset_config(
         tmp_path,
         time_dim_model=_make_time_dimension_absolute(),
-        use_project_geography_time_zone=False,
         geo_has_tz=False,
     )
-    project_config = _make_mock_project_config(_make_time_dimension_absolute())
+    project_config = _make_mock_project_config(
+        tmp_path, _make_time_dimension_absolute(), geo_has_tz=False
+    )
 
     ProjectRegistryManager._check_time_zone_for_mapping(project_config, dataset_config)
 
@@ -472,19 +462,228 @@ def test_index_time_single_tz_dataset_config_no_geo_tz_passes(tmp_path):
     """Dataset with single-tz IndexTime does not require time_zone in geography."""
     config = _build_dataset_config_model(
         tmp_path,
-        use_project_geography_time_zone=False,
         geo_has_tz=False,
         time_dim_model=_make_index_time_single_tz(),
     )
     assert config is not None
 
 
-def test_index_time_multi_tz_dataset_config_no_geo_tz_raises(tmp_path):
-    """Dataset with multi-tz IndexTime requires time_zone in geography."""
-    with pytest.raises((ValueError, DSGInvalidDimension)):
-        _build_dataset_config_model(
-            tmp_path,
-            use_project_geography_time_zone=False,
-            geo_has_tz=False,
-            time_dim_model=_make_index_time_multi_tz(),
+def test_index_time_multi_tz_dataset_config_no_geo_tz_passes(tmp_path):
+    """Index time is never localized at registration, so config load does not require tz.
+
+    Multi-tz index time does need geography time zones, but only at mapping time, where
+    the geography that supplies them depends on the dataset's geography mapping.
+    """
+    config = _build_dataset_config_model(
+        tmp_path,
+        geo_has_tz=False,
+        time_dim_model=_make_index_time_multi_tz(),
+    )
+    assert config is not None
+
+
+# ---------------------------------------------------------------------------
+# Query-time geography selection
+# ---------------------------------------------------------------------------
+
+
+def _make_geography_config(tmp_path, *, with_time_zone: bool, filename):
+    return DimensionConfig.load_from_model(
+        _make_geography_dimension(tmp_path, with_time_zone=with_time_zone, filename=filename)
+    )
+
+
+def _make_handler(dataset_geo_dim):
+    """Build a stand-in handler exposing what _get_time_zone_geography_dimension reads."""
+    handler = MagicMock()
+    handler._config.get_dimension_with_records.return_value = dataset_geo_dim
+    handler.dataset_id = "test_dataset"
+    return handler
+
+
+def test_select_geography_uses_mapping_target_when_geography_is_mapped(tmp_path):
+    """When geography was mapped, the target's records own the ids in the column."""
+    dataset_geo = _make_geography_config(tmp_path, with_time_zone=True, filename="ds.csv")
+    to_geo = _make_geography_config(tmp_path, with_time_zone=True, filename="project.csv")
+
+    selected = DatasetSchemaHandlerBase._get_time_zone_geography_dimension(
+        _make_handler(dataset_geo), to_geo
+    )
+    assert selected is to_geo
+
+
+def test_select_geography_uses_dataset_when_geography_is_not_mapped(tmp_path):
+    """When geography was not mapped, the dataset's own records own the ids."""
+    dataset_geo = _make_geography_config(tmp_path, with_time_zone=True, filename="ds.csv")
+
+    selected = DatasetSchemaHandlerBase._get_time_zone_geography_dimension(
+        _make_handler(dataset_geo), None
+    )
+    assert selected is dataset_geo
+
+
+def test_select_geography_raises_when_mapping_target_has_no_time_zone(tmp_path):
+    """A dataset geography with time zones does not rescue a target without them."""
+    dataset_geo = _make_geography_config(tmp_path, with_time_zone=True, filename="ds.csv")
+    to_geo = _make_geography_config(tmp_path, with_time_zone=False, filename="project.csv")
+
+    with pytest.raises(DSGInvalidDataset, match="mapped into"):
+        DatasetSchemaHandlerBase._get_time_zone_geography_dimension(
+            _make_handler(dataset_geo), to_geo
         )
+
+
+def test_select_geography_raises_when_dataset_has_no_time_zone(tmp_path):
+    """Unmapped geography without time zones names the dataset's own dimension."""
+    dataset_geo = _make_geography_config(tmp_path, with_time_zone=False, filename="ds.csv")
+
+    with pytest.raises(DSGInvalidDataset, match="dataset's own geography dimension"):
+        DatasetSchemaHandlerBase._get_time_zone_geography_dimension(
+            _make_handler(dataset_geo), None
+        )
+
+
+def test_select_geography_raises_when_dataset_has_no_geography_records(tmp_path):
+    """No geography dimension with records is a dataset error, not an assertion."""
+    with pytest.raises(DSGInvalidDataset, match="no geography dimension with records"):
+        DatasetSchemaHandlerBase._get_time_zone_geography_dimension(_make_handler(None), None)
+
+
+def _make_mapping_manager(scratch_dir_context):
+    """Build a mapping manager stand-in that runs the operation and does not persist."""
+    manager = MagicMock()
+    manager.has_completed_operation.return_value = False
+    manager.plan.map_time_op.persist = False
+    manager.scratch_dir_context = scratch_dir_context
+    return manager
+
+
+def _run_convert_time_dimension(df, geo_dim, scratch_dir_context):
+    """Run _convert_time_dimension with chronify stubbed out.
+
+    Returns the patched ``add_time_zone`` so the caller can assert whether the geography
+    join happened. chronify cannot map ``DatetimeRangeWithTZColumn`` at all, so the real
+    mapper cannot stand in here.
+
+    Only the DuckDB dispatcher is stubbed, hence the ``skip_unless_duckdb`` on the callers.
+    The guard under test sits before the backend dispatch and is itself backend-agnostic.
+    """
+    from_time_dim = DateTimeDimensionConfig.load_from_model(_make_time_dimension_ntz_multi_tz())
+    to_time_dim = DateTimeDimensionConfig.load_from_model(_make_time_dimension_absolute())
+    handler = _make_handler(geo_dim)
+    handler._config.get_time_dimension.return_value = from_time_dim
+    # Keep the real selection logic; only the mapping_manager and chronify are stand-ins.
+    handler._get_time_zone_geography_dimension.side_effect = lambda to_geo: (
+        DatasetSchemaHandlerBase._get_time_zone_geography_dimension(handler, to_geo)
+    )
+
+    module = "dsgrid.dataset.dataset_schema_handler_base"
+    with (
+        patch(f"{module}.add_time_zone", side_effect=add_time_zone) as mock_add_tz,
+        patch(f"{module}.map_time_dimension_with_chronify_duckdb", side_effect=lambda df, **_: df),
+    ):
+        result = DatasetSchemaHandlerBase._convert_time_dimension(
+            handler,
+            load_data_df=df,
+            to_time_dim=to_time_dim,
+            value_column=VALUE_COLUMN,
+            mapping_manager=_make_mapping_manager(scratch_dir_context),
+            wrap_time_allowed=False,
+            time_based_data_adjustment=TimeBasedDataAdjustmentModel(),
+            to_geo_dim=None,
+        )
+    return mock_add_tz, result
+
+
+@skip_unless_duckdb
+def test_convert_time_skips_join_when_time_zone_column_present(
+    spark, scratch_dir_context, tmp_path
+):
+    """A table already carrying time_zone must not be joined with geography records again.
+
+    Registration-time localization leaves the column on the registered data, and a
+    one-table dataset may supply it directly. Joining again collides on the column name.
+    """
+    df = _make_multi_tz_dataframe(spark, time_zones=("Etc/GMT+5",))
+    assert TIME_ZONE_COLUMN in df.columns
+
+    geo_dim = _make_geography_config(tmp_path, with_time_zone=True, filename="geo.csv")
+    # Without the guard, this is the join that _convert_time_dimension would perform.
+    with pytest.raises(DSGInvalidOperation, match="collide"):
+        add_time_zone(df, geo_dim)
+
+    mock_add_tz, result = _run_convert_time_dimension(df, geo_dim, scratch_dir_context)
+    mock_add_tz.assert_not_called()
+    assert TIME_ZONE_COLUMN not in result.columns
+
+
+@skip_unless_duckdb
+def test_convert_time_joins_when_time_zone_column_absent(spark, scratch_dir_context, tmp_path):
+    """Without the column, the selected geography records still supply it."""
+    df = drop_columns(_make_multi_tz_dataframe(spark, time_zones=("Etc/GMT+5",)), TIME_ZONE_COLUMN)
+    assert TIME_ZONE_COLUMN not in df.columns
+
+    geo_dim = _make_geography_config(tmp_path, with_time_zone=True, filename="geo.csv")
+    mock_add_tz, result = _run_convert_time_dimension(df, geo_dim, scratch_dir_context)
+    mock_add_tz.assert_called_once()
+    assert TIME_ZONE_COLUMN not in result.columns
+
+
+# ---------------------------------------------------------------------------
+# time_zone as a data column in the two-table format
+# ---------------------------------------------------------------------------
+
+
+def _make_two_table_handler(load_data, lookup):
+    """Build a two-table handler exposing only what the column checks read."""
+    handler = object.__new__(TwoTableDatasetSchemaHandler)
+    handler._load_data = load_data
+    handler._load_data_lookup = lookup
+    handler._config = MagicMock()
+    handler._config.get_value_format.return_value = ValueFormat.STACKED
+    time_dim = MagicMock()
+    time_dim.get_load_data_time_columns.return_value = ["timestamp"]
+    handler._config.get_time_dimension.return_value = time_dim
+    return handler
+
+
+def _two_table_frames(*, lookup_has_tz: bool, load_data_has_tz: bool):
+    load_columns = ["id", "timestamp", VALUE_COLUMN]
+    load_rows = [("1", "2018-01-01 00:00:00", 1.0), ("1", "2018-01-01 01:00:00", 2.0)]
+    if load_data_has_tz:
+        load_columns.append(TIME_ZONE_COLUMN)
+        load_rows = [row + ("Etc/GMT+5",) for row in load_rows]
+
+    lookup_columns = ["id", "geography", "sector", "subsector", "metric", "model_year", "scenario"]
+    lookup_row = ("1", "g1", "com", "hospital", "electricity", "2018", "reference")
+    if lookup_has_tz:
+        lookup_columns.append(TIME_ZONE_COLUMN)
+        lookup_row = lookup_row + ("Etc/GMT+5",)
+
+    return make_table(load_columns, *load_rows), make_table(lookup_columns, lookup_row)
+
+
+def test_two_table_lookup_accepts_time_zone_column(spark):
+    """The lookup may carry time_zone, matching what one-table already allows."""
+    load_data, lookup = _two_table_frames(lookup_has_tz=True, load_data_has_tz=False)
+    handler = _make_two_table_handler(load_data, lookup)
+    handler._check_lookup_data_consistency()
+
+
+def test_two_table_load_data_accepts_time_zone_column(spark):
+    """load_data may carry time_zone, matching what one-table already allows."""
+    load_data, lookup = _two_table_frames(lookup_has_tz=False, load_data_has_tz=True)
+    handler = _make_two_table_handler(load_data, lookup)
+    handler._check_dataset_internal_consistency()
+
+
+def test_two_table_still_rejects_unknown_columns(spark):
+    """Allowing time_zone must not open the door to arbitrary columns."""
+    load_data = make_table(
+        ["id", "timestamp", VALUE_COLUMN, "not_a_dimension"],
+        ("1", "2018-01-01 00:00:00", 1.0, "x"),
+    )
+    _, lookup = _two_table_frames(lookup_has_tz=False, load_data_has_tz=False)
+    handler = _make_two_table_handler(load_data, lookup)
+    with pytest.raises(DSGInvalidDataset, match="not_a_dimension"):
+        handler._check_dataset_internal_consistency()

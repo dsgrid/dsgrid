@@ -1324,10 +1324,12 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         """Check that time_zone is available when time mapping requires it.
 
-        If either the dataset's or project's time dimension requires time zone
-        information in geography, and the dataset has
-        ``use_project_geography_time_zone=False``, the dataset's geography
-        dimension records must include a ``time_zone`` column.
+        Time mapping runs after every dimension mapping, so it reads time zones from the
+        geography dimension that owns the ids in the geography column at that point.  A
+        project query always passes the project's base geography, whether or not the
+        dataset's geography was mapped, so that is the dimension that must provide a
+        ``time_zone`` column.  The dataset's own geography is what registration uses, and
+        :meth:`DatasetConfigModel.check_time_zone` covers that.
 
         Raises
         ------
@@ -1351,23 +1353,16 @@ class ProjectRegistryManager(RegistryManagerBase):
         if not needs_time_zone:
             return
 
-        if dataset_config.model.use_project_geography_time_zone:
-            return
-
-        geo_dim = dataset_config.get_dimension(DimensionType.GEOGRAPHY)
-        if geo_dim is None:
-            return
-
+        geo_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
         try:
             check_timezone_in_geography(geo_dim.model)
         except (ValueError, DSGInvalidDimension) as exc:
             msg = (
-                f"Dataset {dataset_config.config_id!r} has "
-                "use_project_geography_time_zone=False, but the time mapping to "
-                "the project requires time zone information and the dataset's "
-                "geography dimension records do not include a valid 'time_zone' "
-                "column. Either add a 'time_zone' column to the dataset's "
-                "geography dimension or set use_project_geography_time_zone=True."
+                f"Time mapping for dataset {dataset_config.config_id!r} requires time zone "
+                "information from a geography dimension. A project query reads it from the "
+                f"project's base geography dimension, {geo_dim.model.name!r}, whose records "
+                "do not provide a valid 'time_zone' column. Add that column to the project's "
+                "geography dimension records."
             )
             raise DSGInvalidDataset(msg) from exc
 

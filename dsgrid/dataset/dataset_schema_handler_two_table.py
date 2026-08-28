@@ -2,7 +2,7 @@ import ibis
 import logging
 from typing import Any, Self, cast
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -234,7 +234,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if col == "id":
                 found_id = True
                 continue
-            if col == SCALING_FACTOR_COLUMN:
+            if col in (SCALING_FACTOR_COLUMN, TIME_ZONE_COLUMN):
                 continue
             if not is_string_column(self._load_data_lookup, col):
                 msg = f"dimension column {col} must have data type = StringType"
@@ -275,7 +275,7 @@ class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         allowed_columns = (
             DimensionType.get_allowed_dimension_column_names()
             .union(time_columns)
-            .union({VALUE_COLUMN, "id", "scaling_factor"})
+            .union({VALUE_COLUMN, TIME_ZONE_COLUMN, "id", "scaling_factor"})
         )
 
         found_id = False

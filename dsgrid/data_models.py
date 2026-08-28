@@ -81,8 +81,17 @@ class DSGBaseModel(BaseModel):
     def from_file(cls, filename: Path | str) -> Self:
         """Deserialize the model from a file. Unlike the load method,
         this does not change directories.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            If the file contents fail model validation.
         """
-        return cls(**load_data(filename))
+        try:
+            return cls(**load_data(filename))
+        except ValidationError as e:
+            msg = f"Validation error in '{filename}': {e}"
+            raise DSGInvalidParameter(msg) from e
 
     def to_file(self, filename: Path) -> None:
         """Serialize the model to a file."""

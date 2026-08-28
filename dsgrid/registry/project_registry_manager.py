@@ -15,11 +15,13 @@ import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
+from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
 from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.noop_time_dimension_config import NoOpTimeDimensionConfig
+from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimension,
@@ -1277,6 +1279,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_references: list[DimensionMappingReferenceModel],
         context: RegistrationContext,
     ):
+        self._check_time_zone_for_mapping(project_config, dataset_config)
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
         project_config.add_dataset_base_dimension_names(
             dataset_config.model.dataset_id,
@@ -1313,6 +1316,55 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.version,
             config.model.project_id,
         )
+
+    @staticmethod
+    def _check_time_zone_for_mapping(
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+    ):
+        """Check that time_zone is available when time mapping requires it.
+
+        Time mapping runs after every dimension mapping, so it reads time zones from the
+        geography dimension that owns the ids in the geography column at that point.  A
+        project query always passes the project's base geography, whether or not the
+        dataset's geography was mapped, so that is the dimension that must provide a
+        ``time_zone`` column.  The dataset's own geography is what registration uses, and
+        :meth:`DatasetConfigModel.check_time_zone` covers that.
+
+        Raises
+        ------
+        DSGInvalidDataset
+            If time_zone is needed for mapping but not available.
+        """
+        dataset_time_dim = dataset_config.get_time_dimension()
+        if dataset_time_dim is None:
+            return
+
+        # Annual and NoOp time dimensions do not go through chronify-based
+        # mapping, so they never need time_zone from geography.
+        if isinstance(dataset_time_dim, (AnnualTimeDimensionConfig, NoOpTimeDimensionConfig)):
+            return
+
+        project_time_dim = project_config.get_base_time_dimension()
+        needs_time_zone = (
+            dataset_time_dim.model.is_time_zone_required_in_geography()
+            or project_time_dim.model.is_time_zone_required_in_geography()
+        )
+        if not needs_time_zone:
+            return
+
+        geo_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+        try:
+            check_timezone_in_geography(geo_dim.model)
+        except (ValueError, DSGInvalidDimension) as exc:
+            msg = (
+                f"Time mapping for dataset {dataset_config.config_id!r} requires time zone "
+                "information from a geography dimension. A project query reads it from the "
+                f"project's base geography dimension, {geo_dim.model.name!r}, whose records "
+                "do not provide a valid 'time_zone' column. Add that column to the project's "
+                "geography dimension records."
+            )
+            raise DSGInvalidDataset(msg) from exc
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

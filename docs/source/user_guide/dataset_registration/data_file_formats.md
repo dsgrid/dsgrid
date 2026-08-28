@@ -609,7 +609,7 @@ The [one-table](#one-table-format) and [two-table](#two-table-format) examples a
 - Spark type: `TimestampNTZType`
 - Example: `2012-01-01 00:00:00`
 
-Timezone-naive data requires a `time_zone` column (see [Time Zone Column Sourcing](#time-zone-column-sourcing) below) and specific localization handling. For requirements and restrictions, see [Dimension Concepts — Time Zone Localization](dimension_concepts.md#time-zone-localization).
+Timezone-naive data is localized during registration, which needs either a single `time_zone` in the config or a `time_zone` column in the data (see [Time Zone Column Sourcing](#time-zone-column-sourcing) below). For requirements and restrictions, see [Dimension Concepts — Time Zone Localization](dimension_concepts.md#time-zone-localization).
 
 **Data example (two-table, pivoted):**
 
@@ -638,14 +638,17 @@ Timezone-naive data requires a `time_zone` column (see [Time Zone Column Sourcin
 (time-zone-column-sourcing)=
 #### Time Zone Column Sourcing
 
-When using timezone-naive timestamps (`TIMESTAMP_NTZ`) or time-in-parts formats, a `time_zone` column is required in the data table (one value per row). This column provides the IANA time zone for each row, allowing dsgrid to interpret local times correctly.
+A `time_zone` column (one value per row) is required in the data table when timestamps are timezone-naive (`TIMESTAMP_NTZ`, or time-in-parts without `offset_column`) **and** the time dimension uses `aligned_in_std_clock_time`. The column provides the IANA time zone for each row, allowing dsgrid to interpret local times correctly. Timezone-naive data using `aligned_in_absolute_time` needs no such column, because the single `time_zone` in the config applies to every row. Data that is already timezone-aware carries its offset on the timestamp itself and needs no column either.
 
-There are two ways to source the `time_zone` column:
+You can include the column in your data files directly, and dsgrid uses it as-is. A [one-table](#one-table-format) dataset may carry `time_zone` alongside its dimension columns. A [two-table](#two-table-format) dataset may carry it in either `load_data` or `load_data_lookup`, but not both, since the join on `id` cannot reconcile two columns of the same name. The lookup is usually the better place, because time zone follows geography rather than varying by timestamp.
 
-- **Dataset geography records** (default) — include a `time_zone` column with IANA time zone strings (e.g., `America/New_York`) in the dataset's geography dimension records file. dsgrid automatically joins this column to the data during registration.
-- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config. dsgrid will read time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+Otherwise dsgrid adds the column for you, if it is needed and not already present, by joining the data with geography dimension records. It picks the geography dimension whose record IDs the data carries at that point:
 
-In both cases, the resulting data table has a `time_zone` column containing IANA time zone strings, with one value per row. The `time_zones` list in your time dimension config must include all unique values that appear in this column.
+- **During registration**, no dimension mapping has been applied, so the dataset's own geography records are used. Include a `time_zone` column with IANA time zone strings (e.g., `America/New_York`) in the dataset's geography dimension records file.
+- **During a project query**, time is mapped after every other dimension, so the project's base geography records supply the time zones. This holds whether or not the dataset's geography is mapped, because an unmapped dataset geography already uses the project's record IDs.
+- **During a standalone dataset query**, the geography dimension the query maps to supplies them, or the dataset's own records when the query maps no geography.
+
+Either way, timezone-naive timestamps are localized during registration using a `time_zone` column containing IANA time zone strings, with one value per row. The `time_zones` list in your time dimension config must include every value that appears in that column. dsgrid raises an error if no time zones are available, whether because the geography records lack the column, because every value is null, or because no data row matched a geography record. It also raises if the column holds a zone the config does not declare, since chronify would otherwise drop those rows during localization without reporting anything.
 
 For configuration requirements, see [Dimension Concepts — Time Dimensions](dimension_concepts.md#time-dimensions).
 

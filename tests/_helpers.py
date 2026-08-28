@@ -13,9 +13,22 @@ pandas conversion, call ``dsgrid.ibis.table_utils`` (``count_rows`` /
 from typing import Any
 
 import ibis
+import pandas as pd
+import pytest
 
+from dsgrid.common import VALUE_COLUMN
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import create_temp_view
 from dsgrid.ibis.session import get_runtime_session, get_spark_session
+from dsgrid.ibis.table_utils import table_to_pandas
+from dsgrid.ibis.types import use_duckdb
+
+skip_unless_spark = pytest.mark.skipif(
+    use_duckdb(), reason="Spark routing tests only run when backend_engine is SPARK"
+)
+skip_unless_duckdb = pytest.mark.skipif(
+    not use_duckdb(), reason="DuckDB routing tests only run when backend_engine is DUCKDB"
+)
 
 
 def make_table(columns: list[str], *rows: tuple) -> ibis.Table:
@@ -107,6 +120,41 @@ def first_value(df, column: str):
     return getattr(collect(df.limit(1))[0], column)
 
 
+class DummyDatasetConfig:
+    """Minimal stub of DatasetConfig for functions that only need dimension lookups."""
+
+    def __init__(self, time_dim, value_columns=None, geography_dim=None):
+        self._time_dim = time_dim
+        self._value_columns = value_columns or [VALUE_COLUMN]
+        self._geo_dim = geography_dim
+
+    def get_dimension(self, dimension_type):
+        if dimension_type == DimensionType.TIME:
+            return self._time_dim
+        if dimension_type == DimensionType.GEOGRAPHY:
+            return self._geo_dim
+        return None
+
+    def get_value_columns(self):
+        return self._value_columns
+
+
+class DummyGeoDim:
+    """Geography dimension stub with a single record mapping 'g1' to ``time_zone``."""
+
+    def __init__(self, spark, time_zone: str | None = "Etc/GMT+5"):
+        self._spark = spark
+        self._time_zone = time_zone
+
+    def get_records_dataframe(self):
+        # An explicit string dtype keeps an all-null column from being inferred
+        # as NULL-typed, which DuckDB rejects.
+        pdf = pd.DataFrame(
+            {"id": ["g1"], "time_zone": pd.Series([self._time_zone], dtype="string")}
+        )
+        return self._spark.createDataFrame(pdf)
+
+
 def spark_physical_plan(df: ibis.Table) -> str:
     """Return the Spark physical plan for ``df`` as a string.
 
@@ -121,3 +169,27 @@ def spark_physical_plan(df: ibis.Table) -> str:
     """
     spark_df = get_spark_session().table(create_temp_view(df))
     return spark_df._jdf.queryExecution().executedPlan().toString()
+
+
+def assert_globally_sorted(table: ibis.Table, sort_columns: list[str]) -> None:
+    """Assert an Ibis table is globally ordered by ``sort_columns``.
+
+    Use this on the table a query returns, not on one read back from the output file. A
+    Spark Parquet write produces a directory of part files: ``ORDER BY``
+    range-partitions so each file is internally sorted, but reading the directory back
+    packs splits by descending file size, so the concatenation is not globally ordered.
+    dsgrid therefore re-sorts the table it hands back
+    (``QuerySubmitterBase._apply_sort``), and only ``single_output_file`` makes the file
+    itself read back in order.
+
+    Takes a table rather than a pandas frame, and projects to ``sort_columns`` before
+    collecting, so the check cannot pull a whole query result into the driver. That
+    matters: Spark's local-mode default heap is 1 GB, and collecting a full result here
+    (on top of the collect a caller has usually already done) was enough to OOM the JVM
+    partway through the suite and cascade into every later test.
+    """
+    assert sort_columns, "caller must declare sort_columns to exercise the sort path"
+    pdf = table_to_pandas(table.select(*sort_columns))
+    actual = pdf.reset_index(drop=True)
+    expected = pdf.sort_values(sort_columns).reset_index(drop=True)
+    assert actual.equals(expected), f"output is not globally sorted by {sort_columns}"

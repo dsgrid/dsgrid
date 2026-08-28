@@ -6,7 +6,6 @@ from pathlib import Path
 
 import rich_click as click
 from chronify.utils.path_utils import check_overwrite
-from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.cli.common import (
@@ -25,6 +24,7 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
@@ -281,7 +281,7 @@ def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
         print(f"Validated {query_file}", file=sys.stderr)
-    except ValidationError:
+    except DSGInvalidParameter:
         print(f"Failed to validate query file {query_file}", file=sys.stderr)
         raise
 

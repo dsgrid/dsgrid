@@ -87,6 +87,7 @@ from dsgrid.utils.files import load_data, dump_data
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 from tests._helpers import (
+    assert_globally_sorted,
     collect as _collect,
     order_by as _order_by,
     row_value as _row_value,
@@ -692,7 +693,7 @@ def run_query_test(test_query_cls, *args, expected_values=None, to_time_zone=Non
             *args, REGISTRY_PATH, project, output_dir=output_dir, to_time_zone=to_time_zone
         )
         for load_cached_table in (False, True):
-            ProjectQuerySubmitter(project, output_dir).submit(
+            query.result_df = ProjectQuerySubmitter(project, output_dir).submit(
                 query.make_query(),
                 persist_intermediate_table=True,
                 load_cached_table=load_cached_table,
@@ -724,6 +725,10 @@ class QueryTestBase(abc.ABC):
         self._model = None
         self._cached_stats = None
         self._to_time_zone = to_time_zone
+        # The dataframe submit() returns, set by run_query_test. sort_columns orders this
+        # on both backends; it orders the output file only on DuckDB or with
+        # single_output_file, so ordering assertions belong here.
+        self.result_df = None
 
     @staticmethod
     def get_db_connection() -> DatabaseConnection:
@@ -853,6 +858,7 @@ class QueryTestElectricityValues(QueryTestBase):
                 replace_ids_with_names=True,
                 table_format=StackedTableFormatModel(),
                 time_zone=self._to_time_zone,
+                sort_columns=["county", "time_est"],
             ),
         )
         match self._category:
@@ -900,6 +906,16 @@ class QueryTestElectricityValues(QueryTestBase):
         expected = [VALUE_COLUMN]
 
         pdf = table_to_pandas(df)
+        # Regression check: sort_columns must produce a globally sorted result, including
+        # when time zone conversion runs after the initial save (see _convert_time_zone).
+        # Asserted on the returned dataframe, which is ordered on both backends; the
+        # output file is ordered only on DuckDB (see assert_globally_sorted).
+        sort_columns = self._model.result.sort_columns
+        assert_globally_sorted(self.result_df, sort_columns)
+        if use_duckdb():
+            # DuckDB writes one file, so the output table itself is ordered too. Spark
+            # needs single_output_file for that; QueryTestMapAnnualTime covers it.
+            assert_globally_sorted(df, sort_columns)
         # Check time zone conversion
         if self._model.result.time_zone:
             expected.append("time_zone")
@@ -1619,12 +1635,28 @@ class QueryTestMapAnnualTime(QueryTestBase):
                 ],
                 output_format="parquet",
                 table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+                # Regression check: sorting must run after the pivot aggregation, which
+                # does not preserve pre-existing row order.
+                sort_columns=["state", "sector"],
+                # ...and that sort_columns reaches the output file itself, which on
+                # Spark requires collapsing the Parquet directory to one part file.
+                single_output_file=True,
             ),
         )
         return self._model
 
     def validate(self, expected_values=None):
-        df = read_parquet(self.output_dir / self.name / "table.parquet")
+        table_path = self.output_dir / self.name / "table.parquet"
+        df = read_parquet(table_path)
+        # Regression check: sorting must run after the pivot aggregation, which does not
+        # preserve pre-existing row order.
+        sort_columns = self._model.result.sort_columns
+        assert_globally_sorted(self.result_df, sort_columns)
+        # single_output_file is set, so the file on disk is ordered too on both backends.
+        assert_globally_sorted(df, sort_columns)
+        if not use_duckdb():
+            parts = list(table_path.glob("*.parquet"))
+            assert len(parts) == 1, f"single_output_file did not coalesce: {parts}"
         distinct_model_years = _collect(df.select(DimensionType.MODEL_YEAR.value).distinct())
         assert len(distinct_model_years) == 1
         assert _row_value(distinct_model_years[0], DimensionType.MODEL_YEAR.value) == "2020"

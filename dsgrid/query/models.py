@@ -571,8 +571,20 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     table_format: TableFormatModel = StackedTableFormatModel()
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     sort_columns: list[str] = Field(
-        description="Sort the results by these dimension names.",
+        description="Sort the results by these dimension names. This always orders the "
+        "dataframe returned by the query. It orders the output file as well only on "
+        "DuckDB, which writes a single file; on Spark the output is a directory of part "
+        "files that reads back in split order rather than sort order. Set "
+        "single_output_file to make the file itself ordered.",
         default=[],
+    )
+    single_output_file: bool = Field(
+        description="Write the result table as a single file. Only meaningful on Spark, "
+        "whose default distributed write produces a directory of part files; DuckDB "
+        "always writes a single file. Required for sort_columns to be preserved in the "
+        "output file itself. Costs write parallelism and routes the whole result through "
+        "one task, so it is off by default.",
+        default=False,
     )
     dimension_filters: list[DimensionFilters] = Field(
         description="Filters to apply to the result. Must contain columns in the result.",

@@ -44,24 +44,21 @@ from dsgrid.ibis.session import (
     StructField,
     StructType,
     TimestampNTZType,
-    use_duckdb,
 )
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.utils.dataset import localize_timestamps_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from tests._helpers import (
+    DummyDatasetConfig,
+    DummyGeoDim,
+    skip_unless_duckdb,
+    skip_unless_spark,
+)
 
 
 @pytest.fixture(scope="module")
 def spark():
     return get_runtime_session()
-
-
-skip_unless_spark = pytest.mark.skipif(
-    use_duckdb(), reason="Spark routing tests only run when backend_engine is SPARK"
-)
-skip_unless_duckdb = pytest.mark.skipif(
-    not use_duckdb(), reason="DuckDB routing tests only run when backend_engine is DUCKDB"
-)
 
 
 def make_datetime_config_single_tz_ntz(time_zone="Etc/GMT+7"):
@@ -223,34 +220,6 @@ def test_datetime_model_allows_dst_zone_when_tz_aware():
     dimension may legitimately use a DST-observing zone like ``America/New_York``."""
     config = make_datetime_config_tz_aware()  # America/New_York, TZ-aware column format
     assert config.get_time_zone() == "America/New_York"
-
-
-class DummyDatasetConfig:
-    def __init__(self, time_dim, value_columns=None, geography_dim=None):
-        self._time_dim = time_dim
-        self._value_columns = value_columns or [VALUE_COLUMN]
-        self._geo_dim = geography_dim
-
-    def get_dimension(self, dimension_type):
-        if dimension_type == DimensionType.TIME:
-            return self._time_dim
-        if dimension_type == DimensionType.GEOGRAPHY:
-            return self._geo_dim
-        return None
-
-    def get_value_columns(self):
-        return self._value_columns
-
-
-class DummyGeoDim:
-    """Minimal geography dimension stub that maps 'g1' to Etc/GMT+5."""
-
-    def __init__(self, spark):
-        self._spark = spark
-
-    def get_records_dataframe(self):
-        pdf = pd.DataFrame({"id": ["g1"], "time_zone": ["Etc/GMT+5"]})
-        return self._spark.createDataFrame(pdf)
 
 
 def _make_simple_dataframe(spark, extra_columns: dict | None = None) -> ibis.Table:
@@ -419,6 +388,25 @@ def test_multi_tz_duckdb_existing_tz_column(spark, tmp_path):
     res_df2 = table_to_pandas(res_df)
     assert res_df2[TIME_COLUMN].dt.tz is not None
     assert set(res_df2[TIME_COLUMN]) == set(sdf2[TIME_COLUMN].dt.tz_localize(tz))
+
+
+def test_multi_tz_undeclared_zone_raises(spark, tmp_path):
+    """A time zone absent from the config's time_zones list must not be dropped silently.
+
+    chronify localizes against the declared list and discards rows carrying any other
+    zone, so without this check four rows go in and two come out with no error.
+
+    Backend-agnostic: the check runs before ``localize_timestamps_if_necessary`` dispatches
+    on the backend engine.
+    """
+    time_dim = make_datetime_config_multi_tz_ntz(time_zones=["Etc/GMT+5"])
+    config = DummyDatasetConfig(time_dim, geography_dim=None)
+    df = _make_multi_tz_dataframe(spark, time_zones=("Etc/GMT+5", "Etc/GMT+8"))
+
+    with pytest.raises(DSGInvalidOperation, match="Etc/GMT\\+8"):
+        localize_timestamps_if_necessary(
+            df, config, scratch_dir_context=ScratchDirContext(tmp_path)
+        )
 
 
 @skip_unless_duckdb

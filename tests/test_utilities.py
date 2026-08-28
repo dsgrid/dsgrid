@@ -1,6 +1,13 @@
 """Tests for dsgrid.utils.utilities module."""
 
-from dsgrid.utils.utilities import make_unique_key, sorted_with_nulls
+import pytest
+
+from dsgrid.config.mapping_tables import MappingTableRecordModel
+from dsgrid.utils.utilities import (
+    convert_record_dicts_to_classes,
+    make_unique_key,
+    sorted_with_nulls,
+)
 
 
 def test_make_unique_key_new_name():
@@ -96,3 +103,31 @@ def test_sorted_with_nulls_ints():
 def test_sorted_with_nulls_mixed_types():
     """Test that mutually incomparable values fall back to a stable order."""
     assert sorted_with_nulls({6037, "6037", None}) == [None, 6037, "6037"]
+
+
+def test_convert_record_dicts_to_classes_reports_record_number():
+    """Test that a validation failure names the failing record and its content."""
+    rows = [
+        {"from_id": "a", "from_fraction": 1.0},
+        {"from_id": "b", "from_fraction": "not-a-float"},
+    ]
+    with pytest.raises(ValueError, match="record 2") as exc:
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)
+    assert "not-a-float" in str(exc.value)
+
+
+def test_convert_record_dicts_to_classes_reports_inconsistent_length():
+    """Test that a ragged record reports its record number and both lengths."""
+    rows = [
+        {"from_id": "a", "from_fraction": 1.0},
+        {"from_id": "b"},
+    ]
+    with pytest.raises(ValueError, match="Record 2 has 1 columns; expected 2"):
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)
+
+
+def test_convert_record_dicts_to_classes_reports_none_key():
+    """Test that a None key reports the record number."""
+    rows = [{"from_id": "a", None: 1.0}]
+    with pytest.raises(ValueError, match="record 1 has a key that is None"):
+        convert_record_dicts_to_classes(rows, MappingTableRecordModel)

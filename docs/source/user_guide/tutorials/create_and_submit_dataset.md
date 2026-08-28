@@ -65,9 +65,6 @@ Add the relevant settings to your dataset.json5:
     "sector",
     "weather_year",
   ],
-  // The time in this dataset has no time zone. It is based on the local time perceived by the
-  // people being modeled. dsgrid will map times to the project's geography time zone.
-  use_project_geography_time_zone: true,
   data_layout: {
     table_format: "two_table",
     value_format: "pivoted",

@@ -607,7 +607,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         title="column_format",
         description="Specifies the format of the timestamps in the dataset.",
     )
-    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+    time_zone_format: AlignedTimeSingleTimeZone | LocalTimeMultipleTimeZones = Field(
         title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether timestamps are aligned in absolute time or in local standard time when adjusted for time zone.",
@@ -926,7 +926,7 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             "options": MeasurementType.format_for_docs(),
         },
     )
-    time_zone_format: Union[AlignedTimeSingleTimeZone, LocalTimeMultipleTimeZones] = Field(
+    time_zone_format: AlignedTimeSingleTimeZone | LocalTimeMultipleTimeZones = Field(
         title="time_zone_format",
         discriminator="format_type",
         description="Specifies whether all geographies share a single time zone or each "

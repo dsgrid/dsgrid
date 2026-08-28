@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta, tzinfo
-from typing import Type, Union
+from typing import Type
 from zoneinfo import ZoneInfo
 
 import chronify
@@ -29,7 +29,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def to_chronify(
         self,
-    ) -> Union[chronify.IndexTimeRange, chronify.IndexTimeRangeWithTZColumn]:
+    ) -> chronify.IndexTimeRange | chronify.IndexTimeRangeWithTZColumn:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1

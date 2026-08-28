@@ -1,5 +1,17 @@
-import gc
 import os
+
+# Spark's local-mode driver runs tasks in a JVM that defaults to 1 GB of heap, which this
+# suite exceeds: the standard-scenarios query tests execute the largest query twice each
+# (once per load_cached_table mode), on top of everything earlier modules leave in the
+# session. Exceeding it kills the JVM mid-run, and every later test then fails with
+# ConnectionRefusedError rather than anything that points at the cause.
+#
+# This must be set before PySpark launches the JVM -- spark.driver.memory cannot be
+# changed through SparkConf once it is running -- so it cannot be a fixture, and it has to
+# precede any import that might build a session. setdefault so callers can override.
+os.environ.setdefault("PYSPARK_SUBMIT_ARGS", "--driver-memory 4g pyspark-shell")
+
+import gc
 import re
 import shutil
 import sys

@@ -59,7 +59,7 @@ from dsgrid.ibis.table_utils import (
     is_table_empty,
     table_to_records,
 )
-from dsgrid.ibis.types import is_tz_aware_timestamp, use_duckdb
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.ibis.io import persist_table, write_dataframe
 from dsgrid.ibis.null_checks import check_for_nulls
@@ -507,7 +507,9 @@ def convert_time_zone_with_chronify_duckdb(
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with the specified time zone as a new column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
     store = _create_runtime_chronify_store()
     _create_chronify_source(store, df, src_schema)
     try:
@@ -534,7 +536,9 @@ def convert_time_zone_by_column_with_chronify_duckdb(
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
     store = _create_runtime_chronify_store()
     _create_chronify_source(store, df, src_schema)
     try:
@@ -559,7 +563,9 @@ def localize_time_zone_with_chronify_duckdb(
     All operations are performed in memory.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
 
     store = _create_runtime_chronify_store()
     _create_chronify_source(store, df, src_schema)
@@ -586,7 +592,9 @@ def localize_time_zone_by_column_with_chronify_duckdb(
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
     the time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
     store = _create_runtime_chronify_store()
     _create_chronify_source(store, df, src_schema)
     try:
@@ -641,7 +649,9 @@ def convert_time_zone_with_chronify_runtime_path(
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with the specified time zone as a new column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
@@ -667,7 +677,9 @@ def convert_time_zone_by_column_with_chronify_runtime_path(
     Time zone conversion converts from tz-aware timestamps to
     tz-naive timestamps with time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=True, value_column=value_column
+    )
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
@@ -691,7 +703,9 @@ def localize_time_zone_with_chronify_runtime_path(
     """Create a single time zone-localized table with chronify and the runtime backend using the local filesystem.
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on time_zone input.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
@@ -716,7 +730,9 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
     Time zone localization converts from tz-naive timestamps to tz-aware timestamps based on
     the time zones specified in the time_zone_column.
     """
-    src_schema = _get_src_schema(df, from_time_dim, value_column=value_column)
+    src_schema = _get_src_schema(
+        df, from_time_dim, data_is_localized=False, value_column=value_column
+    )
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
@@ -762,29 +778,26 @@ def _to_chronify_time_based_data_adjustment(
     )
 
 
-def _df_time_column_is_tz_aware(df: ibis.Table, time_column: str) -> bool:
-    """Return True when df's ``time_column`` is a tz-aware timestamp.
-
-    On ibis-on-Spark, timestamps report as tz-naive even though they render via
-    the session time zone, so on that backend this returns False and the
-    post-localization adjustment degrades to a no-op (the pre-shim behavior).
-    """
-    return is_tz_aware_timestamp(df[time_column].type())
-
-
 def _adjust_time_config_for_post_localization(
     time_config: chronify.TimeBaseModel,
     time_dim: TimeDimensionBaseConfig,
-    df: ibis.Table,
 ) -> chronify.TimeBaseModel:
     """Return ``time_config`` adjusted to match a time column that was already localized.
 
-    Currently ``to_chronify()`` always reports the original datetime shape,
-    which doesn't match the actual data with a ``localize_to_single_tz`` plan.
-    In that case, the pre-localization shape has a NTZ dtype and a naive start,
-    but after registration the stored data is tz-aware (see #427). If
-    ``df``'s time column is tz-aware, rebuild the config as ``TIMESTAMP_TZ``
-    with a localized start; otherwise return it unchanged.
+    ``to_chronify()`` always reports the original datetime shape, which doesn't match
+    the actual data with a ``localize_to_single_tz`` plan: the pre-localization shape
+    has an NTZ dtype and a naive start, but registration localizes the data and only
+    updates the dimension config in memory, so the persisted record stays stale (#427).
+    Rebuild the config as ``TIMESTAMP_TZ`` with a localized start so chronify's mapping
+    table lines up with the instants actually stored.
+
+    Callers say whether the data has been localized rather than having this function
+    infer it from the column dtype. Only DuckDB can answer that question: Spark's
+    ``TimestampType`` is instant-only, so ibis reports ``Timestamp(timezone=None)`` for
+    tz-aware and naive data alike. Inferring from the dtype therefore silently skipped
+    the adjustment on Spark, and the resulting offset between the mapping table and the
+    data dropped rows with no error -- everything for a short range, and ``offset``
+    hours' worth for a realistic one.
     """
     if not isinstance(time_dim, DateTimeDimensionConfig):
         return time_config
@@ -794,8 +807,7 @@ def _adjust_time_config_for_post_localization(
     # branch always returns DatetimeRange.
     assert isinstance(time_config, chronify.DatetimeRange), time_config
 
-    time_columns = time_dim.get_load_data_time_columns()
-    if len(time_columns) != 1 or not _df_time_column_is_tz_aware(df, time_columns[0]):
+    if len(time_dim.get_load_data_time_columns()) != 1:
         return time_config
 
     tz = time_dim.get_chronify_time_zone()
@@ -816,14 +828,29 @@ def _adjust_time_config_for_post_localization(
 def _get_src_schema(
     df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
+    *,
+    data_is_localized: bool,
     src_name: str | None = None,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
+    """Build the chronify source schema for ``df``.
+
+    Parameters
+    ----------
+    data_is_localized : bool
+        Whether ``df``'s time column has already been localized at this point in the
+        pipeline. True for mapping and time zone conversion, whose input is registered
+        data that registration localized; a ``localize_to_single_tz`` config then
+        describes the pre-localization shape and must be corrected (see
+        :func:`_adjust_time_config_for_post_localization`). False for the localization
+        operations themselves, whose input is pre-localization by definition and whose
+        config is therefore already accurate.
+    """
     src = src_name or "src_" + make_temp_view_name()
     time_col_list = from_time_dim.get_load_data_time_columns()
-    time_config = _adjust_time_config_for_post_localization(
-        from_time_dim.to_chronify(), from_time_dim, df
-    )
+    time_config = from_time_dim.to_chronify()
+    if data_is_localized:
+        time_config = _adjust_time_config_for_post_localization(time_config, from_time_dim)
     time_array_id_columns = [
         x
         for x in df.columns
@@ -842,11 +869,14 @@ def _get_dst_schema(
     df: ibis.Table,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    *,
+    data_is_localized: bool,
     value_column: str = VALUE_COLUMN,
 ) -> TableSchema:
-    time_config = _adjust_time_config_for_post_localization(
-        to_time_dim.to_chronify(), to_time_dim, df
-    )
+    """Build the chronify destination schema. See :func:`_get_src_schema` for the flag."""
+    time_config = to_time_dim.to_chronify()
+    if data_is_localized:
+        time_config = _adjust_time_config_for_post_localization(time_config, to_time_dim)
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_array_id_columns = [
         x
@@ -869,8 +899,21 @@ def _get_mapping_schemas(
     src_name: str | None = None,
     value_column: str = VALUE_COLUMN,
 ) -> tuple[TableSchema, TableSchema]:
-    src_schema = _get_src_schema(df, from_time_dim, src_name=src_name, value_column=value_column)
-    dst_schema = _get_dst_schema(df, from_time_dim, to_time_dim, value_column=value_column)
+    """Build both chronify schemas for a time-dimension mapping.
+
+    Mapping only ever runs on registered data, which registration has already localized,
+    so both schemas are built with ``data_is_localized=True``.
+    """
+    src_schema = _get_src_schema(
+        df,
+        from_time_dim,
+        data_is_localized=True,
+        src_name=src_name,
+        value_column=value_column,
+    )
+    dst_schema = _get_dst_schema(
+        df, from_time_dim, to_time_dim, data_is_localized=True, value_column=value_column
+    )
     return src_schema, dst_schema
 
 

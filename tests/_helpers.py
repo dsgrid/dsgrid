@@ -19,6 +19,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.ibis.operations import create_temp_view
 from dsgrid.ibis.session import get_runtime_session, get_spark_session
+from dsgrid.ibis.table_utils import table_to_pandas
 
 
 def make_table(columns: list[str], *rows: tuple) -> ibis.Table:
@@ -159,3 +160,27 @@ def spark_physical_plan(df: ibis.Table) -> str:
     """
     spark_df = get_spark_session().table(create_temp_view(df))
     return spark_df._jdf.queryExecution().executedPlan().toString()
+
+
+def assert_globally_sorted(table: ibis.Table, sort_columns: list[str]) -> None:
+    """Assert an Ibis table is globally ordered by ``sort_columns``.
+
+    Use this on the table a query returns, not on one read back from the output file. A
+    Spark Parquet write produces a directory of part files: ``ORDER BY``
+    range-partitions so each file is internally sorted, but reading the directory back
+    packs splits by descending file size, so the concatenation is not globally ordered.
+    dsgrid therefore re-sorts the table it hands back
+    (``QuerySubmitterBase._apply_sort``), and only ``single_output_file`` makes the file
+    itself read back in order.
+
+    Takes a table rather than a pandas frame, and projects to ``sort_columns`` before
+    collecting, so the check cannot pull a whole query result into the driver. That
+    matters: Spark's local-mode default heap is 1 GB, and collecting a full result here
+    (on top of the collect a caller has usually already done) was enough to OOM the JVM
+    partway through the suite and cascade into every later test.
+    """
+    assert sort_columns, "caller must declare sort_columns to exercise the sort path"
+    pdf = table_to_pandas(table.select(*sort_columns))
+    actual = pdf.reset_index(drop=True)
+    expected = pdf.sort_values(sort_columns).reset_index(drop=True)
+    assert actual.equals(expected), f"output is not globally sorted by {sort_columns}"

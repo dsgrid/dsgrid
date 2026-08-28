@@ -13,8 +13,17 @@ join fails (under DuckDB with `Conversion Error: Unimplemented type for cast
 
 The fix lives in the shared `_get_src_schema` / `_get_dst_schema` helpers in
 `dsgrid.utils.dataset`, so it covers both chronify map dispatchers (DuckDB and
-runtime path). The test body is backend-agnostic: it dispatches via
-`_map_time_dim` to whichever chronify map function matches the active backend.
+runtime path). Those helpers take `data_is_localized` from the caller rather than
+inferring it from the time column's dtype, which is what makes this test meaningful
+on both backends: Spark's `TimestampType` is instant-only, so ibis reports
+`Timestamp(timezone=None)` for tz-aware and naive data alike. While detection was
+dtype-based, the adjustment never fired on Spark and the resulting offset between
+chronify's mapping table and the data silently dropped rows -- all four here, and
+`offset` hours' worth on a realistic range.
+
+The test body is therefore backend-agnostic, but it compares *instants* rather than
+rendered timestamps: DuckDB returns the mapped column tz-aware, while Spark returns
+it naive, rendered in the Spark session time zone.
 """
 
 from datetime import timedelta
@@ -37,7 +46,7 @@ from dsgrid.dimension.time import (
     TimeZoneFormat,
 )
 from dsgrid.ibis.io import persist_table, read_dataframe
-from dsgrid.ibis.session import get_runtime_session
+from dsgrid.ibis.session import get_runtime_session, get_spark_session
 from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.dataset import (
@@ -63,6 +72,22 @@ def _map_time_dim(df, from_time_dim, to_time_dim, scratch_dir_context):
         to_time_dim=to_time_dim,
         scratch_dir_context=scratch_dir_context,
     )
+
+
+def _utc_instants(series: pd.Series) -> set:
+    """Return the set of UTC instants represented by a mapped timestamp column.
+
+    DuckDB returns the column tz-aware. Spark's ``TimestampType`` is instant-only, so
+    the column comes back tz-naive, rendered in the Spark session time zone; read that
+    zone back rather than assuming UTC, since a caller may have changed it (e.g. via
+    ``dsgrid.ibis.tz.custom_time_zone``).
+    """
+    # DuckDB path
+    if series.dt.tz is not None:
+        return set(series.dt.tz_convert("UTC"))
+    # Spark path (tz-naive, interpreted in session time zone)
+    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    return set(series.dt.tz_localize(session_tz).dt.tz_convert("UTC"))
 
 
 def _make_ntz_single_tz_config(name: str, time_zone: str) -> DateTimeDimensionConfig:
@@ -126,17 +151,18 @@ def test_ntz_config_with_tz_aware_dataframe(scratch_dir_context):
     )
 
     df = get_runtime_session().createDataFrame(pdf)
-    # Confirm tz-awareness propagated through the backend ingestion.
-    assert table_to_pandas(df)[time_column].dt.tz is not None
 
     mapped_df = _map_time_dim(df, from_time_dim, to_time_dim, scratch_dir_context)
 
     out = table_to_pandas(mapped_df)
     out_time_column = to_time_dim.get_load_data_time_columns()[0]
     assert out_time_column in out.columns
-    assert out[out_time_column].dt.tz is not None
-    # Compare instants — display tz can differ across backends/sessions, but the
-    # set of represented moments must match.
-    assert set(out[out_time_column]) == set(timestamps)
+    # Every input row survives the mapping. This is the assertion that fails when the
+    # config handed to chronify does not match the data: the mapping table is built
+    # from a start that is off by the time zone offset, so the join drops rows.
+    assert len(out) == len(timestamps)
+    # Compare instants — display tz differs across backends, but the set of
+    # represented moments must match.
+    assert _utc_instants(out[out_time_column]) == set(timestamps.tz_convert("UTC"))
     assert out[VALUE_COLUMN].notna().all()
     assert set(out[VALUE_COLUMN]) == {1.0, 2.0, 3.0, 4.0}

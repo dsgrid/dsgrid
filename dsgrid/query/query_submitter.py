@@ -37,16 +37,18 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.ibis.functions import write_csv
-from dsgrid.ibis.operations import drop_columns, join, pivot
+from dsgrid.ibis.operations import coalesce, drop_columns, join, pivot
 
 from dsgrid.project import Project
 from dsgrid.ibis.io import (
     persist_table,
     read_dataframe,
+    read_parquet,
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
 )
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.ibis.tz import custom_time_zone
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
@@ -135,6 +137,21 @@ class QuerySubmitterBase:
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
 
+        return self._apply_sort(context, df)
+
+    def _apply_sort(self, context: QueryContext, df: ibis.Table) -> ibis.Table:
+        """Apply ``sort_columns`` only.
+
+        Re-applied to the table re-read from disk after a save. Sorting before the write
+        is not enough on Spark: the output is a directory of part files, and while
+        ``ORDER BY`` range-partitions so each file is internally sorted, reading the
+        directory back packs splits by descending file size, so the concatenation is not
+        globally ordered. Re-sorting the re-read table is what makes ``sort_columns``
+        hold for the dataframe the caller receives. Only ``single_output_file`` makes the
+        file itself read back in order.
+
+        The pivot is deliberately not repeated here — it is already materialized on disk.
+        """
         if context.model.result.sort_columns:
             df = df.order_by(*context.model.result.sort_columns)
 
@@ -347,7 +364,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         repartition = not persist_intermediate_table
         # When time zone conversion runs next, _convert_time_zone owns the final save.
         final = not bool(model.result.time_zone)
-        table_filename = self._save_query_results(
+        table_filename, df = self._save_query_results(
             context, df, repartition, final=final, zip_file=zip_file
         )
 
@@ -446,7 +463,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             raise DSGInvalidParameter(msg)
 
         repartition = not persist_intermediate_table
-        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
+        table_filename, df = self._save_query_results(context, df, repartition, zip_file=zip_file)
 
         for report_inputs in context.model.result.reports:
             report = make_report(report_inputs.report_type)
@@ -578,7 +595,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     ) -> ibis.Table:
         df = self._process_aggregations(df, context)
 
-        self._save_query_results(context, df, repartition, zip_file=zip_file)
+        _, df = self._save_query_results(context, df, repartition, zip_file=zip_file)
         return df
 
     def _apply_filters(self, df, context: QueryContext):
@@ -621,31 +638,63 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             output_dir /= aggregation_name
             output_dir.mkdir(exist_ok=True)
         filename = output_dir / f"table.{context.model.result.output_format}"
-        self._save_result(context, df, filename, repartition)
+        saved_df = self._save_result(context, df, filename, repartition, reread=final)
+        if final:
+            # The write does not preserve row order on Spark, so re-sort what the
+            # caller gets back. See _apply_sort.
+            df = self._apply_sort(context, saved_df)
+        # Intermediate saves deliberately keep the caller's table rather than the one
+        # bound to `filename`: the next stage (_convert_time_zone) may build lazily on it
+        # and then overwrite `filename`, which would leave the expression reading a path
+        # that no longer exists.
         if zip_file:
             zip_name = Path(str(output_dir) + ".zip")
             with ZipFile(zip_name, "w") as zipf:
                 for path in output_dir.rglob("*"):
                     zipf.write(path)
-        return filename
+        return filename, df
 
-    def _save_result(self, context: QueryContext, df, filename, repartition):
+    def _save_result(
+        self, context: QueryContext, df, filename, repartition, reread: bool = True
+    ) -> ibis.Table:
+        """Write the result table, returning it as re-read from disk when ``reread``.
+
+        Returning the re-read table keeps the dataframe the caller passes downstream
+        bound to what was actually written, rather than to a lazy expression that the
+        write happened to consume. Callers re-apply :meth:`_apply_sort` to it, because a
+        Spark Parquet directory does not read back in sort order.
+
+        Callers that discard the result pass ``reread=False``: the re-read is not free on
+        Spark, where it registers a temp view and caches the file listing behind it.
+        """
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
+            # write_csv collects on Spark to produce a single file, so CSV output already
+            # matches the post-processed table in both content and order. Deliberately not
+            # re-read: a CSV round trip infers dtypes from text and can change them, which
+            # would be a lossy substitution for a table that already agrees with the file.
             write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
+            if context.model.result.single_output_file and not use_duckdb():
+                # One part file is the only way a Spark Parquet directory reads back in
+                # the order it was written. DuckDB already writes a single file.
+                df = coalesce(df, 1)
+                repartition = False
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
             else:
                 delete_if_exists(filename)
                 write_dataframe(df, filename, overwrite=True)
+                if reread:
+                    df = read_parquet(filename)
         else:
             msg = f"Unsupported output_format={suffix}"
             raise NotImplementedError(msg)
         self.query_filename(output_dir).write_text(context.model.serialize_with_hash()[1])
         self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
+        return df
 
 
 class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -827,7 +876,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         output_dir = self._composite_datasets_dir() / model.dataset_id
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / "table.parquet"
-        self._save_result(context, df, filename, repartition)
+        self._save_result(context, df, filename, repartition, reread=False)
         self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
 
 
@@ -974,13 +1023,24 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         filename = output_dir / f"table.{context.model.result.output_format}"
         suffix = filename.suffix
         if suffix == ".csv":
+            # See _save_result: CSV output is a single ordered file already matching df,
+            # and a re-read would infer dtypes from text.
             write_csv(df, filename, overwrite=True)
         elif suffix == ".parquet":
-            df = write_dataframe_and_auto_partition(df, filename)
+            if context.model.result.single_output_file and not use_duckdb():
+                df = coalesce(df, 1)
+                delete_if_exists(filename)
+                write_dataframe(df, filename, overwrite=True)
+                df = read_parquet(filename)
+            else:
+                df = write_dataframe_and_auto_partition(df, filename)
         else:
             msg = f"Unsupported output_format={suffix}"
             raise NotImplementedError(msg)
 
+        if final:
+            # See _apply_sort: the write does not preserve row order on Spark.
+            df = self._apply_sort(context, df)
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
         return df
 

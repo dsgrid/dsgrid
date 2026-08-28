@@ -626,14 +626,22 @@ def map_time_dimension_with_chronify_runtime_path(
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.map_table_time_config(
-        src_schema.name,
-        dst_schema,
-        check_mapped_timestamps=False,
-        output_file=output_file,
-        wrap_time_allowed=wrap_time_allowed,
-        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
-    )
+    try:
+        store.map_table_time_config(
+            src_schema.name,
+            dst_schema,
+            check_mapped_timestamps=False,
+            output_file=output_file,
+            wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+        )
+    finally:
+        # Drop the source view even if the operation raises, mirroring the DuckDB
+        # dispatchers. chronify's view is not dsgrid-owned temp state, so the sweep in
+        # QueryContext.finalize() is the only thing that would otherwise remove it, and
+        # callers without a QueryContext (a direct unit test, say) leave it in the
+        # session for good.
+        _drop_chronify_source(store, src_schema)
     return read_parquet(output_file)
 
 
@@ -655,11 +663,15 @@ def convert_time_zone_with_chronify_runtime_path(
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.convert_time_zone(
-        src_schema.name,
-        time_zone,
-        output_file=output_file,
-    )
+    try:
+        store.convert_time_zone(
+            src_schema.name,
+            time_zone,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
     return read_parquet(output_file)
 
 
@@ -683,12 +695,16 @@ def convert_time_zone_by_column_with_chronify_runtime_path(
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.convert_time_zone_by_column(
-        src_schema.name,
-        time_zone_column,
-        wrap_time_allowed=wrap_time_allowed,
-        output_file=output_file,
-    )
+    try:
+        store.convert_time_zone_by_column(
+            src_schema.name,
+            time_zone_column,
+            wrap_time_allowed=wrap_time_allowed,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
     return read_parquet(output_file)
 
 
@@ -709,11 +725,15 @@ def localize_time_zone_with_chronify_runtime_path(
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.localize_time_zone(
-        src_schema.name,
-        time_zone,
-        output_file=output_file,
-    )
+    try:
+        store.localize_time_zone(
+            src_schema.name,
+            time_zone,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
     return read_parquet(output_file)
 
 
@@ -736,11 +756,15 @@ def localize_time_zone_by_column_with_chronify_runtime_path(
     store = _create_shared_chronify_store()
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    store.localize_time_zone_by_column(
-        src_schema.name,
-        time_zone_column=time_zone_column,
-        output_file=output_file,
-    )
+    try:
+        store.localize_time_zone_by_column(
+            src_schema.name,
+            time_zone_column=time_zone_column,
+            output_file=output_file,
+        )
+    finally:
+        # See map_time_dimension_with_chronify_runtime_path for why this is explicit.
+        _drop_chronify_source(store, src_schema)
     return read_parquet(output_file)
 
 

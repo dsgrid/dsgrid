@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import duckdb
 import ibis
 import pandas as pd
 import pytest
@@ -138,12 +139,6 @@ def test_parquet_exception_detection():
     class SparkException(Exception):
         pass
 
-    class IOException(Exception):
-        __module__ = "duckdb.fake"
-
-    class InvalidInputException(Exception):
-        __module__ = "duckdb.fake"
-
     # Spark corruption signatures, matched on the message regardless of class.
     assert _is_spark_corrupt_parquet_error(
         AnalysisException("Unable to infer schema for Parquet. It must be specified manually.")
@@ -155,15 +150,15 @@ def test_parquet_exception_detection():
     )
     assert not _is_spark_corrupt_parquet_error(AnalysisException("other"))
 
-    # DuckDB corruption is matched on the exception class within the duckdb module.
-    assert _is_duckdb_corrupt_parquet_error(IOException("bad parquet"))
-    assert _is_duckdb_corrupt_parquet_error(InvalidInputException("No magic bytes found"))
+    # DuckDB corruption is matched on the exception class.
+    assert _is_duckdb_corrupt_parquet_error(duckdb.IOException("bad parquet"))
+    assert _is_duckdb_corrupt_parquet_error(duckdb.InvalidInputException("No magic bytes found"))
     assert not _is_duckdb_corrupt_parquet_error(ValueError("bad parquet"))
 
     # The combined classifier accepts either backend's corruption signature and
     # rejects transient/unrelated errors so they propagate instead of deleting a
     # cache file.
-    assert _is_corrupt_file_error(IOException("bad parquet"))
+    assert _is_corrupt_file_error(duckdb.IOException("bad parquet"))
     assert _is_corrupt_file_error(SparkException("part.parquet is not a Parquet file"))
     assert not _is_corrupt_file_error(MemoryError("out of memory"))
     assert not _is_corrupt_file_error(ConnectionError("spark master unreachable"))

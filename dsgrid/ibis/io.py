@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+import duckdb
 import ibis
 from chronify.utils.path_utils import check_overwrite
 
@@ -354,11 +355,7 @@ def _is_corrupt_file_error(exc: Exception) -> bool:
 def _is_duckdb_corrupt_parquet_error(exc: Exception) -> bool:
     # DuckDB raises IOException for read failures and InvalidInputException for
     # malformed Parquet content (bad magic bytes, truncated footer, ...).
-    cls = exc.__class__
-    return cls.__module__.startswith("duckdb") and cls.__name__ in {
-        "IOException",
-        "InvalidInputException",
-    }
+    return isinstance(exc, (duckdb.IOException, duckdb.InvalidInputException))
 
 
 def _is_spark_corrupt_parquet_error(exc: Exception) -> bool:

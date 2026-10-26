@@ -86,7 +86,7 @@ allow-direct-references = true
 [project.optional-dependencies]
 spark = [
     "chronify[spark]",
-    "pyspark==4.0.0",  # Keep this synced with the spark version in Dockerfile.
+    "pyspark==4.1.1",  # Keep this synced with the spark version in Dockerfile.
 ]
 
 dev = [

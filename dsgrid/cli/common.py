@@ -78,15 +78,11 @@ def handle_dsgrid_exception(ctx, func, *args, **kwargs) -> tuple[Any, int]:
 
 
 def handle_scratch_dir(*args):
-    """Handle the user input for scratch_dir. If a path is passed, ensure it exists."""
+    """Handle the user input for scratch_dir. The directory does not need to exist."""
     val = args[2]
     if val is None:
         return val
-    path = Path(val)
-    if not path.exists:
-        msg = f"scratch-dir={path} does not exist"
-        raise ValueError(msg)
-    return path
+    return Path(val)
 
 
 def path_callback(*args) -> Path | None:

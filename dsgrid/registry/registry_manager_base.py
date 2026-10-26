@@ -43,11 +43,6 @@ class RegistryManagerBase(abc.ABC):
     def db(self) -> RegistryInterfaceBase:
         """Return the database interface."""
 
-    @db.setter
-    @abc.abstractmethod
-    def db(self, db: RegistryInterfaceBase) -> None:
-        """Return the database interface."""
-
     @classmethod
     def load(cls, path, params, db, *args: Any, **kwargs: Any) -> Self:
         """Load the registry manager.
@@ -61,7 +56,7 @@ class RegistryManagerBase(abc.ABC):
 
         """
         mgr = cls(path, params)
-        mgr.db = db
+        mgr._db = db
         return mgr
 
     @classmethod

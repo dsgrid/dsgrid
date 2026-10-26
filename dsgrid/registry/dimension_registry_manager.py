@@ -50,10 +50,6 @@ class DimensionRegistryManager(RegistryManagerBase):
     def db(self) -> DimensionRegistryInterface:
         return self._db
 
-    @db.setter
-    def db(self, db: DimensionRegistryInterface) -> None:
-        self._db = db
-
     @staticmethod
     def name() -> str:
         return "Dimensions"

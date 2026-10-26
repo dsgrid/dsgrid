@@ -151,10 +151,6 @@ class ProjectRegistryManager(RegistryManagerBase):
     def db(self) -> ProjectRegistryInterface:
         return self._db
 
-    @db.setter
-    def db(self, db: ProjectRegistryInterface):
-        self._db = db
-
     @staticmethod
     def name() -> str:
         return "Projects"

@@ -53,7 +53,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def load(cls, path, params: RegistryManagerParams, dimension_manager, db):
         mgr = cls._load(path, params)
         mgr.dimension_manager = dimension_manager
-        mgr.db = db
+        mgr._db = db
         return mgr
 
     @staticmethod
@@ -63,10 +63,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     @property
     def db(self) -> DimensionMappingRegistryInterface:
         return self._db
-
-    @db.setter
-    def db(self, db: DimensionMappingRegistryInterface):
-        self._db = db
 
     @staticmethod
     def name():

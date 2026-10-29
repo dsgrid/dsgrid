@@ -106,6 +106,11 @@ project base dimensions. There are two ways to provide mappings at
 submission time, controlled by the `-m` and `-r` options. Both options work the
 same way for `submit-dataset` and `register-and-submit-dataset`.
 
+```{note}
+dsgrid accepts `-m` and `-r` together and combines the resulting mapping
+references. Avoid supplying more than one mapping for the same dimension type.
+```
+
 ### Option 1: `-m` with new mappings
 
 The `-m` / `--dimension-mapping-file` option accepts a JSON5 file that
@@ -152,8 +157,7 @@ Each entry specifies:
 
 dsgrid identifies the source dimension (from the dataset) and target dimension
 (from the project) automatically based on the `dimension_type` and, if
-provided, `project_base_dimension_name`. The `-m` file does not accept explicit
-`from_dimension` / `to_dimension` references; to specify those, use Option 2.
+provided, `project_base_dimension_name`.
 
 ### Option 2: `-r` with pre-registered mapping references
 
@@ -177,7 +181,9 @@ schema:
 }
 ```
 
-To register a mapping with explicit source and target dimensions, write a
+This path can be used simply because the mapping has already been registered, or because
+you would like to fully specify the source and target dimensions by id. In the latter case,
+specifying the mapping becomes a two step process. First, write a
 [DimensionMappingsConfigModel](../../software_reference/data_models/dimension_mapping_model.md#dimensionmappingsconfigmodel)
 file and register it with `dsgrid registry dimension-mappings register`:
 
@@ -203,15 +209,9 @@ file and register it with `dsgrid registry dimension-mappings register`:
 }
 ```
 
-Use `dsgrid registry dimensions list` to find the `dimension_id` values for
-your dataset and project dimensions, and `dsgrid registry dimension-mappings list`
-to find the new `mapping_id` for the references file.
-
-```{note}
-dsgrid accepts `-m` and `-r` together and combines the resulting mapping
-references. Avoid supplying more than one mapping for the same dimension type.
-```
-
+(Use `dsgrid registry dimensions list` to find the `dimension_id` values for
+your dataset and project dimensions.) Second, use `dsgrid registry dimension-mappings list`
+to find the new `mapping_id` and enter that in the dimension mapping references file.
 
 ### When no mappings are needed
 
@@ -234,9 +234,9 @@ dimension, dsgrid looks in the project's dimension mappings for one from that
 supplemental dimension to the base dimension and uses it if found. If not, it
 takes the project's base → supplemental mapping, swaps `from_id` and `to_id`,
 drops `from_fraction`, and registers the result as a
-`many_to_many_explicit_multipliers` mapping, so every reversed record has a
-multiplier of 1.0. This reversal is only correct when the original mapping's
-`from_fraction` values are empty or all 1.0.
+`many_to_many_explicit_multipliers` mapping. This operation only proceeds if the original
+mapping's `from_fraction` values are empty or all 1.0 and after the operation is complete,
+every reversed record also has an (implied) multiplier of 1.0.
 
 ```bash
 dsgrid registry projects submit-dataset \

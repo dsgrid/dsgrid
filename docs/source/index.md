@@ -108,6 +108,10 @@ If you're evaluating dsgrid for your organization:
 - **[Software Architecture](software_reference/architecture.md)** - System design and components
 - **[Data Models](software_reference/data_models/index.md)** - Configuration and data model specifications
 
+### Developer Guide
+
+- **[Developer Guide](developer_guide/index.md)** - Resources for contributing to dsgrid
+
 ### Additional Resources
 
 - **[Publications](publications.md)** - Research papers and reports using dsgrid
@@ -122,6 +126,7 @@ getting_started/index
 published_data/index
 user_guide/index
 software_reference/index
+developer_guide/index
 publications
 citation
 contact

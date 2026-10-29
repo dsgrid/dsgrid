@@ -8,10 +8,15 @@ Learn how to query dsgrid projects and analyze energy demand data.
 :maxdepth: 1
 
 project_query_concepts
-aggregations
-filters
 output_formats
 ```
+
+## Planned Content
+
+- **Aggregations** — Aggregating query results to coarser or supplemental
+  dimensions, aggregation functions, and `aggregate_each_dataset`. Until then,
+  see [AggregationModel](../../software_reference/data_models/dataset_query_model.md#aggregationmodel)
+  and the [Query a Project](../tutorials/query_project) tutorial.
 
 ## How-Tos
 

@@ -88,7 +88,7 @@ dsgrid create-registry --help
 DuckDB is the default backend and is suitable for local work and moderate-sized datasets. Use the Spark extra when you need a distributed backend for large datasets or HPC workflows.
 
 - **NLR High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
-- **Standalone resources**: [TODO: Provide link]
+- **Standalone resources**: [Installing a Spark Standalone Cluster](../user_guide/apache_spark/overview.md#installing-a-spark-standalone-cluster)
 
 ## Test Your Installation
 

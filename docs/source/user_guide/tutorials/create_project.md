@@ -67,25 +67,19 @@ datasets: [
 
 Inspect the datasets' dimensionality to determine the project's base dimension records.
 
-:::{note}
-**TODO**: Add detailed instructions for analyzing dataset dimensions to determine base dimension requirements.
-:::
+See [How to Create Base Dimensions](../how_tos/how_to_base_dimensions.md#1-analyze-dataset-dimensions).
 
 ## Step 5: Add Supplemental Dimensions
 
 Add supplemental dimensions based on expected user demand.
 
-:::{note}
-**TODO**: Add guidance on identifying and creating supplemental dimensions based on analysis requirements.
-:::
+See [How to Create Supplemental Dimensions](../how_tos/how_to_supplemental_dimensions.md#1-identify-analysis-requirements).
 
 ## Step 6: Create Base-to-Supplemental Mappings
 
 Create base-to-supplemental dimension mappings.
 
-:::{note}
-**TODO**: Add examples of base-to-supplemental dimension mapping configurations.
-:::
+See [How to Create Supplemental Dimensions](../how_tos/how_to_supplemental_dimensions.md#4-create-base-to-supplemental-mappings).
 
 ## Step 7: Add Dataset Dimension Requirements
 

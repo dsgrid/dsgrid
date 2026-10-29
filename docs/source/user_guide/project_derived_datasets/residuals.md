@@ -1,3 +1,0 @@
-# Residuals
-
-(To be populated)

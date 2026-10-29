@@ -366,7 +366,7 @@ combinations. The typical iteration cycle is:
    the current directory: the full list of missing combinations and, if the
    Rust extension is available, minimal-pattern files in `./missing_associations/`.
    These are the same outputs that dataset registration produces; see
-   [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations.md#review-generated-outputs).
+   [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations.md#2-review-generated-outputs).
    At submission, the combinations use the project's record IDs (after
    mapping), not the dataset's.
 4. **Fix the mapping CSV** or update the dataset, then re-run.

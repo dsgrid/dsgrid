@@ -19,6 +19,7 @@ from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.models import TableFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
+from dsgrid.ibis.table_utils import table_to_pandas
 from dsgrid.config.common import SUPPORTED_METRIC_TYPES
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.bulk_register import bulk_register
@@ -37,6 +38,9 @@ from dsgrid.utils.filters import ACCEPTED_OPS
 
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of records printed by the dimensions and dimension-mappings show commands.
+MAX_RECORDS_TO_SHOW = 4000
 
 
 class _LazyRegistryManager:
@@ -314,13 +318,12 @@ description={dim.model.description}
         _print_records(records)
 
 
-_MAX_RECORDS_TO_SHOW = 4000
-
-
 def _print_records(records: ibis.Table) -> None:
-    """Print up to _MAX_RECORDS_TO_SHOW rows of a dimension or mapping records table."""
-    df = records.limit(_MAX_RECORDS_TO_SHOW).to_pandas()
-    click.echo(df.to_string(index=False))
+    """Print up to MAX_RECORDS_TO_SHOW rows of a dimension or mapping records table."""
+    df = table_to_pandas(records.limit(MAX_RECORDS_TO_SHOW + 1))
+    click.echo(df.head(MAX_RECORDS_TO_SHOW).to_string(index=False))
+    if len(df) > MAX_RECORDS_TO_SHOW:
+        click.echo(f"only showing top {MAX_RECORDS_TO_SHOW} rows")
 
 
 _update_dimension_epilog = """
@@ -557,7 +560,7 @@ def show_dimension_mapping(
     to_dim = registry_manager.dimension_manager.get_by_id(mapping.model.to_dimension.dimension_id)
     print(
         f"""
-type={mapping.model.from_dimension.dimension_type}
+type={mapping.model.from_dimension.dimension_type.value}
 from_id={mapping.model.from_dimension.dimension_id}
 from_name={from_dim.model.name}
 from_description={from_dim.model.description}
@@ -1874,7 +1877,7 @@ def bulk_register_cli(
 
     The JSON/JSON5 filename must match the data model defined by this documentation:
 
-    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html#registrationmodel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/registration_model.html#registrationmodel
     """
     res = handle_dsgrid_exception(
         ctx,

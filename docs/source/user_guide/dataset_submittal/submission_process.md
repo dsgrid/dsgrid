@@ -362,13 +362,13 @@ combinations. The typical iteration cycle is:
    column. If any are missing, it logs "The mapped dataset has different
    distinct values than the project for column=..." with up to 100 of the
    missing values, and stops before the full combination check.
-3. **If the combination check fails**, examine the Parquet file that dsgrid
-   writes to the current directory
-   (`{dataset_id}__missing_dimension_record_combinations.parquet`). dsgrid
-   also writes a summary to the console and log file. If dsgrid was built with
-   its Rust extension, the summary lists up to 10 minimal patterns that
-   characterize the missing combinations. Otherwise, it lists each column whose distinct values differ
-   between the dataset and the missing combinations.
+3. **If the combination check fails**, review the outputs dsgrid writes to
+   the current directory: the full list of missing combinations and, if the
+   Rust extension is available, minimal-pattern files in `./missing_associations/`.
+   These are the same outputs that dataset registration produces; see
+   [How to Handle Dimension Associations](../how_tos/how_to_dimension_associations.md#review-generated-outputs).
+   At submission, the combinations use the project's record IDs (after
+   mapping), not the dataset's.
 4. **Fix the mapping CSV** or update the dataset, then re-run.
 
 See the [Troubleshooting](submission_checks.md#troubleshooting) section of

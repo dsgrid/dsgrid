@@ -61,13 +61,19 @@ MODELS = [
         [
             # CLI ``projects`` subcommand inputs (register-subset-dimensions,
             # register-supplemental-dimensions, add-dataset-requirements,
-            # replace-dataset-dimension-requirements) and ``bulk-register``.
+            # replace-dataset-dimension-requirements).
             "dsgrid.config.project_config.SubsetDimensionGroupListModel",
             "dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel",
             "dsgrid.config.input_dataset_requirements.InputDatasetListModel",
             "dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel",
-            "dsgrid.config.registration_models.RegistrationModel",
         ],
+    ),
+    (
+        # CLI ``bulk-register`` input. Spans projects and datasets, so it gets its own page.
+        "Bulk Registration",
+        "dsgrid.config.registration_models.RegistrationModel",
+        "source/software_reference/data_models/registration_model.md",
+        [],
     ),
     (
         "Dataset Query",

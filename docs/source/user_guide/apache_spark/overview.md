@@ -1,6 +1,6 @@
 # Apache Spark Overview
 
-This page describes Spark concepts that are important to understand when using dsgrid.
+dsgrid uses Ibis for table operations and can execute those operations on DuckDB or Apache Spark. DuckDB is the default local backend. This page describes Spark concepts that are important when you choose the Spark backend for distributed or HPC workloads.
 
 ## Windows Users
 
@@ -343,7 +343,7 @@ spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
 #### 4. Dynamic Changes
 
-You can make changes to a limited number of settings at runtime. You can't change the number of executor cores because those have already been allocated. You can change the number of shuffle partitions that Spark will use. You may want to change that value if the sizes of the dataframes you're working on change dramatically.
+You can make changes to a limited number of settings at runtime. You can't change the number of executor cores because those have already been allocated. You can change the number of shuffle partitions that Spark will use. You may want to change that value if the sizes of the tables you're working on change dramatically.
 
 ```python
 from pyspark.sql import SparkSession

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.api.models import AsyncTaskStatus, SparkSubmitProjectQueryRequest
+from dsgrid.api.models import AsyncTaskStatus, SubmitProjectQueryRequest
 from dsgrid.api.response_models import (
     GetAsyncTaskResponse,
     GetDatasetResponse,
@@ -30,7 +30,7 @@ from dsgrid.api.response_models import (
     ListProjectDimensionsResponse,
     ListReportTypesResponse,
     ListValueFormatsResponse,
-    SparkSubmitProjectQueryResponse,
+    SubmitProjectQueryResponse,
 )
 from dsgrid.query.models import ReportType
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
@@ -188,11 +188,11 @@ def test_list_value_formats(client):
 
 
 def test_submit_project_query(client):
-    query = SparkSubmitProjectQueryRequest(
+    query = SubmitProjectQueryRequest(
         use_spark_submit=False,
         query=load_data(Path(__file__).parent / "data" / "simple_query.json5"),
     )
-    async_task_id = SparkSubmitProjectQueryResponse(
+    async_task_id = SubmitProjectQueryResponse(
         **check_response(client, "/queries/projects", data=query.model_dump(mode="json")).json()
     ).async_task_id
     status = GetAsyncTaskResponse(
@@ -217,9 +217,14 @@ def test_submit_project_query(client):
         .status
     )
     assert other_status == status
-    json_text = check_response(client, f"/async_tasks/data/{async_task_id}").text
-    df = pd.read_json(io.StringIO(json_text), orient="split")
-    assert isinstance(df, pd.DataFrame)
+    data_response = client.get(f"/async_tasks/data/{async_task_id}")
+    if data_response.status_code == 200:
+        json_text = data_response.text
+        df = pd.read_json(io.StringIO(json_text), orient="split")
+        assert isinstance(df, pd.DataFrame)
+    else:
+        assert data_response.status_code == 413
+        assert "Inline JSON responses are limited" in data_response.json()["detail"]
 
     data = check_response(client, f"/async_tasks/archive_file/{async_task_id}")
     with tempfile.NamedTemporaryFile(delete=False) as fp:

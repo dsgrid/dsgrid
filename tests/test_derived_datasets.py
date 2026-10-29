@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from pandas.testing import assert_frame_equal
 
 from dsgrid.cli.dsgrid import cli
 from dsgrid.config.dataset_config import DatasetConfig
@@ -26,7 +27,10 @@ from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.ibis.io import read_dataframe
+from dsgrid.ibis.table_utils import table_to_pandas
+
+from tests._helpers import order_by as _order_by
 
 
 REGISTRY_PATH = (
@@ -110,9 +114,14 @@ def test_create_derived_dataset_config(tmp_path):
     orig_df = read_dataframe(REGISTRY_PATH / "data" / dataset_id / "1.0.0" / "table.parquet")
     new_df = read_dataframe(query_output / "table.parquet")
     assert sorted(new_df.columns) == sorted(orig_df.columns)
-    orig_data = orig_df.sort(*orig_df.columns).collect()
-    new_data = new_df.select(*orig_df.columns).sort(*orig_df.columns).collect()
-    assert new_data == orig_data
+    orig_data = table_to_pandas(_order_by(orig_df, *orig_df.columns))
+    new_data = table_to_pandas(_order_by(new_df.select(*orig_df.columns), *orig_df.columns))
+    # Compare the value column with a relative tolerance rather than exact
+    # equality: unit conversion multiplies/divides in float64, so results differ
+    # from the stored golden values by up to one ULP (~2e-16) depending on the
+    # backend's arithmetic order. Key columns are non-numeric and still match
+    # exactly. atol=0 keeps the check purely relative.
+    assert_frame_equal(new_data, orig_data, rtol=1e-15, atol=0)
 
     # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id

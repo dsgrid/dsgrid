@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Type
 
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -8,7 +9,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to an NoOpTimeDimensionModel."""
 
     @staticmethod
-    def model_class() -> NoOpTimeDimensionModel:
+    def model_class() -> Type[NoOpTimeDimensionModel]:
         return NoOpTimeDimensionModel
 
     def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
@@ -38,5 +39,5 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self) -> None:
         return None
 
-    def list_expected_dataset_timestamps(self) -> list:
+    def list_expected_dataset_timestamps(self, time_based_data_adjustment=None) -> list:
         return []

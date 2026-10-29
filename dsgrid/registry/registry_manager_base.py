@@ -29,7 +29,7 @@ class RegistryManagerBase(abc.ABC):
     def __init__(self, path, params: RegistryManagerParams):
         self._path = path
         self._params = params
-        self._db = None
+        self._db: Any = None
 
         if not path.exists():
             logger.warning(
@@ -41,11 +41,6 @@ class RegistryManagerBase(abc.ABC):
     @property
     @abc.abstractmethod
     def db(self) -> RegistryInterfaceBase:
-        """Return the database interface."""
-
-    @db.setter
-    @abc.abstractmethod
-    def db(self, db: RegistryInterfaceBase) -> None:
         """Return the database interface."""
 
     @classmethod
@@ -61,7 +56,7 @@ class RegistryManagerBase(abc.ABC):
 
         """
         mgr = cls(path, params)
-        mgr.db = db
+        mgr._db = db
         return mgr
 
     @classmethod

@@ -65,9 +65,6 @@ Add the relevant settings to your dataset.json5:
     "sector",
     "weather_year",
   ],
-  // The time in this dataset has no time zone. It is based on the local time perceived by the
-  // people being modeled. dsgrid will map times to the project's geography time zone.
-  use_project_geography_time_zone: true,
   data_layout: {
     table_format: "two_table",
     value_format: "pivoted",
@@ -234,7 +231,8 @@ Create `load_data.parquet`. This data table includes time columns (`day_of_week`
 Refer to [Data File Formats](../dataset_registration/data_file_formats) for guidance about partitions.
 
 ```
->>> spark.read.parquet("tempo_conus_2022/1.0.0/load_data.parquet").show()
+>>> import duckdb
+>>> duckdb.sql("SELECT * FROM 'tempo_conus_2022/1.0.0/load_data.parquet'").show()
 +-----------+----+-----+---------+---------+---------+
 |day_of_week|hour|month|  L1andL2|     DCFC|       id|
 +-----------+----+-----+---------+---------+---------+
@@ -274,7 +272,8 @@ If your dataset uses FIPS county codes, be sure to not inadvertently drop leadin
 :::
 
 ```
->>> spark.read.parquet("tempo_conus_2022/1.0.0/load_data_lookup.parquet").show()
+>>> import duckdb
+>>> duckdb.sql("SELECT * FROM 'tempo_conus_2022/1.0.0/load_data_lookup.parquet'").show()
 +---------+--------------------+----------+--------+------------------+
 |geography|           subsector|model_year|      id|          scenario|
 +---------+--------------------+----------+--------+------------------+
@@ -303,11 +302,23 @@ If your dataset uses FIPS county codes, be sure to not inadvertently drop leadin
 
 ## Step 8: Register and Submit the Dataset
 
-Register and submit the dataset. This requires a properly-configured Spark cluster because of the data size. Smaller datasets may succeed with Spark in local mode. Refer to [Apache Spark Overview](../apache_spark/overview) to setup a Spark cluster.
+Register and submit the dataset. For a dataset of this size, use the Spark backend on a properly-configured cluster; smaller datasets can be registered with the default DuckDB backend. Refer to [Apache Spark Overview](../apache_spark/overview) for cluster setup.
 
 This command assumes that `dataset.json5` and `dimension_mappings.json5` are in a directory called `base_dir`, and that the data files (`load_data.parquet` and `load_data_lookup.parquet`) are in paths relative to the config file as specified in the `data_layout` section. Note that the command provides the option `--data-base-dir` to specify the base directory for the data files if you prefer to avoid filling in the relative path.
 
 When running this command dsgrid will perform numerous validations in order to verify dataset consistency and that the project requirements are met. It may take up to an hour on an HPC compute node.
+
+With the default DuckDB backend:
+
+```bash
+dsgrid registry projects register-and-submit-dataset \
+    --project-id dsgrid_conus_2022 \
+    --dimension-mapping-file base_dir/dimension_mappings.json5 \
+    --log-message "Register and submit TEMPO dataset" \
+    base_dir/dataset.json5
+```
+
+With the Spark backend on a cluster:
 
 ```bash
 spark-submit --master=spark://<master_hostname>:7077 $(which dsgrid-cli.py) registry \

@@ -2,20 +2,23 @@
 
 import logging
 import os
-import sys
 from pathlib import Path
 from typing import Any
 from warnings import warn
 
-import json5
 from pydantic import model_validator
 
 from dsgrid.common import BackendEngine, DEFAULT_DB_PASSWORD, DEFAULT_SCRATCH_DIR
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.files import dump_json_file, load_json_file
 
 RC_FILENAME = ".dsgrid.json5"
 DEFAULT_BACKEND = BackendEngine.DUCKDB
-DEFAULT_THRIFT_SERVER_URL = "hive://localhost:10000/default"
+_LEGACY_FIELDS: tuple[str, ...] = (
+    "database_name",
+    "thrift_server_url",
+    "use_hive_metastore",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +26,13 @@ logger = logging.getLogger(__name__)
 class DsgridRuntimeConfig(DSGBaseModel):
     """Defines the runtime config that can be stored in users' home directories."""
 
+    model_config = DSGBaseModel.model_config | {"extra": "ignore"}
+
     database_url: str | None = None
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = True
     backend_engine: BackendEngine = DEFAULT_BACKEND
-    thrift_server_url: str = DEFAULT_THRIFT_SERVER_URL
-    use_hive_metastore: bool = False
     console_level: str = "info"
     file_level: str = "info"
     timings: bool = False
@@ -39,32 +42,38 @@ class DsgridRuntimeConfig(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def environment_overrides(cls, values: dict[str, Any]) -> dict[str, Any]:
-        for env, field in (
-            ("DSGRID_BACKEND_ENGINE", "backend_engine"),
-            ("THRIFT_SERVER_URL", "thrift_server_url"),
-        ):
+        for env, field in (("DSGRID_BACKEND_ENGINE", "backend_engine"),):
             if env in os.environ:
                 values[field] = os.environ[env]
         return values
 
     @model_validator(mode="before")
     @classmethod
-    def remove_legacy_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
-        for field in ("database_name",):
-            res = data.pop(field, None)
-            if res is not None:
-                warn(
-                    f"The dsgrid runtime config field {field} is deprecated. Please remove it. "
-                    "This will cause an error in a future release.",
+    def warn_legacy_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
+        for field in _LEGACY_FIELDS:
+            if data.pop(field, None) is not None:
+                msg = (
+                    f"The dsgrid runtime config field {field!r} is deprecated and is being "
+                    f"ignored. Please remove it from {RC_FILENAME}. This will cause an error "
+                    "in a future release."
                 )
+                # Log as well as warn. This validator runs at ``import dsgrid`` time, and
+                # Python's default filters hide a DeprecationWarning raised from library
+                # code, so the warning alone never reaches a user running the CLI -- which
+                # is exactly the "silently ignored" behavior the deprecation exists to
+                # avoid. The warning is kept for programmatic callers and tests.
+                logger.warning(msg)
+                # stacklevel=3 skips this validator and pydantic's ``BaseModel.__init__``
+                # so the warning points at the dsgrid/user code that built the config.
+                warn(msg, DeprecationWarning, stacklevel=3)
         return data
 
     @classmethod
-    def load(cls) -> "DsgridRuntimeConfig":
+    def load(cls, filename=None) -> "DsgridRuntimeConfig":
         """Load the dsgrid runtime config if it exists or one with default values."""
-        rc_file = cls.path()
+        rc_file = cls.path() if filename is None else Path(filename)
         if rc_file.exists():
-            data = json5.loads(rc_file.read_text(encoding="utf-8-sig"))
+            data = load_json_file(rc_file)
             return cls(**data)
         return cls()
 
@@ -74,9 +83,8 @@ class DsgridRuntimeConfig(DSGBaseModel):
         data = self.model_dump()
         data.pop("database_user")
         data.pop("database_password")
-        with open(path, "w") as f_out:
-            json5.dump(data, f_out, indent=2)
-        print(f"Wrote dsgrid config to {path}", file=sys.stderr)
+        dump_json_file(data, path, indent=2)
+        logger.info("Wrote dsgrid config to %s", path)
 
     @staticmethod
     def path() -> Path:

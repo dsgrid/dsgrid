@@ -22,7 +22,7 @@ conda activate dsgrid
 
 ### Install Java
 
-dsgrid's key dependency is Apache Spark. Apache Spark requires Java, so check if you have it. Both of these commands must work:
+dsgrid uses Ibis for table operations and supports DuckDB and Apache Spark execution backends. Java is only required when you use the Spark backend. If you plan to run with Spark, both of these commands must work:
 
 ::::{tab-set}
 
@@ -83,7 +83,9 @@ To use dsgrid in your own computational environment, you will need to initialize
 dsgrid create-registry --help
 ```
 
-## Apache Spark
+## Runtime Backends
+
+DuckDB is the default backend and is suitable for local work and moderate-sized datasets. Use the Spark extra when you need a distributed backend for large datasets or HPC workflows.
 
 - **NLR High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
 - **Standalone resources**: [TODO: Provide link]

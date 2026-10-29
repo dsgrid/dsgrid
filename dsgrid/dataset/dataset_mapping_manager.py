@@ -1,3 +1,4 @@
+import ibis
 import logging
 from pathlib import Path
 from typing import Self
@@ -7,9 +8,9 @@ from dsgrid.query.dataset_mapping_plan import (
     MapOperation,
     MapOperationCheckpoint,
 )
-from dsgrid.spark.types import DataFrame
+
 from dsgrid.utils.files import delete_if_exists
-from dsgrid.utils.spark import read_dataframe, write_dataframe
+from dsgrid.ibis.io import read_dataframe, write_dataframe
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,21 @@ class DatasetMappingManager:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args, **kwargs) -> None:
-        # Don't cleanup if an exception occurred.
-        self.cleanup()
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_type is None:
+            self.cleanup()
+            return
+        # Skip cleanup so the persisted intermediate table and checkpoint remain on disk
+        # for postmortem inspection. Log it so the leak is observable.
+        if self._checkpoint_file is not None or self._checkpoint is not None:
+            logger.warning(
+                "DatasetMappingManager skipping cleanup for dataset %s after %s; "
+                "checkpoint file=%s persisted_table=%s",
+                self._dataset_id,
+                exc_type.__name__,
+                self._checkpoint_file,
+                None if self._checkpoint is None else self._checkpoint.persisted_table_filename,
+            )
 
     @property
     def plan(self) -> DatasetMappingPlan:
@@ -48,7 +61,7 @@ class DatasetMappingManager:
         """Return the scratch_dir_context."""
         return self._scratch_dir_context
 
-    def try_read_checkpointed_table(self) -> DataFrame | None:
+    def try_read_checkpointed_table(self) -> ibis.Table | None:
         """Read the checkpointed table for the dataset, if it exists."""
         if self._checkpoint is None:
             return None
@@ -64,8 +77,8 @@ class DatasetMappingManager:
         """Return True if the mapping operation has been completed."""
         return op.name in self.get_completed_mapping_operations()
 
-    def persist_table(self, df: DataFrame, op: MapOperation) -> DataFrame:
-        """Persist the intermediate table to the filesystem and return the persisted DataFrame."""
+    def persist_table(self, df: ibis.Table, op: MapOperation) -> ibis.Table:
+        """Persist the intermediate table to the filesystem and return the persisted Ibis table."""
         persisted_file = self._scratch_dir_context.get_temp_filename(
             suffix=".parquet", add_tracked_path=False
         )

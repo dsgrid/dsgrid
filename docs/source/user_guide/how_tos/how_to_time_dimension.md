@@ -309,10 +309,11 @@ Timestamps cover the **same interval of local standard time** across geographies
 
 **Where does the `time_zone` column come from?**
 
-dsgrid automatically adds a `time_zone` column to the data table by joining it with geography records. The source of the time zone information is configurable:
+A dataset can supply the `time_zone` column in its own data files. Otherwise dsgrid adds it by joining the data with geography records. You do not choose which geography dimension supplies them; dsgrid uses the one whose record IDs the data carries at that point:
 
-- **Dataset geography records** (default) — dsgrid reads time zones from a `time_zone` column in the dataset's geography dimension records file. This is the common case.
-- **Project geography records** — set `use_project_geography_time_zone: true` in the dataset config to read time zones from the project's geography dimension instead. This is useful when the dataset's geography records do not include time zone information.
+- **During registration**, the dataset's own geography records. Timezone-naive data (`timestamp_ntz` or `time_format_in_parts` without `offset_column`) is localized here, so those records must include a `time_zone` column with valid IANA time zone values.
+- **During a project query**, the project's base geography records, whether or not the dataset's geography is mapped.
+- **During a standalone dataset query**, the geography dimension the query maps to, or the dataset's own records when the query maps no geography.
 
 The `time_zones` list in the config must include all unique IANA time zone strings that appear in the geography records.
 
@@ -463,7 +464,9 @@ Index time uses sequential **integer indices** instead of explicit timestamps. T
 **How it works**: Index `start` corresponds to `starting_timestamp`, and each subsequent index shifts forward by one `frequency` increment.
 
 **Requirements**:
-- **`time_zone` column required**: Must exist in both the geography dimension records and the data table. Used when converting indices to datetimes during dataset-to-project mapping.
+- **`time_zone_format` field required**: Specifies how time zones apply to the data:
+  - **`aligned_in_absolute_time`**: All geographies share a single time zone, specified directly in the config via the `time_zone` field. No `time_zone` column is needed in the geography dimension records or the data table.
+  - **`aligned_in_std_clock_time`**: Each geography has its own time zone. A `time_zone` column is required in the geography dimension records. During dataset-to-project mapping, dsgrid automatically joins it onto the data table -- you do not need to include it in the data table yourself.
 - **All time zones allowed**: Including DST-observing zones like `"America/New_York"` and fixed-offset zones like `"Etc/GMT+5"`.
 
 **Conversion behavior**: Index-to-datetime conversion happens only when the dataset (with index time) maps to a project (with datetime time), not during dataset registration. The conversion respects time adjustments specified in the project config, such as `daylight_saving_adjustment`, `leap_day_adjustment`, and `wrap_time_allowed`.
@@ -472,20 +475,20 @@ Index time uses sequential **integer indices** instead of explicit timestamps. T
 
 ### Common use cases
 
-**Example 1: Electricity data with standard 8760 indexing**
+**Example 1: Electricity data with standard 8760 indexing (single time zone)**
 
-Electricity datasets commonly index hourly values from 0-8759 (or 1-8760). The config records the starting point to preserve time specificity (day of week, season, etc.).
+Electricity datasets commonly index hourly values from 0-8759 (or 1-8760). When all data is aligned to a single time zone, use `aligned_in_absolute_time` and specify the `time_zone` directly in the config -- no `time_zone` column is needed in geography records.
 
 **Example 1 data table** (indexed, before mapping to project):
 
 ```
-time_index | time_zone  | geography | value
------------|------------|-----------|-------
-         0 | Etc/GMT+5  | g_east    | 1.2
-         1 | Etc/GMT+5  | g_east    | 0.9
-         2 | Etc/GMT+5  | g_east    | 2.1
-       ... | ...        | ...       | ...
-      8783 | Etc/GMT+5  | g_east    | 1.8
+time_index | geography | value
+-----------|-----------|-------
+         0 | g_east    | 1.2
+         1 | g_east    | 0.9
+         2 | g_east    | 2.1
+       ... | ...       | ...
+      8783 | g_east    | 1.8
 ```
 
 **Config 1**:
@@ -496,6 +499,10 @@ time_index | time_zone  | geography | value
   name: "Hourly 2012 Index",
   "class": "Time",
   time_type: "index",
+  time_zone_format: {
+    format_type: "aligned_in_absolute_time",
+    time_zone: "Etc/GMT+5",                        // single time zone for all data
+  },
   ranges: [
     {
       start: 0,                                     // first index value (inclusive)
@@ -513,31 +520,40 @@ time_index | time_zone  | geography | value
 **Data table 1 after mapping to project**:
 
 ```
-timestamp           | time_zone  | geography | value
---------------------|------------|-----------|-------
-2012-01-01 00:00:00 | Etc/GMT+5  | g_east    | 1.2
-2012-01-01 01:00:00 | Etc/GMT+5  | g_east    | 0.9
-2012-01-01 02:00:00 | Etc/GMT+5  | g_east    | 2.1
-...                 | ...        | ...       | ...
-2012-12-31 23:00:00 | Etc/GMT+5  | g_east    | 1.8
+timestamp           | geography | value
+--------------------|-----------|-------
+2012-01-01 00:00:00 | g_east    | 1.2
+2012-01-01 01:00:00 | g_east    | 0.9
+2012-01-01 02:00:00 | g_east    | 2.1
+...                 | ...       | ...
+2012-12-31 23:00:00 | g_east    | 1.8
 ```
 
-During registration, dsgrid converts the integer `time_index` column to a proper `timestamp` column by combining the starting timestamp with the index and frequency. The resulting timestamps are timezone-naive, paired with the `time_zone` column to fully specify each point in time.
+During mapping, dsgrid converts the integer `time_index` column to a proper `timestamp` column by combining the starting timestamp with the index and frequency. Because `aligned_in_absolute_time` is used, the time zone comes from the config and no per-row `time_zone` column is needed.
 
-**Example 2: Industrial data with DST adjustment**
+**Example 2: Industrial data with DST adjustment (multiple time zones)**
 
-Some datasets (e.g., IEF industrial profiles) are stitched together from representative diurnal profiles in local standard time. When mapping to a project, both the timestamps and data values must be adjusted for DST transitions. Geographies observing DST will have dropped (spring-forward) or duplicated (fall-back) hours. Interpolation is available for the fall-back hour adjustment.
+Some datasets (e.g., IEF industrial profiles) are stitched together from representative diurnal profiles in local standard time, with each geography in its own time zone. Use `aligned_in_std_clock_time` so that each geography's `time_zone` is read from the geography dimension records. When mapping to a project, both the timestamps and data values must be adjusted for DST transitions. Geographies observing DST will have dropped (spring-forward) or duplicated (fall-back) hours. Interpolation is available for the fall-back hour adjustment.
 
 **Example 2 data table** (before mapping to project, showing hours around spring-forward DST transition):
 
 ```
-time_index | time_zone        | geography | value
------------|------------------|-----------|-------
-      1560 | America/Chicago   | g_midwest | 1.5
-      1561 | America/Chicago   | g_midwest | 1.4
-      1562 | America/Chicago   | g_midwest | 1.3
-      1563 | America/Chicago   | g_midwest | 1.2
-       ... | ...              | ...       | ...
+time_index | geography | value
+-----------|-----------|-------
+      1560 | g_midwest | 1.5
+      1561 | g_midwest | 1.4
+      1562 | g_midwest | 1.3
+      1563 | g_midwest | 1.2
+       ... | ...       | ...
+```
+
+**Example 2 geography dimension records** (provides `time_zone` for each geography):
+
+```
+id        | time_zone
+----------|------------------
+g_midwest | America/Chicago
+g_east    | America/New_York
 ```
 
 **Config 2 (dataset)**:
@@ -549,6 +565,10 @@ time_index | time_zone        | geography | value
   time_type: "index",
   name: "ind_time",
   description: "Industrial 8760-indexed time with 2018-01-01 00:00:00 start, stitched from representative diurnal profiles in local standard time. Requires DST adjustment during mapping to account for DST transitions.",
+  time_zone_format: {
+    format_type: "aligned_in_std_clock_time",
+    time_zones: ["America/Chicago", "America/New_York"],   // per-geography time zones
+  },
   time_interval_type: "period_beginning",
   ranges: [
     {
@@ -601,7 +621,7 @@ Two formats are currently supported, selected by the `format` field.
 **How it works**: Data is structured using integer columns (month, day_of_week/is_weekday, hour) that define typical periods independent of actual calendar dates. When the dataset maps to a project, these typical periods are repeated across a selected calendar year, matching the day-of-week or weekday/weekend patterns.
 
 **Requirements**:
-- **`time_zone` column required**: Must exist in both the geography dimension records and the data table. Used when localizing the representative periods to a specific project year.
+- **`time_zone` column required in geography dimension records**: Each geography record must include a `time_zone` value. During dataset-to-project mapping, dsgrid automatically joins the `time_zone` from the geography records onto the data table -- you do not need to include it in the data table yourself.
 - **All time zones allowed**: Including DST-observing zones like `"America/New_York"` and fixed-offset zones like `"Etc/GMT+5"`.
 - **Two formats supported**: `one_week_per_month_by_hour` or `one_weekday_day_and_one_weekend_day_per_month_by_hour`.
 

@@ -78,11 +78,20 @@ class DSGBaseModel(BaseModel):
         return self.model_dump(*args, mode="json", **kwargs)
 
     @classmethod
-    def from_file(cls, filename: Path) -> Self:
+    def from_file(cls, filename: Path | str) -> Self:
         """Deserialize the model from a file. Unlike the load method,
         this does not change directories.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            If the file contents fail model validation.
         """
-        return cls(**load_data(filename))
+        try:
+            return cls(**load_data(filename))
+        except ValidationError as e:
+            msg = f"Validation error in '{filename}': {e}"
+            raise DSGInvalidParameter(msg) from e
 
     def to_file(self, filename: Path) -> None:
         """Serialize the model to a file."""
@@ -124,6 +133,10 @@ class EnumValue:
 class DSGEnum(Enum):
     """dsgrid Enum class"""
 
+    # Declared, never assigned: an assignment here would make this an enum member.
+    # Each member's value is set in __new__.
+    description: str | None
+
     def __new__(cls, *args):
         obj = object.__new__(cls)
         assert len(args) in (1, 2)
@@ -151,5 +164,5 @@ class DSGEnum(Enum):
         """Returns formatted dict of enum values and descriptions for docs."""
         desc = {}
         for e in cls:
-            desc[f"``{e.value}``"] = f"{e.description}"
+            desc[f"``{e.value}``"] = f"{getattr(e, 'description')}"
         return desc

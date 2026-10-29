@@ -10,12 +10,15 @@ from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     cross_join,
     read_csv,
 )
-from dsgrid.spark.types import (
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns, rename_columns
+from dsgrid.ibis.models import models_to_dataframe
+from dsgrid.ibis.session import (
     F,
+    get_runtime_session,
     IntegerType,
 )
 from dsgrid.utils.files import (
@@ -25,10 +28,6 @@ from dsgrid.utils.files import (
     dump_line_delimited_json,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import (
-    models_to_dataframe,
-    get_spark_session,
-)
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from dsgrid.tests.utils import read_parquet_two_table_format
 
@@ -71,8 +70,9 @@ def build_expected_datasets():
             / "aeo2021_reference_residential_energy_use_growth_factors"
             / "1.0.0"
             / "load_data.csv"
-        ).drop("sector")
+        )
     )
+    aeo_res = drop_columns(aeo_res, "sector")
     comstock = make_projection_df(
         aeo_com,
         read_parquet_two_table_format(path / "data" / "comstock_conus_2022_reference" / "1.0.0"),
@@ -108,24 +108,24 @@ def load_dataset_stats() -> dict:
 
 
 def apply_load_mapping_aeo_com(aeo_com):
-    return (
+    aeo_com = (
         aeo_com.withColumn("electricity_cooling", F.col("elec_cooling") * 1.0)
         .withColumn("electricity_heating", F.col("elec_heating") * 1.0)
         .withColumn("natural_gas_heating", F.col("ng_heating") * 1.0)
-        .drop("elec_cooling", "elec_heating", "ng_heating")
     )
+    return drop_columns(aeo_com, "elec_cooling", "elec_heating", "ng_heating")
 
 
 def duplicate_aeo_com_census_division_to_county(aeo_com):
     records = get_dim_mapping_records_from_db("US Census Divisions", "US Counties 2020 L48")
     assert records.select("from_fraction").distinct().collect()[0].from_fraction == 1.0
-    records = records.drop("from_fraction")
+    records = drop_columns(records, "from_fraction")
     mapped = aeo_com.join(records, on=aeo_com.geography == records.from_id)
     # Make sure no census division got dropped in the join.
     orig_count = aeo_com.select("geography").distinct().count()
     new_count = mapped.select("geography").distinct().count()
     assert orig_count == new_count, f"{orig_count} {new_count}"
-    return mapped.drop("from_id", "geography").withColumnRenamed("to_id", "geography")
+    return rename_columns(drop_columns(mapped, "from_id", "geography"), {"to_id": "geography"})
 
 
 def map_aeo_com_county_to_comstock_county(aeo_com):
@@ -133,13 +133,13 @@ def map_aeo_com_county_to_comstock_county(aeo_com):
         "conus_2022-comstock_US_county_FIP", "US Counties 2020 L48"
     )
     assert records.select("from_fraction").distinct().collect()[0].from_fraction == 1.0
-    records = records.drop("from_fraction")
+    records = drop_columns(records, "from_fraction")
     mapped = aeo_com.join(records, on=aeo_com.geography == records.to_id)
     # Make sure no entries were dropped.
     orig_count = aeo_com.count()
     new_count = mapped.count()
     assert orig_count == new_count, f"{orig_count} {new_count}"
-    return mapped.drop("to_id", "geography").withColumnRenamed("from_id", "geography")
+    return rename_columns(drop_columns(mapped, "to_id", "geography"), {"from_id": "geography"})
 
 
 def map_aeo_com_subsectors(aeo_com):
@@ -151,11 +151,11 @@ def map_aeo_com_subsectors(aeo_com):
     orig_count = aeo_com.select("subsector").distinct().count()
     new_count = mapped.select("subsector").distinct().count()
     assert orig_count == new_count, f"{orig_count} {new_count}"
-    mapped = mapped.drop("from_id", "subsector").withColumnRenamed("to_id", "subsector")
+    mapped = rename_columns(drop_columns(mapped, "from_id", "subsector"), {"to_id": "subsector"})
     for col in ("electricity_cooling", "electricity_heating"):
         mapped = mapped.withColumn(col, mapped[col] * mapped["from_fraction"])
     return (
-        mapped.drop("from_fraction")
+        drop_columns(mapped, "from_fraction")
         .groupBy("subsector", "geography")
         .agg(
             F.sum("electricity_cooling").alias("electricity_cooling"),
@@ -182,18 +182,18 @@ def get_dim_mapping_records_from_db(from_dim_name, to_dim_name):
 
 
 def apply_load_mapping_aeo_res(aeo_res):
-    return (
+    aeo_res = (
         aeo_res.withColumn("electricity_cooling", F.col("elec_heat_cool") * 1.0)
         .withColumn("electricity_heating", F.col("elec_heat_cool") * 1.0)
         .withColumn("natural_gas_heating", F.col("ng_heat_cool") * 1.0)
-        .drop("elec_heat_cool", "ng_heat_cool")
     )
+    return drop_columns(aeo_res, "elec_heat_cool", "ng_heat_cool")
 
 
 def make_projection_df(aeo, ld_df, join_columns):
     # comstock and resstock have a single year of data for model_year 2018
     # Apply the growth rate for 2020 and 2040, the years in the filtered registry.
-    spark = get_spark_session()
+    spark = get_runtime_session()
     years_df = spark.createDataFrame([{"model_year": "2020"}, {"model_year": "2040"}])
     aeo = cross_join(aeo, years_df)
     ld_df = cross_join(ld_df, years_df)
@@ -205,12 +205,14 @@ def make_projection_df(aeo, ld_df, join_columns):
         gr_df = gr_df.withColumn(
             gr_col,
             F.pow((1 + F.col(column)), F.col("model_year").cast(IntegerType()) - base_year),
-        ).drop(column)
+        )
+        gr_df = drop_columns(gr_df, column)
 
     df = ld_df.join(gr_df, on=join_columns)
     for column in pivoted_columns:
         gr_col = column + "__gr"
-        df = df.withColumn(column, df[column] * df[gr_col]).drop(gr_col)
+        df = df.withColumn(column, df[column] * df[gr_col])
+        df = drop_columns(df, gr_col)
 
     return df
 
@@ -235,7 +237,7 @@ def build_tempo():
         context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
         with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mapping_mgr:
             tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-                load_data_df=load_data.join(lookup, on="id").drop("id"),
+                load_data_df=drop_columns(join_multiple_columns(load_data, lookup, ["id"]), "id"),
                 to_time_dim=project.config.get_base_time_dimension(),
                 mapping_manager=mapping_mgr,
                 value_column=value_column,

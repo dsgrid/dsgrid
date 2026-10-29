@@ -34,6 +34,11 @@ This document defines the coding conventions for the Python client codebase. The
 
 - Use pytest.
 - Write free functions. Do not write test classes.
+- Build small test tables with `make_table(columns, *rows)` from `tests/_helpers.py` — a
+  column header followed by one tuple per row — so the data reads like a table. Do not
+  define tables as lists of verbose per-row dicts.
+- Put shared test helpers in `tests/_helpers.py` rather than redefining small local
+  helpers in each test module.
 
 ## Docstrings
 

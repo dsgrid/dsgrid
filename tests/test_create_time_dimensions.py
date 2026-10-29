@@ -16,6 +16,7 @@ from dsgrid.config.dimensions import (
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
+from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
@@ -25,16 +26,14 @@ from dsgrid.dimension.time_utils import (
     get_time_ranges,
 )
 
-from dsgrid.spark.types import (
+from dsgrid.ibis.session import (
     DoubleType,
     F,
+    get_runtime_session,
     IntegerType,
     StringType,
     StructField,
     StructType,
-)
-from dsgrid.utils.spark import (
-    get_spark_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,6 +104,14 @@ def datetime_eq_index_time_model():
 
 
 @pytest.fixture
+def index_time_dimension_model_single_tz():
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][8]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # IndexTimeDimensionModel (aligned_in_absolute_time, single tz)
+
+
+@pytest.fixture
 def index_time_dimension_model_subhourly():
     config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
     config_as_dict["dimensions"] = [config_as_dict["dimensions"][6]]
@@ -133,7 +140,7 @@ def create_index_time_dataframe(interval="1h"):
             StructField("time_zone", StringType(), False),
         ]
     )
-    df = get_spark_session().createDataFrame([], schema=schema)
+    df = get_runtime_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     if interval == "1h":
@@ -145,7 +152,7 @@ def create_index_time_dataframe(interval="1h"):
     else:
         msg = f"Unsupported {interval=}"
         raise ValueError(msg)
-    df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
+    df_tz = get_runtime_session().createDataFrame(zip(indices, values), ["time_index", "value"])
     for geo, tz in zip(geography, time_zones):
         df = df.union(
             df_tz.withColumn("geography", F.lit(geo))
@@ -176,7 +183,7 @@ def df_date_time():
             StructField("time_zone", StringType(), False),
         ]
     )
-    df = get_spark_session().createDataFrame([], schema=schema)
+    df = get_runtime_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "California", "Arizona"]
     time_zones = ["America/Denver", "America/Los_Angeles", "America/Phoenix"]
     ts_pt = pd.date_range(
@@ -196,7 +203,7 @@ def df_date_time():
         ]
     )
     for geo, tz, ts in zip(geography, time_zones, timestamps):
-        df_tz = get_spark_session().createDataFrame(zip(ts, values), schema=sch)
+        df_tz = get_runtime_session().createDataFrame(zip(ts, values), schema=sch)
         df = df.union(
             df_tz.withColumn("geography", F.lit(geo))
             .withColumn("time_zone", F.lit(tz))
@@ -262,7 +269,7 @@ def check_date_range_creation(time_dimension_model, time_based_data_adjustment=N
     if 24 % hours != 0:
         msg = f"Time frequency of {hours} hours does not evenly divide 24 hours."
         raise ValueError(msg)
-    periods = 24 // hours
+    periods = int(24 // hours)
 
     for yr in years:
         if ld_adj == LeapDayAdjustmentType.NONE:
@@ -370,3 +377,18 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     check_date_range_creation(
         time_dimension_model0, time_based_data_adjustment=time_based_data_adjustment
     )
+
+
+def test_index_time_single_tz_model(index_time_dimension_model_single_tz):
+    """Exercise the single-tz index entry through the json5 fixture path.
+
+    Accessor behavior on directly-constructed models is covered in
+    tests/test_timezone_validation.py; this test pins that the new config file
+    entry parses through DimensionsConfigModel and that derived values
+    (lengths, tz-aware start times) are computed correctly from it.
+    """
+    model = index_time_dimension_model_single_tz
+    assert not model.is_time_zone_required_in_geography()
+    config = IndexTimeDimensionConfig(model)
+    assert config.get_lengths() == [8784]
+    assert config.get_start_times()[0].tzinfo is not None

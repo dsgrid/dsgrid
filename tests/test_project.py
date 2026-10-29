@@ -12,7 +12,11 @@ from dsgrid.exceptions import (
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.ibis.operations import filter_sql
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+from dsgrid.ibis.table_utils import count_rows
+from tests._helpers import collect as _collect
 
 
 PROJECT_ID = "test_efs"
@@ -51,7 +55,7 @@ def test_project_load(cached_registry):
         assert subset_dims == ["commercial_subsectors2", "residential_subsectors"]
         config.get_dimension("residential_subsectors").get_unique_ids() == {"MidriseApartment"}
 
-        records = project.config.get_dimension_records("all_test_efs_subsectors").collect()
+        records = _collect(project.config.get_dimension_records("all_test_efs_subsectors"))
         assert len(records) == 1
         assert records[0].id == "all_subsectors"
 
@@ -136,7 +140,9 @@ def test_get_dimension_with_records(project_config: ProjectConfig):
 
 
 def test_get_dimension_records(project_config: ProjectConfig):
-    assert project_config.get_dimension_records("US Counties 2010 - ComStock Only").count() == 8
+    assert (
+        count_rows(project_config.get_dimension_records("US Counties 2010 - ComStock Only")) == 8
+    )
     with pytest.raises(DSGInvalidParameter):
         project_config.get_dimension_records(
             "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
@@ -170,7 +176,9 @@ def test_get_base_dimension_by_id(project_config: ProjectConfig):
 
 def test_get_base_dimension_records_by_id(project_config: ProjectConfig):
     county = project_config.get_dimension("US Counties 2010 - ComStock Only")
-    assert project_config.get_base_dimension_records_by_id(county.model.dimension_id).count() == 8
+    assert (
+        count_rows(project_config.get_base_dimension_records_by_id(county.model.dimension_id)) == 8
+    )
     assert (
         project_config.get_base_dimension_by_id(county.model.dimension_id).model.name
         == "US Counties 2010 - ComStock Only"
@@ -197,7 +205,7 @@ def test_dataset_load(cached_registry, scratch_dir_context):
             "all_test_efs_geographies",
         ]
         records = project.config.get_dimension_records("US States")
-        assert records.filter("id = 'CO'").count() > 0
+        assert count_rows(filter_sql(records, "id = 'CO'")) > 0
 
 
 def test_dimension_map_and_reduce_in_dataset(cached_registry):
@@ -232,7 +240,7 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
                 table_type = "load_data_lookup"
                 table = mapped_load_data_lookup
             diff = set(
-                [row[column] for row in table.select(column).distinct().collect()]
+                getattr(row, column) for row in _collect(table.select(column).distinct())
             ).symmetric_difference(to_records)
             if diff:
                 raise DSGInvalidDimensionMapping(
@@ -248,10 +256,9 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
         data_filters = "subsector=='Warehouse' and model_year=='2050'"
         fraction = [
             row.fraction
-            for row in mapped_load_data_lookup.filter(data_filters)
-            .select("fraction")
-            .distinct()
-            .collect()
+            for row in _collect(
+                filter_sql(mapped_load_data_lookup, data_filters).select("fraction").distinct()
+            )
         ]
         assert len(fraction) == 1
         assert fraction[0] == (0.9 * 1.3)

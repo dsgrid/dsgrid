@@ -98,10 +98,7 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
             items.append(_relpath_or_absolute(missing_path, config_dir))
         data_layout["missing_associations"] = items
 
-    if (
-        "expected_associations" in data_layout
-        and data_layout["expected_associations"] is not None
-    ):
+    if "expected_associations" in data_layout and data_layout["expected_associations"] is not None:
         items = []
         for item in data_layout["expected_associations"]:
             stem = Path(item).stem

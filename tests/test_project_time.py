@@ -5,6 +5,7 @@ import pytest
 from typing import Optional
 from datetime import timedelta
 
+import ibis
 import pandas as pd
 from chronify.time_range_generator_factory import make_time_range_generator
 
@@ -12,24 +13,24 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns, with_literal_column
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeIntervalType
 
-from dsgrid.spark.functions import (
+from dsgrid.ibis.functions import (
     create_temp_view,
     make_temp_view_name,
     get_current_time_zone,
-    join_multiple_columns,
     select_expr,
     set_current_time_zone,
-    perform_interval_op,
 )
-from dsgrid.spark.types import (
-    DataFrame,
-    FloatType,
-    F,
+from dsgrid.ibis.table_utils import get_unique_values, table_to_pandas
+from dsgrid.ibis.session import (
+    create_dataframe_from_pandas,
+    get_runtime_session,
     StructField,
     StructType,
     TimestampType,
@@ -37,9 +38,15 @@ from dsgrid.spark.types import (
 )
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_spark_session, get_unique_values
 
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
+
+from tests._helpers import (
+    collect as _collect,
+    order_by as _order_by,
+    perform_interval_op,
+    row_value as _row_value,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -84,8 +91,9 @@ def tempo(project):
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
 
-    tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
-        "id"
+    tempo_data = drop_columns(
+        join_multiple_columns(tempo._handler._load_data, tempo._handler._load_data_lookup, ["id"]),
+        "id",
     )
     value_columns = tempo._handler.config.get_value_columns()
     assert len(value_columns) == 1
@@ -167,10 +175,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     # get sum from converted_data
     groupby_cols = [col for col in converted_data.columns if col not in [ptime_col, VALUE_COLUMN]]
-    converted_sum = converted_data.groupBy(*groupby_cols).agg(
-        F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
-    )
-    pdf = converted_sum.toPandas()
+    converted_sum = _sum_value_by_group(converted_data, groupby_cols)
+    pdf = table_to_pandas(converted_sum)
     pdf[VALUE_COLUMN] = pdf[VALUE_COLUMN].round(3)
     converted_sum_df = pdf.set_index(groupby_cols).sort_index()
 
@@ -224,10 +230,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         .to_frame()
     )
     other_cols = [col for col in raw_data.columns if col != VALUE_COLUMN]
-    raw_data_df = (
-        raw_data.select(other_cols + [VALUE_COLUMN])
-        .toPandas()
-        .join(model_time_map, on=["time_zone"] + time_cols, how="left")
+    raw_data_df = table_to_pandas(raw_data.select(other_cols + [VALUE_COLUMN])).join(
+        model_time_map, on=["time_zone"] + time_cols, how="left"
     )
     raw_data_df[VALUE_COLUMN] = raw_data_df[VALUE_COLUMN].round(3)
 
@@ -253,7 +257,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             weekday_func = "WEEKDAY"
             weekday_modifier = ""
         for tz_name in geo_tz_names:
-            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_name))
+            local_time_df = with_literal_column(project_time_df, "time_zone", tz_name)
             local_time_df = to_utc_timestamp(local_time_df, "map_time", session_tz, "UTC")
             local_time_df = from_utc_timestamp(local_time_df, "UTC", tz_name, "local_time")
             select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
@@ -269,20 +273,27 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             else:
                 time_df = time_df.union(local_time_df)
             idx += 1
-        assert isinstance(time_df, DataFrame)
+        assert isinstance(time_df, ibis.Table)
+        # Materialize now, while the session time zone is UTC, so that hour/day/month
+        # values extracted from local_time are not recomputed under the original session
+        # time zone after the finally block restores it.
         if use_duckdb():
-            # DuckDB does not persist the hour value unless we create a table.
             view = create_temp_view(time_df)
             table = make_temp_view_name()
-            spark = get_spark_session()
-            spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
+            spark = get_runtime_session()
+            get_runtime_backend().connection.raw_sql(
+                f"CREATE TABLE {table} AS SELECT * FROM {view}"
+            )
             time_df = spark.sql(f"SELECT * FROM {table}")
+        else:
+            time_df_pdf = table_to_pandas(time_df)
+            time_df = create_dataframe_from_pandas(time_df_pdf)
     finally:
         # reset session time_zone
         set_current_time_zone(session_tz_orig)
         session_tz = get_current_time_zone()
 
-    grouped_time_df = time_df.groupBy(["time_zone"] + time_cols).count()
+    grouped_time_df = _count_by_group(time_df, ["time_zone"] + time_cols)
 
     raw_data_df2 = join_multiple_columns(
         raw_data,
@@ -291,14 +302,12 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         how="left",
     )
 
-    raw_sum_df2 = raw_data_df2.groupBy(groupby_cols).agg(
-        F.sum(F.col(VALUE_COLUMN) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
-    )
-    raw_sum_df2 = raw_sum_df2.toPandas().set_index(groupby_cols).sort_index()
+    raw_sum_df2 = _sum_value_times_count_by_group(raw_data_df2, groupby_cols)
+    raw_sum_df2 = table_to_pandas(raw_sum_df2).set_index(groupby_cols).sort_index()
     raw_sum_df2[VALUE_COLUMN] = raw_sum_df2[VALUE_COLUMN].round(3)
 
     # check 1: that mapping df are the same for both spark and pandas
-    time_df2 = time_df.toPandas()
+    time_df2 = table_to_pandas(time_df)
     if not use_duckdb():
         time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
             session_tz, ambiguous="infer"
@@ -317,13 +326,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     assert list(n_ts) == [
         len(model_time)
     ], f"Mismatch in number of timestamps for pandas: {n_ts} vs. {len(model_time)}"
-    n_ts2 = (
-        raw_data_df2.groupBy(groupby_cols)
-        .agg(F.sum("count").alias("count"))
-        .select("count")
-        .distinct()
-        .toPandas()
-    )
+    n_ts2 = table_to_pandas(_distinct_sum_count_by_group(raw_data_df2, groupby_cols))
     assert n_ts2["count"].to_list() == [
         len(model_time)
     ], f"Mismatch in number of timestamps for spark: {n_ts2} vs. {len(model_time)}"
@@ -343,16 +346,20 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
 def check_exploded_tempo_time(project_time_dim, load_data):
     """
-    - DF.show() (and probably all arithmetics) use spark.sql.session.timeZone
-    - DF.toPandas() likely goes through spark.sql.session.timeZone
-    - DF.collect() converts timestamps to system time_zone (different from spark.sql.session.timeZone!)
-    - hour(F.col(timestamp)) extracts hour from timestamp col as exactly shown in DF.show()
-    - spark.sql.session.timeZone time that is consistent with system time seems to show time correctly
-        (in session time) for DF.show(), however, it does not work well with time converting functions
-        from spark.sql.functions
-    - On the other hand, even though spark.sql.session.timeZone=UTC does not always show time correctly
-        in DF.show(), it converts time correctly when using F.from_utc_timestamp() and F.to_utc_timestamp().
-        Thus, we explicitly set session_tz to UTC when extracting timeinfo from local_time column.
+    Notes on time-zone semantics under Spark (preserved from prior behavior; the
+    Ibis layer routes both backends through the same SQL on the Spark runtime):
+
+    - Arithmetic and SQL functions on TIMESTAMP columns use ``spark.sql.session.timeZone``.
+    - Materializing a table to pandas (``ibis.Table.execute()`` / ``.to_pandas()``)
+      converts via ``spark.sql.session.timeZone``.
+    - ``hour(timestamp_col)`` extracts the hour in the session time zone, matching
+      what would be displayed by Spark's row formatter.
+    - Setting ``spark.sql.session.timeZone`` to match the local system tz makes
+      display look correct but interacts badly with ``from_utc_timestamp`` /
+      ``to_utc_timestamp``. Conversely, setting it to UTC does not always render
+      timestamps the way you'd expect, but the conversion functions then behave
+      correctly. We explicitly set ``session_tz`` to UTC before extracting
+      timeinfo from the ``local_time`` column for that reason.
     """
 
     # extract data for comparison
@@ -362,10 +369,16 @@ def check_exploded_tempo_time(project_time_dim, load_data):
 
     project_time, project_timestamps = make_date_time_df(project_time_dim)
     model_time = pd.Series(project_timestamps).rename(time_col).to_frame()
-    tempo_time = load_data.select(time_col).distinct().sort(time_col)
+    tempo_time = _order_by(load_data.select(time_col).distinct(), time_col)
 
     # QC 1: each timestamp has the same number of occurences
-    freq_count = load_data.groupBy(time_col).count().select("count").distinct().collect()
+    view = create_temp_view(load_data)
+    freq_count = _collect(
+        get_runtime_session().sql(
+            f"SELECT DISTINCT count FROM (SELECT {time_col}, COUNT(*) AS count "
+            f"FROM {view} GROUP BY {time_col})"
+        )
+    )
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time
@@ -373,9 +386,9 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert session_tz is not None
     z_info = ZoneInfo(session_tz)
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
-    project_time = [t[0].astimezone(z_info) for t in project_time.collect()]
+    project_time = [_as_timezone(_row_value(t, 0), z_info) for t in _collect(project_time)]
     project_time = pd.DataFrame(project_time, columns=["project_time"])
-    tempo_time = [t[0].astimezone(z_info) for t in tempo_time.collect()]
+    tempo_time = [_as_timezone(_row_value(t, 0), z_info) for t in _collect(tempo_time)]
     tempo_time = pd.DataFrame(tempo_time, columns=["tempo_time"])
 
     # Checks
@@ -399,67 +412,119 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     ), f"Mismatch:\nn_model={n_model}, n_project={n_project}, n_tempo={n_tempo}\n{mismatch}"
 
 
-# The duckdb implementations of the next two functions may not be fully correct or ideal.
-# We don't need them in the dsgrid package because time mapping is performed in chronify.
-# There are some extensive tests in this file that rely on them, and so we are keeping them
-# here.
+def _as_timezone(value, tz):
+    if value.tzinfo is None:
+        if hasattr(value, "tz_localize"):
+            value = value.tz_localize("UTC")
+        else:
+            value = value.replace(tzinfo=ZoneInfo("UTC"))
+    return value.astimezone(tz)
+
+
+def _count_by_group(df, groupby_cols):
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, COUNT(*) AS count FROM {view} GROUP BY {groups}"
+    )
+
+
+def _sum_value_by_group(df, groupby_cols):
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, SUM({_sql_ident(VALUE_COLUMN)}) AS {_sql_ident(VALUE_COLUMN)} "
+        f"FROM {view} GROUP BY {groups}"
+    )
+
+
+def _sum_value_times_count_by_group(df, groupby_cols):
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT {groups}, "
+        f"SUM({_sql_ident(VALUE_COLUMN)} * CAST({_sql_ident('count')} AS FLOAT)) "
+        f"AS {_sql_ident(VALUE_COLUMN)} FROM {view} GROUP BY {groups}"
+    )
+
+
+def _distinct_sum_count_by_group(df, groupby_cols):
+    view = create_temp_view(df)
+    groups = ", ".join(_sql_ident(x) for x in groupby_cols)
+    return get_runtime_session().sql(
+        f"SELECT DISTINCT count FROM ("
+        f"SELECT {groups}, SUM({_sql_ident('count')}) AS count FROM {view} GROUP BY {groups}"
+        f")"
+    )
+
+
+def _sql_ident(column):
+    if get_runtime_backend().name == "spark":
+        return "`" + column.replace("`", "``") + "`"
+    return '"' + column.replace('"', '""') + '"'
+
+
+# The DuckDB implementations of from_utc_timestamp / to_utc_timestamp may not be fully
+# correct or ideal. We don't need them in the dsgrid package because time mapping is
+# performed in chronify. There are some extensive tests in this file that rely on them,
+# so we keep them here.
+
+
+def _convert_timestamp_tz(
+    df: ibis.Table,
+    time_column: str,
+    time_zone: str,
+    new_column: str,
+    *,
+    direction: str,
+) -> ibis.Table:
+    """Run Spark's ``from_utc_timestamp`` / ``to_utc_timestamp`` (or DuckDB equivalent).
+
+    ``direction`` must be ``"from_utc"`` or ``"to_utc"``.
+    """
+    if direction not in {"from_utc", "to_utc"}:
+        msg = f"direction must be 'from_utc' or 'to_utc'; got {direction!r}"
+        raise ValueError(msg)
+    view = create_temp_view(df)
+    cols = df.columns[:]
+    if time_column == new_column:
+        cols.remove(time_column)
+    cols_str = ",".join(_sql_ident(c) for c in cols)
+    tc = _sql_ident(time_column)
+    nc = _sql_ident(new_column)
+    if use_duckdb():
+        # DuckDB has a single ``timezone(zone, ts)`` builtin that handles both directions
+        # via TIMESTAMPTZ casting.
+        expr = f"CAST(timezone('{time_zone}', {tc}) AS TIMESTAMPTZ)"
+    else:
+        spark_func = "from_utc_timestamp" if direction == "from_utc" else "to_utc_timestamp"
+        expr = f"{spark_func}({tc}, '{time_zone}')"
+    return get_runtime_session().sql(f"SELECT {cols_str}, {expr} AS {nc} FROM {view}")
 
 
 def from_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.from_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
-    return df2
+    df: ibis.Table, time_column: str, time_zone: str, new_column: str
+) -> ibis.Table:
+    """Refer to ``pyspark.sql.functions.from_utc_timestamp``."""
+    return _convert_timestamp_tz(df, time_column, time_zone, new_column, direction="from_utc")
 
 
 def to_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.to_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
-    return df2
+    df: ibis.Table, time_column: str, time_zone: str, new_column: str
+) -> ibis.Table:
+    """Refer to ``pyspark.sql.functions.to_utc_timestamp``."""
+    return _convert_timestamp_tz(df, time_column, time_zone, new_column, direction="to_utc")
 
 
 def make_date_time_df(
     time_config: DateTimeDimensionConfig,
-) -> tuple[DataFrame, list[pd.Timestamp]]:
+) -> tuple[ibis.Table, list[pd.Timestamp]]:
     timestamps = make_time_range_generator(time_config.to_chronify()).list_timestamps()
     project_time_cols = time_config.get_load_data_time_columns()
     assert len(project_time_cols) == 1, project_time_cols
     time_col = project_time_cols[0]
     schema = StructType([StructField(time_col, TimestampType(), False)])
-    df = get_spark_session().createDataFrame(
+    df = get_runtime_session().createDataFrame(
         [(x.to_pydatetime(),) for x in timestamps], schema=schema
     )
     return df, timestamps

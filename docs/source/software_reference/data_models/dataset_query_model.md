@@ -14,7 +14,7 @@ Defines how to transform a dataset
 |------|------|---------|-------------|
 | `name` | `str` | *(required)* | Name of query |
 | `version` | `str` | `"0.1.0"` | Version of the query structure. Changes to the major or minor version invalidate cached tables. |
-| `result` | [QueryResultParamsModel](dataset_query_model.md#queryresultparamsmodel) | `replace_ids_with_names=False aggregations=[] aggregate_each_dataset=False reports=[] column_type=<ColumnType.DIMENSION_NAMES: 'dimension_names'> table_format=StackedTableFormatModel(format_type=<ValueFormat.STACKED: 'stacked'>) output_format='parquet' sort_columns=[] dimension_filters=[] time_zone=None` | Controls the output results |
+| `result` | [QueryResultParamsModel](dataset_query_model.md#queryresultparamsmodel) | `replace_ids_with_names=False aggregations=[] aggregate_each_dataset=False reports=[] column_type=<ColumnType.DIMENSION_NAMES: 'dimension_names'> table_format=StackedTableFormatModel(format_type=<ValueFormat.STACKED: 'stacked'>) output_format='parquet' sort_columns=[] single_output_file=False dimension_filters=[] time_zone=None` | Controls the output results |
 | `dataset_id` | `str` | *(required)* | Dataset ID for query |
 | `to_dimension_references` | list[[DimensionReferenceModel](dimension_model.md#dimensionreferencemodel)] | *(required)* | Map the dataset to these dimensions. Mappings must exist in the registry. There cannot be duplicate mappings. |
 | `mapping_plan` | [DatasetMappingPlan](dataset_query_model.md#datasetmappingplan) \| None | `None` | Defines the order in which to map the dimensions of the dataset. |
@@ -38,7 +38,7 @@ Aggregate on one or more dimensions.
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `aggregation_function` | `Any` | `None` | Must be a function name in pyspark.sql.functions |
+| `aggregation_function` | `Any` | `None` | Must be an aggregation function name. |
 | `dimensions` | [DimensionNamesModel](dataset_query_model.md#dimensionnamesmodel) | *(required)* | Dimensions on which to aggregate |
 
 </div>
@@ -70,7 +70,7 @@ Defines one column in a SQL aggregation statement.
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `dimension_name` | `str` | *(required)* |  |
-| `function` | `Any` | `None` | Function or name of function in pyspark.sql.functions. |
+| `function` | `Any` | `None` | Name of a SQL function to apply to the column (e.g. 'hour'), or a FunctionReference. |
 | `alias` | `str` \| None | `None` | Name of the resulting column. |
 
 </div>
@@ -222,7 +222,8 @@ Controls post-processing and storage of CompositeDatasets
 | `column_type` | [ColumnType](enums.md#columntype) | `"dimension_names"` | Whether to make the result table columns dimension types. Default behavior is to use dimension names. In order to register a result table as a derived dataset, this must be set to dimension_types. Project queries only; not supported in dataset queries. |
 | `table_format` | [PivotedTableFormatModel](dataset_query_model.md#pivotedtableformatmodel) \| [StackedTableFormatModel](dataset_query_model.md#stackedtableformatmodel) | `format_type=<ValueFormat.STACKED: 'stacked'>` |  |
 | `output_format` | `str` | `"parquet"` | Output file format: csv or parquet |
-| `sort_columns` | list[`str`] | `[]` | Sort the results by these dimension names. |
+| `sort_columns` | list[`str`] | `[]` | Sort the results by these dimension names. This always orders the dataframe returned by the query. It orders the output file as well only on DuckDB, which writes a single file; on Spark the output is a directory of part files that reads back in split order rather than sort order. Set single_output_file to make the file itself ordered. |
+| `single_output_file` | `bool` | `False` | Write the result table as a single file. Only meaningful on Spark, whose default distributed write produces a directory of part files; DuckDB always writes a single file. Required for sort_columns to be preserved in the output file itself. Costs write parallelism and routes the whole result through one task, so it is off by default. |
 | `dimension_filters` | list[`Annotated`] | `[]` | Filters to apply to the result. Must contain columns in the result. Project queries only; not supported in dataset queries. |
 | `time_zone` | `str` \| `Literal` \| None | `None` | Convert the results to this time zone. If 'geography', use the time zone of the geography dimension. The resulting time column will be time zone-naive with time zone recorded in a separate column. Project queries only; not supported in dataset queries. |
 

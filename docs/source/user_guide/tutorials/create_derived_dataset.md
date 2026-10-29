@@ -4,6 +4,10 @@ In this tutorial you will learn how to query a dsgrid project to produce and reg
 
 You can run all commands in this tutorial except the last one on NLR's HPC Kestrel cluster (the dataset is already registered).
 
+:::{note}
+This tutorial uses the Spark backend because the source dataset is ~1 TB. For smaller derived datasets, the default DuckDB backend can be used and the Spark-cluster setup below can be skipped — run the `dsgrid` commands directly without `spark-submit`.
+:::
+
 ## Steps
 
 SSH to a login node to begin the tutorial.

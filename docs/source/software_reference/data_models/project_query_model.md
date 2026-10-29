@@ -14,7 +14,7 @@ Represents a user query on a Project.
 |------|------|---------|-------------|
 | `name` | `str` | *(required)* | Name of query |
 | `version` | `str` | `"0.1.0"` | Version of the query structure. Changes to the major or minor version invalidate cached tables. |
-| `result` | [QueryResultParamsModel](dataset_query_model.md#queryresultparamsmodel) | `replace_ids_with_names=False aggregations=[] aggregate_each_dataset=False reports=[] column_type=<ColumnType.DIMENSION_NAMES: 'dimension_names'> table_format=StackedTableFormatModel(format_type=<ValueFormat.STACKED: 'stacked'>) output_format='parquet' sort_columns=[] dimension_filters=[] time_zone=None` | Controls the output results |
+| `result` | [QueryResultParamsModel](dataset_query_model.md#queryresultparamsmodel) | `replace_ids_with_names=False aggregations=[] aggregate_each_dataset=False reports=[] column_type=<ColumnType.DIMENSION_NAMES: 'dimension_names'> table_format=StackedTableFormatModel(format_type=<ValueFormat.STACKED: 'stacked'>) output_format='parquet' sort_columns=[] single_output_file=False dimension_filters=[] time_zone=None` | Controls the output results |
 | `project` | [ProjectQueryParamsModel](project_query_model.md#projectqueryparamsmodel) | *(required)* | Defines the datasets to use and how to transform them. |
 
 </div>
@@ -91,7 +91,7 @@ Defines how to transform a project into a CompositeDataset
 | `include_dsgrid_dataset_components` | `bool` | `False` |  |
 | `version` | `str` \| None | `None` | Version of project or dataset on which the query is based. Should not be set by the user |
 | `mapping_plans` | list[[DatasetMappingPlan](dataset_query_model.md#datasetmappingplan)] | `[]` | Defines the order in which to map the dimensions of datasets. |
-| `spark_conf_per_dataset` | list[[SparkConfByDataset](project_query_model.md#sparkconfbydataset)] | `[]` | Apply these Spark configuration settings while a dataset is being processed. |
+| `runtime_conf_per_dataset` | list[[RuntimeConfByDataset](project_query_model.md#runtimeconfbydataset)] | `[]` | Apply these runtime configuration settings while a dataset is being processed. |
 
 </div>
 
@@ -110,11 +110,11 @@ Defines how to transform a project into a CompositeDataset
 
 ---
 
-## SparkConfByDataset
+## RuntimeConfByDataset
 
-*dsgrid.query.models.SparkConfByDataset*
+*dsgrid.query.models.RuntimeConfByDataset*
 
-Defines a custom Spark configuration to use while running a query on a dataset.
+Defines a custom runtime configuration to use while running a query on a dataset.
 
 ### Fields
 

@@ -1,13 +1,16 @@
 """Implementation for AWS S3 bucket filesystem"""
 
 import logging
+import importlib
 import re
-
-import boto3
-from s3path import S3Path, register_configuration_parameter
+from typing import Any, cast
 
 from .cloud_filesystem import CloudFilesystemInterface
 
+_boto3 = cast(Any, importlib.import_module("boto3"))
+_s3path = cast(Any, importlib.import_module("s3path"))
+S3Path = _s3path.S3Path
+register_configuration_parameter = _s3path.register_configuration_parameter
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,7 @@ class S3Filesystem(CloudFilesystemInterface):
         self._relpath = match.groupdict()["prefix"]
         self._uri = str(path)
         self._profile = profile
-        self._session = boto3.session.Session(profile_name=self._profile)
+        self._session = _boto3.session.Session(profile_name=self._profile)
         self._client = self._session.client("s3")
 
         register_configuration_parameter(S3Path("/"), resource=self._session.resource("s3"))
@@ -100,7 +103,7 @@ class S3Filesystem(CloudFilesystemInterface):
         contents = list(self.path(directory).rglob(pattern))
         if exclude_hidden:
             # NOTE: this does not currently ignore hidden directories in the path.
-            contents = [str(x) for x in contents if not x.name.startswith(".")]
+            contents = [x for x in contents if not x.name.startswith(".")]
         if files_only:
             return [str(x) for x in contents if x.is_file()]
         if directories_only:

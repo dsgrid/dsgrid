@@ -75,7 +75,8 @@ def versioning(registry_type, id_handle, update):
         old_registry_file = f"{registry_path}/{old_project_version}.json5"
 
         # depricate old project registry
-        t = json5.load(old_registry_file)
+        with open(old_registry_file) as f:
+            t = json5.load(f)
         t["status"] = "Deprecated"
         with open(old_registry_file.format(**locals()), "w") as f:
             json5.dump(t, f)

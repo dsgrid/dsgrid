@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Collection, Iterable
 
 from chronify.utils.path_utils import check_overwrite
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def generate_project_config(
     project_id: str,
     dataset_ids: Iterable[str],
-    metric_types: Iterable[str],
+    metric_types: Collection[str],
     name: str | None = None,
     description: str | None = None,
     time_type: TimeDimensionType = TimeDimensionType.DATETIME,

@@ -1,3 +1,4 @@
+import ibis
 import abc
 import logging
 from typing import Iterable
@@ -12,9 +13,15 @@ from dsgrid.query.models import (
     DatasetDimensionsMetadataModel,
     DimensionMetadataModel,
 )
-from dsgrid.spark.types import DataFrame
-from dsgrid.utils.dataset import map_stacked_dimension, remove_invalid_null_timestamps
-from dsgrid.utils.spark import persist_intermediate_query
+
+from dsgrid.utils.dataset import (
+    handle_column_spaces,
+    map_stacked_dimension,
+    remove_invalid_null_timestamps,
+)
+from dsgrid.ibis.operations import drop_columns, join, rename_columns
+from dsgrid.ibis.io import persist_and_reload_table
+from dsgrid.ibis.table_utils import count_rows
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 
@@ -30,17 +37,17 @@ class TableFormatHandlerBase(abc.ABC):
 
     def add_columns(
         self,
-        df: DataFrame,
+        df: ibis.Table,
         column_models: list[ColumnModel],
         context: QueryContext,
         value_columns: Iterable[str],
-    ) -> DataFrame:
+    ) -> ibis.Table:
         """Add columns to the dataframe. For example, suppose the geography dimension is at
         county resolution and the user wants to add a column for state.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.Table
         column_models : list
         context : QueryContext
         value_columns: Iterable[str]
@@ -106,27 +113,26 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
-            for col in value_columns:
-                df = df.withColumn(col, df[col] * df["fraction"])
-            df = df.drop("fraction")
+            multiplied = {c: df[c] * df["fraction"] for c in df.columns if c in value_columns}
+            df = drop_columns(df.mutate(**multiplied), "fraction")
 
         return df
 
     @abc.abstractmethod
     def process_aggregations(
-        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
-    ) -> DataFrame:
+        self, df: ibis.Table, aggregations: list[AggregationModel], context: QueryContext
+    ) -> ibis.Table:
         """Aggregate the dimensional data as specified by aggregations.
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.Table
         aggregations : AggregationModel
         context : QueryContext
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
 
         """
 
@@ -141,8 +147,8 @@ class TableFormatHandlerBase(abc.ABC):
         return self._dataset_id
 
     def convert_columns_to_query_names(
-        self, df: DataFrame, dataset_id: str, context: QueryContext
-    ) -> DataFrame:
+        self, df: ibis.Table, dataset_id: str, context: QueryContext
+    ) -> ibis.Table:
         """Convert columns from dimension types to dimension query names."""
         columns = set(df.columns)
         for dim_type in DimensionType:
@@ -155,12 +161,12 @@ class TableFormatHandlerBase(abc.ABC):
                 assert len(new_cols) == 1, f"{dim_type=} {new_cols=}"
                 new_col = next(iter(new_cols))
                 if existing_col != new_col:
-                    df = df.withColumnRenamed(existing_col, new_col)
+                    df = rename_columns(df, {existing_col: new_col})
                     logger.debug("Converted column from %s to %s", existing_col, new_col)
 
         return df
 
-    def replace_ids_with_names(self, df: DataFrame) -> DataFrame:
+    def replace_ids_with_names(self, df: ibis.Table) -> ibis.Table:
         """Replace dimension record IDs with names."""
         assert not {"id", "name"}.intersection(df.columns), df.columns
         orig = df
@@ -170,12 +176,11 @@ class TableFormatHandlerBase(abc.ABC):
                 # Time doesn't have records.
                 dim_config = self._project_config.get_dimension_with_records(name)
                 records = dim_config.get_records_dataframe().select("id", "name")
-                df = (
-                    df.join(records, on=df[name] == records["id"])
-                    .drop("id", name)
-                    .withColumnRenamed("name", name)
-                )
-        assert df.count() == orig.count(), f"counts changed {df.count()} {orig.count()}"
+                df = drop_columns(join(df, records, name, "id"), "id", name)
+                df = rename_columns(df, {"name": name})
+        new_count = count_rows(df)
+        orig_count = count_rows(orig)
+        assert new_count == orig_count, f"counts changed {new_count} {orig_count}"
         return df
 
     @staticmethod
@@ -210,7 +215,7 @@ class TableFormatHandlerBase(abc.ABC):
                     column_names = [column.get_column_name()]
                     expr = self._make_group_by_column_expr(column)
                     group_by_cols.append(expr)
-                    if not isinstance(expr, str) or expr != column.dimension_name:
+                    if column.function is not None:
                         # In this case we are replacing any existing query name with an expression
                         # or alias, and so the old name must be removed.
                         final_metadata.remove_metadata(dim_type, column.dimension_name)
@@ -228,15 +233,15 @@ class TableFormatHandlerBase(abc.ABC):
     @staticmethod
     def _make_group_by_column_expr(column):
         if column.function is None:
-            expr = column.dimension_name
+            expr = handle_column_spaces(column.dimension_name)
         else:
-            expr = column.function(column.dimension_name)
+            expr = f"{column.function.name}({handle_column_spaces(column.dimension_name)})"
             if column.alias is not None:
-                expr = expr.alias(column.alias)
+                expr = f"{expr} AS {handle_column_spaces(column.alias)}"
         return expr
 
     @track_timing(timer_stats_collector)
-    def _remove_invalid_null_timestamps(self, df: DataFrame, orig_id, context: QueryContext):
+    def _remove_invalid_null_timestamps(self, df: ibis.Table, orig_id, context: QueryContext):
         if id(df) != orig_id:
             # The table could have NULL timestamps that designate expected-missing data.
             # Those rows could be obsolete after aggregating stacked dimensions.
@@ -250,7 +255,7 @@ class TableFormatHandlerBase(abc.ABC):
             )
             if time_columns:
                 # Persist the query up to this point to avoid multiple evaluations.
-                df = persist_intermediate_query(df, context.scratch_dir_context)
+                df = persist_and_reload_table(df, context.scratch_dir_context)
                 stacked_columns = set(df.columns) - value_columns.union(time_columns)
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
                 logger.debug("Removed any rows with invalid null timestamps")

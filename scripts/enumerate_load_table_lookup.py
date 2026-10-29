@@ -5,10 +5,11 @@ import shutil
 import logging
 
 from dsgrid.loggers import setup_logging
-from dsgrid.spark.functions import cross_join, read_parquet
-from dsgrid.spark.types import use_duckdb
+from dsgrid.ibis.io import read_parquet
+from dsgrid.ibis.operations import cross_join
+from dsgrid.ibis.partition import TablePartition
+from dsgrid.ibis.types import use_duckdb
 from dsgrid.utils.timing import timed_info
-from dsgrid.utils.spark_partition import SparkPartition
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class EnumerateTable:
     def __init__(self):
-        self.partition = SparkPartition()
+        self.partition = TablePartition()
 
     def copydirectory(self, src, dst, override=False):
         """

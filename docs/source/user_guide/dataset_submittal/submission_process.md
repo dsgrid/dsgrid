@@ -147,10 +147,13 @@ Each entry specifies:
 - **`mapping_type`** — The mapping operation. See
   [Dimension Mapping Types](../dataset_mapping/dimension_mapping_types).
 - **`project_base_dimension_name`** — Required only when the project has
-  multiple base dimensions of the same type.
+  multiple base dimensions of the same type (e.g., several metric base
+  dimensions). Set it to the `name` of the target project base dimension.
 
 dsgrid identifies the source dimension (from the dataset) and target dimension
-(from the project) automatically based on the `dimension_type`.
+(from the project) automatically based on the `dimension_type` and, if
+provided, `project_base_dimension_name`. The `-m` file does not accept explicit
+`from_dimension` / `to_dimension` references; to specify those, use Option 2.
 
 ### Option 2: `-r` with pre-registered mapping references
 
@@ -173,6 +176,36 @@ schema:
   ],
 }
 ```
+
+To register a mapping with explicit source and target dimensions, write a
+[DimensionMappingsConfigModel](../../software_reference/data_models/dimension_mapping_model.md#dimensionmappingsconfigmodel)
+file and register it with `dsgrid registry dimension-mappings register`:
+
+```json5
+{
+  mappings: [
+    {
+      description: "County to project county mapping",
+      file: "dimension_mappings/county_to_county.csv",
+      mapping_type: "many_to_one_aggregation",
+      from_dimension: {
+        type: "geography",
+        dimension_id: "<dataset-geography-id>",
+        version: "1.0.0",
+      },
+      to_dimension: {
+        type: "geography",
+        dimension_id: "<project-geography-id>",
+        version: "1.0.0",
+      },
+    },
+  ],
+}
+```
+
+Use `dsgrid registry dimensions list` to find the `dimension_id` values for
+your dataset and project dimensions, and `dsgrid registry dimension-mappings list`
+to find the new `mapping_id` for the references file.
 
 ```{note}
 dsgrid accepts `-m` and `-r` together and combines the resulting mapping
@@ -197,10 +230,13 @@ base-to-supplemental mapping registered for that dimension type.
 Every dimension type listed with `-a` must use one of the project's
 supplemental dimensions in the dataset and must not already have a mapping
 provided through `-m` or `-r`; otherwise submission fails. For each such
-dimension, dsgrid uses a registered supplemental → base mapping if the project
-has one. If not, it reverses the project's base → supplemental mapping and
-registers the result. This is only possible when that mapping's `from_fraction`
-values are empty or all 1.0.
+dimension, dsgrid looks in the project's dimension mappings for one from that
+supplemental dimension to the base dimension and uses it if found. If not, it
+takes the project's base → supplemental mapping, swaps `from_id` and `to_id`,
+drops `from_fraction`, and registers the result as a
+`many_to_many_explicit_multipliers` mapping, so every reversed record has a
+multiplier of 1.0. This reversal is only correct when the original mapping's
+`from_fraction` values are empty or all 1.0.
 
 ```bash
 dsgrid registry projects submit-dataset \
@@ -228,8 +264,8 @@ config repository). Find your dataset in the `datasets` list and examine its
 `required_dimensions` field. You can also use the CLI:
 
 ```bash
-# Dump the project config to inspect it locally (the directory must exist)
-mkdir -p output_dir
+# Dump the project config to inspect it locally
+mkdir -p output_dir # output_dir must exist
 dsgrid registry projects dump <project-id> -d output_dir/
 ```
 
@@ -293,9 +329,14 @@ Submission proceeds through these stages:
    dsgrid confirms each referenced mapping exists in the registry.
 4. **Auto-generate reverse mappings** — If `-a` is specified, dsgrid creates
    reverse supplemental mappings as needed.
-5. **Time zone check** — If converting the dataset's time to the project's
-   time requires time zones, dsgrid confirms that the project's base geography
-   dimension records include a valid `time_zone` column.
+5. **Time zone check** — If the dataset's or the project's time dimension
+   needs per-geography time zones (a datetime or index time dimension with
+   `aligned_in_std_clock_time`, or any representative-period time dimension),
+   dsgrid confirms that the project's base geography dimension records include
+   a `time_zone` column with valid IANA time zones. During a project query,
+   dsgrid reads time zones from those records when the data does not already
+   carry a `time_zone` column. See
+   [Time Zone Column Sourcing](../dataset_registration/data_file_formats.md#time-zone-column-sourcing).
 6. **Identify base dimensions** — dsgrid determines which project base
    dimension each dataset dimension maps to. See
    [Base Dimension Identification](submission_checks.md#base-dimension-identification).
@@ -323,9 +364,11 @@ combinations. The typical iteration cycle is:
    missing values, and stops before the full combination check.
 3. **If the combination check fails**, examine the Parquet file that dsgrid
    writes to the current directory
-   (`{dataset_id}__missing_dimension_record_combinations.parquet`). If the
-   `dsgrid.rust_ext` extension is installed, dsgrid also logs the minimal
-   patterns that characterize the missing combinations.
+   (`{dataset_id}__missing_dimension_record_combinations.parquet`). dsgrid
+   also writes a summary to the console and log file. If dsgrid was built with
+   its Rust extension, the summary lists up to 10 minimal patterns that
+   characterize the missing combinations. Otherwise, it lists each column whose distinct values differ
+   between the dataset and the missing combinations.
 4. **Fix the mapping CSV** or update the dataset, then re-run.
 
 See the [Troubleshooting](submission_checks.md#troubleshooting) section of

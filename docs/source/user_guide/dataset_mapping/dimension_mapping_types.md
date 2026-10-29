@@ -91,7 +91,7 @@ dsgrid does not currently check that a required `from_fraction` column is
 present. Missing values default to 1.0, which usually causes the fraction-sum
 check to fail for disaggregation and assignment types. For the
 explicit-multiplier types, which have no sum check, a missing column silently
-applies a multiplier of 1.0. Always provide the column for these types.
+applies a multiplier of 1.0.
 ```
 
 ## Standard Mappings

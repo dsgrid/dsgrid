@@ -508,3 +508,221 @@ need to be converted to get clock time load profiles.
 | `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Daylight saving adjustment method applied to time data |
 
 </div>
+
+
+---
+
+## SubsetDimensionGroupListModel
+
+*dsgrid.config.project_config.SubsetDimensionGroupListModel*
+
+Defines a list of subset dimensions.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `subset_dimensions` | list[[SubsetDimensionGroupModel](project_model.md#subsetdimensiongroupmodel)] | *(required)* | List of subset dimensions to be registered |
+
+</div>
+
+
+---
+
+## SupplementalDimensionsListModel
+
+*dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel*
+
+Defines a list of supplemental dimensions.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `supplemental_dimensions` | list[[SupplementalDimensionModel](project_model.md#supplementaldimensionmodel)] | *(required)* | List of supplemental dimensions and mappings to be registered |
+
+</div>
+
+
+---
+
+## InputDatasetListModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetListModel*
+
+Base data model for all dsgrid data models
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `datasets` | list[[InputDatasetModel](project_model.md#inputdatasetmodel)] | *(required)* | List of input datasets for the project. |
+
+</div>
+
+
+---
+
+## InputDatasetDimensionRequirementsListModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel*
+
+Defines a list of dataset dimension requirements.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_dimension_requirements` | list[[InputDatasetDimensionRequirementsModel](project_model.md#inputdatasetdimensionrequirementsmodel)] | *(required)* | List of dataset dimension requirements |
+
+</div>
+
+
+---
+
+## InputDatasetDimensionRequirementsModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsModel*
+
+Defines dataset dimension requirements.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_id` | `str` | *(required)* |  |
+| `required_dimensions` | [RequiredDimensionsModel](project_model.md#requireddimensionsmodel) | *(required)* | Defines required record IDs that must exist for each dimension. |
+
+</div>
+
+
+---
+
+## RegistrationModel
+
+*dsgrid.config.registration_models.RegistrationModel*
+
+Defines a list of projects and datasets to be registered.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `projects` | list[[ProjectRegistrationModel](project_model.md#projectregistrationmodel)] | *(required)* | List of projects to register. |
+| `datasets` | list[[DatasetRegistrationModel](project_model.md#datasetregistrationmodel)] | *(required)* | List of datasets to register. |
+| `dataset_submissions` | list[[DatasetSubmissionModel](project_model.md#datasetsubmissionmodel)] | *(required)* | List of datasets to be submitted to projects. |
+
+</div>
+
+
+---
+
+## DatasetRegistrationModel
+
+*dsgrid.config.registration_models.DatasetRegistrationModel*
+
+Defines a dataset to be registered.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_id` | `str` | *(required)* | Dataset ID |
+| `config_file` | `Path` | *(required)* | Path to dataset.json5 |
+| `replace_dimension_names_with_ids` | `bool` | `False` | Replace the dimension entries with IDs of dimensions in the database with matching names. Typically only useful for tests. |
+| `log_message` | `str` \| None | `None` | Log message to use when registering the dataset. Defaults to an auto-generated message. |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `fix_log_message` | `fix_log_message` | No description |
+| `fix_paths` | `*(model)*` | No description |
+
+</div>
+
+
+---
+
+## DatasetSubmissionModel
+
+*dsgrid.config.registration_models.DatasetSubmissionModel*
+
+Defines how a dataset should be submitted to a project.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_id` | `str` | *(required)* |  |
+| `project_id` | `str` | *(required)* |  |
+| `dimension_mapping_file` | `Path` \| None | `None` | Path to file containing mappings of dataset-to-project dimensions |
+| `dimension_mapping_references_file` | `Path` \| None | `None` | Path to file containing references to mappings of dataset-to-project dimensions |
+| `replace_dimension_mapping_names_with_ids` | `bool` | `False` | Replace the dimension mapping entries with IDs of dimension mappings in the database with matching names. Typically only useful for tests. |
+| `autogen_reverse_supplemental_mappings` | `set` | `set()` | Dimensions on which to attempt create reverse mappings from supplemental dimensions. |
+| `log_message` | `str` \| None | `None` | Log message to use when submitting the dataset. Defaults to an auto-generated message. |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `fix_log_message` | `fix_log_message` | No description |
+| `fix_autogen_reverse_supplemental_mappings` | `*(model)*` | No description |
+
+</div>
+
+
+---
+
+## ProjectRegistrationModel
+
+*dsgrid.config.registration_models.ProjectRegistrationModel*
+
+Defines a project to be registered.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `project_id` | `str` | *(required)* | Project ID |
+| `config_file` | `Path` | *(required)* | Path to project.json5 |
+| `log_message` | `str` \| None | `None` | Log message to use when registering the project. Defaults to an auto-generated message. |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `fix_log_message` | `fix_log_message` | No description |
+| `fix_paths` | `*(model)*` | No description |
+
+</div>

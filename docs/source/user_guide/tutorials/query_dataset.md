@@ -266,6 +266,18 @@ duckdb.sql(
 ).show()
 ```
 
+For outputs too large for a single node, use PySpark:
+
+```python
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+df = spark.read.parquet("query_output/my-state-aggregation/table.parquet")
+df.show()
+df.select("geography").distinct().show()
+df.select("subsector").distinct().show()
+```
+
 If you ran the query with the Spark backend, `table.parquet` is a directory of
 part files rather than a single file (unless you set `single_output_file: true`).
 pandas reads the directory as-is; with DuckDB, use

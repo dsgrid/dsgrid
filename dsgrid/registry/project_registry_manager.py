@@ -1196,7 +1196,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 ), f"from={from_dim.model.dimension_id} to={to_dim.model.dimension_id}"
                 records = models_to_dataframe(p_mapping.model.records)
                 fraction_vals = get_unique_values(records, "from_fraction")
-                if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
+                if len(fraction_vals) != 1 or next(iter(fraction_vals)) != 1.0:
                     msg = (
                         f"Cannot auto-generate a dataset-to-project mapping from from a project "
                         "supplemental dimension unless the from_fraction column is empty or only "

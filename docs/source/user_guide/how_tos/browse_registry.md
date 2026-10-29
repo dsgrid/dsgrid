@@ -69,6 +69,9 @@ dsgrid registry datasets list -f "ID contains com" -f "Submitter == jdoe"
   - Type [From, To], ID, From ID, To ID, Version, Date, Submitter, Description
 ```
 
+The `Description` column shows the log message recorded at registration (the
+`-l` argument), not the `description` field of the config.
+
 
 ## Find a Project's Dimensions
 
@@ -101,9 +104,9 @@ view its records:
 dsgrid registry dimensions show <dimension-id>
 ```
 
-This prints the dimension's metadata (type, name, description) followed by its
-full records table. The default version is `1.0.0`; specify a different version
-with `-v`:
+This prints the dimension's metadata (ID, type, name, description) followed by
+its records table (up to 4000 rows; time dimensions have no records table). The
+default version is `1.0.0`; specify a different version with `-v`:
 
 ```bash
 dsgrid registry dimensions show <dimension-id> -v 2.0.0
@@ -124,16 +127,20 @@ To see the records of a registered dimension mapping:
 dsgrid registry dimension-mappings show <mapping-id>
 ```
 
-This prints the mapping's from/to dimension metadata followed by the full
-records table (`from_id`, `to_id`, and `from_fraction` if applicable).
+This prints the mapping's from/to dimension metadata followed by its records
+table (`from_id`, `to_id`, and `from_fraction` if applicable; up to 4000 rows).
 
 
 ## Export a Config for Local Inspection
 
 The `dump` command exports a config file (and associated records for dimensions
-and mappings) to a local directory:
+and mappings) to a local directory. The `-d` directory defaults to the current
+directory and must already exist, so create it first (the examples below assume
+you have):
 
 ```bash
+mkdir -p output_dir
+
 # Export a project config (includes required_dimensions for each dataset)
 dsgrid registry projects dump <project-id> -d output_dir/
 

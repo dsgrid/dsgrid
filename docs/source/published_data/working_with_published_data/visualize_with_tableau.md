@@ -24,7 +24,7 @@ Copy the Parquet files from your query output to your local computer:
 
 ```bash
 # From HPC to local
-scp -r username@kestrel.hpc.nrel.gov:/path/to/query_output ./local_data
+scp -r username@kestrel.hpc.nlr.gov:/path/to/query_output ./local_data
 ```
 
 #### 2. Install DuckDB

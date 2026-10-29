@@ -102,17 +102,18 @@ attempt.
 ## Providing Dimension Mappings
 
 Dimension mappings tell dsgrid how to transform dataset dimensions into
-project base dimensions. There are three ways to provide mappings at
-submission time, controlled by the `-m` and `-r` options.
+project base dimensions. There are two ways to provide mappings at
+submission time, controlled by the `-m` and `-r` options. Both options work the
+same way for `submit-dataset` and `register-and-submit-dataset`.
 
-### Option 1: `-m` with new mappings (recommended for `register-and-submit-dataset`)
+### Option 1: `-m` with new mappings
 
-When using `register-and-submit-dataset`, the `-m` / `--dimension-mapping-file`
-option accepts a JSON5 file that references CSV mapping record files. dsgrid
-registers these mappings automatically during submission.
+The `-m` / `--dimension-mapping-file` option accepts a JSON5 file that
+references CSV mapping record files. dsgrid registers these mappings
+automatically during submission.
 
 The file must match the
-[DatasetBaseToProjectMappingTableListModel](../../software_reference/data_models/dimension_mapping_model)
+[DatasetBaseToProjectMappingTableListModel](../../software_reference/data_models/dimension_mapping_model.md#datasetbasetoprojectmappingtablelistmodel)
 schema:
 
 ```json5
@@ -151,46 +152,14 @@ Each entry specifies:
 dsgrid identifies the source dimension (from the dataset) and target dimension
 (from the project) automatically based on the `dimension_type`.
 
-### Option 2: `-m` with full mapping definitions (for `submit-dataset`)
-
-When using `submit-dataset`, the `-m` option accepts a JSON5 file with fully
-specified mappings that include explicit `from_dimension` and `to_dimension`
-references. dsgrid registers these mappings during submission.
-
-The file must match the
-[DimensionMappingsConfigModel](../../software_reference/data_models/dimension_mapping_model)
-schema:
-
-```json5
-{
-  mappings: [
-    {
-      description: "County to project county mapping",
-      file: "dimension_mappings/county_to_county.csv",
-      mapping_type: "many_to_one_aggregation",
-      from_dimension: {
-        type: "geography",
-        dimension_id: "<dataset-geography-uuid>",
-        version: "1.0.0",
-      },
-      to_dimension: {
-        type: "geography",
-        dimension_id: "<project-geography-uuid>",
-        version: "1.0.0",
-      },
-    },
-  ],
-}
-```
-
-Use `dsgrid registry dimensions list` to find the `dimension_id` values for
-your dataset and project dimensions.
-
-### Option 3: `-r` with pre-registered mapping references
+### Option 2: `-r` with pre-registered mapping references
 
 If the mappings have already been registered (e.g., via
 `dsgrid registry dimension-mappings register`), use `-r` /
-`--dimension-mapping-references-file` to reference them by ID:
+`--dimension-mapping-references-file` to reference them by ID. The file must
+match the
+[DimensionMappingReferenceListModel](../../software_reference/data_models/dimension_mapping_model.md#dimensionmappingreferencelistmodel)
+schema:
 
 ```json5
 {
@@ -206,7 +175,8 @@ If the mappings have already been registered (e.g., via
 ```
 
 ```{note}
-The `-m` and `-r` options are mutually exclusive. Use one or the other.
+dsgrid accepts `-m` and `-r` together and combines the resulting mapping
+references. Avoid supplying more than one mapping for the same dimension type.
 ```
 
 
@@ -224,11 +194,13 @@ case: when a dataset's dimension is actually one of the project's
 *supplemental* dimensions (not a base dimension) and the project already has a
 base-to-supplemental mapping registered for that dimension type.
 
-For each dimension type listed with `-a`, dsgrid checks whether the dataset's
-dimension matches a project supplemental dimension. If so and no explicit
-mapping is provided, dsgrid automatically creates and registers a reverse
-mapping (supplemental → base) so the dataset can be mapped to the project's
-base dimension.
+Every dimension type listed with `-a` must use one of the project's
+supplemental dimensions in the dataset and must not already have a mapping
+provided through `-m` or `-r`; otherwise submission fails. For each such
+dimension, dsgrid uses a registered supplemental → base mapping if the project
+has one. If not, it reverses the project's base → supplemental mapping and
+registers the result. This is only possible when that mapping's `from_fraction`
+values are empty or all 1.0.
 
 ```bash
 dsgrid registry projects submit-dataset \
@@ -256,7 +228,8 @@ config repository). Find your dataset in the `datasets` list and examine its
 `required_dimensions` field. You can also use the CLI:
 
 ```bash
-# Dump the project config to inspect it locally
+# Dump the project config to inspect it locally (the directory must exist)
+mkdir -p output_dir
 dsgrid registry projects dump <project-id> -d output_dir/
 ```
 
@@ -320,13 +293,16 @@ Submission proceeds through these stages:
    dsgrid confirms each referenced mapping exists in the registry.
 4. **Auto-generate reverse mappings** — If `-a` is specified, dsgrid creates
    reverse supplemental mappings as needed.
-5. **Identify base dimensions** — dsgrid determines which project base
+5. **Time zone check** — If converting the dataset's time to the project's
+   time requires time zones, dsgrid confirms that the project's base geography
+   dimension records include a valid `time_zone` column.
+6. **Identify base dimensions** — dsgrid determines which project base
    dimension each dataset dimension maps to. See
    [Base Dimension Identification](submission_checks.md#base-dimension-identification).
-6. **Completeness check** — dsgrid verifies the mapped dataset covers all
+7. **Completeness check** — dsgrid verifies the mapped dataset covers all
    required dimension combinations. See
    [Dataset-to-Project Mapping Completeness](submission_checks.md#dataset-to-project-mapping-completeness).
-7. **Update project config** — On success, dsgrid records the mapping
+8. **Update project config** — On success, dsgrid records the mapping
    references and base dimension names in the project config, sets the
    dataset's status to `REGISTERED`, and (if all datasets are now submitted)
    updates the project status to `COMPLETE`.
@@ -341,11 +317,15 @@ Submission failures are usually caused by mapping errors or missing dimension
 combinations. The typical iteration cycle is:
 
 1. **Run the submit command.**
-2. **Read the error output.** Start with per-column errors (e.g., "missing
-   values for column=county"), which appear first and are easiest to diagnose.
-3. **If the cross-join check fails**, examine the generated Parquet file
-   (`{dataset_id}__missing_dimension_record_combinations.parquet`) and the
-   logged minimal patterns to identify which combinations are absent.
+2. **Read the error output.** dsgrid first compares the distinct values in each
+   column. If any are missing, it logs "The mapped dataset has different
+   distinct values than the project for column=..." with up to 100 of the
+   missing values, and stops before the full combination check.
+3. **If the combination check fails**, examine the Parquet file that dsgrid
+   writes to the current directory
+   (`{dataset_id}__missing_dimension_record_combinations.parquet`). If the
+   `dsgrid.rust_ext` extension is installed, dsgrid also logs the minimal
+   patterns that characterize the missing combinations.
 4. **Fix the mapping CSV** or update the dataset, then re-run.
 
 See the [Troubleshooting](submission_checks.md#troubleshooting) section of

@@ -215,7 +215,7 @@ def register_dimensions(
 ):
     """Register new dimensions with the dsgrid repository. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/dimension.html#dsgrid.config.dimensions.DimensionsConfigModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_model.html
     """
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
@@ -443,7 +443,7 @@ def register_dimension_mappings(
 ):
     """Register new dimension mappings with the dsgrid repository. The contents of the JSON/JSON5
     file must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html
     """
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
@@ -615,7 +615,7 @@ def update_dimension_mapping(
 ):
     """Update an existing dimension mapping registry. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.mapping_tables.MappingTableModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html
     """
     manager = registry_manager.dimension_mapping_manager
     submitter = getpass.getuser()
@@ -694,7 +694,7 @@ def register_project(
 ):
     """Register a new project with the dsgrid repository. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.ProjectConfigModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html#projectconfigmodel
     """
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
@@ -739,7 +739,7 @@ $ dsgrid registry projects submit-dataset \\ \n
     type=click.Path(exists=True),
     show_default=True,
     help="Dimension mapping file. Must match the data model defined by "
-    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingsconfig",
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#datasetbasetoprojectmappingtablelistmodel",
     callback=path_callback,
 )
 @click.option(
@@ -747,7 +747,7 @@ $ dsgrid registry projects submit-dataset \\ \n
     "--dimension-mapping-references-file",
     type=click.Path(exists=True),
     show_default=True,
-    help="Dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    help="Dimension mapping references file. Can be combined with dimension_mapping_file. "
     "Use it when the mappings are already registered. Must match the data model defined by "
     "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingreferencelistmodel",
     callback=path_callback,
@@ -824,7 +824,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "--dimension-mapping-file",
     type=click.Path(exists=True),
     help="Dimension mapping file. Must match the data model defined by "
-    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingsconfig",
+    "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#datasetbasetoprojectmappingtablelistmodel",
     callback=path_callback,
 )
 @click.option(
@@ -832,7 +832,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "--dimension-mapping-references-file",
     type=click.Path(exists=True),
     show_default=True,
-    help="Dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    help="Dimension mapping references file. Can be combined with dimension_mapping_file. "
     "Use it when the mappings are already registered. Must match the data model defined by "
     "https://dsgrid.github.io/dsgrid/software_reference/data_models/dimension_mapping_model.html#dimensionmappingreferencelistmodel",
     callback=path_callback,
@@ -1069,7 +1069,7 @@ def register_subset_dimensions(
     """Register new subset dimensions with a project. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
 
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.SubsetDimensionGroupListModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html
     """
 
     submitter = getpass.getuser()
@@ -1120,7 +1120,7 @@ def register_supplemental_dimensions(
 ):
     """Register new supplemental dimensions with a project. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html
     """
 
     submitter = getpass.getuser()
@@ -1171,7 +1171,7 @@ def add_dataset_requirements(
 ):
     """Add requirements for one or more datasets to a project. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html
     """
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
@@ -1222,7 +1222,7 @@ def replace_dataset_dimension_requirements(
     """Replace dimension requirements for one or more datasets in a project. The contents of the
     JSON/JSON5 file must match the data model defined by this documentation:
 
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html
     """
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
@@ -1485,7 +1485,7 @@ def register_dataset(
 ):
     """Register a new dataset with the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/dataset_model.html#datasetconfigmodel
 
     The config file must include a data_layout with data_file and optional
     lookup_data_file paths pointing to the dataset files.
@@ -1593,7 +1593,7 @@ def update_dataset(
 ):
     """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
-    https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/dataset_model.html#datasetconfigmodel
 
     If the config file includes a UserDatasetSchema with file paths, the data will be
     re-read from those paths. Otherwise, the existing data in the registry is used.
@@ -1864,7 +1864,7 @@ def bulk_register_cli(
 
     The JSON/JSON5 filename must match the data model defined by this documentation:
 
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/project_model.html
     """
     res = handle_dsgrid_exception(
         ctx,

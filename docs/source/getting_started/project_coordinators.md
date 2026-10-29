@@ -6,7 +6,7 @@ Project coordinators define the structure of a dsgrid project: its base dimensio
 
 - [Install dsgrid](installation) on your system. DuckDB is the default backend and is sufficient for many coordination tasks.
 - For large datasets that exceed a single node's resources, install the Spark extras (`pip install "dsgrid-toolkit[spark]"`) and see [How to Start a Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel).
-- Access to NREL HPC is recommended when working with production-scale datasets.
+- Access to NLR HPC is recommended when working with production-scale datasets.
 
 ## Workflow Overview
 

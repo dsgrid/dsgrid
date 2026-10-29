@@ -43,6 +43,10 @@ MODELS = [
         "source/software_reference/data_models/dimension_mapping_model.md",
         [
             "dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel",
+            # CLI ``submit-dataset`` / ``register-and-submit-dataset`` inputs
+            # (-m and -r, respectively).
+            "dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel",
+            "dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
         ],
     ),
     (

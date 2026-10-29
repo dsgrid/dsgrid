@@ -86,6 +86,14 @@ that dsgrid assigns automatically based on the `mapping_type`.
   - Interpolation with explicit weights
 ```
 
+```{note}
+dsgrid does not currently check that a required `from_fraction` column is
+present. Missing values default to 1.0, which usually causes the fraction-sum
+check to fail for disaggregation and assignment types. For the
+explicit-multiplier types, which have no sum check, a missing column silently
+applies a multiplier of 1.0. Always provide the column for these types.
+```
+
 ## Standard Mappings
 
 These types have an optional `from_fraction` column (defaults to 1.0) and
@@ -155,7 +163,7 @@ national_total,state_C
 
 ## Disaggregation and Complex Fraction Mappings
 
-These types **require** a `from_fraction` column and validate that
+These types **require** a `from_fraction` column (see the note above) and validate that
 `sum(from_fraction) = 1` when grouped by `from_id`. Values are multiplied by
 `from_fraction` during the mapping.
 
@@ -189,7 +197,7 @@ disaggregation — splitting sources across targets.
 
 ## Assignment Mappings
 
-These types **require** a `from_fraction` column and validate that
+These types **require** a `from_fraction` column (see the note above) and validate that
 `sum(from_fraction) = 1` when grouped by **`to_id`** (not `from_id`). This
 ensures each target receives a complete allocation.
 

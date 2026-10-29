@@ -69,3 +69,69 @@ dimension mapping reference configuration (dimension_mapping_references.json5) t
 | `handle_legacy_fields` | `*(model)*` | No description |
 
 </div>
+
+
+---
+
+## DatasetBaseToProjectMappingTableListModel
+
+*dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel*
+
+Represents the config file passed to register-and-submit-dataset command.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `mappings` | list[[DatasetBaseToProjectMappingTableModel](dimension_mapping_model.md#datasetbasetoprojectmappingtablemodel)] | *(required)* |  |
+
+</div>
+
+
+---
+
+## DatasetBaseToProjectMappingTableModel
+
+*dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel*
+
+Attributes for a dimension mapping table to map soon-to-be-registered dataset base
+dimensions to a project's dimensions. This will be converted to a MappingTableModel as soon as
+the dimensions are registered.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `mapping_type` | [DimensionMappingType](enums.md#dimensionmappingtype) | `DimensionMappingType.MANY_TO_ONE_AGGREGATION` | Type/purpose of the dimension mapping |
+| `archetype` | [DimensionMappingArchetype](enums.md#dimensionmappingarchetype) \| None | `None` | Dimension mapping archetype, determined based on mapping_type |
+| `description` | `str` \| None | `None` | Description of dimension mapping |
+| `from_fraction_tolerance` | `float` | `1e-06` | Tolerance value to apply to the from_fraction column |
+| `to_fraction_tolerance` | `float` | `1e-06` | Tolerance value to apply to the to_fraction column |
+| `project_base_dimension_name` | `str` \| None | `None` | Name of the base dimension for which the mapping is being registered. This is required in cases where the project has multiple base dimensions of the same type. If None, there must only be one base dimension of this type in the project. |
+| `dimension_type` | [DimensionType](enums.md#dimensiontype) | *(required)* | Dimension types that will be mapped |
+| `filename` | `str` | *(required)* | Filename containing association table records. |
+
+</div>
+
+
+---
+
+## DimensionMappingReferenceListModel
+
+*dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel*
+
+List of dimension mapping references used by the dimensions_mappings.json5 config
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `references` | list[[DimensionMappingReferenceModel](dimension_mapping_model.md#dimensionmappingreferencemodel)] | *(required)* | List of dimension mapping references |
+
+</div>

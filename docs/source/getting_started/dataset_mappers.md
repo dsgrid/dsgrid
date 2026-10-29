@@ -21,9 +21,10 @@ Dimension mappings are also central to other dsgrid workflows, particularly when
 
 ## When You Need Apache Spark
 
-Mapping can be computationally intensive for datasets with many records or fine-grained dimensions. If you are working with large datasets on NLR HPC:
+dsgrid uses the DuckDB backend by default, which is sufficient for many dataset queries. Mapping can be computationally intensive for datasets with many records or fine-grained dimensions. If you are working with large datasets on NLR HPC:
 
-- Install the Spark extras: `pip install dsgrid-toolkit[spark]`
+- Install the Spark extras: `pip install "dsgrid-toolkit[spark]"`
+- Select the Spark backend; see [Selecting the Execution Backend](../software_reference/cli_fundamentals.md#selecting-the-execution-backend)
 - See [How to Run dsgrid on Kestrel](../user_guide/how_tos/run_on_kestrel)
 
 ## Key Resources

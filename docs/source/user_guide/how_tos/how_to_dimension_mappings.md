@@ -31,7 +31,7 @@ Compare each dimension type between source and target:
 dsgrid registry dimensions list
 
 # Filter by type
-dsgrid registry dimensions list -f "dimension_type == geography"
+dsgrid registry dimensions list -f "Type == geography"
 ```
 
 ### 2. Check If Target Dimensions Exist
@@ -39,7 +39,7 @@ dsgrid registry dimensions list -f "dimension_type == geography"
 Search the registry for existing dimensions that match your target:
 
 ```bash
-dsgrid registry dimensions list -f "dimension_type == geography"
+dsgrid registry dimensions list -f "Type == geography"
 ```
 
 If the target dimension already exists, note its `dimension_id` and `version`

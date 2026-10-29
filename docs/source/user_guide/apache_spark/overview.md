@@ -166,7 +166,7 @@ If your Spark cluster is running on a remote system, like an HPC, you may need t
 **On your laptop:**
 ```bash
 $ export COMPUTE_NODE=<compute_node_name>
-$ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@kestrel.hpc.nrel.gov
+$ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@kestrel.hpc.nlr.gov
 ```
 
 Then access:

@@ -18,9 +18,7 @@ A dataset query has three phases:
    do not supply mapping IDs directly — dsgrid finds them automatically using a
    graph traversal of the dimension mapping registry.
 
-2. **Apply mappings** — dsgrid applies each mapping to transform the data,
-   optionally following a mapping plan that controls the order of operations
-   and intermediate checkpoints.
+2. **Apply mappings** — dsgrid applies each mapping to transform the data.
 
 3. **Write results** — The mapped data is written to the output directory in
    the specified format (Parquet or CSV).
@@ -43,7 +41,7 @@ A dataset query is defined by a JSON5 file with these fields:
   ],
 
   // Optional
-  mapping_plan: null,
+  mapping_plan: null,  // leave null; see note below
   wrap_time_allowed: false,
   time_based_data_adjustment: {},
 
@@ -52,6 +50,7 @@ A dataset query is defined by a JSON5 file with these fields:
     table_format: {format_type: "stacked"},
     output_format: "parquet",
     sort_columns: [],
+    single_output_file: false,
   },
 }
 ```
@@ -69,16 +68,15 @@ mapping between the dataset's current dimension and the specified target.
 
 ### `mapping_plan`
 
-An optional plan that controls the order in which dimension mappings are
-applied. This is useful for large datasets where intermediate persistence
-helps Spark manage memory. See the
-[Map a Dataset tutorial](../tutorials/map_dataset) for mapping plan details.
+User-defined mapping plans (and the checkpoint files that depend on them) are
+not yet supported for dataset queries. Leave `mapping_plan` as `null`; dsgrid
+builds a default plan from the resolved mappings. Mapping plans are supported in
+project queries; see the [Map a Dataset tutorial](../tutorials/map_dataset).
 
 ### `wrap_time_allowed`
 
-When `true`, allows the dataset's time dimension to be wrapped to match a
-different target time dimension (e.g., mapping a 2018 calendar to a 2020
-calendar).
+When `true`, allows the dataset's time to be wrapped to the target time
+dimension if the two differ.
 
 ### Supported Result Parameters
 
@@ -99,7 +97,12 @@ in project queries:
   - `"parquet"` or `"csv"`
 * - `sort_columns`
   - Yes
-  - Sort result by these columns
+  - Sort result by these columns. On the Spark backend, the output file is
+    only sorted if `single_output_file` is also `true`.
+* - `single_output_file`
+  - Yes
+  - Write one file instead of a directory of part files. Only matters on
+    Spark; DuckDB always writes a single file.
 * - `aggregations`
   - **No**
   - Aggregation happens through mapping types
@@ -130,12 +133,16 @@ When you specify a `to_dimension_references` entry, dsgrid resolves the
 required mapping automatically:
 
 1. It looks up the dataset's current dimension for that dimension type.
-2. It searches the dimension mapping registry graph for a registered mapping
-   from the dataset's dimension to the target dimension.
-3. If a mapping exists, it is applied. If no mapping is found, the query fails.
+2. It searches the dimension mapping registry graph for the shortest chain of
+   registered mappings from the dataset's dimension to the target dimension.
+   This is usually a single mapping, but dsgrid can chain several (e.g.,
+   county → state → census region). It uses the latest version of each mapping.
+3. If a path exists, the mappings are applied in order. If not, the query fails.
 
-This means the dimension mapping must already be registered before you run the
+This means the dimension mappings must already be registered before you run the
 query. See [How to Create Dimension Mappings](../how_tos/how_to_dimension_mappings).
+Time is the exception: time conversion does not use registered mappings, so a
+time reference only needs to identify the target time dimension.
 
 ## Comparison with Project Queries
 
@@ -191,7 +198,6 @@ dsgrid query dataset run dataset_query.json5 -o output/
 Options:
 
 - `-o`, `--output` — Output directory (default: `query_output`)
-- `-c`, `--checkpoint-file` — Resume from a checkpoint (requires `mapping_plan`)
 - `--overwrite` — Overwrite existing results
 
 ## Next Steps

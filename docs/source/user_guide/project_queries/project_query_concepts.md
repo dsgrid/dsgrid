@@ -29,7 +29,7 @@ Currently, there is no way to skip caching of the dataset. If it is not performe
 
 7. **Replace IDs with names** - If the field `replace_ids_with_names` in the `result` data model is `true`, replace all dimension record IDs with names.
 
-8. **Sort columns** - If the field `sort_columns` in the `result` data model is `true`, sort the table by those columns.
+8. **Sort columns** - If the field `sort_columns` in the `result` data model lists any columns, sort the table by those columns. On the Spark backend, the output file is only sorted if `single_output_file` is also `true`.
 
 9. **Write output** - Evaluate the query for the previous steps by writing the table to the filesystem in the directory `query_output/<query-name>`.
 

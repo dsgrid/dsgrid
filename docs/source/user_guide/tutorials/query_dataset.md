@@ -112,11 +112,11 @@ Identify which dimensions you want to remap. For this example, we want to:
 Check what target dimensions and mappings are available:
 
 ```bash
-dsgrid registry dimensions list -f "dimension_type == geography"
-dsgrid registry dimensions list -f "dimension_type == subsector"
+dsgrid registry dimensions list -f "Type == geography"
+dsgrid registry dimensions list -f "Type == subsector"
 ```
 
-Note the `dimension_id` (a UUID) and `version` of each target dimension.
+Note the `ID` (a UUID) and `Version` of each target dimension.
 
 ## Step 2: Verify Mappings Exist
 
@@ -127,8 +127,8 @@ target:
 dsgrid registry dimension-mappings list
 ```
 
-Look for mappings whose `from_dimension` matches the dataset's geography /
-subsector and whose `to_dimension` matches the targets. If a mapping does not
+Look for mappings whose `From ID` matches the dataset's geography /
+subsector dimension and whose `To ID` matches the target. If a mapping does not
 exist, create and register one using
 [How to Create Dimension Mappings](../how_tos/how_to_dimension_mappings).
 
@@ -145,23 +145,30 @@ This creates `dataset_query.json5` with the following structure:
 ```json5
 {
   name: "my-state-aggregation",
-  dataset_id: "my-dataset-id",
-  to_dimension_references: [],
-  mapping_plan: null,
-  wrap_time_allowed: false,
-  time_based_data_adjustment: {
-    leap_day_adjustment: "none",
-    daylight_saving_adjustment: "none",
-  },
   result: {
     table_format: {
       format_type: "stacked",
     },
     output_format: "parquet",
     sort_columns: [],
+    single_output_file: false,
   },
+  dataset_id: "my-dataset-id",
+  to_dimension_references: [],
+  mapping_plan: null,
+  time_based_data_adjustment: {
+    leap_day_adjustment: "none",
+    daylight_saving_adjustment: {
+      spring_forward_hour: "none",
+      fall_back_hour: "none",
+    },
+  },
+  wrap_time_allowed: false,
 }
 ```
+
+Leave `mapping_plan` as `null`. User-defined mapping plans are not yet supported
+for dataset queries.
 
 ## Step 4: Populate Target Dimensions
 
@@ -191,7 +198,7 @@ subsector — in a single query:
       format_type: "stacked",
     },
     output_format: "parquet",
-    sort_columns: ["geography", "subsector", "timestamp"],
+    sort_columns: ["geography", "subsector"],
   },
 }
 ```
@@ -246,74 +253,28 @@ print(f"Unique geographies: {df['geography'].nunique()}")
 print(f"Unique subsectors: {df['subsector'].nunique()}")
 ```
 
-Or with PySpark if the output is large:
+For large outputs, query the file with DuckDB (installed with dsgrid) instead of
+loading it all into memory:
 
 ```python
-from pyspark.sql import SparkSession
+import duckdb
 
-spark = SparkSession.builder.getOrCreate()
-df = spark.read.parquet("query_output/my-state-aggregation/table.parquet")
-df.show()
-df.select("geography").distinct().show()
-df.select("subsector").distinct().show()
+duckdb.sql(
+    "SELECT geography, subsector, SUM(value) AS value "
+    "FROM 'query_output/my-state-aggregation/table.parquet' "
+    "GROUP BY geography, subsector"
+).show()
 ```
+
+If you ran the query with the Spark backend, `table.parquet` is a directory of
+part files rather than a single file (unless you set `single_output_file: true`).
+pandas reads the directory as-is; with DuckDB, use
+`'query_output/my-state-aggregation/table.parquet/*.parquet'`.
 
 Because we mapped counties → states, the `geography` column now contains state
 abbreviations (`CA`, `CO`, `NY`, `TX`, …) instead of FIPS codes. Similarly,
 `subsector` now contains the coarser grouping rather than individual building
 types. All other dimension columns remain at their original resolution.
-
-## Using a Mapping Plan for Large Datasets
-
-When `mapping_plan` is omitted (the default), dsgrid automatically determines
-the mapping order. For most queries this is sufficient.
-
-For large datasets, Spark may struggle to apply all mappings in a single pass.
-A mapping plan lets you control the order in which dimension mappings are
-applied and persist intermediate results between steps. Each entry in
-`mappings` identifies a dimension by its registered **dimension name** (the
-`name` field from the dimension config, not the dimension type). The order of
-the list determines the order in which dsgrid applies the mappings.
-
-```json5
-{
-  name: "my-state-aggregation",
-  dataset_id: "my-dataset-id",
-  to_dimension_references: [ /* ... */ ],
-  mapping_plan: {
-    dataset_id: "my-dataset-id",
-    mappings: [
-      {name: "Commercial Subsectors", persist: true},
-      {name: "US States L48", persist: true},
-    ],
-  },
-  // ...
-}
-```
-
-Use `dsgrid registry dimensions list` to find the exact dimension names.
-
-Setting `persist: true` causes dsgrid to write the intermediate table to disk
-after that mapping step completes, which keeps the Spark query plan from growing
-too large.
-
-If a mapping operation has `persist: true` and the query fails on a later step,
-you can resume from the last persisted checkpoint instead of starting over.
-dsgrid writes checkpoint files to the scratch directory
-(`__dsgrid_scratch__/` by default) with auto-generated names (e.g.,
-`tmp_abc123.json`). Pass the most recent checkpoint to resume:
-
-```bash
-dsgrid query dataset run dataset_query.json5 -o query_output/ \
-    -c __dsgrid_scratch__/<checkpoint-file>.json
-```
-
-:::{note}
-Checkpoints require a mapping plan that persists intermediate tables.
-:::
-
-See the [Map a Dataset tutorial](map_dataset) for more details on mapping plans
-and checkpoint workflows.
 
 ## Next Steps
 
@@ -322,5 +283,5 @@ and checkpoint workflows.
 - Explore [Dimension Mapping Types](../dataset_mapping/dimension_mapping_types)
   to understand how different mapping types transform data
 - See [Map a Dataset to a Project](map_dataset) for project-based mapping
-- Review [Apache Spark performance tuning](../apache_spark/overview.md#troubleshooting-configuration-problems)
-  for large datasets
+- If you use the Spark backend for large datasets, review
+  [Apache Spark performance tuning](../apache_spark/overview.md#troubleshooting-configuration-problems)

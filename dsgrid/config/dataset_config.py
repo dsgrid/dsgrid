@@ -404,7 +404,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     origin_organization: str | None = Field(
         default=None,
         title="origin_organization",
-        description="Organization name of the origin_creator, e.g., 'NREL'",
+        description="Organization name of the origin_creator, e.g., 'NLR'",
     )
     origin_contributors: list[str] | None = Field(
         default=None,

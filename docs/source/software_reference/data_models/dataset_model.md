@@ -27,7 +27,7 @@ Represents dataset configurations.
 | `data_source_authors` | list[`str`] \| None | `None` | List of authors for the original data source. |
 | `data_source_doi_url` | `str` \| None | `None` | Original data source doi or other url |
 | `origin_creator` | `str` \| None | `None` | First and last name of the person who formatted this dataset for dsgrid |
-| `origin_organization` | `str` \| None | `None` | Organization name of the origin_creator, e.g., 'NREL' |
+| `origin_organization` | `str` \| None | `None` | Organization name of the origin_creator, e.g., 'NLR' |
 | `origin_contributors` | list[`str`] \| None | `None` | List of contributors to the compilation of this dataset for dsgrid, e.g., ['Harry Potter', 'Ronald Weasley'] |
 | `origin_project` | `str` \| None | `None` | Name of the project for/from which this dataset was compiled, e.g., 'IEF', 'Building Standard Scenarios'. |
 | `user_defined_metadata` | dict[`str`, `Any`] | `{}` | Additional user defined metadata fields |

@@ -60,7 +60,9 @@ class DSGBaseModel(BaseModel):
     def get_fields_with_extra_attribute(cls, attribute):
         fields = set()
         for f, attrs in cls.model_fields.items():
-            if attrs.json_schema_extra.get(attribute):
+            if isinstance(attrs.json_schema_extra, dict) and attrs.json_schema_extra.get(
+                attribute
+            ):
                 fields.add(f)
         return fields
 

@@ -1,4 +1,7 @@
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
 
 from dsgrid.rust_ext import find_minimal_patterns_from_file
 
@@ -132,3 +135,30 @@ def test_expected_cardinalities_prevents_false_single_column_patterns(tmp_path):
     geo_sub_df = pd.read_csv(geo_sub_file, dtype=str)
     geo_sub_rows = sorted([tuple(row) for row in geo_sub_df.values])
     assert geo_sub_rows == [("geo3", "A"), ("geo3", "B")]
+
+
+def test_integer_and_large_string_columns(tmp_path):
+    """Integer and large_string columns are read across multiple row groups."""
+    table = pa.table(
+        {
+            "geography": pa.array([3, 3, 3, 3], type=pa.int32()),
+            "subsector": pa.array(["A", "B", "A", "B"], type=pa.large_string()),
+            "metric": pa.array([1, 1, 2, 2], type=pa.uint8()),
+        }
+    )
+    parquet_path = tmp_path / "missing.parquet"
+    pq.write_table(table, parquet_path, row_group_size=1)
+
+    output_dir = tmp_path / "output"
+    find_minimal_patterns_from_file(parquet_path, output_dir=output_dir)
+    geography_df = pd.read_csv(output_dir / "geography.csv", dtype=str)
+    assert geography_df["geography"].tolist() == ["3"]
+
+
+def test_float_column_is_rejected(tmp_path):
+    table = pa.table({"geography": ["geo1"], "value": pa.array([1.0], type=pa.float64())})
+    parquet_path = tmp_path / "missing.parquet"
+    pq.write_table(table, parquet_path)
+
+    with pytest.raises(RuntimeError, match="Float column 'value'"):
+        find_minimal_patterns_from_file(parquet_path, output_dir=tmp_path / "output")

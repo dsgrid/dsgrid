@@ -8,64 +8,27 @@ use rayon::prelude::*;
 use roaring::RoaringBitmap;
 use ahash::{AHashMap, AHashSet};
 
-use arrow2::io::parquet::read::{read_metadata, infer_schema, FileReader};
-use arrow2::datatypes::{Schema, DataType};
-use arrow2::array::{Utf8Array, Array, PrimitiveArray};
+use arrow::array::{Array, AsArray};
+use arrow::datatypes::{
+    DataType, Int16Type, Int32Type, Int64Type, Int8Type, UInt16Type, UInt32Type, UInt64Type,
+    UInt8Type,
+};
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 /// Helper to extract a string value from an array element at the given index.
 /// Supports UTF8 arrays and integer arrays (converted to string).
 fn get_string_value(arr: &dyn Array, idx: usize) -> Result<String> {
     match arr.data_type() {
-        DataType::Utf8 => {
-            let utf8 = arr.as_any().downcast_ref::<Utf8Array<i32>>()
-                .context("Failed to downcast to Utf8Array<i32>")?;
-            Ok(utf8.value(idx).to_string())
-        }
-        DataType::LargeUtf8 => {
-            let utf8 = arr.as_any().downcast_ref::<Utf8Array<i64>>()
-                .context("Failed to downcast to Utf8Array<i64>")?;
-            Ok(utf8.value(idx).to_string())
-        }
-        DataType::Int8 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<i8>>()
-                .context("Failed to downcast to PrimitiveArray<i8>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::Int16 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<i16>>()
-                .context("Failed to downcast to PrimitiveArray<i16>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::Int32 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<i32>>()
-                .context("Failed to downcast to PrimitiveArray<i32>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::Int64 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<i64>>()
-                .context("Failed to downcast to PrimitiveArray<i64>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::UInt8 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<u8>>()
-                .context("Failed to downcast to PrimitiveArray<u8>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::UInt16 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<u16>>()
-                .context("Failed to downcast to PrimitiveArray<u16>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::UInt32 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<u32>>()
-                .context("Failed to downcast to PrimitiveArray<u32>")?;
-            Ok(prim.value(idx).to_string())
-        }
-        DataType::UInt64 => {
-            let prim = arr.as_any().downcast_ref::<PrimitiveArray<u64>>()
-                .context("Failed to downcast to PrimitiveArray<u64>")?;
-            Ok(prim.value(idx).to_string())
-        }
+        DataType::Utf8 => Ok(arr.as_string::<i32>().value(idx).to_string()),
+        DataType::LargeUtf8 => Ok(arr.as_string::<i64>().value(idx).to_string()),
+        DataType::Int8 => Ok(arr.as_primitive::<Int8Type>().value(idx).to_string()),
+        DataType::Int16 => Ok(arr.as_primitive::<Int16Type>().value(idx).to_string()),
+        DataType::Int32 => Ok(arr.as_primitive::<Int32Type>().value(idx).to_string()),
+        DataType::Int64 => Ok(arr.as_primitive::<Int64Type>().value(idx).to_string()),
+        DataType::UInt8 => Ok(arr.as_primitive::<UInt8Type>().value(idx).to_string()),
+        DataType::UInt16 => Ok(arr.as_primitive::<UInt16Type>().value(idx).to_string()),
+        DataType::UInt32 => Ok(arr.as_primitive::<UInt32Type>().value(idx).to_string()),
+        DataType::UInt64 => Ok(arr.as_primitive::<UInt64Type>().value(idx).to_string()),
         dt => anyhow::bail!("Unsupported data type: {:?}", dt),
     }
 }
@@ -168,47 +131,46 @@ impl PatternConfig {
 fn read_and_encode_parquet(
     path: &str,
 ) -> Result<(EncodedDataset, Vec<Vec<String>>, Vec<String>)> {
-    let mut f = File::open(path).with_context(|| format!("Opening parquet file {}", path))?;
-    let metadata = read_metadata(&mut f).context("Reading parquet metadata")?;
-    let schema: Schema = infer_schema(&metadata).context("Inferring parquet schema")?;
+    let f = File::open(path).with_context(|| format!("Opening parquet file {}", path))?;
+    let builder = ParquetRecordBatchReaderBuilder::try_new(f).context("Reading parquet metadata")?;
+    let schema = builder.schema().clone();
 
     // Check column types: allow UTF8 and integers, reject floats
-    for field in &schema.fields {
-        match &field.data_type {
+    for field in schema.fields() {
+        match field.data_type() {
             DataType::Utf8 | DataType::LargeUtf8 => {}
             DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64
             | DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => {}
             DataType::Float32 | DataType::Float64 => {
                 anyhow::bail!(
                     "Float column '{}' found (dtype {:?}). Float columns are not supported.",
-                    field.name,
-                    field.data_type
+                    field.name(),
+                    field.data_type()
                 );
             }
             _ => {
                 anyhow::bail!(
                     "Unsupported column type '{}' found (dtype {:?}). Only UTF8 and integer columns are supported.",
-                    field.name,
-                    field.data_type
+                    field.name(),
+                    field.data_type()
                 );
             }
         }
     }
 
-    let d = schema.fields.len();
-    let col_names: Vec<String> = schema.fields.iter().map(|f| f.name.clone()).collect();
+    let d = schema.fields().len();
+    let col_names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
 
     // PASS 1: Build dictionaries
     eprintln!("  Pass 1: Building dictionaries for {}", path);
     let mut dicts: Vec<Vec<String>> = vec![Vec::new(); d];
     let mut maps: Vec<AHashMap<String, u16>> = (0..d).map(|_| AHashMap::new()).collect();
 
-    let row_groups = metadata.row_groups.clone();
-    let reader = FileReader::new(f, row_groups.clone(), schema.clone(), None, None, None);
+    let reader = builder.build().context("Building parquet reader")?;
 
     for chunk_res in reader {
         let chunk = chunk_res.context("Reading parquet chunk in pass 1")?;
-        let arrays = chunk.arrays();
+        let arrays = chunk.columns();
         for (ci, arr) in arrays.iter().enumerate() {
             let arr_len = arr.len();
             for row_idx in 0..arr_len {
@@ -240,18 +202,19 @@ fn read_and_encode_parquet(
 
     // PASS 2: Encode to flattened u16 buffer
     eprintln!("  Pass 2: Encoding to flat u16 buffer for {}", path);
-    let mut f2 = File::open(path).with_context(|| format!("Re-opening parquet file {}", path))?;
-    let metadata2 = read_metadata(&mut f2).context("Re-reading parquet metadata")?;
-    let row_groups2 = metadata2.row_groups.clone();
-    let reader2 = FileReader::new(f2, row_groups2, schema.clone(), None, None, None);
+    let f2 = File::open(path).with_context(|| format!("Re-opening parquet file {}", path))?;
+    let reader2 = ParquetRecordBatchReaderBuilder::try_new(f2)
+        .context("Re-reading parquet metadata")?
+        .build()
+        .context("Building parquet reader")?;
 
     let mut data: Vec<u16> = Vec::new();
     let mut total_rows = 0usize;
 
     for chunk_res in reader2 {
         let chunk = chunk_res.context("Reading parquet chunk in pass 2")?;
-        let arrays = chunk.arrays();
-        let chunk_len = arrays[0].len();
+        let arrays = chunk.columns();
+        let chunk_len = chunk.num_rows();
         total_rows += chunk_len;
 
         // Pre-calculate codes for each column in this chunk for better memory access

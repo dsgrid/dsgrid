@@ -9,7 +9,7 @@ __description__ = (
     "Python API for registring and accessing demand-side grid model (dsgrid) datasets"
 )
 __url__ = "https://github.com/dsgrid/dsgrid"
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __author__ = "National Laboratory of the Rockies (formerly NREL)"
 __maintainer_email__ = "elaine.hale@nlr.gov"
 __license__ = "BSD-3"

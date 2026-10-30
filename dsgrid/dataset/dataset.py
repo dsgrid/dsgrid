@@ -1,5 +1,6 @@
 """Provides access to a dataset."""
 
+import ibis
 import abc
 import logging
 
@@ -7,14 +8,14 @@ from sqlalchemy import Connection
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
-from dsgrid.spark.types import DataFrame
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class Dataset(DatasetBase):
         dimension_mgr: DimensionRegistryManager,
         dimension_mapping_mgr: DimensionMappingRegistryManager,
         store: DataStoreInterface,
-        mapping_references: list[DimensionMappingReferenceListModel],
+        mapping_references: list[DimensionMappingReferenceModel],
         conn: Connection | None = None,
     ):
         """Load a dataset from a store.
@@ -62,7 +63,7 @@ class Dataset(DatasetBase):
         config : DatasetConfig
         dimension_mgr : DimensionRegistryManager
         dimension_mapping_mgr : DimensionMappingRegistryManager
-        mapping_references: list[DimensionMappingReferenceListModel]
+        mapping_references: list[DimensionMappingReferenceModel]
 
         Returns
         -------
@@ -82,7 +83,7 @@ class Dataset(DatasetBase):
 
     def make_project_dataframe(
         self, query: QueryContext, project_config: ProjectConfig
-    ) -> DataFrame:
+    ) -> ibis.Table:
         return self._handler.make_project_dataframe(query, project_config)
 
 
@@ -96,7 +97,7 @@ class StandaloneDataset(DatasetBase):
         dimension_mgr: DimensionRegistryManager,
         dimension_mapping_mgr: DimensionMappingRegistryManager,
         store: DataStoreInterface,
-        mapping_references: list[DimensionMappingReferenceListModel] | None = None,
+        mapping_references: list[DimensionMappingReferenceModel] | None = None,
         conn: Connection | None = None,
     ):
         """Load a dataset from a store.

@@ -19,3 +19,15 @@ repos:
       # Run the formatter.
       - id: ruff-format
         exclude: dsgrid/utils/py_expression_eval/.*
+
+  - repo: local
+    hooks:
+      # Run ty against the project's installed environment (matches CI's `ty check`).
+      # Uses the active venv rather than an isolated one so third-party types resolve;
+      # scope is inherited from [tool.ty.src] in pyproject.toml.
+      - id: ty
+        name: ty check
+        entry: ty check
+        language: system
+        pass_filenames: false
+        types: [python]

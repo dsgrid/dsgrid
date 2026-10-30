@@ -7,7 +7,6 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.utils.files import load_data
 
 
 class ProjectRegistrationModel(DSGBaseModel):
@@ -181,8 +180,3 @@ def _fix_paths(data: dict[str, Any], fields: Iterable[str]) -> None:
         val = data.get(field)
         if isinstance(val, str):
             data[field] = Path(val)
-
-
-def create_registration(input_file: Path):
-    """Create registration inputs."""
-    return RegistrationModel(**load_data(input_file))

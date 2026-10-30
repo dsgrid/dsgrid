@@ -1,25 +1,25 @@
 from pathlib import Path
 
-from dsgrid.spark.types import use_duckdb
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.ibis.session import get_runtime_session
+from dsgrid.ibis.operations import drop_columns, join_multiple_columns
 
 
 def read_parquet(filename: Path):
-    """Read a Parquet file and load it into cache. This helps debugging with pytest --pdb.
-    If you don't use this, the parquet file will get deleted on a failure and you won't be able
-    to inspect the dataframe.
+    """Read a Parquet file into an Ibis table.
+
+    Deliberately does not cache: with the Spark backend, ``cache()`` returns
+    a ``CachedTable`` whose backing view is dropped once that object is
+    garbage-collected. Callers that immediately wrap the result in further
+    expressions without retaining the return value thus trigger a use-after-free
+    (``TABLE_OR_VIEW_NOT_FOUND``) error when a later operation executes the
+    derived expression.
     """
-    spark = get_spark_session()
-    df = spark.read.parquet(Path(filename).as_posix())
-    if not use_duckdb():
-        df.cache()
-        df.count()
-    return df
+    return get_runtime_session().read.parquet(Path(filename).as_posix())
 
 
 def read_parquet_two_table_format(path: Path):
-    spark = get_spark_session()
+    spark = get_runtime_session()
     load_data = spark.read.parquet((path / "load_data.parquet").as_posix())
     lookup = spark.read.parquet((path / "load_data_lookup.parquet").as_posix())
-    table = load_data.join(lookup, on="id").drop("id")
+    table = drop_columns(join_multiple_columns(load_data, lookup, ["id"]), "id")
     return table

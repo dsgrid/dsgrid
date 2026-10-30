@@ -3,7 +3,7 @@ import logging
 import os
 
 
-from pydantic import field_validator, Field, ValidationInfo, field_serializer
+from pydantic import ValidationError, field_validator, Field, ValidationInfo, field_serializer
 
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
@@ -12,6 +12,7 @@ from dsgrid.config.dimension_mapping_base import (
 )
 from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.exceptions import DSGInvalidDimensionMapping
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from .config_base import ConfigWithRecordFileBase
@@ -155,16 +156,29 @@ class MappingTableModel(DimensionMappingBaseModel):
         from_dimension: DimensionReferenceModel,
         to_dimension: DimensionReferenceModel,
     ):
-        return MappingTableModel(
-            mapping_type=model.mapping_type,
-            archetype=model.archetype,
-            from_dimension=from_dimension,
-            to_dimension=to_dimension,
-            description=model.description,
-            file=model.filename,
-            from_fraction_tolerance=model.from_fraction_tolerance,
-            to_fraction_tolerance=model.to_fraction_tolerance,
-        )
+        """Create a MappingTableModel from a pre-registered mapping model.
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            If the mapping file contents fail model validation.
+        """
+        try:
+            return MappingTableModel.model_validate(
+                {
+                    "mapping_type": model.mapping_type,
+                    "archetype": model.archetype,
+                    "from_dimension": from_dimension,
+                    "to_dimension": to_dimension,
+                    "description": model.description,
+                    "file": model.filename,
+                    "from_fraction_tolerance": model.from_fraction_tolerance,
+                    "to_fraction_tolerance": model.to_fraction_tolerance,
+                }
+            )
+        except ValidationError as e:
+            msg = f"Validation error creating dimension mapping (file '{model.filename}'): {e}"
+            raise DSGInvalidDimensionMapping(msg) from e
 
 
 class MappingTableConfig(ConfigWithRecordFileBase):

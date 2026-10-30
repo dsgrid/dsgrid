@@ -195,7 +195,7 @@ This will be converted to a MappingTableModel as soon as the dimensions are regi
 
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
-| `mapping_type` | [DimensionMappingType](enums.md#dimensionmappingtype) | `"many_to_one_aggregation"` | Type/purpose of the dimension mapping |
+| `mapping_type` | [DimensionMappingType](enums.md#dimensionmappingtype) | `DimensionMappingType.MANY_TO_ONE_AGGREGATION` | Type/purpose of the dimension mapping |
 | `archetype` | [DimensionMappingArchetype](enums.md#dimensionmappingarchetype) \| None | `None` | Dimension mapping archetype, determined based on mapping_type |
 | `description` | `str` \| None | `None` | Description of dimension mapping |
 | `from_fraction_tolerance` | `float` | `1e-06` | Tolerance value to apply to the from_fraction column |

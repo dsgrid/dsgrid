@@ -8,6 +8,7 @@ Focus:
 Localization call-order tests have been moved to
 `tests/test_localize_timestamps_if_necessary.py`.
 """
+
 import pytest
 from unittest.mock import MagicMock
 from pathlib import Path
@@ -17,12 +18,14 @@ from dsgrid.config.dimensions import (
     TimeFormatInPartsModel,
 )
 from dsgrid.common import TIME_COLUMN
-from dsgrid.spark.functions import (
-    get_spark_session,
+from dsgrid.ibis.functions import (
+    get_runtime_session,
     select_expr,
 )
-from dsgrid.spark.types import use_duckdb
+from dsgrid.ibis.types import use_duckdb
 import pandas as pd
+
+from tests._helpers import collect as _collect
 
 
 def _utc_ts_str_expr() -> str:
@@ -59,7 +62,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     )
 
     # Build a small dataframe of test cases
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020] * 6,
@@ -87,7 +90,7 @@ def test_offset_parsing_in_parts_builds_correct_timestamps():
     # session time zone (default UTC).
     # These are the UTC instants corresponding to local times + offsets above.
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     got = [row.ts_str for row in rows]
     expected = [
         "2019-12-31 18:30:00",  # +05:30
@@ -110,7 +113,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
         offset_column="utc_offset_str",
     )
 
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020] * 3,
@@ -129,7 +132,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
 
     assert new_col_format.dtype == "timestamp_tz"
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     got = [row.ts_str for row in rows]
     # UTC instants corresponding to local time + string offsets
     expected = [
@@ -142,7 +145,7 @@ def test_offset_parsing_in_parts_accepts_string_offsets():
 
 def test_invalid_numeric_offset_raises():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -160,7 +163,7 @@ def test_invalid_numeric_offset_raises():
 
 def test_invalid_string_offset_raises():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -177,7 +180,7 @@ def test_invalid_string_offset_raises():
 
 def test_invalid_string_offset_minutes_out_of_range():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -194,7 +197,7 @@ def test_invalid_string_offset_minutes_out_of_range():
 
 def test_invalid_string_offset_24_with_nonzero_minutes():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -211,7 +214,7 @@ def test_invalid_string_offset_24_with_nonzero_minutes():
 
 def test_invalid_string_offset_bad_format():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -228,7 +231,7 @@ def test_invalid_string_offset_bad_format():
 
 def test_invalid_string_offset_missing_leading_zero_hours():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -245,7 +248,7 @@ def test_invalid_string_offset_missing_leading_zero_hours():
 
 def test_invalid_string_offset_missing_leading_zero_minutes():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -262,7 +265,7 @@ def test_invalid_string_offset_missing_leading_zero_minutes():
 
 def test_valid_string_offset_24_allowed():
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020, 2020],
@@ -284,7 +287,7 @@ def test_cast_with_offset_24_numeric_previous_behavior():
     both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -309,8 +312,61 @@ def test_cast_with_offset_24_numeric_previous_behavior():
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]
+
+
+def test_dst_spring_forward_and_fall_back_offset_round_trip():
+    """02:00 does not exist in America/Los_Angeles on 2024-03-10
+    (spring-forward) and 01:00 occurs twice on 2024-11-03 (fall-back).
+    Time-in-parts conversion takes the offset explicitly, so both
+    transitions disambiguate to distinct UTC instants. We pin those
+    instants so backend changes can't silently coalesce them across the
+    DST boundary.
+    """
+    mgr = make_manager()
+    col_format = TimeFormatInPartsModel(
+        year_column="year",
+        month_column="month",
+        day_column="day",
+        hour_column="hour",
+        offset_column="utc_offset_str",
+    )
+    spark = get_runtime_session()
+    pdf = pd.DataFrame(
+        {
+            "year": [2024, 2024, 2024, 2024],
+            "month": [3, 3, 11, 11],
+            "day": [10, 10, 3, 3],
+            # The TimeFormatInPartsModel is hour-grained — using the gap
+            # hour 02:00 on spring-forward and the repeated 01:00 on
+            # fall-back to cover both DST transitions.
+            "hour": [2, 2, 1, 1],
+            # Spring-forward: 02:00 with PST(-08) and PDT(-07) offsets.
+            # Fall-back: 01:00 with PDT(-07) and PST(-08) — the ambiguous
+            # repeat. The offset column disambiguates each row.
+            "utc_offset_str": ["-08:00", "-07:00", "-07:00", "-08:00"],
+        }
+    )
+    df = spark.createDataFrame(pdf)
+
+    base_ts_expr, offset_expr = mgr._build_timestamp_string_expr(col_format)
+    ts_sql, _ = mgr._build_timestamp_sql(base_ts_expr, offset_expr, col_format)
+    cols_to_drop = mgr._get_time_columns_to_drop(col_format)
+    out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
+    check_df = select_expr(out_df, [_utc_ts_str_expr()])
+    rows = _collect(check_df)
+    got = [row.ts_str for row in rows]
+    expected = [
+        "2024-03-10 10:00:00",  # 02:00 - (-08:00) = 10:00 UTC
+        "2024-03-10 09:00:00",  # 02:00 - (-07:00) = 09:00 UTC
+        "2024-11-03 08:00:00",  # 01:00 - (-07:00) = 08:00 UTC (first 01:00, PDT)
+        "2024-11-03 09:00:00",  # 01:00 - (-08:00) = 09:00 UTC (second 01:00, PST)
+    ]
+    assert got == expected, (
+        "DST spring-forward and fall-back round-trip must preserve distinct "
+        "UTC instants; the parts-format converter must not coalesce them."
+    )
 
 
 def test_cast_with_offset_24_string_previous_behavior():
@@ -320,7 +376,7 @@ def test_cast_with_offset_24_string_previous_behavior():
     both DuckDB and Spark produce the same result.
     """
     mgr = make_manager()
-    spark = get_spark_session()
+    spark = get_runtime_session()
     pdf = pd.DataFrame(
         {
             "year": [2020],
@@ -345,5 +401,5 @@ def test_cast_with_offset_24_string_previous_behavior():
 
     out_df = mgr._apply_timestamp_transformation(df, cols_to_drop, ts_sql)
     check_df = select_expr(out_df, [_utc_ts_str_expr()])
-    rows = check_df.collect()
+    rows = _collect(check_df)
     assert [row.ts_str for row in rows] == ["2019-12-31 00:00:00"]

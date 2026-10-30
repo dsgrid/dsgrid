@@ -63,7 +63,7 @@ There is a CLI command that can generate a query file for your project. Refer to
               "2040",
               "2050",
             ],
-            "filter_type": "DimensionFilterColumnOperatorModel"
+            "filter_type": "column_operator"
           }
         ],
       }
@@ -142,15 +142,16 @@ If you only care about a limited number of fuel types, you could add this filter
             ],
             "operator": "isin",
             "negate": false,
-            "filter_type": "SupplementalDimensionFilterColumnOperatorModel"
+            "filter_type": "supplemental_column_operator"
           }
         ],
       }
 ```
 
-### Step 3: Start a Spark Cluster
+### Step 3: Choose a Backend
 
-Start a Spark cluster with two compute nodes as described in [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel).
+- **DuckDB (default):** no additional setup required. Recommended for small to moderate datasets.
+- **Spark:** for large datasets, start a Spark cluster with two compute nodes as described in [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel).
 
 ### Step 4: Activate Python Environment
 
@@ -162,26 +163,30 @@ conda activate dsgrid
 
 ### Step 5: Run the Query
 
-Run the query using spark-submit:
+With the default DuckDB backend:
+
+```bash
+dsgrid query project run query.json5
+```
+
+With the Spark backend, submit the command to the cluster:
 
 ```bash
 spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) query project run query.json5
 ```
 
-The query may take ~55 minutes.
+The query may take ~55 minutes on Spark.
 
 ### Step 6: Inspect the Output
 
-Inspect the output table using pyspark:
-
-```bash
-pyspark --master=spark://$(hostname):7077
-```
+The output table is a Parquet file. Inspect it with any Parquet-capable tool — for example, DuckDB:
 
 ```python
->>> df = spark.read.load("query_output/load-per-state-2030/table.parquet")
->>> columns = ["time_est", "state", "scenario", "sector", "weather_2012", "all_electricity"]
->>> df.sort("state", "scenario", "model_year", "time_est").show()
+>>> import duckdb
+>>> duckdb.sql(
+...     "SELECT * FROM 'query_output/load-per-state-2030/table.parquet' "
+...     "ORDER BY state, scenario, model_year, time_est"
+... ).show()
 +-----+----------+------------+------+-------------------+------------+--------------------+-------------------+--------------------+------------------+
 |state|model_year|    scenario|sector|           time_est|weather_2012|electricity_end_uses|  fuel_oil_end_uses|natural_gas_end_uses|  propane_end_uses|
 +-----+----------+------------+------+-------------------+------------+--------------------+-------------------+--------------------+------------------+

@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
 from dsgrid.config.mapping_tables import MappingTableConfig, MappingTableModel
 from dsgrid.config.dataset_config import DatasetConfig, DatasetConfigModel
@@ -237,6 +237,7 @@ class RegistryAutoUpdater:
                 version=key.version,
                 parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
+                model = cast(Any, model)
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)
                 )
@@ -270,6 +271,7 @@ class RegistryAutoUpdater:
                 version=key.version,
                 parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
+                model = cast(Any, model)
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)
                 )
@@ -300,6 +302,7 @@ class RegistryAutoUpdater:
                 version=key.version,
                 parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
+                model = cast(Any, model)
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)
                 )

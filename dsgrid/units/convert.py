@@ -1,71 +1,139 @@
+import ibis
 import logging
 
-import dsgrid.units.energy as energy
-import dsgrid.units.power as power
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.spark.functions import except_all, is_dataframe_empty, join
-from dsgrid.spark.types import DataFrame, F
-from dsgrid.units.constants import ENERGY_UNITS, POWER_UNITS
-from dsgrid.utils.spark import get_unique_values
-
+from dsgrid.ibis.operations import drop_columns, except_all, join, rename_columns
+from dsgrid.ibis.table_utils import get_unique_values, is_table_empty
+from dsgrid.units.constants import (
+    ENERGY_UNITS,
+    POWER_UNITS,
+    GW,
+    GWH,
+    KILO_TO_GIGA,
+    KW,
+    KWH,
+    MBTU,
+    MBTU_TO_KWH,
+    MEGA_TO_KILO,
+    MW,
+    MWH,
+    TERA_TO_KILO,
+    THERM,
+    THERM_TO_KWH,
+    TW,
+    TWH,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def convert_units_unpivoted(
-    df: DataFrame,
+    df: ibis.Table,
     metric_column: str,
-    from_records: DataFrame,
-    from_to_records: DataFrame | None,
-    to_unit_records: DataFrame,
-) -> DataFrame:
+    from_records: ibis.Table,
+    from_to_records: ibis.Table | None,
+    to_unit_records: ibis.Table,
+) -> ibis.Table:
     """Convert the value column of the dataframe to the target units.
 
     Parameters
     ----------
-    df : DataFrame
+    df : Ibis table
         Load data table
     metric_column : str
         Column in dataframe with metric record IDs
-    from_records : DataFrame
+    from_records : Ibis table
         Metric dimension records for the columns being converted
-    from_to_records : DataFrame | None
+    from_to_records : Ibis table | None
         Records that map the dimension IDs in columns to the target IDs
         If None, mapping is not required and from_records contain the units.
-    to_unit_records : DataFrame
+    to_unit_records : Ibis table
         Metric dimension records for the target IDs
     """
     unit_col = "unit"  # must match EnergyEndUse.unit
-    tmp1 = from_records.select("id", unit_col).withColumnRenamed(unit_col, "from_unit")
+    tmp1 = rename_columns(from_records.select("id", unit_col), {unit_col: "from_unit"})
     if from_to_records is None:
         unit_df = tmp1.select("id", "from_unit")
     else:
         tmp2 = from_to_records.select("from_id", "to_id")
-        unit_df = (
-            join(tmp1, tmp2, "id", "from_id")
-            .select(F.col("to_id").alias("id"), "from_unit")
-            .distinct()
+        joined = join(tmp1, tmp2, "id", "from_id")
+        unit_df = joined.select(_alias_column(joined, "to_id", "id"), "from_unit").distinct()
+    if is_table_empty(
+        except_all(
+            unit_df,
+            to_unit_records.select("id", _alias_column(to_unit_records, "unit", "from_unit")),
         )
-    if is_dataframe_empty(
-        except_all(unit_df, to_unit_records.select("id", F.col("unit").alias("from_unit")))
     ):
         logger.debug("Return early because the units match.")
         return df
 
-    df = join(df, unit_df, metric_column, "id").drop("id")
-    tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
-    df = join(df, tmp3, metric_column, "id").drop("id")
+    df = drop_columns(join(df, unit_df, metric_column, "id"), "id")
+    tmp3 = rename_columns(to_unit_records.select("id", "unit"), {unit_col: "to_unit"})
+    df = drop_columns(join(df, tmp3, metric_column, "id"), "id")
     logger.debug("Converting units from column %s", metric_column)
 
     units = get_unique_values(to_unit_records, unit_col)
     if units.issubset(ENERGY_UNITS):
-        func = energy.from_any_to_any
+        unit_to_base = _ENERGY_TO_KWH
     elif units.issubset(POWER_UNITS):
-        func = power.from_any_to_any
+        unit_to_base = _POWER_TO_KW
     else:
         msg = f"Unsupported unit conversion: {units}"
         raise ValueError(msg)
 
-    return df.withColumn(VALUE_COLUMN, func("from_unit", "to_unit", VALUE_COLUMN)).drop(
-        "from_unit", "to_unit"
+    converted = _make_conversion_expr(df, unit_to_base, "from_unit", "to_unit")
+    keep = [c for c in df.columns if c not in ("from_unit", "to_unit", VALUE_COLUMN)]
+    projections = [df[c] for c in keep] + [converted.name(VALUE_COLUMN)]
+    return df.select(*projections)
+
+
+def _alias_column(df: ibis.Table, column: str, alias: str):
+    return df[column].name(alias)
+
+
+def _make_conversion_expr(
+    df: ibis.Table, unit_to_base: dict[str, float], from_unit_col: str, to_unit_col: str
+):
+    from_col = df[from_unit_col]
+    to_col = df[to_unit_col]
+    # Cast to double so the result dtype is deterministically float64 (a float32
+    # source otherwise yields float32 on some DuckDB versions) and a real double
+    # operand leads the arithmetic below.
+    value_col = df[VALUE_COLUMN].cast("float64")
+    # Map each unit to its factor relative to the family base unit. An unknown
+    # (non-empty) unit matches no branch, so ibis.cases emits NULL, which
+    # propagates to the result (preserving "unknown unit -> NULL").
+    from_factor = ibis.cases(*[(from_col == unit, f) for unit, f in unit_to_base.items()]).cast(
+        "float64"
     )
+    to_factor = ibis.cases(*[(to_col == unit, f) for unit, f in unit_to_base.items()]).cast(
+        "float64"
+    )
+    # Group as ``value * from / to`` (i.e. (value*from)/to), NOT ``value*(from/to)``:
+    # the latter divides two float64 literals, which Spark compiles to a
+    # decimal/decimal division and truncates the scale (~6 sig figs for small
+    # ratios like therm -> TWh). Keeping value (a double) in each operation forces
+    # double arithmetic on every backend.
+    converted = value_col * from_factor / to_factor
+    return ibis.cases(
+        (from_col == to_col, value_col),  # same unit (incl. unitless) -> passthrough
+        (from_col == "", value_col),  # unitless source -> passthrough
+        else_=converted,
+    )
+
+
+_ENERGY_TO_KWH = {
+    KWH: 1.0,
+    MWH: MEGA_TO_KILO,
+    GWH: 1 / KILO_TO_GIGA,
+    TWH: TERA_TO_KILO,
+    THERM: THERM_TO_KWH,
+    MBTU: MBTU_TO_KWH,
+}
+
+_POWER_TO_KW = {
+    KW: 1.0,
+    MW: MEGA_TO_KILO,
+    GW: 1 / KILO_TO_GIGA,
+    TW: TERA_TO_KILO,
+}

@@ -2,7 +2,7 @@
 
 dsgrid offers several ways to filter the result of a query. It is important to understand some dsgrid behaviors to get an optimal result. Please refer to [query concepts](../project_queries/query_concepts) for details.
 
-The examples below show how to define the filters in JSON5 or Python as well as the equivalent implementation if you were to filter the dataframe with Spark in Python (pyspark).
+The examples below show how to define the filters in JSON5 or Python, along with the equivalent SQL expression that dsgrid applies through its Ibis-based query backend.
 
 All examples except `DimensionFilterBetweenColumnOperatorModel` assume that the dataframe being filtered is the dimension record table. `DimensionFilterBetweenColumnOperatorModel` assumes that the table is the load data dataframe with time-series information.
 
@@ -51,9 +51,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter("geography == '06037'")
+:::{tab-item} SQL
+```sql
+WHERE geography = '06037'
 ```
 :::
 
@@ -92,9 +92,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter("geography == '06037'")
+:::{tab-item} SQL
+```sql
+WHERE geography = '06037'
 ```
 :::
 
@@ -102,7 +102,7 @@ df.filter("geography == '06037'")
 
 ### 3. Column Operator Filter
 
-Filter a table where the specified column matches the specified value(s) according to the Spark SQL operator. This is useful for cases where you want to match partial strings or use a list of possible values.
+Filter a table where the specified column matches the specified value(s) according to the given SQL operator. This is useful for cases where you want to match partial strings or use a list of possible values.
 
 **Example: Filter by multiple values**
 
@@ -139,9 +139,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(col("geography").isin(["06037", "06073"]))
+:::{tab-item} SQL
+```sql
+WHERE geography IN ('06037', '06073')
 ```
 :::
 
@@ -182,9 +182,9 @@ dimension_filters=[
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(col("name").like("%County"))
+:::{tab-item} SQL
+```sql
+WHERE name LIKE '%County'
 ```
 :::
 
@@ -231,7 +231,7 @@ dimension_filters=[
 
 ### 5. Time-Based Filter
 
-Filter data between two time columns. This is useful for selecting data within specific time ranges.
+Filter data between two bounds of a time column, inclusive. This is useful for selecting data within specific time ranges.
 
 ::::{tab-set}
 
@@ -241,10 +241,9 @@ dimension_filters: [
   {
     dimension_type: "time",
     dimension_name: "time_est",
-    column1: "timestamp",
-    column2: "timestamp",
-    operator: "between",
-    value: ["2012-01-01 00:00:00", "2012-01-31 23:59:59"],
+    column: "timestamp",
+    lower_bound: "2012-01-01 00:00:00",
+    upper_bound: "2012-01-31 23:59:59",
     filter_type: "between_column_operator",
     negate: false,
   },
@@ -258,22 +257,18 @@ dimension_filters=[
     DimensionFilterBetweenColumnOperatorModel(
         dimension_type=DimensionType.TIME,
         dimension_name="time_est",
-        column1="timestamp",
-        column2="timestamp",
-        operator="between",
-        value=["2012-01-01 00:00:00", "2012-01-31 23:59:59"],
+        column="timestamp",
+        lower_bound="2012-01-01 00:00:00",
+        upper_bound="2012-01-31 23:59:59",
         negate=False,
     ),
 ]
 ```
 :::
 
-:::{tab-item} pyspark
-```python
-df.filter(
-    (col("timestamp") >= "2012-01-01 00:00:00") &
-    (col("timestamp") <= "2012-01-31 23:59:59")
-)
+:::{tab-item} SQL
+```sql
+WHERE timestamp BETWEEN '2012-01-01 00:00:00' AND '2012-01-31 23:59:59'
 ```
 :::
 
@@ -281,18 +276,23 @@ df.filter(
 
 ## Common Operators
 
+Filters with `filter_type: "column_operator"` (and `"supplemental_column_operator"`) accept
+exactly these operators:
+
 | Operator | Description | Example Value |
 |----------|-------------|---------------|
-| `==` | Equals | `"06037"` |
-| `!=` | Not equals | `"06037"` |
-| `>` | Greater than | `"2020"` |
-| `>=` | Greater than or equal | `"2020"` |
-| `<` | Less than | `"2050"` |
-| `<=` | Less than or equal | `"2050"` |
-| `isin` | In list | `["06037", "06073"]` |
-| `like` | Pattern match | `"%County"` |
+| `contains` | Substring match | `"County"` |
+| `startswith` | Prefix match | `"06"` |
+| `endswith` | Suffix match | `"037"` |
+| `like` | SQL pattern match | `"%County"` |
 | `rlike` | Regex match | `"^06.*"` |
-| `between` | Between two values | `["2020", "2050"]` |
+| `isin` | In list | `["06037", "06073"]` |
+| `isNull` | Value is null | (value is ignored) |
+| `isNotNull` | Value is not null | (value is ignored) |
+| `between` | Between two values, inclusive | `["2020", "2050"]` |
+
+Filters with `filter_type: "expression"` interpolate their operator into SQL, so comparison
+operators such as `==`, `!=`, `>`, `>=`, `<`, and `<=` are written there instead.
 
 ## Negating Filters
 

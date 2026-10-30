@@ -1,15 +1,16 @@
+import ibis
 import abc
 import logging
 from pathlib import Path
-from typing import Type
+from typing import Any, Type, cast
 
 import json5
 
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.spark.types import (
-    DataFrame,
-)
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.ibis.functions import write_csv
+
+from dsgrid.ibis.models import models_to_dataframe
+from dsgrid.ibis.temp import TEMP_TABLE_PREFIX
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ class ConfigBase(abc.ABC):
 
     @classmethod
     def _load(cls, config_file):
-        model = cls.model_class().load(config_file)
+        model = cast(Any, cls.model_class()).load(config_file)
         return cls(model)
 
     @staticmethod
@@ -118,12 +119,15 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_records_dataframe(self) -> DataFrame:
-        """Return the records in a spark dataframe. Cached on first call."""
+    def get_records_dataframe(self) -> ibis.Table:
+        """Return the records in an Ibis table. Cached on first call."""
         # id provides uniqueness and the config_id could help inspect what's in cache in case we
         # ever need that.
+        # Prefix with the dsgrid temp-view prefix so this cached view is cleared together with
+        # the underlying tmp views it references (see drop_temp_tables_and_views); otherwise the
+        # outer view becomes a dangling reference once its underlying temp view is dropped.
         # Spark doesn't allow dashes in the table name.
-        table_name = f"{self.config_id}__{id(self)}".replace("-", "_")
+        table_name = f"{TEMP_TABLE_PREFIX}_cached__{self.config_id}__{id(self)}".replace("-", "_")
         df = models_to_dataframe(self.model.records, table_name=table_name)
         logger.debug("Loaded %s records dataframe", self.config_id)
         return df
@@ -141,7 +145,7 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
                 msg = f"{filename} exists. Set force=True to overwrite."
                 raise DSGInvalidOperation(msg)
 
-        self.get_records_dataframe().toPandas().to_csv(records_file, index=False)
+        write_csv(self.get_records_dataframe(), records_file, overwrite=True)
         model_data = self.model.serialize()
         model_data["file"] = records_file.name
         dst_config_file.write_text(json5.dumps(model_data, indent=2))

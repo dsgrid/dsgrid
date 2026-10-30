@@ -1,7 +1,5 @@
 """Tests for dsgrid config CLI commands."""
 
-from pathlib import Path
-
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli

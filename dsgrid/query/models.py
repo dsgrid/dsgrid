@@ -1,5 +1,7 @@
 import abc
 import itertools
+import logging
+import re
 from enum import StrEnum
 from typing import Any, Generator, Union, Literal, Self, TypeAlias
 
@@ -11,6 +13,7 @@ from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
+    PivotedTableFormatModel,
     TableFormatModel,
     StackedTableFormatModel,
     ValueFormat,
@@ -25,12 +28,13 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
+from dsgrid.ibis.aggregations import SUPPORTED_AGGREGATIONS
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
 )
-from dsgrid.spark.types import F
 from dsgrid.utils.files import compute_hash
 
+logger = logging.getLogger(__name__)
 
 DimensionFilters: TypeAlias = Annotated[
     Union[
@@ -45,6 +49,42 @@ DimensionFilters: TypeAlias = Annotated[
 ]
 
 
+_FUNCTION_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class FunctionReference:
+    """Reference a query function without binding to a dataframe backend at model-parse time.
+
+    The name is forwarded directly into the SQL the backend executes, e.g.
+    ``MAX(value)`` for an aggregation or ``HOUR(timestamp)`` for a scalar
+    column expression. dsgrid does not maintain its own allowlist; any
+    function the active backend (DuckDB or Spark) accepts will work, and
+    unrecognized names will surface as a backend error at execution time.
+
+    The name MUST match ``[A-Za-z_][A-Za-z0-9_]*`` — a plain SQL identifier.
+    Anything else (punctuation, whitespace, parentheses) would allow SQL
+    fragments to be injected into the interpolated query string the
+    aggregation/column-expression builders produce.
+
+    Names registered in :data:`dsgrid.ibis.aggregations.AGGREGATION_SPECS`
+    (see :data:`~dsgrid.ibis.aggregations.SUPPORTED_AGGREGATIONS`) carry
+    backend-correct SQL spellings and a native Ibis fast path. All other
+    names are uppercased and passed through unchanged.
+    """
+
+    def __init__(self, name: str):
+        if not _FUNCTION_NAME_RE.match(name):
+            msg = (
+                f"FunctionReference name {name!r} is not a plain SQL identifier "
+                "(letters, digits, underscores; must start with a letter or "
+                "underscore). dsgrid forwards the name directly into SQL so "
+                "anything else risks injection."
+            )
+            raise ValueError(msg)
+        self.name = name
+        self.__name__ = name
+
+
 class FilteredDatasetModel(DSGBaseModel):
     """Filters to apply to a dataset"""
 
@@ -57,23 +97,24 @@ class ColumnModel(DSGBaseModel):
 
     dimension_name: str
     function: Any = Field(
-        default=None, description="Function or name of function in pyspark.sql.functions."
+        default=None,
+        description="Name of a SQL function to apply to the column (e.g. 'hour'), or a "
+        "FunctionReference.",
     )
     alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
     def handle_function(cls, function_name):
-        if function_name is None:
+        if function_name is None or isinstance(function_name, FunctionReference):
             return function_name
         if not isinstance(function_name, str):
-            return function_name
-
-        func = getattr(F, function_name, None)
-        if func is None:
-            msg = f"function={function_name} is not defined in pyspark.sql.functions"
+            msg = (
+                "function must be a function name (str), a FunctionReference, or None; "
+                f"got {type(function_name).__name__}"
+            )
             raise ValueError(msg)
-        return func
+        return FunctionReference(function_name)
 
     @field_validator("alias")
     @classmethod
@@ -140,22 +181,33 @@ class AggregationModel(DSGBaseModel):
 
     aggregation_function: Any = Field(
         default=None,
-        description="Must be a function name in pyspark.sql.functions",
+        description="Must be an aggregation function name.",
     )
     dimensions: DimensionNamesModel = Field(description="Dimensions on which to aggregate")
 
     @field_validator("aggregation_function")
     @classmethod
     def check_aggregation_function(cls, aggregation_function):
-        if isinstance(aggregation_function, str):
-            aggregation_function = getattr(F, aggregation_function, None)
-            if aggregation_function is None:
-                msg = f"{aggregation_function} is not defined in pyspark.sql.functions"
-                raise ValueError(msg)
-        elif aggregation_function is None:
+        if aggregation_function is None:
             msg = "aggregation_function cannot be None"
             raise ValueError(msg)
-        return aggregation_function
+        if isinstance(aggregation_function, FunctionReference):
+            return aggregation_function
+        if not isinstance(aggregation_function, str):
+            msg = (
+                "aggregation_function must be a function name (str) or a FunctionReference; "
+                f"got {type(aggregation_function).__name__}"
+            )
+            raise ValueError(msg)
+        if aggregation_function not in SUPPORTED_AGGREGATIONS:
+            logger.warning(
+                "aggregation_function=%r is not a registered dsgrid aggregation; it will "
+                "be uppercased and forwarded to the backend, which may reject it. "
+                "Registered: %s",
+                aggregation_function,
+                sorted(SUPPORTED_AGGREGATIONS),
+            )
+        return FunctionReference(aggregation_function)
 
     @field_validator("dimensions")
     @classmethod
@@ -281,8 +333,8 @@ class CacheableQueryBaseModel(DSGBaseModel):
         return compute_hash(text.encode()), text
 
 
-class SparkConfByDataset(DSGBaseModel):
-    """Defines a custom Spark configuration to use while running a query on a dataset."""
+class RuntimeConfByDataset(DSGBaseModel):
+    """Defines a custom runtime configuration to use while running a query on a dataset."""
 
     dataset_id: str
     conf: dict[str, Any]
@@ -418,8 +470,8 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         default=[],
         description="Defines the order in which to map the dimensions of datasets.",
     )
-    spark_conf_per_dataset: list[SparkConfByDataset] = Field(
-        description="Apply these Spark configuration settings while a dataset is being processed.",
+    runtime_conf_per_dataset: list[RuntimeConfByDataset] = Field(
+        description="Apply these runtime configuration settings while a dataset is being processed.",
         default=[],
     )
 
@@ -442,13 +494,13 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         source_dataset_ids: set[str] = set()
         for src_dataset in self.dataset.source_datasets:
             source_dataset_ids.update(src_dataset.list_source_dataset_ids())
-        for item in itertools.chain(self.mapping_plans, self.spark_conf_per_dataset):
+        for item in itertools.chain(self.mapping_plans, self.runtime_conf_per_dataset):
             if item.dataset_id not in source_dataset_ids:
                 msg = f"Dataset {item.dataset_id} is not a source dataset"
                 raise ValueError(msg)
         return self
 
-    @field_validator("mapping_plans", "spark_conf_per_dataset")
+    @field_validator("mapping_plans", "runtime_conf_per_dataset")
     @classmethod
     def check_duplicate_dataset_ids(cls, value: list) -> list:
         dataset_ids: set[str] = set()
@@ -475,9 +527,9 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
                 return mapper
         return None
 
-    def get_spark_conf(self, dataset_id: str) -> dict[str, Any]:
-        """Return the Spark settings to apply while processing dataset_id."""
-        for dataset in self.spark_conf_per_dataset:
+    def get_runtime_conf(self, dataset_id: str) -> dict[str, Any]:
+        """Return the runtime settings to apply while processing dataset_id."""
+        for dataset in self.runtime_conf_per_dataset:
             if dataset.dataset_id == dataset_id:
                 return dataset.conf
         return {}
@@ -519,8 +571,20 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     table_format: TableFormatModel = StackedTableFormatModel()
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     sort_columns: list[str] = Field(
-        description="Sort the results by these dimension names.",
+        description="Sort the results by these dimension names. This always orders the "
+        "dataframe returned by the query. It orders the output file as well only on "
+        "DuckDB, which writes a single file; on Spark the output is a directory of part "
+        "files that reads back in split order rather than sort order. Set "
+        "single_output_file to make the file itself ordered.",
         default=[],
+    )
+    single_output_file: bool = Field(
+        description="Write the result table as a single file. Only meaningful on Spark, "
+        "whose default distributed write produces a directory of part files; DuckDB "
+        "always writes a single file. Required for sort_columns to be preserved in the "
+        "output file itself. Costs write parallelism and routes the whole result through "
+        "one task, so it is off by default.",
+        default=False,
     )
     dimension_filters: list[DimensionFilters] = Field(
         description="Filters to apply to the result. Must contain columns in the result.",
@@ -536,7 +600,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
 
     @model_validator(mode="after")
     def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
-        if self.table_format.format_type == ValueFormat.PIVOTED:
+        if isinstance(self.table_format, PivotedTableFormatModel):
             pivoted_dim_type = self.table_format.pivoted_dimension_type
             for agg in self.aggregations:
                 names = getattr(agg.dimensions, pivoted_dim_type.value)
@@ -605,7 +669,7 @@ class ProjectQueryModel(QueryBaseModel):
     def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
         exclude = {
-            "spark_conf_per_dataset",  # Doesn't change the query.
+            "runtime_conf_per_dataset",  # Doesn't change the query.
             "version",  # We use the project major version as a separate field.
         }
         return self.project.model_dump(mode="json", exclude=exclude)
@@ -716,7 +780,7 @@ class CreateCompositeDatasetQueryModel(QueryBaseModel):
 
     def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
-        return self.project.model_dump(mode="json", exclude="spark_conf_per_dataset")
+        return self.project.model_dump(mode="json", exclude="runtime_conf_per_dataset")
 
 
 class CompositeDatasetQueryModel(QueryBaseModel):

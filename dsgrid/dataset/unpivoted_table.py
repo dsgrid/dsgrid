@@ -1,7 +1,13 @@
 import logging
+from typing import Sequence
+
+import ibis
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.ibis.aggregations import find_aggregation_spec, sql_aggregate_expression
+from dsgrid.ibis.backend import get_runtime_backend
+from dsgrid.ibis.operations import create_temp_view, handle_column_spaces
 from dsgrid.query.models import (
     AggregationModel,
     ColumnModel,
@@ -9,7 +15,7 @@ from dsgrid.query.models import (
     DatasetDimensionsMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
-from dsgrid.spark.types import DataFrame
+
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.dataset.table_format_handler_base import TableFormatHandlerBase
 
@@ -21,7 +27,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
     """Implements behavior for tables stored in unpivoted format."""
 
     def process_aggregations(
-        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
+        self, df: ibis.Table, aggregations: list[AggregationModel], context: QueryContext
     ):
         orig_id = id(df)
         df = self.process_stacked_aggregations(df, aggregations, context)
@@ -35,13 +41,13 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
 
         Parameters
         ----------
-        df : pyspark.sql.DataFrame
+        df : ibis.Table
         aggregations : AggregationModel
         context : QueryContext
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        ibis.Table
 
         """
         if not aggregations:
@@ -72,7 +78,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             df = self.add_columns(df, columns, context, [VALUE_COLUMN])
             group_by_cols = self._build_group_by_columns(columns, context, final_metadata)
             op = agg.aggregation_function
-            df = df.groupBy(*group_by_cols).agg(op(VALUE_COLUMN).alias(VALUE_COLUMN))
+            df = _aggregate_value(df, group_by_cols, op.name)
 
             if metric_query_name not in dim_type_to_base_query_name[DimensionType.METRIC]:
                 to_dim = self.project_config.get_dimension_with_records(metric_query_name)
@@ -119,3 +125,60 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
             msg = f"Bug: unhandled: {context.model.result.column_type}"
             raise NotImplementedError(msg)
     return metric_column
+
+
+def _aggregate_value(df: ibis.Table, group_by_cols: list[str], op_name: str) -> ibis.Table:
+    # Fast path: registered reductions over bare group-by columns dispatch
+    # through native Ibis, keeping the chain lazy. Everything else takes the
+    # SQL path below. Unregistered names must not reach the fast path:
+    # resolving an arbitrary identifier against the Ibis column API could
+    # pick a scalar method (e.g. ``round``), which is invalid inside
+    # ``aggregate()``.
+    spec = find_aggregation_spec(op_name)
+    bare_cols = [col for col in group_by_cols if _looks_like_bare_column(col, df.columns)]
+    if spec is not None and len(bare_cols) == len(group_by_cols):
+        agg_method = getattr(df[VALUE_COLUMN], spec.ibis_method)
+        return df.group_by(bare_cols).aggregate(**{VALUE_COLUMN: agg_method()})
+
+    # SQL-string fallback for group-by entries that carry function calls or
+    # aliases (e.g. ``year(timestamp) AS year``); these would require parsing
+    # the SQL fragment back into Ibis exprs, which the SQL round-trip avoids.
+    view = create_temp_view(df)
+    select_cols = ", ".join(_select_expr(x) for x in group_by_cols)
+    group_cols = ", ".join(_group_by_expr(x) for x in group_by_cols)
+    agg_expr = sql_aggregate_expression(op_name, handle_column_spaces(VALUE_COLUMN))
+    query = (
+        f"SELECT {select_cols}, {agg_expr} " f"AS {handle_column_spaces(VALUE_COLUMN)} FROM {view}"
+    )
+    if group_cols:
+        query += f" GROUP BY {group_cols}"
+    return get_runtime_backend().sql(query)
+
+
+def _looks_like_bare_column(expr: str, columns: Sequence[str]) -> bool:
+    """True if ``expr`` is a plain column reference (no function, alias, or
+    quoting) that exists in the table's columns."""
+    if "(" in expr or " AS " in expr:
+        return False
+    if (expr.startswith('"') and expr.endswith('"')) or (
+        expr.startswith("`") and expr.endswith("`")
+    ):
+        return False
+    return expr in columns
+
+
+def _group_by_expr(select_expr: str) -> str:
+    marker = " AS "
+    if marker in select_expr:
+        return select_expr.rsplit(marker, 1)[1]
+    return _select_expr(select_expr)
+
+
+def _select_expr(expr: str) -> str:
+    if "(" in expr or " AS " in expr:
+        return expr
+    if (expr.startswith('"') and expr.endswith('"')) or (
+        expr.startswith("`") and expr.endswith("`")
+    ):
+        return expr
+    return handle_column_spaces(expr)

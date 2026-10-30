@@ -1,0 +1,818 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Submission Checks" href="submission_checks.html"><link rel="prev" title="Dataset Submittal" href="index.html">
+
+    <!-- Generated with Sphinx 7.4.7 and Furo 2025.12.19 -->
+        <title>Submission Process - dsgrid 0.5.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/design-style.1e8bd061cd6da7fc9cf755528e8ffc24.min.css?v=0a3b3ea7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=e83df60f" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.5.1 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">dsgrid 0.5.1 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../getting_started/index.html">Getting Started</a><input aria-label="Toggle navigation of Getting Started" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/data_users.html">Data Users</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_submitters.html">Dataset Submitters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/dataset_mappers.html">Dataset Mappers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../getting_started/project_coordinators.html">Project Coordinators</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../published_data/index.html">Published Data</a><input aria-label="Toggle navigation of Published Data" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../published_data/published_datasets.html">Published Datasets</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../published_data/working_with_published_data/index.html">Working with Published Data</a><input aria-label="Toggle navigation of Working with Published Data" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/tutorial.html">Query a Dataset with Python</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../published_data/working_with_published_data/visualize_with_tableau.html">Visualize Data with Tableau</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../fundamentals.html">dsgrid Fundamentals</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../tutorials/index.html">Tutorials</a><input aria-label="Toggle navigation of Tutorials" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/define_dimension_associations.html">Define Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_dataset.html">Query a Dataset</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/map_dataset.html">Map a Dataset to a Project’s Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/query_project.html">Query a Project</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tutorials/create_derived_dataset.html">Create a Derived Dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../how_tos/index.html">How-To Guides</a><input aria-label="Toggle navigation of How-To Guides" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimensions.html">How to Create Dataset Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimension_associations.html">How to Handle Dimension Associations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_dimension_mappings.html">How to Create Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_base_dimensions.html">How to Create Project Base Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_supplemental_dimensions.html">How to Create Project Supplemental Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_time_dimension.html">How to Define a Time Dimension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/how_to_filter.html">How to Filter a Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/run_on_kestrel.html">How to Run dsgrid on Kestrel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../how_tos/spark_cluster_on_kestrel.html">How to Start a Spark Cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_registration/index.html">Dataset Registration</a><input aria-label="Toggle navigation of Dataset Registration" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dimension_concepts.html">Dimension Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/dataset_concepts.html">Dataset Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/data_file_formats.html">Data File Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_registration/registration_checks.html">Registration Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dataset_mapping/index.html">Dataset Mapping</a><input aria-label="Toggle navigation of Dataset Mapping" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mapping_concepts.html">Dimension Mapping Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dimension_mapping_types.html">Dimension Mapping Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dataset_mapping/dataset_query_concepts.html">Dataset Query Concepts</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Dataset Submittal</a><input aria-label="Toggle navigation of Dataset Submittal" checked="" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Submission Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="submission_checks.html">Submission Checks</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_creation/index.html">Project Creation</a><input aria-label="Toggle navigation of Project Creation" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_creation/project_concepts.html">Project Concepts</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_queries/index.html">Project Queries</a><input aria-label="Toggle navigation of Project Queries" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" role="switch" type="checkbox"/><label for="toctree-checkbox-11"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/project_query_concepts.html">Project Query Concepts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../project_queries/output_formats.html">Output Formats</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../project_derived_datasets/index.html">Project Derived Datasets</a><input aria-label="Toggle navigation of Project Derived Datasets" class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" role="switch" type="checkbox"/><label for="toctree-checkbox-12"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../project_derived_datasets/concepts.html">Derived Dataset Concepts</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../apache_spark/index.html">Apache Spark</a><input aria-label="Toggle navigation of Apache Spark" class="toctree-checkbox" id="toctree-checkbox-13" name="toctree-checkbox-13" role="switch" type="checkbox"/><label for="toctree-checkbox-13"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../apache_spark/overview.html">Apache Spark Overview</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../software_reference/index.html">Software Reference</a><input aria-label="Toggle navigation of Software Reference" class="toctree-checkbox" id="toctree-checkbox-14" name="toctree-checkbox-14" role="switch" type="checkbox"/><label for="toctree-checkbox-14"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/architecture.html">Software Architecture</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../software_reference/data_models/index.html">Data Models</a><input aria-label="Toggle navigation of Data Models" class="toctree-checkbox" id="toctree-checkbox-15" name="toctree-checkbox-15" role="switch" type="checkbox"/><label for="toctree-checkbox-15"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_model.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_classes.html">Dimension Record Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_model.html">Dataset Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_model.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/registration_model.html">Bulk Registration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/dataset_query_model.html">Dataset Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/project_query_model.html">Project Query</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../software_reference/data_models/enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/cli_reference.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../software_reference/python_api.html">Python API</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../developer_guide/index.html">Developer Guide</a><input aria-label="Toggle navigation of Developer Guide" class="toctree-checkbox" id="toctree-checkbox-16" name="toctree-checkbox-16" role="switch" type="checkbox"/><label for="toctree-checkbox-16"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../developer_guide/how_tos/how_to_convert_time_zone.html">How to Convert Time Zones</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../publications.html">Publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../citation.html">Software Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../contact.html">Contact</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../../_sources/user_guide/dataset_submittal/submission_process.md.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="submission-process">
+<h1>Submission Process<a class="headerlink" href="#submission-process" title="Link to this heading">¶</a></h1>
+<p>Submitting a dataset to a project connects a registered dataset to a specific
+project in the dsgrid registry. During submission, dsgrid registers any new
+dimension mappings, identifies which project base dimension each dataset
+dimension maps to, and validates that the mapped dataset covers all dimension
+combinations the project requires. On success, the dataset’s status within the
+project changes from <code class="docutils literal notranslate"><span class="pre">UNREGISTERED</span></code> to <code class="docutils literal notranslate"><span class="pre">REGISTERED</span></code>.</p>
+<p>This page covers the commands, mapping file formats, and end-to-end workflow. For
+the validation checks that run during submission, see
+<a class="reference internal" href="submission_checks.html"><span class="doc std std-doc">Submission Checks</span></a>.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>The dataset is registered in the dsgrid registry (via
+<code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">datasets</span> <span class="pre">register</span></code>).</p></li>
+<li><p>The project is registered and the dataset is listed in the project’s
+<code class="docutils literal notranslate"><span class="pre">datasets</span></code> configuration (with status <code class="docutils literal notranslate"><span class="pre">UNREGISTERED</span></code>).</p></li>
+<li><p>Dimension mappings have been created for every dimension type where the
+dataset’s dimension differs from the project’s base dimension. See
+<a class="reference internal" href="../how_tos/how_to_dimension_mappings.html"><span class="doc std std-doc">How to Create Dimension Mappings</span></a>.</p></li>
+</ul>
+<p>If a dataset dimension is identical to the corresponding project base
+dimension (same <code class="docutils literal notranslate"><span class="pre">dimension_id</span></code> and <code class="docutils literal notranslate"><span class="pre">version</span></code>), no mapping is needed for
+that dimension type — dsgrid recognizes the match automatically.</p>
+</section>
+<section id="commands">
+<h2>Commands<a class="headerlink" href="#commands" title="Link to this heading">¶</a></h2>
+<p>dsgrid provides two commands for submitting a dataset to a project. Both
+perform the same validation; they differ in whether the dataset is already
+registered.</p>
+<section id="submit-dataset-dataset-already-registered">
+<h3><code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code> (dataset already registered)<a class="headerlink" href="#submit-dataset-dataset-already-registered" title="Link to this heading">¶</a></h3>
+<p>Use this when the dataset has already been registered separately with
+<code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">datasets</span> <span class="pre">register</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-p<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-d<span class="w"> </span>&lt;dataset-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-m<span class="w"> </span>dimension_mappings.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-l<span class="w"> </span><span class="s2">"Submit dataset to project."</span>
+</pre></div>
+</div>
+</section>
+<section id="register-and-submit-dataset-combined-operation">
+<h3><code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code> (combined operation)<a class="headerlink" href="#register-and-submit-dataset-combined-operation" title="Link to this heading">¶</a></h3>
+<p>Use this to register and submit in a single transaction. If any step fails,
+the entire operation rolls back — the dataset is not left partially registered.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>register-and-submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-c<span class="w"> </span>dataset.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-p<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-m<span class="w"> </span>dimension_mappings.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-l<span class="w"> </span><span class="s2">"Register and submit dataset to project."</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">-D</span></code> / <code class="docutils literal notranslate"><span class="pre">--data-base-dir</span></code> option lets you specify a base directory for data
+file paths if they are not relative to the config file location:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>register-and-submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-c<span class="w"> </span>dataset.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-p<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-m<span class="w"> </span>dimension_mappings.json5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-D<span class="w"> </span>/path/to/data<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-l<span class="w"> </span><span class="s2">"Register and submit dataset to project."</span>
+</pre></div>
+</div>
+</section>
+<section id="choosing-between-the-two-commands">
+<h3>Choosing between the two commands<a class="headerlink" href="#choosing-between-the-two-commands" title="Link to this heading">¶</a></h3>
+<div class="table-wrapper docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Aspect</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Dataset registration</p></td>
+<td><p>Must be done beforehand</p></td>
+<td><p>Happens automatically</p></td>
+</tr>
+<tr class="row-odd"><td><p>Transaction scope</p></td>
+<td><p>Submission only</p></td>
+<td><p>Registration + submission</p></td>
+</tr>
+<tr class="row-even"><td><p>Rollback on failure</p></td>
+<td><p>Only submission rolls back</p></td>
+<td><p>Both registration and submission roll back</p></td>
+</tr>
+<tr class="row-odd"><td><p>When to use</p></td>
+<td><p>Iterating on submission after dataset is stable</p></td>
+<td><p>First-time submission, or when you want an atomic operation</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you are iterating on dimension mappings and the dataset itself is already
+correct, use <code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code> to avoid re-registering the dataset on each
+attempt.</p>
+</div>
+</section>
+</section>
+<section id="providing-dimension-mappings">
+<h2>Providing Dimension Mappings<a class="headerlink" href="#providing-dimension-mappings" title="Link to this heading">¶</a></h2>
+<p>Dimension mappings tell dsgrid how to transform dataset dimensions into
+project base dimensions. There are two ways to provide mappings at
+submission time, controlled by the <code class="docutils literal notranslate"><span class="pre">-m</span></code> and <code class="docutils literal notranslate"><span class="pre">-r</span></code> options. Both options work the
+same way for <code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code> and <code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>dsgrid accepts <code class="docutils literal notranslate"><span class="pre">-m</span></code> and <code class="docutils literal notranslate"><span class="pre">-r</span></code> together and combines the resulting mapping
+references. Avoid supplying more than one mapping for the same dimension type.</p>
+</div>
+<section id="option-1-m-with-new-mappings">
+<h3>Option 1: <code class="docutils literal notranslate"><span class="pre">-m</span></code> with new mappings<a class="headerlink" href="#option-1-m-with-new-mappings" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">-m</span></code> / <code class="docutils literal notranslate"><span class="pre">--dimension-mapping-file</span></code> option accepts a JSON5 file that
+references CSV mapping record files. dsgrid registers these mappings
+automatically during submission.</p>
+<p>The file must match the
+<a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html#datasetbasetoprojectmappingtablelistmodel"><span class="std std-ref">DatasetBaseToProjectMappingTableListModel</span></a>
+schema:</p>
+<div class="highlight-json5 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nv">mappings</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nv">description</span><span class="p">:</span><span class="w"> </span><span class="s">"County to project county mapping"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">dimension_type</span><span class="p">:</span><span class="w"> </span><span class="s">"geography"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">file</span><span class="p">:</span><span class="w"> </span><span class="s">"dimension_mappings/county_to_county.csv"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">mapping_type</span><span class="p">:</span><span class="w"> </span><span class="s">"many_to_one_aggregation"</span><span class="p">,</span>
+<span class="w">      </span><span class="c1">// Required only if the project has multiple base dimensions</span>
+<span class="w">      </span><span class="c1">// of this type:</span>
+<span class="w">      </span><span class="c1">// project_base_dimension_name: "US Counties 2020 L48",</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nv">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Model year interpolation"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">dimension_type</span><span class="p">:</span><span class="w"> </span><span class="s">"model_year"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">file</span><span class="p">:</span><span class="w"> </span><span class="s">"dimension_mappings/model_year_to_model_year.csv"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">mapping_type</span><span class="p">:</span><span class="w"> </span><span class="s">"many_to_many_explicit_multipliers"</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Each entry specifies:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">dimension_type</span></code></strong> — The dimension type being mapped (e.g., <code class="docutils literal notranslate"><span class="pre">geography</span></code>,
+<code class="docutils literal notranslate"><span class="pre">model_year</span></code>).</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">file</span></code></strong> — Path to a CSV file with <code class="docutils literal notranslate"><span class="pre">from_id</span></code>, <code class="docutils literal notranslate"><span class="pre">to_id</span></code>, and optionally
+<code class="docutils literal notranslate"><span class="pre">from_fraction</span></code> columns. Paths are relative to the mapping config file.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">mapping_type</span></code></strong> — The mapping operation. See
+<a class="reference internal" href="../dataset_mapping/dimension_mapping_types.html"><span class="doc std std-doc">Dimension Mapping Types</span></a>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">project_base_dimension_name</span></code></strong> — Required only when the project has
+multiple base dimensions of the same type (e.g., several metric base
+dimensions). Set it to the <code class="docutils literal notranslate"><span class="pre">name</span></code> of the target project base dimension.</p></li>
+</ul>
+<p>dsgrid identifies the source dimension (from the dataset) and target dimension
+(from the project) automatically based on the <code class="docutils literal notranslate"><span class="pre">dimension_type</span></code> and, if
+provided, <code class="docutils literal notranslate"><span class="pre">project_base_dimension_name</span></code>.</p>
+</section>
+<section id="option-2-r-with-pre-registered-mapping-references">
+<h3>Option 2: <code class="docutils literal notranslate"><span class="pre">-r</span></code> with pre-registered mapping references<a class="headerlink" href="#option-2-r-with-pre-registered-mapping-references" title="Link to this heading">¶</a></h3>
+<p>If the mappings have already been registered (e.g., via
+<code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">dimension-mappings</span> <span class="pre">register</span></code>), use <code class="docutils literal notranslate"><span class="pre">-r</span></code> /
+<code class="docutils literal notranslate"><span class="pre">--dimension-mapping-references-file</span></code> to reference them by ID. The file must
+match the
+<a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html#dimensionmappingreferencelistmodel"><span class="std std-ref">DimensionMappingReferenceListModel</span></a>
+schema:</p>
+<div class="highlight-json5 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nv">references</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nv">from_dimension_type</span><span class="p">:</span><span class="w"> </span><span class="s">"geography"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">to_dimension_type</span><span class="p">:</span><span class="w"> </span><span class="s">"geography"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">mapping_id</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;mapping-uuid&gt;"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0.0"</span><span class="p">,</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This path can be used simply because the mapping has already been registered, or because
+you would like to fully specify the source and target dimensions by id. In the latter case,
+specifying the mapping becomes a two step process. First, write a
+<a class="reference internal" href="../../software_reference/data_models/dimension_mapping_model.html#dimensionmappingsconfigmodel"><span class="std std-ref">DimensionMappingsConfigModel</span></a>
+file and register it with <code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">dimension-mappings</span> <span class="pre">register</span></code>:</p>
+<div class="highlight-json5 notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nv">mappings</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nv">description</span><span class="p">:</span><span class="w"> </span><span class="s">"County to project county mapping"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">file</span><span class="p">:</span><span class="w"> </span><span class="s">"dimension_mappings/county_to_county.csv"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">mapping_type</span><span class="p">:</span><span class="w"> </span><span class="s">"many_to_one_aggregation"</span><span class="p">,</span>
+<span class="w">      </span><span class="nv">from_dimension</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nv">type</span><span class="p">:</span><span class="w"> </span><span class="s">"geography"</span><span class="p">,</span>
+<span class="w">        </span><span class="nv">dimension_id</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;dataset-geography-id&gt;"</span><span class="p">,</span>
+<span class="w">        </span><span class="nv">version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0.0"</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nv">to_dimension</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nv">type</span><span class="p">:</span><span class="w"> </span><span class="s">"geography"</span><span class="p">,</span>
+<span class="w">        </span><span class="nv">dimension_id</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;project-geography-id&gt;"</span><span class="p">,</span>
+<span class="w">        </span><span class="nv">version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0.0"</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>(Use <code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">dimensions</span> <span class="pre">list</span></code> to find the <code class="docutils literal notranslate"><span class="pre">dimension_id</span></code> values for
+your dataset and project dimensions.) Second, use <code class="docutils literal notranslate"><span class="pre">dsgrid</span> <span class="pre">registry</span> <span class="pre">dimension-mappings</span> <span class="pre">list</span></code>
+to find the new <code class="docutils literal notranslate"><span class="pre">mapping_id</span></code> and enter that in the dimension mapping references file.</p>
+</section>
+<section id="when-no-mappings-are-needed">
+<h3>When no mappings are needed<a class="headerlink" href="#when-no-mappings-are-needed" title="Link to this heading">¶</a></h3>
+<p>If every dataset dimension is identical to the corresponding project base
+dimension (same registered dimension), you can omit both <code class="docutils literal notranslate"><span class="pre">-m</span></code> and <code class="docutils literal notranslate"><span class="pre">-r</span></code>.
+dsgrid will detect that no transformation is needed.</p>
+</section>
+</section>
+<section id="auto-generated-reverse-supplemental-mappings">
+<h2>Auto-Generated Reverse Supplemental Mappings<a class="headerlink" href="#auto-generated-reverse-supplemental-mappings" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">-a</span></code> / <code class="docutils literal notranslate"><span class="pre">--autogen-reverse-supplemental-mappings</span></code> option handles a special
+case: when a dataset’s dimension is actually one of the project’s
+<em>supplemental</em> dimensions (not a base dimension) and the project already has a
+base-to-supplemental mapping registered for that dimension type.</p>
+<p>Every dimension type listed with <code class="docutils literal notranslate"><span class="pre">-a</span></code> must use one of the project’s
+supplemental dimensions in the dataset and must not already have a mapping
+provided through <code class="docutils literal notranslate"><span class="pre">-m</span></code> or <code class="docutils literal notranslate"><span class="pre">-r</span></code>; otherwise submission fails. For each such
+dimension, dsgrid looks in the project’s dimension mappings for one from that
+supplemental dimension to the base dimension and uses it if found. If not, it
+takes the project’s base → supplemental mapping, swaps <code class="docutils literal notranslate"><span class="pre">from_id</span></code> and <code class="docutils literal notranslate"><span class="pre">to_id</span></code>,
+drops <code class="docutils literal notranslate"><span class="pre">from_fraction</span></code>, and registers the result as a
+<code class="docutils literal notranslate"><span class="pre">many_to_many_explicit_multipliers</span></code> mapping. This operation only proceeds if the original
+mapping’s <code class="docutils literal notranslate"><span class="pre">from_fraction</span></code> values are empty or all 1.0 and after the operation is complete,
+every reversed record also has an (implied) multiplier of 1.0.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>submit-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-p<span class="w"> </span>my-project<span class="w"> </span>-d<span class="w"> </span>my-dataset<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-a<span class="w"> </span>subsector<span class="w"> </span>-a<span class="w"> </span>metric<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-l<span class="w"> </span><span class="s2">"Submit with auto-generated reverse mappings"</span>
+</pre></div>
+</div>
+<p>This is most useful when a dataset’s subsector or metric dimension uses
+categories that match a project’s supplemental (aggregated) view of those
+dimensions.</p>
+</section>
+<section id="understanding-project-requirements">
+<h2>Understanding Project Requirements<a class="headerlink" href="#understanding-project-requirements" title="Link to this heading">¶</a></h2>
+<p>Before submitting, it is important to understand what dimension records the
+project expects from your dataset. This is controlled by the
+<code class="docutils literal notranslate"><span class="pre">required_dimensions</span></code> field in the project config’s <code class="docutils literal notranslate"><span class="pre">datasets</span></code> entry for your
+dataset.</p>
+<section id="where-to-find-requirements">
+<h3>Where to find requirements<a class="headerlink" href="#where-to-find-requirements" title="Link to this heading">¶</a></h3>
+<p>Look at the project config file (typically <code class="docutils literal notranslate"><span class="pre">project.json5</span></code> in the project’s
+config repository). Find your dataset in the <code class="docutils literal notranslate"><span class="pre">datasets</span></code> list and examine its
+<code class="docutils literal notranslate"><span class="pre">required_dimensions</span></code> field. You can also use the CLI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Dump the project config to inspect it locally</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>output_dir<span class="w"> </span><span class="c1"># output_dir must exist</span>
+dsgrid<span class="w"> </span>registry<span class="w"> </span>projects<span class="w"> </span>dump<span class="w"> </span>&lt;project-id&gt;<span class="w"> </span>-d<span class="w"> </span>output_dir/
+</pre></div>
+</div>
+</section>
+<section id="how-requirements-work">
+<h3>How requirements work<a class="headerlink" href="#how-requirements-work" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">required_dimensions</span></code> field has two sections:</p>
+<p><strong><code class="docutils literal notranslate"><span class="pre">single_dimensional</span></code></strong> — Specifies required records for individual dimension
+types. For example, if the project has residential, commercial, and
+transportation sectors but your dataset only covers transportation:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">required_dimensions</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">single_dimensional</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">sector</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">base</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">record_ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"transportation"</span><span class="p">]},</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong><code class="docutils literal notranslate"><span class="pre">multi_dimensional</span></code></strong> — Specifies required records as combinations across
+dimension types. Use this when only specific cross-dimensional combinations are
+required (rather than the full cross-join):</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="nx">required_dimensions</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">multi_dimensional</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nx">sector</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">base</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">record_ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"commercial"</span><span class="p">]}},</span>
+<span class="w">      </span><span class="nx">subsector</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">base</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="nx">record_ids</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"office"</span><span class="p">,</span><span class="w"> </span><span class="s2">"retail"</span><span class="p">]}},</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="key-conventions">
+<h3>Key conventions<a class="headerlink" href="#key-conventions" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">record_ids:</span> <span class="pre">[&quot;__all__&quot;]</span></code></strong> — The dataset must provide all records from
+the project’s base dimension of that type. This is the default when no
+requirement is specified.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">base_missing</span></code></strong> — Lists records the dataset does <em>not</em> need to provide.
+dsgrid computes the required set as the base dimension records minus the
+<code class="docutils literal notranslate"><span class="pre">base_missing</span></code> records.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">subset</span></code></strong> — References a project subset dimension to define requirements.</p></li>
+</ul>
+<p>See the <a class="reference internal" href="../../software_reference/data_models/project_model.html#inputdatasetmodel"><span class="std std-ref">InputDatasetModel</span></a>
+and <a class="reference internal" href="../../software_reference/data_models/project_model.html#requireddimensionsmodel"><span class="std std-ref">RequiredDimensionsModel</span></a>
+reference for the full specification.</p>
+</section>
+</section>
+<section id="what-happens-during-submission">
+<h2>What Happens During Submission<a class="headerlink" href="#what-happens-during-submission" title="Link to this heading">¶</a></h2>
+<p>Submission proceeds through these stages:</p>
+<ol class="arabic simple">
+<li><p><strong>Status check</strong> — dsgrid confirms the project is registered and the
+dataset’s status is <code class="docutils literal notranslate"><span class="pre">UNREGISTERED</span></code>.</p></li>
+<li><p><strong>Register mappings</strong> — If a mapping file is provided (<code class="docutils literal notranslate"><span class="pre">-m</span></code>), dsgrid
+registers the new dimension mappings.</p></li>
+<li><p><strong>Validate mapping references</strong> — If a references file is provided (<code class="docutils literal notranslate"><span class="pre">-r</span></code>),
+dsgrid confirms each referenced mapping exists in the registry.</p></li>
+<li><p><strong>Auto-generate reverse mappings</strong> — If <code class="docutils literal notranslate"><span class="pre">-a</span></code> is specified, dsgrid creates
+reverse supplemental mappings as needed.</p></li>
+<li><p><strong>Time zone check</strong> — If the dataset’s or the project’s time dimension
+needs per-geography time zones (a datetime or index time dimension with
+<code class="docutils literal notranslate"><span class="pre">aligned_in_std_clock_time</span></code>, or any representative-period time dimension),
+dsgrid confirms that the project’s base geography dimension records include
+a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column with valid IANA time zones. During a project query,
+dsgrid reads time zones from those records when the data does not already
+carry a <code class="docutils literal notranslate"><span class="pre">time_zone</span></code> column. See
+<a class="reference internal" href="../dataset_registration/data_file_formats.html#id8"><span class="std std-ref">Time Zone Column Sourcing</span></a>.</p></li>
+<li><p><strong>Identify base dimensions</strong> — dsgrid determines which project base
+dimension each dataset dimension maps to. See
+<a class="reference internal" href="submission_checks.html#base-dimension-identification"><span class="std std-ref">Base Dimension Identification</span></a>.</p></li>
+<li><p><strong>Completeness check</strong> — dsgrid verifies the mapped dataset covers all
+required dimension combinations. See
+<a class="reference internal" href="submission_checks.html#dataset-to-project-mapping-completeness"><span class="std std-ref">Dataset-to-Project Mapping Completeness</span></a>.</p></li>
+<li><p><strong>Update project config</strong> — On success, dsgrid records the mapping
+references and base dimension names in the project config, sets the
+dataset’s status to <code class="docutils literal notranslate"><span class="pre">REGISTERED</span></code>, and (if all datasets are now submitted)
+updates the project status to <code class="docutils literal notranslate"><span class="pre">COMPLETE</span></code>.</p></li>
+</ol>
+<p>If any step fails, the transaction rolls back and the dataset remains
+<code class="docutils literal notranslate"><span class="pre">UNREGISTERED</span></code>.</p>
+</section>
+<section id="iterating-on-failures">
+<h2>Iterating on Failures<a class="headerlink" href="#iterating-on-failures" title="Link to this heading">¶</a></h2>
+<p>Submission failures are usually caused by mapping errors or missing dimension
+combinations. The typical iteration cycle is:</p>
+<ol class="arabic simple">
+<li><p><strong>Run the submit command.</strong></p></li>
+<li><p><strong>Read the error output.</strong> dsgrid first compares the distinct values in each
+column. If any are missing, it logs “The mapped dataset has different
+distinct values than the project for column=…” with up to 100 of the
+missing values, and stops before the full combination check.</p></li>
+<li><p><strong>If the combination check fails</strong>, review the outputs dsgrid writes to
+the current directory: the full list of missing combinations and, if the
+Rust extension is available, minimal-pattern files in <code class="docutils literal notranslate"><span class="pre">./missing_associations/</span></code>.
+These are the same outputs that dataset registration produces; see
+<a class="reference internal" href="../how_tos/how_to_dimension_associations.html#review-generated-outputs"><span class="std std-ref">How to Handle Dimension Associations</span></a>.
+At submission, the combinations use the project’s record IDs (after
+mapping), not the dataset’s.</p></li>
+<li><p><strong>Fix the mapping CSV</strong> or update the dataset, then re-run.</p></li>
+</ol>
+<p>See the <a class="reference internal" href="submission_checks.html#troubleshooting"><span class="std std-ref">Troubleshooting</span></a> section of
+Submission Checks for common error messages and solutions.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>When iterating, use <code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code> rather than <code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code>
+to avoid re-registering the dataset each time. You only need to re-register
+the dataset if the data or dimensions change.</p>
+</div>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="submission_checks.html"><span class="doc std std-doc">Submission Checks</span></a> — Detailed description of each validation</p></li>
+<li><p><a class="reference internal" href="../how_tos/how_to_dimension_mappings.html"><span class="doc std std-doc">How to Create Dimension Mappings</span></a> — Step-by-step mapping guide</p></li>
+<li><p><a class="reference internal" href="../dataset_mapping/dimension_mapping_concepts.html"><span class="doc std std-doc">Dimension Mapping Concepts</span></a> — Config structure reference</p></li>
+<li><p><a class="reference internal" href="../dataset_mapping/dimension_mapping_types.html"><span class="doc std std-doc">Dimension Mapping Types</span></a> — Type selection guide</p></li>
+<li><p><a class="reference internal" href="../tutorials/create_and_submit_dataset.html"><span class="doc std std-doc">Create and Submit a Dataset</span></a> — End-to-end tutorial</p></li>
+<li><p><a class="reference internal" href="../tutorials/map_dataset.html"><span class="doc std std-doc">Map a Dataset</span></a> — Post-submission mapping to project dimensions</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="submission_checks.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Submission Checks</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Dataset Submittal</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2026, Alliance for Energy Innovation, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Submission Process</a><ul>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#commands">Commands</a><ul>
+<li><a class="reference internal" href="#submit-dataset-dataset-already-registered"><code class="docutils literal notranslate"><span class="pre">submit-dataset</span></code> (dataset already registered)</a></li>
+<li><a class="reference internal" href="#register-and-submit-dataset-combined-operation"><code class="docutils literal notranslate"><span class="pre">register-and-submit-dataset</span></code> (combined operation)</a></li>
+<li><a class="reference internal" href="#choosing-between-the-two-commands">Choosing between the two commands</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#providing-dimension-mappings">Providing Dimension Mappings</a><ul>
+<li><a class="reference internal" href="#option-1-m-with-new-mappings">Option 1: <code class="docutils literal notranslate"><span class="pre">-m</span></code> with new mappings</a></li>
+<li><a class="reference internal" href="#option-2-r-with-pre-registered-mapping-references">Option 2: <code class="docutils literal notranslate"><span class="pre">-r</span></code> with pre-registered mapping references</a></li>
+<li><a class="reference internal" href="#when-no-mappings-are-needed">When no mappings are needed</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#auto-generated-reverse-supplemental-mappings">Auto-Generated Reverse Supplemental Mappings</a></li>
+<li><a class="reference internal" href="#understanding-project-requirements">Understanding Project Requirements</a><ul>
+<li><a class="reference internal" href="#where-to-find-requirements">Where to find requirements</a></li>
+<li><a class="reference internal" href="#how-requirements-work">How requirements work</a></li>
+<li><a class="reference internal" href="#key-conventions">Key conventions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#what-happens-during-submission">What Happens During Submission</a></li>
+<li><a class="reference internal" href="#iterating-on-failures">Iterating on Failures</a></li>
+<li><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=d9b85e4f"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    <script src="../../_static/design-tabs.js?v=36754332"></script>
+    </body>
+</html>

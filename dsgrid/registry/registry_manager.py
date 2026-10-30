@@ -225,7 +225,7 @@ class RegistryManager:
         >>> from dsgrid.registry.registry_database import DatabaseConnection
         >>> manager = RegistryManager.load(
             DatabaseConnection(
-                hostname="dsgrid-registry.hpc.nrel.gov",
+                hostname="dsgrid-registry.hpc.nlr.gov",
                 database="standard-scenarios",
             )
         )

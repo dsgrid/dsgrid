@@ -35,7 +35,7 @@ def bulk_register(
 
     The JSON/JSON5 filename must match the data model defined by this documentation:
 
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel
+    https://dsgrid.github.io/dsgrid/software_reference/data_models/registration_model.html#registrationmodel
     """
     registration = RegistrationModel.from_file(registration_file)
     tmp_files = []

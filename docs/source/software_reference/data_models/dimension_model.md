@@ -566,3 +566,35 @@ Reference to a dimension stored in the registry
 | `version` | `str` | *(required)* | Version of the dimension. The version string must be in semver format (e.g., '1.0.0') and it must be a valid/existing version in the registry. |
 
 </div>
+
+
+---
+
+## DimensionsConfigModel
+
+*dsgrid.config.dimensions_config.DimensionsConfigModel*
+
+Represents multiple dimension models.
+
+Used when registering multiple dimensions in one command.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dimensions` | list[[DimensionModel](dimension_model.md#dimensionmodel) \| [DateTimeDimensionModel](dimension_model.md#datetimedimensionmodel) \| [AnnualTimeDimensionModel](dimension_model.md#annualtimedimensionmodel) \| [RepresentativePeriodTimeDimensionModel](dimension_model.md#representativeperiodtimedimensionmodel) \| [IndexTimeDimensionModel](dimension_model.md#indextimedimensionmodel) \| [NoOpTimeDimensionModel](dimension_model.md#nooptimedimensionmodel)] | *(required)* | Dimensions for submission to the dimension registry |
+
+</div>
+
+### Validators
+
+<div class="model-validators-table">
+
+| Name | Applies To | Description |
+|------|------------|-------------|
+| `check_files` | `check_files` | Validate dimension files are unique across all dimensions |
+| `check_names` | `check_names` | Validate dimension names are unique across all dimensions. |
+
+</div>

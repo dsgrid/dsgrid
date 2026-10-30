@@ -1,6 +1,6 @@
 # Query a Dataset with Python
 
-In this tutorial you will learn how to query data from a published dsgrid dataset using DuckDB and Python. We'll show you how to access data from from [OEDI](https://data.openei.org/) and from [NLR's HPC](https://www.nrel.gov/hpc/).
+In this tutorial you will learn how to query data from a published dsgrid dataset using DuckDB and Python. We'll show you how to access data from from [OEDI](https://data.openei.org/) and from [NLR's HPC](https://www.nlr.gov/hpc/).
 
 This tutorial uses the `state_level_simplified` dataset from the [tempo project](https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project) as an example and accomplishes the following:
 

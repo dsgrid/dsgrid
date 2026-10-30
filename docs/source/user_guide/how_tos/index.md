@@ -8,6 +8,7 @@ Quick reference guides for specific tasks and operations.
 browse_registry
 how_to_dimensions
 how_to_dimension_associations
+how_to_dimension_mappings
 how_to_base_dimensions
 how_to_supplemental_dimensions
 how_to_time_dimension

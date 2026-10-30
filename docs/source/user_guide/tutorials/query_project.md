@@ -216,5 +216,5 @@ The output table is a Parquet file. Inspect it with any Parquet-capable tool —
 ## Next Steps
 
 - Learn how to [filter queries](../how_tos/how_to_filter) for more specific results
-- Understand [query concepts](../project_queries/query_concepts) in more detail
+- Understand [project query concepts](../project_queries/project_query_concepts) in more detail
 - Explore [creating derived datasets](create_derived_dataset) from query results

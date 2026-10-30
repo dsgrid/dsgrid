@@ -1,6 +1,4 @@
-# Query Concepts
-
-## Project Queries
+# Project Query Concepts
 
 This section describes how dsgrid processes queries when you run the command `dsgrid query project run -o query_output`.
 
@@ -31,7 +29,7 @@ Currently, there is no way to skip caching of the dataset. If it is not performe
 
 7. **Replace IDs with names** - If the field `replace_ids_with_names` in the `result` data model is `true`, replace all dimension record IDs with names.
 
-8. **Sort columns** - If the field `sort_columns` in the `result` data model is `true`, sort the table by those columns.
+8. **Sort columns** - If the field `sort_columns` in the `result` data model lists any columns, sort the table by those columns. On the Spark backend, the output file is only sorted if `single_output_file` is also `true`.
 
 9. **Write output** - Evaluate the query for the previous steps by writing the table to the filesystem in the directory `query_output/<query-name>`.
 
@@ -59,5 +57,5 @@ You can choose to filter data before or after the datasets are mapped to the pro
 
 - Follow the [Query a Project Tutorial](../tutorials/query_project) for hands-on practice
 - Learn [how to filter queries](../how_tos/how_to_filter)
-- Explore [aggregation options](aggregations.md)
+- Explore [aggregation options](../../software_reference/data_models/dataset_query_model.md#aggregationmodel)
 - Understand [output formats](output_formats.md)

@@ -1,5 +1,8 @@
 import pytest
+from click.testing import CliRunner
 
+import dsgrid.cli.registry
+from dsgrid.cli.dsgrid import cli
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidParameter
@@ -75,3 +78,35 @@ def test_registry_list_filters(load_registry_manager):
     # test max_width and drop_fields
     registry_manager.show(max_width=40, drop_fields=["Submitter", "Date", "Datasets"])
     registry_manager.show(max_width={"Description": 30, "Date": 20})
+
+
+def test_registry_show_records(load_registry_manager):
+    """dsgrid registry dimensions|dimension-mappings show prints the records table."""
+    conn, manager = load_registry_manager
+    dim_id = next(
+        x.dimension_id
+        for x in manager.dimension_manager.db.iter_models()
+        if x.dimension_type.value == "geography"
+    )
+    mapping_id = next(x.mapping_id for x in manager.dimension_mapping_manager.db.iter_models())
+    runner = CliRunner()
+    for group, config_id, expected in (
+        ("dimensions", dim_id, "name"),
+        ("dimension-mappings", mapping_id, "from_id"),
+    ):
+        result = runner.invoke(cli, ["--url", conn.url, "registry", group, "show", config_id])
+        assert result.exit_code == 0, result.output
+        assert expected in result.output
+        assert "only showing top" not in result.output
+
+
+def test_registry_show_records_truncated(load_registry_manager, monkeypatch):
+    """dsgrid registry dimension-mappings show notes when it truncates the records table."""
+    conn, manager = load_registry_manager
+    mapping_id = next(x.mapping_id for x in manager.dimension_mapping_manager.db.iter_models())
+    monkeypatch.setattr(dsgrid.cli.registry, "MAX_RECORDS_TO_SHOW", 1)
+    result = CliRunner().invoke(
+        cli, ["--url", conn.url, "registry", "dimension-mappings", "show", mapping_id]
+    )
+    assert result.exit_code == 0, result.output
+    assert "only showing top 1 rows" in result.output

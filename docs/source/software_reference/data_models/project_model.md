@@ -508,3 +508,99 @@ need to be converted to get clock time load profiles.
 | `daylight_saving_adjustment` | [DaylightSavingAdjustmentModel](project_model.md#daylightsavingadjustmentmodel) | `spring_forward_hour=<DaylightSavingSpringForwardType.NONE: 'none'> fall_back_hour=<DaylightSavingFallBackType.NONE: 'none'>` | Daylight saving adjustment method applied to time data |
 
 </div>
+
+
+---
+
+## SubsetDimensionGroupListModel
+
+*dsgrid.config.project_config.SubsetDimensionGroupListModel*
+
+Defines a list of subset dimensions.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `subset_dimensions` | list[[SubsetDimensionGroupModel](project_model.md#subsetdimensiongroupmodel)] | *(required)* | List of subset dimensions to be registered |
+
+</div>
+
+
+---
+
+## SupplementalDimensionsListModel
+
+*dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel*
+
+Defines a list of supplemental dimensions.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `supplemental_dimensions` | list[[SupplementalDimensionModel](project_model.md#supplementaldimensionmodel)] | *(required)* | List of supplemental dimensions and mappings to be registered |
+
+</div>
+
+
+---
+
+## InputDatasetListModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetListModel*
+
+Base data model for all dsgrid data models
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `datasets` | list[[InputDatasetModel](project_model.md#inputdatasetmodel)] | *(required)* | List of input datasets for the project. |
+
+</div>
+
+
+---
+
+## InputDatasetDimensionRequirementsListModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel*
+
+Defines a list of dataset dimension requirements.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_dimension_requirements` | list[[InputDatasetDimensionRequirementsModel](project_model.md#inputdatasetdimensionrequirementsmodel)] | *(required)* | List of dataset dimension requirements |
+
+</div>
+
+
+---
+
+## InputDatasetDimensionRequirementsModel
+
+*dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsModel*
+
+Defines dataset dimension requirements.
+
+### Fields
+
+<div class="model-fields-table">
+
+| Name | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataset_id` | `str` | *(required)* |  |
+| `required_dimensions` | [RequiredDimensionsModel](project_model.md#requireddimensionsmodel) | *(required)* | Defines required record IDs that must exist for each dimension. |
+
+</div>

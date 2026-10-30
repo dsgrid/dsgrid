@@ -32,7 +32,7 @@ Create a `dataset.json5` with these fields (but choose your own values):
   origin_project: "dsgrid CONUS 2022",
   origin_date: "Dec 21 2021",
   origin_version: "dsgrid",
-  source: "https://github.nrel.gov/mmurator/TMM/commit/54f715e0fe015a578dd0594c7031c046cfe27907",
+  source: "https://github.nlr.gov/mmurator/TMM/commit/54f715e0fe015a578dd0594c7031c046cfe27907",
   data_classification: "low",
   tags: [
     "transportation",
@@ -334,4 +334,4 @@ spark-submit --master=spark://<master_hostname>:7077 $(which dsgrid-cli.py) regi
 
 - Learn how to [map a dataset](map_dataset) to project dimensions
 - Explore [querying project data](query_project)
-- Understand [dimension mapping concepts](../dataset_mapping/concepts)
+- Understand [dimension mapping concepts](../dataset_mapping/dimension_mapping_concepts)

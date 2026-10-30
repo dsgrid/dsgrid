@@ -36,6 +36,9 @@ ENUMS = [
     # From dsgrid.config.dimension_mapping_base
     "dsgrid.config.dimension_mapping_base.DimensionMappingType",
     "dsgrid.config.dimension_mapping_base.DimensionMappingArchetype",
+    # From dsgrid.query.models
+    "dsgrid.query.models.ColumnType",
+    "dsgrid.query.models.ReportType",
 ]
 
 

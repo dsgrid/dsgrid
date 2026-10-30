@@ -331,3 +331,32 @@ dimensions and apply rules about the sum of the from_fraction column.
 | `MANY_TO_MANY_MAP` | `'many_to_many_map'` | Many-to-many dimension mapping with no from_fraction sum check | True | True | False | False |
 
 </div>
+
+## ColumnType
+
+*dsgrid.query.models.ColumnType*
+
+Defines what the columns of a dataset table represent.
+
+<div class="enum-table">
+
+| Constant | Value |
+|----------|-------|
+| `DIMENSION_TYPES` | `'dimension_types'` |
+| `DIMENSION_NAMES` | `'dimension_names'` |
+
+</div>
+
+## ReportType
+
+*dsgrid.query.models.ReportType*
+
+Pre-defined reports
+
+<div class="enum-table">
+
+| Constant | Value |
+|----------|-------|
+| `PEAK_LOAD` | `'peak_load'` |
+
+</div>

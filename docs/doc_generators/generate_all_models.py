@@ -24,6 +24,8 @@ MODELS = [
             "dsgrid.config.dimensions.NoOpTimeDimensionModel",
             # Dimension reference
             "dsgrid.config.dimensions.DimensionReferenceModel",
+            # CLI ``dimensions register`` input.
+            "dsgrid.config.dimensions_config.DimensionsConfigModel",
         ],
     ),
     (
@@ -43,12 +45,46 @@ MODELS = [
         "source/software_reference/data_models/dimension_mapping_model.md",
         [
             "dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel",
+            # CLI ``submit-dataset`` / ``register-and-submit-dataset`` inputs
+            # (-m and -r, respectively).
+            "dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel",
+            "dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
+            # CLI ``dimension-mappings register`` and ``update`` inputs, respectively.
+            "dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
+            "dsgrid.config.mapping_tables.MappingTableModel",
         ],
     ),
     (
         "Project Config",
         "dsgrid.config.project_config.ProjectConfigModel",
         "source/software_reference/data_models/project_model.md",
+        [
+            # CLI ``projects`` subcommand inputs (register-subset-dimensions,
+            # register-supplemental-dimensions, add-dataset-requirements,
+            # replace-dataset-dimension-requirements).
+            "dsgrid.config.project_config.SubsetDimensionGroupListModel",
+            "dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel",
+            "dsgrid.config.input_dataset_requirements.InputDatasetListModel",
+            "dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel",
+        ],
+    ),
+    (
+        # CLI ``bulk-register`` input. Spans projects and datasets, so it gets its own page.
+        "Bulk Registration",
+        "dsgrid.config.registration_models.RegistrationModel",
+        "source/software_reference/data_models/registration_model.md",
+        [],
+    ),
+    (
+        "Dataset Query",
+        "dsgrid.query.models.DatasetQueryModel",
+        "source/software_reference/data_models/dataset_query_model.md",
+        [],
+    ),
+    (
+        "Project Query",
+        "dsgrid.query.models.ProjectQueryModel",
+        "source/software_reference/data_models/project_query_model.md",
         [],
     ),
 ]

@@ -8,10 +8,18 @@ Learn how to create and configure dsgrid projects.
 :maxdepth: 1
 
 project_concepts
-base_dimensions
-supplemental_dimensions
-dataset_requirements
 ```
+
+## Planned Content
+
+- **Base dimensions** — Choosing a project's base dimensions and records.
+  Until then, see [How to Create Base Dimensions](../how_tos/how_to_base_dimensions).
+- **Supplemental dimensions** — Designing supplemental dimensions and their
+  base-to-supplemental mappings. Until then, see
+  [How to Create Supplemental Dimensions](../how_tos/how_to_supplemental_dimensions).
+- **Dataset requirements** — Specifying `required_dimensions` for each
+  dataset. Until then, see
+  [Understanding Project Requirements](../dataset_submittal/submission_process.md#understanding-project-requirements).
 
 ## How-Tos
 

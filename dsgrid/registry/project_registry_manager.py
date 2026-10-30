@@ -1177,14 +1177,17 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         new_mappings = []
         for from_id, from_version in needs_mapping:
+            # to_dim is the dataset dimension; from_dim is the project base dimension
             to_dim = self._dimension_mgr.get_by_id(from_id, version=from_version, conn=conn)
             from_dim, to_version = project_config.get_base_dimension_and_version(
                 to_dim.model.dimension_type
             )
+            # looks for direct dataset -> project mapping
             mapping, version = self._try_get_mapping(
                 project_config, to_dim, from_version, from_dim, to_version, context
             )
             if mapping is None:
+                # now looks for project to dataset (supplemental dim) mapping
                 p_mapping, _ = self._try_get_mapping(
                     project_config, from_dim, to_version, to_dim, from_version, context
                 )
@@ -1193,13 +1196,15 @@ class ProjectRegistryManager(RegistryManagerBase):
                 ), f"from={from_dim.model.dimension_id} to={to_dim.model.dimension_id}"
                 records = models_to_dataframe(p_mapping.model.records)
                 fraction_vals = get_unique_values(records, "from_fraction")
-                if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
+                if len(fraction_vals) != 1 or next(iter(fraction_vals)) != 1.0:
                     msg = (
                         f"Cannot auto-generate a dataset-to-project mapping from from a project "
                         "supplemental dimension unless the from_fraction column is empty or only "
                         f"has values of 1.0: {p_mapping.model.mapping_id} - {fraction_vals}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
+                # reversed mapping simply swaps to/from ids. no fraction handling or other checks
+                # of the mapping types / whether this makes sense.
                 reverse_records = records.select(from_id=records.to_id, to_id=records.from_id)
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
                 write_csv(reverse_records, dst, overwrite=True)

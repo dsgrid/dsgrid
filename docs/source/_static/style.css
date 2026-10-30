@@ -254,3 +254,27 @@ article[role="main"] table td a {
     width: 100% !important;
     table-layout: auto !important;
 }
+
+/* Publications page: year headings - compact, no top rule */
+.pub-year > h2 {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.3em;
+    border-bottom: none;
+    color: var(--color-foreground-secondary);
+}
+
+/* Publications page: paper-title headings - visually hidden in body,
+   still present in the "On this page" sidebar TOC */
+.pub-title > h3 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

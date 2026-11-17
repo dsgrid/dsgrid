@@ -210,7 +210,7 @@ Note that after doing this your system will have two versions of `pyspark`:
 - In your Python virtual environment where you installed dsgrid (because dsgrid installs pyspark)
 - In `$HOME/spark-4.0.0-bin-hadoop3/bin`
 
-If you use a conda virtual environment, when that environment is activated, its `pyspark` will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.
+When your Python virtual environment is activated, its `pyspark` will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.
 
 :::{warning}
 Setting `SPARK_HOME` will affect operation of your Python `pyspark` installation in local mode. That may not be what you want if you make settings specific to the standalone cluster.

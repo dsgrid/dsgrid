@@ -19,7 +19,6 @@ export SIMPLE_SS_DATA=$(pwd)/simple_standard_scenarios_data
 rm -rf ${SIMPLE_SS_DATA} ${DUMP_DIR}
 
 dsgrid-admin \
-    --url http://${DSGRID_REGISTRY_DATABASE_URL} \
     make-filtered-registry \
     --src-database-url ${DSGRID_REGISTRY_DATABASE_URL} \
     --dst-database-url ${DSGRID_REGISTRY_SIMPLE_DB_URL} \

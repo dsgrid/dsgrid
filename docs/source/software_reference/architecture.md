@@ -18,6 +18,8 @@ dsgrid is built on a distributed architecture designed to handle large-scale ene
 - **Load all data tables as Ibis tables** - Execute queries on DuckDB or Apache Spark backends
 - **Convert selected small results to Pandas DataFrames** - For API payloads, post-processing, and visualizations
 
+The registry database schema is described in [Registry Database](../developer_guide/registry_database.md).
+
 ## APIs
 
 ### Python
@@ -96,9 +98,9 @@ Future workflows may change significantly. We may have a persistent database and
 
    When running on an HPC with Spark, this compute node is usually the Spark master node.
 
-### Local Development Workflow
+### Local Machine Workflow
 
-1. **Install dsgrid** in a conda environment
+1. **Install dsgrid** in a Python virtual environment
    - See [Installation](../getting_started/installation)
 
 2. **Configure local registry** connection
@@ -159,3 +161,4 @@ User → Web Browser → Dash App → HTTP API → Registry DB
 - Explore the [Python API](python_api)
 - Understand [data file formats](../user_guide/dataset_registration/data_file_formats)
 - See [data models](data_models/index) for configuration schemas
+- Read about the [registry database](../developer_guide/registry_database.md) schema

@@ -1,83 +1,226 @@
 # Installation
 
+:::{admonition} Contributing to dsgrid or installing from source?
+:class: tip
+
+This page covers installing the released dsgrid package. If you want to work on the dsgrid
+code itself, follow [Development Setup](../developer_guide/development_setup) instead.
+:::
+
 ## Python Environment
 
-dsgrid requires python=3.11 or later. If you do not already have a python environment with python>=3.11, we recommend using [Conda](https://conda.io/projects/conda/en/latest/index.html) to help manage your python packages and environments.
+dsgrid requires Python 3.11 or later. Prebuilt packages are published for Python 3.11, 3.12, and
+3.13 on Linux, macOS, and Windows, so we recommend one of those versions. We recommend installing
+dsgrid into a virtual environment created with Python's built-in `venv` module.
 
-### Steps to Create a dsgrid Conda Environment
+:::{admonition} NLR Kestrel HPC
+:class: note
 
-1. [Download and install Conda](https://conda.io/projects/conda/en/latest/user-guide/install) if it is not already installed. We recommend Miniconda over Anaconda because it has a smaller installation size.
+Load a Python module before creating the environment, for example `module load python/3.13.12`
+(run `module avail python` to see the available versions).
+:::
 
-2. Create a suitable environment:
+### Create and Activate a Virtual Environment
 
+Choose a working directory for your dsgrid work and create a virtual environment named `.venv`
+inside it. You only need to create the environment once. Activate it in every new terminal
+session where you want to use dsgrid.
+
+::::{tab-set}
+
+:::{tab-item} Mac/Linux
 ```bash
-conda create -n dsgrid python=3.11
+# Create the environment (once)
+python3 -m venv .venv
+
+# Activate the environment (each new terminal)
+source .venv/bin/activate
+
+# Upgrade pip (recommended)
+python -m pip install --upgrade pip
+```
+:::
+
+:::{tab-item} Windows (PowerShell)
+```pwsh
+# Create the environment (once)
+py -m venv .venv
+
+# Activate the environment (each new terminal)
+.venv\Scripts\Activate.ps1
+
+# Upgrade pip (recommended)
+python -m pip install --upgrade pip
 ```
 
-3. Activate the environment:
+If PowerShell refuses to run the activation script, allow locally created scripts for your user
+account and try again:
+
+```pwsh
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+:::
+
+:::{tab-item} Windows (Command Prompt)
+```bat
+:: Create the environment (once)
+py -m venv .venv
+
+:: Activate the environment (each new terminal)
+.venv\Scripts\activate.bat
+
+:: Upgrade pip (recommended)
+python -m pip install --upgrade pip
+```
+:::
+
+::::
+
+When an environment is active, your prompt shows its name (for example, `(.venv)`). To leave the
+environment, run this command on any platform:
 
 ```bash
-conda activate dsgrid
+deactivate
 ```
 
-### Install Java
+## Package Installation
 
-dsgrid uses Ibis for table operations and supports DuckDB and Apache Spark execution backends. Java is only required when you use the Spark backend. If you plan to run with Spark, both of these commands must work:
+With your virtual environment active, install dsgrid with one of the following commands.
+
+### To use DuckDB as the backend
+
+```bash
+pip install dsgrid-toolkit
+```
+
+### To use Apache Spark as the backend
+
+```bash
+pip install "dsgrid-toolkit[spark]"
+```
+
+:::{admonition} Spark on Windows
+:class: warning
+
+Apache Spark's Windows support is limited to local mode. On Windows, do not attempt to run a
+Spark cluster; we recommend limiting dsgrid use to browsing the registry, registering and
+submitting small- to medium-sized datasets, and development work with small test projects. Large
+projects require Linux-based HPC or cloud resources. See also the Windows notes in
+[Apache Spark](../user_guide/apache_spark/overview.md).
+:::
+
+#### Install Java
+
+Java is only required when you use the Spark backend. dsgrid uses Apache Spark 4.0, which
+requires **Java 17 or 21**. We recommend Java 21.
+
+Spark uses the `JAVA_HOME` environment variable if it is set, and otherwise the `java` command on
+your `PATH`. We recommend setting `JAVA_HOME`. Check your installation with:
 
 ::::{tab-set}
 
 :::{tab-item} Mac/Linux
 ```bash
 java --version
-# openjdk 11.0.12 2021-07-20
-
 echo $JAVA_HOME
-# /Users/dthom/brew/Cellar/openjdk@11/11.0.12
-
-# If you don't have java installed:
-conda install openjdk
 ```
 :::
 
-:::{tab-item} Windows
+:::{tab-item} Windows (PowerShell)
 ```pwsh
 java --version
-# openjdk 11.0.13 2021-10-19
-# OpenJDK Runtime Environment JBR-11.0.13.7-1751.21-jcef
+echo $env:JAVA_HOME
+```
+:::
 
+:::{tab-item} Windows (Command Prompt)
+```bat
+java --version
 echo %JAVA_HOME%
-# C:\Users\ehale\Anaconda3\envs\dsgrid\Library
-
-# If you don't have java installed:
-conda install openjdk
 ```
 :::
 
 ::::
 
-## Package Installation
+If Java 17 or 21 is not installed, install it as follows.
 
-### To use DuckDB as the backend:
+::::{tab-set}
 
-```bash
-pip install dsgrid-toolkit
-```
-
-### To use Apache Spark as the backend:
+:::{tab-item} Mac
+Install Eclipse Temurin 21 with [Homebrew](https://brew.sh):
 
 ```bash
-pip install "dsgrid-toolkit[spark]"
+brew install --cask temurin@21
 ```
+
+Then set `JAVA_HOME` by adding this line to your shell profile (e.g., `~/.zshrc`):
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+```
+:::
+
+:::{tab-item} Linux
+Install OpenJDK 21 with your distribution's package manager. If your distribution does not
+package Java 21 (e.g., Debian 12), install Java 17 instead (`openjdk-17-jdk` or
+`java-17-openjdk-devel`).
+
+```bash
+# Debian/Ubuntu
+sudo apt install openjdk-21-jdk
+
+# Fedora/RHEL
+sudo dnf install java-21-openjdk-devel
+```
+
+Then set `JAVA_HOME` by adding this line to your shell profile (e.g., `~/.bashrc`):
+
+```bash
+export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+```
+:::
+
+:::{tab-item} NLR Kestrel
+A JDK is available on the shared filesystem. Add these lines to your shell profile or job
+script:
+
+```bash
+export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
+export PATH=$JAVA_HOME/bin:$PATH
+```
+:::
+
+:::{tab-item} Windows
+Download the Eclipse Temurin 21 JDK `.msi` installer from
+[adoptium.net](https://adoptium.net/temurin/releases/?version=21). During installation, enable
+the **Set JAVA_HOME variable** feature.
+
+Alternatively, install it with winget:
+
+```pwsh
+winget install EclipseAdoptium.Temurin.21.JDK
+```
+
+Open a new terminal and run `echo $env:JAVA_HOME` (PowerShell) or `echo %JAVA_HOME%` (Command 
+Prompt). If it prints nothing, set `JAVA_HOME` to the JDK installation directory (e.g., 
+`C:\Program Files\Eclipse Adoptium\jdk-21...`) under
+**System Properties → Environment Variables**.
+:::
+
+::::
 
 ## Registry
 
 ### NLR Shared Registry
 
-The current dsgrid registries are stored in per-project SQLite database files. All configuration information is stored in the database(s) and all dataset files are stored on the NLR HPC shared filesystem.
+The current dsgrid registries are stored in per-project SQLite database files. All configuration
+information is stored in the database(s) and all dataset files are stored on the NLR HPC shared
+filesystem.
 
 ### Standalone Registry
 
-To use dsgrid in your own computational environment, you will need to initialize your own registry with this CLI command:
+To use dsgrid in your own computational environment, you will need to initialize your own registry
+with this CLI command:
 
 ```bash
 dsgrid create-registry --help
@@ -85,14 +228,22 @@ dsgrid create-registry --help
 
 ## Runtime Backends
 
-DuckDB is the default backend and is suitable for local work and moderate-sized datasets. Use the Spark extra when you need a distributed backend for large datasets or HPC workflows.
+DuckDB is the default backend and is suitable for local work and moderate-sized datasets. Use the
+Spark extra when you need a distributed backend for large datasets or HPC workflows.
 
 - **NLR High Performance Computing**: [How to Start Spark Cluster on Kestrel](../user_guide/how_tos/spark_cluster_on_kestrel)
 - **Standalone resources**: [Installing a Spark Standalone Cluster](../user_guide/apache_spark/overview.md#installing-a-spark-standalone-cluster)
 
 ## Test Your Installation
 
-If you're running dsgrid at NLR and using the shared registry, you can test your installation with this command:
+Confirm that the dsgrid command-line interface is installed:
+
+```bash
+dsgrid --help
+```
+
+If you're running dsgrid at NLR and using the shared registry, you can also test your access to
+the registry with this command:
 
 ```bash
 dsgrid -u sqlite:///<your-db-path> registry projects list
@@ -100,52 +251,10 @@ dsgrid -u sqlite:///<your-db-path> registry projects list
 
 ## Save Your Configuration
 
-Running `dsgrid config create` stores key information for working with dsgrid in a config file at `~/.dsgrid.json5`. Currently, dsgrid only supports offline mode, and the other key information to store is the registry URL. The parameters in the config file are the default values used by the command-line interface.
-
-The appropriate configuration for using the shared registry at NLR is:
-
-```bash
-dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db
-```
-
-:::{admonition} AWS Cloud Access
-:class: note
-
-Access from AWS is under development.
-
-<!--
-dsgrid uses Amazon Web Services (AWS) cloud. The dsgrid registry of datasets and configurations are stored on S3. dsgrid also uses EMR spark clusters for big data ETLs and queries.
-
-Currently, the dsgrid registry is only accessible through the internal NLR dsgrid sandbox account (`nrel-aws-dsgrid`). To get set up on the sandbox account, please reach out to the dsgrid team.
-
-### Setup sandbox account
-
-Once the NLR Stratus Cloud Team has set you up with a dsgrid sandbox account (`nrel-aws-dsgrid`), you will receive an email with your temporary password and instructions on how to setup your account. Follow the instructions in the email to complete the following:
-
-1. Log in and set up your password
-2. Set up Multi-Factor Authentication (MFA)
-
-### Configure named profile
-
-Configure named profile for nrel-aws-dsgrid. See [these directions](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) for how to configure your named profile for the aws-cli.
-
-Add the following text to the `~/.aws/credentials` file (replacing XXXX with your credentials):
-
-```
-[nrel-aws-dsgrid]
-aws_access_key_id = XXXX
-aws_secret_access_key = XXXX
-```
-
-You can find your [AWS security credentials](https://console.aws.amazon.com/iam/home?#/security_credentials) in your profile.
-
-Finally, check that you can view contents in the registry:
-
-```bash
-aws s3 ls s3://nrel-dsgrid-registry
-```
--->
-:::
+Running `dsgrid config create` stores key information for working with dsgrid in a config file at
+`~/.dsgrid.json5`. Currently, dsgrid only supports offline mode, and the other key information to
+store is the registry URL. The parameters in the config file are the default values used by the
+command-line interface.
 
 ## Next Steps
 

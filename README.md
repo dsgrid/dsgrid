@@ -4,101 +4,47 @@
 
 Python API for contributing to and accessing demand-side grid model (dsgrid) projects and datasets.
 
-⚠️ **dsgrid is under active development and does not yet have a formal package release.** Details listed here are subject to change. Please reach out to the dsgrid coordination team with any questions or other feedback. ⚠️
+**dsgrid is under active development.** Please reach out to the dsgrid coordination team with any questions or other feedback.
 
-[Install](#install) | [Usage](#usage) | [Uninstall](#uninstall)
+[Install](#install) | [Usage](#usage) | [Uninstall](#uninstall) | [Documentation](https://dsgrid.github.io/dsgrid)
 
 ## Install
 
-[Virtual environment](#virtual-environment) | [Dependencies](#dependencies) | [from PIPY/pip](#from-pipypip) | [from pip+git](#from-pipgit) | [from cloned repository](#from-cloned-repository)
+dsgrid requires Python 3.11 or later (prebuilt packages are available for 3.11–3.13). Create and
+activate a virtual environment, then install dsgrid with pip.
 
-### Virtual environment
+Virtual environment:
 
-Create a virtual environment in which to install dsgrid. Anaconda or miniconda is recommended.
-
+**Mac/Linux:**
 ```
-conda create -n dsgrid python=3.11
-conda activate dsgrid
-```
-
-### Dependencies
-
-dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data. There are no separate installation steps for Apache Spark beyond installing the dsgrid package and installing:
-
-```
-pip install "dsgrid-toolkit[spark]"
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Otherwise installing the pyspark Python dependency handles it.
-
-However, you should be aware that Apache Spark's Microsoft Windows support is poor and essentially limited to local mode. That is, if you use dsgrid on a Windows machine you should not attempt to install a full version of Spark nor expect to run on a Spark cluster. As such, we recommend limiting dsgrid use on Windows to browsing the registry, registering and submitting small- to medium-sized datasets, or development work with small test projects. Full dsgrid functionality with large projects requires additional computational resources, e.g., high performance or cloud computing, typically on a Linux operating system.
-
-#### Additional Notes
-- If pyspark complains about not finding Python, you may need to locate your python executable file (python.exe on Windows), copy it, and rename the copy to python3 (python3.exe on Windows)
-
-Spark requires Java 8 or later with the `JAVA_HOME` environment variable set to the Java installation directory.
-
-On Linux you can install OpenJDK with conda:
+**Windows (PowerShell):**
 ```
-conda install openjdk
+py -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
-Windows install instructions are below.
-
-#### Windows
-
-To install Apache Spark on Windows, follow [these instructions](https://towardsdatascience.com/installing-apache-pyspark-on-windows-10-f5f0c506bea1).
-
-### From PIPY/pip
-
+Install dsgrid with the default DuckDB backend:
+```
 pip install dsgrid-toolkit
+```
 
-or
-
+or with Apache Spark support (requires Java 17 or 21):
+```
 pip install "dsgrid-toolkit[spark]"
-
-### From pip+git
-
-**With ssh keys:**
-```
-pip install git+ssh://git@github.com/dsgrid/dsgrid.git@main
-
-# or
-
-pip install git+ssh://git@github.com/dsgrid/dsgrid.git@develop
 ```
 
-**From http:**
-```
-pip install git+https://github.com/dsgrid/dsgrid.git@main
+Spark's Windows support is limited to local mode, so large projects require Linux-based HPC or
+cloud resources.
 
-# or
+See the [Installation guide](https://dsgrid.github.io/dsgrid/getting_started/installation.html)
+for full instructions, including Java setup and registry configuration.
 
-pip install git+https://github.com/dsgrid/dsgrid.git@develop
-```
-
-### From Cloned Repository
-
-First, clone the repository and change into the `dsgrid` directory. For example:
-
-```
-cd ~                                       # or other directory where you put repositories
-git clone git@github.com:dsgrid/dsgrid.git # or the http address
-cd dsgrid
-```
-
-Then install the pacakge using the pip `-e` flag to directly use the files in the
-cloned repository.
-
-**Users:**
-```
-pip install -e .
-```
-
-**Developers:**
-```
-pip install -e '.[dev,spark]'
-```
+**Developers:** to work on dsgrid itself (editable install, Rust extension, tests), see
+[Development Setup](https://dsgrid.github.io/dsgrid/developer_guide/development_setup.html).
 
 ## Usage
 
@@ -110,13 +56,11 @@ dsgrid --help
 ## Uninstall
 
 ```
-pip uninstall dsgrid
+pip uninstall dsgrid-toolkit
+deactivate
 ```
 
-If you are using a conda environment
-```
-conda deactivate
-```
+You can then delete the `.venv` directory.
 
 ## Software Record
 

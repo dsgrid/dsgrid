@@ -4,13 +4,36 @@ This guide explains how to start an Apache Spark cluster on NLR's Kestrel HPC sy
 
 ## Prerequisites
 
-Install the Python package `sparkctl` - a tool for managing Spark clusters on HPC systems:
+Install the Python package `sparkctl` - a tool for managing Spark clusters on HPC systems - into the same Python environment (venv or conda) as dsgrid:
 
 ```bash
 pip install "sparkctl[pyspark]"
 ```
 
 Refer to the [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) for more details.
+
+### One-Time sparkctl Setup
+
+Before sparkctl can start a cluster, it needs to know where the Spark and Java binaries are. Kestrel provides them in `/datasets/images/apache_spark/`. Run this once (it can be done on a login node):
+
+```bash
+sparkctl default-config \
+    /datasets/images/apache_spark/spark-4.1.1-bin-hadoop3 \
+    /datasets/images/apache_spark/jdk-21.0.7 \
+    -e slurm
+```
+
+This command writes `~/.sparkctl.toml`, which every later `sparkctl` command reads. Use `-d <directory>` to write the file somewhere else (sparkctl also checks the current directory). Rerun the command if you change Spark versions.
+
+:::{tip}
+Choose the Spark directory whose version matches the `pyspark` package in your environment (`pip show pyspark`). Run `ls /datasets/images/apache_spark/` to see which versions are available.
+:::
+
+:::{note}
+The `-e slurm` option (`--compute-environment`) tells sparkctl to find the allocated nodes and their CPU and memory through Slurm environment variables and to start workers with `srun`. It is the default, so you can leave it out on Kestrel. The other choice, `native`, is for machines without a scheduler, where you list the worker nodes yourself.
+:::
+
+If you skip this step, `sparkctl configure` fails with `No sparkctl binary paths are configured`.
 
 ## Compute Node Types
 
@@ -52,9 +75,10 @@ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
 
 ### 3. Configure and Start the Cluster
 
-Configure the Spark settings and start the cluster:
+`salloc` opens a new shell on the compute node, so activate your Python environment there first, then configure the Spark settings and start the cluster:
 
 ```bash
+source /path/to/your/.venv/bin/activate   # or: conda activate <env>
 sparkctl configure --start
 ```
 
@@ -125,6 +149,14 @@ spark-submit --master=spark://$(hostname):7077 \
 ```
 
 ## Troubleshooting
+
+### `sparkctl: command not found`
+
+Your Python environment is not active in the current shell. Activate the environment where you installed sparkctl (for example, `source /path/to/your/.venv/bin/activate`).
+
+### `No sparkctl binary paths are configured`
+
+sparkctl doesn't know where Spark and Java are installed. Run the [one-time setup](#one-time-sparkctl-setup) command `sparkctl default-config`.
 
 ### Cluster Won't Start
 

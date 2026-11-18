@@ -273,6 +273,19 @@ $ pip install "sparkctl[pyspark]"
 
 The [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) has generic instructions to run Spark in a variety of ways. The rest of this section calls out choices that you should make to run Spark jobs with dsgrid.
 
+#### Configure sparkctl (one time)
+
+Tell sparkctl where the Spark and Java binaries are. On Kestrel:
+
+```bash
+$ sparkctl default-config \
+    /datasets/images/apache_spark/spark-4.1.1-bin-hadoop3 \
+    /datasets/images/apache_spark/jdk-21.0.7 \
+    -e slurm
+```
+
+This writes `~/.sparkctl.toml`. `-e slurm` (the default) tells sparkctl to find the allocated nodes and their resources through Slurm. Pick the Spark version that matches your installed `pyspark`. See [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel) for details.
+
 #### Steps to Start a Cluster
 
 1. **Choose compute node(s) with fast local storage.** This example will allocate one node. Refer to the [Kestrel Filesystems documentation](https://natlabrockies.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system) for more information for this type of compute node.

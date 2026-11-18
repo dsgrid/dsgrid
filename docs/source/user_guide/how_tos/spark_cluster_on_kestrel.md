@@ -95,14 +95,34 @@ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 ### 5. Verify Cluster is Running
 
-The Spark cluster is now ready to use at `spark://$(hostname):7077`.
+The Spark cluster is now ready to use at `spark://$(hostname):7077`. The Spark master runs on this node (the first node of your allocation) and serves its web UI on port 8080. Get the node name:
 
-You can verify it's running by checking the Spark master UI:
 ```bash
-echo "Spark Master UI: http://$(hostname):8080"
+hostname
 ```
 
-Run all query scripts from this node using spark-submit as described in [Run dsgrid on Kestrel](run_on_kestrel).
+Compute nodes are not reachable directly from your laptop, so open an SSH tunnel to that node by following the [SSH tunnel instructions](../apache_spark/overview.md#ssh-tunnel-for-remote-access), then browse to `http://localhost:8080`. In the master UI, check that **Alive Workers** equals the number of nodes you allocated (`-N`).
+
+### 6. Run dsgrid Commands
+
+Run dsgrid commands from this same node with `spark-submit`, in the shell where your Python environment is active and the Step 4 variables are set:
+
+```bash
+spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) query project run query.json5
+```
+
+While a command is running, you can follow its progress in the application UI at `http://localhost:4040` (through the same SSH tunnel). See [Run dsgrid on Kestrel](run_on_kestrel) for more examples.
+
+### 7. Stop the Cluster and Release the Allocation
+
+When finished, stop the Spark cluster and release your allocation:
+
+```bash
+sparkctl stop
+exit  # Exit salloc session
+```
+
+Also close the SSH tunnel session on your laptop.
 
 ## Example: Multi-Node Cluster
 
@@ -112,7 +132,8 @@ For larger datasets, allocate multiple nodes:
 # Allocate 4 nodes for 2 hours
 salloc -t 02:00:00 -N4 --account=dsgrid --partition=standard --tmp=1600G --mem=240G
 
-# Configure and start (sparkctl detects all allocated nodes)
+# Activate your environment, then configure and start (sparkctl detects all allocated nodes)
+source /path/to/your/.venv/bin/activate
 sparkctl configure --start
 
 # Set environment
@@ -121,6 +142,10 @@ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 # Run dsgrid query
 spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) query project run query.json5
+
+# Stop the cluster and release the allocation
+sparkctl stop
+exit
 ```
 
 ## Configuration Tips
@@ -175,15 +200,6 @@ sparkctl doesn't know where Spark and Java are installed. Run the [one-time setu
 - Use nodes with local NVMe storage
 - Increase shuffle partitions for better parallelism
 - Review Spark UI (port 8080) for task distribution
-
-## Cleaning Up
-
-When finished, stop the Spark cluster and release your allocation:
-
-```bash
-sparkctl stop
-exit  # Exit salloc session
-```
 
 ## Next Steps
 

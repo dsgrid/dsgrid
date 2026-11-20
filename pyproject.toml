@@ -134,7 +134,7 @@ addopts = "-ra"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = ["dsgrid/tests/*", "tests/*", "tests_aws/*", "build_backend.py"]
+omit = ["dsgrid/tests/*", "tests/*", "build_backend.py"]
 
 [tool.ty.src]
 include = ["dsgrid"]

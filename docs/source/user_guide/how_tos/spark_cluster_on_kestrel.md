@@ -4,13 +4,36 @@ This guide explains how to start an Apache Spark cluster on NLR's Kestrel HPC sy
 
 ## Prerequisites
 
-Install the Python package `sparkctl` - a tool for managing Spark clusters on HPC systems:
+Install the Python package `sparkctl` - a tool for managing Spark clusters on HPC systems - into the same Python environment (venv or conda) as dsgrid:
 
 ```bash
 pip install "sparkctl[pyspark]"
 ```
 
 Refer to the [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) for more details.
+
+### One-Time sparkctl Setup
+
+Before sparkctl can start a cluster, it needs to know where the Spark and Java binaries are. Kestrel provides them in `/datasets/images/apache_spark/`. Run this once (it can be done on a login node):
+
+```bash
+sparkctl default-config \
+    /datasets/images/apache_spark/spark-4.1.1-bin-hadoop3 \
+    /datasets/images/apache_spark/jdk-21.0.7 \
+    -e slurm
+```
+
+This command writes `~/.sparkctl.toml`, which every later `sparkctl` command reads. Use `-d <directory>` to write the file somewhere else (sparkctl also checks the current directory). Rerun the command if you change Spark versions.
+
+:::{tip}
+Choose the Spark directory whose version matches the `pyspark` package in your environment (`pip show pyspark`). Run `ls /datasets/images/apache_spark/` to see which versions are available.
+:::
+
+:::{note}
+The `-e slurm` option (`--compute-environment`) tells sparkctl to find the allocated nodes and their CPU and memory through Slurm environment variables and to start workers with `srun`. It is the default, so you can leave it out on Kestrel. The other choice, `native`, is for machines without a scheduler, where you list the worker nodes yourself.
+:::
+
+If you skip this step, `sparkctl configure` fails with `No sparkctl binary paths are configured`.
 
 ## Compute Node Types
 
@@ -52,9 +75,10 @@ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
 
 ### 3. Configure and Start the Cluster
 
-Configure the Spark settings and start the cluster:
+`salloc` opens a new shell on the compute node, so activate your Python environment there first, then configure the Spark settings and start the cluster:
 
 ```bash
+source /path/to/your/.venv/bin/activate   # or: conda activate <env>
 sparkctl configure --start
 ```
 
@@ -71,14 +95,34 @@ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 ### 5. Verify Cluster is Running
 
-The Spark cluster is now ready to use at `spark://$(hostname):7077`.
+The Spark cluster is now ready to use at `spark://$(hostname):7077`. The Spark master runs on this node (the first node of your allocation) and serves its web UI on port 8080. Get the node name:
 
-You can verify it's running by checking the Spark master UI:
 ```bash
-echo "Spark Master UI: http://$(hostname):8080"
+hostname
 ```
 
-Run all query scripts from this node using spark-submit as described in [Run dsgrid on Kestrel](run_on_kestrel).
+Compute nodes are not reachable directly from your laptop, so open an SSH tunnel to that node by following the [SSH tunnel instructions](../apache_spark/overview.md#ssh-tunnel-for-remote-access), then browse to `http://localhost:8080`. In the master UI, check that **Alive Workers** equals the number of nodes you allocated (`-N`).
+
+### 6. Run dsgrid Commands
+
+Run dsgrid commands from this same node with `spark-submit`, in the shell where your Python environment is active and the Step 4 variables are set:
+
+```bash
+spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) query project run query.json5
+```
+
+While a command is running, you can follow its progress in the application UI at `http://localhost:4040` (through the same SSH tunnel). See [Run dsgrid on Kestrel](run_on_kestrel) for more examples.
+
+### 7. Stop the Cluster and Release the Allocation
+
+When finished, stop the Spark cluster and release your allocation:
+
+```bash
+sparkctl stop
+exit  # Exit salloc session
+```
+
+Also close the SSH tunnel session on your laptop.
 
 ## Example: Multi-Node Cluster
 
@@ -88,7 +132,8 @@ For larger datasets, allocate multiple nodes:
 # Allocate 4 nodes for 2 hours
 salloc -t 02:00:00 -N4 --account=dsgrid --partition=standard --tmp=1600G --mem=240G
 
-# Configure and start (sparkctl detects all allocated nodes)
+# Activate your environment, then configure and start (sparkctl detects all allocated nodes)
+source /path/to/your/.venv/bin/activate
 sparkctl configure --start
 
 # Set environment
@@ -97,6 +142,10 @@ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 # Run dsgrid query
 spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) query project run query.json5
+
+# Stop the cluster and release the allocation
+sparkctl stop
+exit
 ```
 
 ## Configuration Tips
@@ -126,6 +175,14 @@ spark-submit --master=spark://$(hostname):7077 \
 
 ## Troubleshooting
 
+### `sparkctl: command not found`
+
+Your Python environment is not active in the current shell. Activate the environment where you installed sparkctl (for example, `source /path/to/your/.venv/bin/activate`).
+
+### `No sparkctl binary paths are configured`
+
+sparkctl doesn't know where Spark and Java are installed. Run the [one-time setup](#one-time-sparkctl-setup) command `sparkctl default-config`.
+
 ### Cluster Won't Start
 
 - Check that your allocation is active: `squeue -u $USER`
@@ -143,15 +200,6 @@ spark-submit --master=spark://$(hostname):7077 \
 - Use nodes with local NVMe storage
 - Increase shuffle partitions for better parallelism
 - Review Spark UI (port 8080) for task distribution
-
-## Cleaning Up
-
-When finished, stop the Spark cluster and release your allocation:
-
-```bash
-sparkctl stop
-exit  # Exit salloc session
-```
 
 ## Next Steps
 

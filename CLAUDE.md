@@ -91,6 +91,25 @@ raise ValueError(f"Invalid value: {value!r}")
 
 This convention improves debuggability and allows for easier message modification.
 
+## Error Context
+
+- When looping over user-named items (projects, datasets, dimensions, mappings) and the code
+  inside can raise errors that do not know which item is being processed, wrap the loop body
+  in `dsgrid.exceptions.error_context`:
+
+```python
+from dsgrid.exceptions import error_context
+
+for dataset in datasets:
+    with error_context(f"registering dataset {dataset.dataset_id} from {dataset.config_file}"):
+        dataset_mgr.register(dataset.config_file, ...)
+```
+
+- The description should read naturally after "While". It is added to the exception as a note,
+  which tracebacks print after the message and the CLI includes in its error line.
+- Use it at the outer loop, not around every call. Do not use it where the error message
+  already names the item; that just repeats the information.
+
 ## Example
 
 ```python

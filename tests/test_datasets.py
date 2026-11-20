@@ -380,6 +380,115 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
         delete_if_exists(missing_record_file)
 
 
+# Uses setup_registry_single, which recreates the shared temp project directory, so it
+# must run after all tests that use the module-scoped register_dataset fixture.
+@pytest.mark.parametrize("with_scaling_factor", [False, True])
+def test_load_data_lookup_null_id_rows_are_missing_associations(
+    setup_registry_single, with_scaling_factor
+):
+    """NULL-id rows in a user lookup table declare missing associations (issue #434)."""
+    manager, _, dataset_config_path, test_data_dir = setup_registry_single
+    dataset_path = test_data_dir / DATASET_ID
+
+    # Move the declared missing associations from the file into NULL-id lookup rows.
+    missing_file = dataset_path / "missing_associations" / "geography__subsector.csv"
+    missing_pairs = pd.read_csv(missing_file, dtype=str)
+    missing_file.unlink()
+    lookup_file = dataset_path / "load_data_lookup.json"
+    lookup = load_line_delimited_json(lookup_file)
+    num_valid_rows = len(lookup)
+    for geography, subsector in missing_pairs.itertuples(index=False):
+        lookup.append(
+            {"geography": geography, "sector": "com", "subsector": subsector, "id": None}
+        )
+    if with_scaling_factor:
+        for row in lookup:
+            row["scaling_factor"] = None if row["id"] is None else 1.0
+    dump_line_delimited_json(lookup, lookup_file)
+
+    config_file = dataset_config_path / "dataset.json5"
+    config = load_data(config_file)
+    layout = config["data_layout"]
+    layout["data_file"]["path"] = str(dataset_path / "load_data.csv")
+    layout["lookup_data_file"]["path"] = str(lookup_file)
+    if with_scaling_factor:
+        layout["lookup_data_file"]["columns"].append(
+            {"name": "scaling_factor", "data_type": "double"}
+        )
+    layout["expected_associations"] = [str(dataset_path / "expected_associations")]
+    layout.pop("missing_associations", None)
+    dump_data(config, config_file)
+
+    manager.dataset_manager.register(config_file, getpass.getuser(), "NULL-id lookup rows")
+
+    store = manager.dataset_manager.store
+    stored_lookup = store.read_lookup_table(DATASET_ID, "1.0.0").to_pandas()
+    assert len(stored_lookup) == num_valid_rows
+    assert not stored_lookup.isna().any().any()
+
+    missing_tables = store.read_missing_associations_tables(DATASET_ID, "1.0.0")
+    assert list(missing_tables) == ["missing_associations_from_nulls"]
+    stored_missing = missing_tables["missing_associations_from_nulls"].to_pandas()
+    assert set(stored_missing.columns) == {"geography", "sector", "subsector"}
+    actual = set(stored_missing[["geography", "subsector"]].itertuples(index=False, name=None))
+    expected = set(missing_pairs.itertuples(index=False, name=None))
+    assert actual == expected
+
+
+def test_one_table_null_rows_are_missing_associations(setup_registry_single):
+    """Rows with NULL time and value in a one-table dataset declare missing associations.
+
+    The geography-subsector gaps are declared with NULL rows while the sector-subsector gaps
+    stay in a missing-associations file, so this also covers combining the two mechanisms.
+    """
+    manager, _, dataset_config_path, test_data_dir = setup_registry_single
+    dataset_id = "test_efs_comstock_unpivoted"
+    dataset_path = test_data_dir / dataset_id
+    config_file = dataset_config_path.parent / "comstock_unpivoted" / "dataset.json5"
+    mappings = map_dimension_names_to_ids(manager.dimension_manager)
+    replace_dimension_names_with_current_ids(config_file, mappings)
+
+    # Move the geography-subsector missing associations into NULL rows.
+    missing_file = dataset_path / "missing_associations" / "geography__subsector.csv"
+    missing_pairs = pd.read_csv(missing_file, dtype=str)
+    missing_file.unlink()
+    data_file = dataset_path / "load_data.parquet"
+    load_data_df = pd.read_parquet(data_file)
+    num_valid_rows = len(load_data_df)
+    null_rows = pd.DataFrame(
+        [
+            (None, geography, "com", subsector, metric, None)
+            for geography, subsector in missing_pairs.itertuples(index=False)
+            for metric in load_data_df["metric"].unique()
+        ],
+        columns=load_data_df.columns,
+    )
+    null_rows = null_rows.astype(load_data_df.dtypes.to_dict())
+    pd.concat([load_data_df, null_rows], ignore_index=True).to_parquet(data_file)
+
+    config = load_data(config_file)
+    layout = config["data_layout"]
+    layout["data_file"]["path"] = str(data_file)
+    layout["missing_associations"] = [str(dataset_path / "missing_associations")]
+    dump_data(config, config_file)
+
+    manager.dataset_manager.register(config_file, getpass.getuser(), "NULL-value rows")
+
+    store = manager.dataset_manager.store
+    stored_data = store.read_table(dataset_id, "1.0.0").to_pandas()
+    assert len(stored_data) == num_valid_rows
+    assert not stored_data["value"].isna().any()
+
+    missing_tables = store.read_missing_associations_tables(dataset_id, "1.0.0")
+    assert set(missing_tables) == {"missing_associations_from_nulls", "sector__subsector"}
+    stored_missing = missing_tables["missing_associations_from_nulls"].to_pandas()
+    assert set(stored_missing.columns) == {"geography", "sector", "subsector", "metric"}
+    assert not stored_missing.duplicated().any()
+    actual = set(stored_missing[["geography", "subsector"]].itertuples(index=False, name=None))
+    expected = set(missing_pairs.itertuples(index=False, name=None))
+    assert actual == expected
+
+
 def test_invalid_dataset_id(tmp_path):
     config_file = (
         STANDARD_SCENARIOS_PROJECT_REPO

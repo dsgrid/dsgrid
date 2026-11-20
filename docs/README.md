@@ -14,6 +14,9 @@ or
 > python -m sphinx -b html source _build/html
 ```
 
+For full developer environment setup (including the `doc` extra), see
+[Development Setup](source/developer_guide/development_setup.md).
+
 ## Documentation Style Guide
 
 ### File format

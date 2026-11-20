@@ -758,6 +758,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             missing_df = missing
             if SCALING_FACTOR_COLUMN in missing_df.columns:
                 missing_df = drop_columns(missing_df, SCALING_FACTOR_COLUMN)
+            # The NULL-id rows declare missing associations; they are recorded in
+            # missing_df and must not remain in the stored lookup table.
+            df = filter_sql(df, "id IS NOT NULL")
         return df, missing_df
 
     def _read_expected_associations_tables_from_user_path(

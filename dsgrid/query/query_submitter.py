@@ -30,7 +30,12 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter, DSGInvalidQuery
+from dsgrid.exceptions import (
+    DSGInvalidDataset,
+    DSGInvalidParameter,
+    DSGInvalidQuery,
+    error_context,
+)
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.dataset_mapping_plan import MapOperationCheckpoint
 from dsgrid.query.query_context import QueryContext
@@ -265,13 +270,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 raise NotImplementedError(msg)
 
             for dataset_id in src_dataset_ids:
-                dataset = self._project.load_dataset(dataset_id, conn=conn)
-                plan = query_model.project.get_dataset_mapping_plan(dataset_id)
-                if plan is None:
-                    plan = dataset.handler.build_default_dataset_mapping_plan()
-                    query_model.project.set_dataset_mapper(plan)
-                else:
-                    dataset.handler.check_dataset_mapping_plan(plan, self._project.config)
+                with error_context(f"checking dataset {dataset_id} and its mapping plan"):
+                    dataset = self._project.load_dataset(dataset_id, conn=conn)
+                    plan = query_model.project.get_dataset_mapping_plan(dataset_id)
+                    if plan is None:
+                        plan = dataset.handler.build_default_dataset_mapping_plan()
+                        query_model.project.set_dataset_mapper(plan)
+                    else:
+                        dataset.handler.check_dataset_mapping_plan(plan, self._project.config)
 
             for dataset_id, names in zip(dataset_ids, query_names):
                 self._fix_legacy_base_dimension_names(names, dataset_id)

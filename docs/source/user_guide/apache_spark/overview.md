@@ -161,17 +161,64 @@ The Spark master starts a web application at `http://<master_hostname>:8080`. Jo
 
 ### SSH Tunnel for Remote Access
 
-If your Spark cluster is running on a remote system, like an HPC, you may need to open an SSH tunnel to the master node. Here is how to do that on NLR's Kestrel cluster.
+If your Spark cluster is running on a remote system, like an HPC, you may need to open an SSH tunnel to the master node. Here is how to do that on NLR's Kestrel cluster. The tunnel goes through a login node, so you do not need direct access to the compute node.
 
-**On your laptop:**
+You need two values:
+- `<compute_node>`: the output of `hostname` on the first node of your allocation (for example, `x1007c0s7b1n0`).
+- `<hpc_username>`: your Kestrel username, which may differ from your laptop username.
+
+::::{tab-set}
+
+:::{tab-item} Mac/Linux
+Run on your laptop:
+
 ```bash
-$ export COMPUTE_NODE=<compute_node_name>
-$ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@kestrel.hpc.nlr.gov
+$ export COMPUTE_NODE=<compute_node>
+$ ssh -L 8080:$COMPUTE_NODE:8080 -L 4040:$COMPUTE_NODE:4040 <hpc_username>@kestrel.hpc.nlr.gov
 ```
+:::
+
+:::{tab-item} Windows (PowerShell)
+Run on your laptop:
+
+```powershell
+$env:COMPUTE_NODE = "<compute_node>"
+ssh -L "8080:$($env:COMPUTE_NODE):8080" -L "4040:$($env:COMPUTE_NODE):4040" <hpc_username>@kestrel.hpc.nlr.gov
+```
+
+The OpenSSH client is built into Windows 11 and Windows 10 version 1803 (April 2018) and later. Check that it is available with `ssh -V`.
+
+```{note}
+- **WSL2:** If you already work in a [WSL2](https://learn.microsoft.com/windows/wsl/) shell, you can follow the Mac/Linux instructions there instead. Browsers on Windows can reach ports forwarded from WSL2 at `localhost`.
+- **PuTTY:** Only needed if `ssh` is not available (Windows older than 10 version 1803, or a managed machine where the OpenSSH Client optional feature was removed). In PuTTY, go to **Connection → SSH → Tunnels** and add source port `8080` with destination `<compute_node>:8080`, and the same for `4040`. See the [PuTTY port forwarding documentation](https://the.earth.li/~sgtatham/putty/0.83/htmldoc/Chapter3.html#using-port-forwarding).
+```
+:::
+
+:::{tab-item} VS Code
+If you are connected to Kestrel with the Remote-SSH extension, you do not need a separate SSH command. This works the same on any operating system.
+
+1. Open the **Ports** panel. It is a tab in the bottom panel, next to **Terminal**, and is shown only when the window is connected to a remote host. You can also open it from the Command Palette (`Ctrl+Shift+P`, or `Cmd+Shift+P` on Mac) with **Ports: Focus on Ports View**, or from **View → Open View… → Ports**.
+2. Select **Forward a Port** and enter the address. What to enter depends on which node the VS Code window is connected to:
+
+   | Window connected to | Enter |
+   |---|---|
+   | The node running the Spark master | `8080` (and `4040`) |
+   | A login node or another compute node | `<compute_node>:8080` (and `<compute_node>:4040`) |
+
+3. VS Code shows the local address for each forwarded port, which you can open with a click.
+
+By default, VS Code also forwards ports automatically when a program starts listening on them, so `8080` or `4040` may already appear in the Ports panel.
+:::
+
+::::
+
+Keep the SSH session open while you use the UI. If a local port is already in use, pick a different local port, for example `-L 8081:<compute_node>:8080`, and browse to `http://localhost:8081`.
 
 Then access:
 - **Master UI:** `http://localhost:8080`
-- **Job UI:** `http://localhost:4040`
+- **Job UI:** `http://localhost:4040` (available only while an application such as `spark-submit` or `pyspark` is running)
+
+Some links inside the UI, such as the links to individual worker pages, point to the compute node's own hostname and port. Your laptop cannot reach those through the tunnel, so they do not open. The master and job UI pages themselves work.
 
 ## Installing a Spark Standalone Cluster
 
@@ -210,7 +257,7 @@ Note that after doing this your system will have two versions of `pyspark`:
 - In your Python virtual environment where you installed dsgrid (because dsgrid installs pyspark)
 - In `$HOME/spark-4.0.0-bin-hadoop3/bin`
 
-If you use a conda virtual environment, when that environment is activated, its `pyspark` will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.
+When your Python virtual environment is activated, its `pyspark` will be in your system path. Be sure not to add the spark bin directory to your path so that there are no collisions.
 
 :::{warning}
 Setting `SPARK_HOME` will affect operation of your Python `pyspark` installation in local mode. That may not be what you want if you make settings specific to the standalone cluster.
@@ -272,6 +319,19 @@ $ pip install "sparkctl[pyspark]"
 ```
 
 The [sparkctl documentation](https://natlabrockies.github.io/sparkctl/) has generic instructions to run Spark in a variety of ways. The rest of this section calls out choices that you should make to run Spark jobs with dsgrid.
+
+#### Configure sparkctl (one time)
+
+Tell sparkctl where the Spark and Java binaries are. On Kestrel:
+
+```bash
+$ sparkctl default-config \
+    /datasets/images/apache_spark/spark-4.1.1-bin-hadoop3 \
+    /datasets/images/apache_spark/jdk-21.0.7 \
+    -e slurm
+```
+
+This writes `~/.sparkctl.toml`. `-e slurm` (the default) tells sparkctl to find the allocated nodes and their resources through Slurm. Pick the Spark version that matches your installed `pyspark`. See [Start Spark Cluster on Kestrel](../how_tos/spark_cluster_on_kestrel) for details.
 
 #### Steps to Start a Cluster
 

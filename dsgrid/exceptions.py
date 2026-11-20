@@ -1,5 +1,37 @@
 """dsgrid exceptions and warnings"""
 
+from contextlib import contextmanager
+from typing import Generator
+
+
+@contextmanager
+def error_context(description: str) -> Generator[None, None, None]:
+    """Add a note describing the current step to any exception raised within the block.
+
+    Use this around the body of a loop over user-named items (projects, datasets,
+    dimensions, mappings) when the code inside raises errors that cannot know which item
+    is being processed. The exception is re-raised unchanged except for the added note,
+    which Python prints after the exception message in tracebacks and which the CLI
+    includes in its one-line error message.
+
+    Parameters
+    ----------
+    description : str
+        What was being done, phrased to follow "While", such as
+        "registering dataset my_dataset from dataset.json5".
+
+    Examples
+    --------
+    >>> for dataset_id in dataset_ids:
+    ...     with error_context(f"processing dataset {dataset_id}"):
+    ...         process(dataset_id)
+    """
+    try:
+        yield
+    except Exception as exc:
+        exc.add_note(f"While {description}")
+        raise
+
 
 class DSGBaseException(Exception):
     """Base class for all dsgrid exceptions."""

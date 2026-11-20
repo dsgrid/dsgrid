@@ -622,7 +622,8 @@ class RegistryDatabase:
 
 def create_tables(engine: Engine, metadata: MetaData) -> None:
     """Create the registry tables in the database."""
-    # Note to devs: Please update dev/registry_database.md if you change the schema.
+    # Note to devs: Please update docs/source/developer_guide/registry_database.md if you
+    # change the schema.
     Table(
         RegistryTables.KEY_VALUE.value,
         metadata,

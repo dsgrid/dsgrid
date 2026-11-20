@@ -261,7 +261,7 @@ Refer to [Data File Formats](../dataset_registration/data_file_formats) for guid
 
 ## Step 7: Create the Lookup Data File
 
-Create `load_data_lookup.parquet`. The `id` column should match the values in `load_data.parquet` so that a single table can be produced by joining the two tables on that column. If the dataset is missing data for specific dimension combinations, include a row for each combination and set `id` to `null`.
+Create `load_data_lookup.parquet`. The `id` column should match the values in `load_data.parquet` so that a single table can be produced by joining the two tables on that column. If the dataset is missing data for specific dimension combinations, you can include a row for each such combination in the lookup with `id` set to `null`. Alternatively, you can declare the missing combinations in separate "missing association" files. See [Missing associations from NULL rows](../how_tos/how_to_dimension_associations.md#missing-associations-from-null-rows) for details.
 
 :::{warning}
 All dimension columns must be strings, including columns that look like numbers, such as `model_year`.

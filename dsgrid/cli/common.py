@@ -70,7 +70,9 @@ def handle_dsgrid_exception(ctx, func, *args, **kwargs) -> tuple[Any, int]:
         assert exc_tb is not None
         filename = exc_tb.tb_frame.f_code.co_filename
         line = exc_tb.tb_lineno
-        msg = f'{func.__name__} failed: exception={exc_type.__name__} message="{exc_value}" {filename=} {line=}'
+        context = "; ".join(getattr(exc_value, "__notes__", []))
+        context_str = f' context="{context}"' if context else ""
+        msg = f'{func.__name__} failed: exception={exc_type.__name__} message="{exc_value}"{context_str} {filename=} {line=}'
         logger.error(msg)
         if ctx.find_root().params["reraise_exceptions"]:
             raise

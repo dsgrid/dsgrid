@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.dimension.base_models import DatasetDimensionRequirements
+from dsgrid.exceptions import error_context
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
@@ -110,7 +111,8 @@ def _run_bulk_registration(
 
     for project in registration.projects:
         assert project.log_message is not None
-        project_mgr.register(project.config_file, user, project.log_message)
+        with error_context(f"registering project {project.project_id} from {project.config_file}"):
+            project_mgr.register(project.config_file, user, project.log_message)
         journal.add_project(project.project_id)
 
     for dataset in registration.datasets:
@@ -126,14 +128,15 @@ def _run_bulk_registration(
             config_file = dataset.config_file
 
         assert dataset.log_message is not None
-        dataset_mgr.register(
-            config_file,
-            user,
-            dataset.log_message,
-            data_base_dir=data_base_dir,
-            associations_base_dir=associations_base_dir,
-            requirements=dataset_dimension_requirements,
-        )
+        with error_context(f"registering dataset {dataset.dataset_id} from {dataset.config_file}"):
+            dataset_mgr.register(
+                config_file,
+                user,
+                dataset.log_message,
+                data_base_dir=data_base_dir,
+                associations_base_dir=associations_base_dir,
+                requirements=dataset_dimension_requirements,
+            )
         journal.add_dataset(dataset.dataset_id)
 
     for dataset in registration.dataset_submissions:
@@ -153,13 +156,16 @@ def _run_bulk_registration(
             refs_file = dataset.dimension_mapping_references_file
 
         assert dataset.log_message is not None
-        project_mgr.submit_dataset(
-            dataset.project_id,
-            dataset.dataset_id,
-            user,
-            dataset.log_message,
-            dimension_mapping_file=dataset.dimension_mapping_file,
-            dimension_mapping_references_file=refs_file,
-            autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
-        )
+        with error_context(
+            f"submitting dataset {dataset.dataset_id} to project {dataset.project_id}"
+        ):
+            project_mgr.submit_dataset(
+                dataset.project_id,
+                dataset.dataset_id,
+                user,
+                dataset.log_message,
+                dimension_mapping_file=dataset.dimension_mapping_file,
+                dimension_mapping_references_file=refs_file,
+                autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+            )
         journal.add_submitted_dataset(dataset.dataset_id, dataset.project_id)

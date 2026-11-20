@@ -19,7 +19,7 @@ from dsgrid.dimension.dimension_filters import (
     DimensionFilterSingleQueryNameBaseModel,
     SubsetDimensionFilterModel,
 )
-from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
+from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered, error_context
 from dsgrid.ibis.operations import join, join_multiple_columns, rename_columns
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
@@ -189,13 +189,14 @@ class Project:
         # them, and so that reference will be invalid.
         df_filenames = {}
         for dataset in model.project.dataset.source_datasets:
-            if isinstance(dataset, StandaloneDatasetModel):
-                path = self._process_dataset(context, cached_datasets_dir, dataset.dataset_id)
-            elif isinstance(dataset, ProjectionDatasetModel):
-                path = self._process_projection_dataset(context, cached_datasets_dir, dataset)
-            else:
-                msg = f"Unsupported type: {type(dataset)}"
-                raise NotImplementedError(msg)
+            with error_context(f"processing dataset {dataset.dataset_id} for query {model.name}"):
+                if isinstance(dataset, StandaloneDatasetModel):
+                    path = self._process_dataset(context, cached_datasets_dir, dataset.dataset_id)
+                elif isinstance(dataset, ProjectionDatasetModel):
+                    path = self._process_projection_dataset(context, cached_datasets_dir, dataset)
+                else:
+                    msg = f"Unsupported type: {type(dataset)}"
+                    raise NotImplementedError(msg)
             df_filenames[dataset.dataset_id] = path
 
         if not df_filenames:

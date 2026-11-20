@@ -1239,14 +1239,84 @@ def filter_out_expected_missing_associations(
 def split_expected_missing_rows(
     df: ibis.Table, time_columns: list[str]
 ) -> tuple[ibis.Table, ibis.Table | None]:
-    """Split an Ibis table into two if it contains expected missing data."""
-    null_df = filter_sql(df, f"{VALUE_COLUMN} IS NULL")
+    """Split a stacked table into data rows and declared missing associations.
+
+    A row declares a missing association when its value and all of its time columns are
+    NULL. Pivoted tables must be unpivoted with :func:`unpivot_dataframe` first, which
+    rewrites a NULL in a pivoted value column as such a row; a pivoted column that is NULL
+    for the whole time series of a combination therefore declares that metric missing.
+
+    Parameters
+    ----------
+    df : ibis.Table
+        Stacked load data table.
+    time_columns : list[str]
+        Time columns of the table. If empty, every row with a NULL value declares a
+        missing association.
+
+    Returns
+    -------
+    tuple[ibis.Table, ibis.Table | None]
+        The rows with data, and the distinct missing associations (dimension columns only),
+        or None if no rows declare missing associations.
+
+    Raises
+    ------
+    DSGInvalidDataset
+        If some but not all time columns of a row are NULL, if a row has a NULL value but
+        non-NULL time or vice versa, or if a combination declared missing also has data.
+    """
+    null_value = f"{VALUE_COLUMN} IS NULL"
+    if time_columns:
+        time_cols = [handle_column_spaces(x) for x in time_columns]
+        all_time_null = "(" + " AND ".join(f"{x} IS NULL" for x in time_cols) + ")"
+        any_time_null = "(" + " OR ".join(f"{x} IS NULL" for x in time_cols) + ")"
+        _raise_if_rows_exist(
+            df,
+            f"{any_time_null} AND NOT {all_time_null}",
+            "rows have NULL values in some but not all time columns",
+        )
+        _raise_if_rows_exist(
+            df,
+            f"{all_time_null} AND {VALUE_COLUMN} IS NOT NULL",
+            "rows have NULL time but a non-NULL value",
+        )
+        _raise_if_rows_exist(
+            df,
+            f"{null_value} AND NOT {all_time_null}",
+            "rows have a NULL value but non-NULL time. To declare a missing dimension "
+            "combination, provide a single row with NULL time and value columns",
+        )
+
+    null_df = filter_sql(df, null_value)
     if is_table_empty(null_df):
         return df, None
 
     columns_to_drop = time_columns + [VALUE_COLUMN]
-    missing_associations = drop_columns(null_df, *columns_to_drop)
-    return filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL"), missing_associations
+    missing_associations = drop_columns(null_df, *columns_to_drop).distinct()
+    data_df = filter_sql(df, f"{VALUE_COLUMN} IS NOT NULL")
+    dim_columns = list(missing_associations.columns)
+    conflicts = join_multiple_columns(
+        data_df.select(*dim_columns), missing_associations, dim_columns
+    ).distinct()
+    if not is_table_empty(conflicts):
+        examples = table_to_records(conflicts.limit(5))
+        msg = (
+            "Dimension combinations are declared missing with NULL values but also have "
+            "data. In a pivoted table, a value column must be NULL for the entire time "
+            f"series to declare that combination missing. Examples: {examples}"
+        )
+        raise DSGInvalidDataset(msg)
+    return data_df, missing_associations
+
+
+def _raise_if_rows_exist(df: ibis.Table, predicate: str, description: str) -> None:
+    """Raise DSGInvalidDataset with example rows if any rows match the SQL predicate."""
+    bad_rows = filter_sql(df, predicate)
+    if not is_table_empty(bad_rows):
+        examples = table_to_records(bad_rows.limit(5))
+        msg = f"Invalid NULL rows in load data: {description}. Examples: {examples}"
+        raise DSGInvalidDataset(msg)
 
 
 def _check_time_zones_are_declared(df: ibis.Table, time_dim: DateTimeDimensionConfig) -> None:

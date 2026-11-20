@@ -84,6 +84,11 @@ Chronify-based checks
 : When the time dimension supports the chronify library, dsgrid delegates
   validation to chronify, which performs its own range and completeness checks.
 
+Rows with NULL time
+: Rows whose time columns are all NULL declare missing associations (see
+  [Missing associations from NULL rows](../how_tos/how_to_dimension_associations.md#missing-associations-from-null-rows))
+  and are excluded from these checks.
+
 ### Skipping time checks
 
 Set the environment variable
@@ -113,6 +118,13 @@ Dimension columns are strings
 No NULL dimension values
 : Dimension columns may not contain NULL values.
 
+Valid NULL rows
+: A row with NULL time and value columns declares a missing association. A NULL
+  value with non-NULL time, NULL time with a non-NULL value, or NULLs in only
+  some time columns is an error, as is a combination that is declared missing
+  but also has data. See
+  [Missing associations from NULL rows](../how_tos/how_to_dimension_associations.md#missing-associations-from-null-rows).
+
 ### Two Table
 
 All One Table checks apply to the joined table (load data joined with the
@@ -124,8 +136,10 @@ Lookup `id` column
 Lookup dimension columns are strings
 : All dimension columns in the lookup table must have `StringType`.
 
-No NULL values in lookup
-: The lookup table may not contain NULL dimension values.
+No NULL dimension values in lookup
+: The lookup table may not contain NULL dimension values. Rows with a NULL `id`
+  are allowed: they declare missing associations and are removed from the
+  stored lookup table. The data table may not contain NULL values.
 
 ID set consistency
 : The set of `id` values in the load data table must exactly match the set of
@@ -190,6 +204,9 @@ checking.
 If the dataset is inherently sparse, you can instead (or additionally) provide
 *expected dimension associations* that replace the full cross-join with only the
 combinations that should be present.
+
+Missing associations can be listed in files, supplied as NULL rows in the
+data files, or both.
 
 See {doc}`../how_tos/how_to_dimension_associations` for details on both
 approaches.

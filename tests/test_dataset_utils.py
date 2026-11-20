@@ -38,12 +38,13 @@ from dsgrid.utils.dataset import (
     merge_expected_associations_tables,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
+    split_expected_missing_rows,
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 from dsgrid.ibis.table_utils import count_rows
-from tests._helpers import collect as _collect, make_table, spark_physical_plan
+from tests._helpers import collect as _collect, make_table, row_set, spark_physical_plan
 
 
 @pytest.fixture(scope="module")
@@ -267,6 +268,108 @@ def test_unpivot(pivoted_dataframe_with_time):
     assert null_data[0].time_index is None
     value = getattr(null_data[0], VALUE_COLUMN)
     assert value is None or value != value
+
+
+def test_split_expected_missing_rows_null_time_row():
+    df = make_table(
+        ["timestamp", "county", "end_use", VALUE_COLUMN],
+        ("2012-01-01 00:00", "Jefferson", "heating", 1.0),
+        ("2012-01-01 01:00", "Jefferson", "heating", 2.0),
+        (None, "Boulder", "heating", None),
+        (None, "Boulder", "heating", None),
+    )
+    data, missing = split_expected_missing_rows(df, ["timestamp"])
+    assert count_rows(data) == 2
+    assert missing is not None
+    assert list(missing.columns) == ["county", "end_use"]
+    assert row_set(missing) == {("Boulder", "heating")}
+
+
+def test_split_expected_missing_rows_no_nulls():
+    df = make_table(
+        ["timestamp", "county", VALUE_COLUMN],
+        ("2012-01-01 00:00", "Jefferson", 1.0),
+    )
+    data, missing = split_expected_missing_rows(df, ["timestamp"])
+    assert count_rows(data) == 1
+    assert missing is None
+
+
+def test_split_expected_missing_rows_no_time_columns():
+    df = make_table(
+        ["county", VALUE_COLUMN],
+        ("Jefferson", 1.0),
+        ("Boulder", None),
+    )
+    data, missing = split_expected_missing_rows(df, [])
+    assert count_rows(data) == 1
+    assert missing is not None
+    assert row_set(missing) == {("Boulder",)}
+
+
+@pytest.mark.parametrize(
+    "columns, rows, time_columns, match",
+    [
+        pytest.param(
+            ["timestamp", "county", VALUE_COLUMN],
+            [("2012-01-01 00:00", "Jefferson", 1.0), ("2012-01-01 01:00", "Jefferson", None)],
+            ["timestamp"],
+            "NULL value but non-NULL time",
+            id="stray_null_value",
+        ),
+        pytest.param(
+            ["timestamp", "county", VALUE_COLUMN],
+            [("2012-01-01 00:00", "Jefferson", 1.0), (None, "Boulder", 2.0)],
+            ["timestamp"],
+            "NULL time but a non-NULL value",
+            id="null_time_with_value",
+        ),
+        pytest.param(
+            ["month", "hour", "county", VALUE_COLUMN],
+            [(1, 0, "Jefferson", 1.0), (None, 1, "Boulder", None)],
+            ["month", "hour"],
+            "some but not all time columns",
+            id="partial_null_time",
+        ),
+        pytest.param(
+            ["timestamp", "county", VALUE_COLUMN],
+            [("2012-01-01 00:00", "Jefferson", 1.0), (None, "Jefferson", None)],
+            ["timestamp"],
+            "declared missing with NULL values but also have data",
+            id="missing_combination_has_data",
+        ),
+    ],
+)
+def test_split_expected_missing_rows_invalid(columns, rows, time_columns, match):
+    df = make_table(columns, *rows)
+    with pytest.raises(DSGInvalidDataset, match=match):
+        split_expected_missing_rows(df, time_columns)
+
+
+def test_split_expected_missing_rows_pivoted_null_column():
+    df = make_table(
+        ["timestamp", "county", "heating", "cooling"],
+        ("2012-01-01 00:00", "Jefferson", 1.0, 2.0),
+        ("2012-01-01 01:00", "Jefferson", 1.5, 2.5),
+        ("2012-01-01 00:00", "Boulder", None, 3.0),
+        ("2012-01-01 01:00", "Boulder", None, 3.5),
+    )
+    stacked = unpivot_dataframe(df, ["heating", "cooling"], "end_use", ["timestamp"])
+    data, missing = split_expected_missing_rows(stacked, ["timestamp"])
+    assert count_rows(data) == 6
+    assert missing is not None
+    assert row_set(missing) == {("Boulder", "heating")}
+
+
+def test_split_expected_missing_rows_pivoted_partial_null_column():
+    df = make_table(
+        ["timestamp", "county", "heating", "cooling"],
+        ("2012-01-01 00:00", "Boulder", 1.0, 3.0),
+        ("2012-01-01 01:00", "Boulder", None, 3.5),
+    )
+    stacked = unpivot_dataframe(df, ["heating", "cooling"], "end_use", ["timestamp"])
+    with pytest.raises(DSGInvalidDataset, match="also have data"):
+        split_expected_missing_rows(stacked, ["timestamp"])
 
 
 @pytest.mark.parametrize("data_type", [IntegerType(), ShortType(), LongType()])

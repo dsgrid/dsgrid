@@ -80,6 +80,8 @@ The following example shows a stacked one-table format. The `metric` column cont
 This example omits the `sector`, `model_year`, and `weather_year` columns because they are [trivial dimensions](./dimension_concepts.md#trivial-dimensions) — each has only a single record (e.g., `sector = "com"`, `model_year = 2020`, `weather_year = 2012`). Trivial dimensions are declared in the dataset config and added by dsgrid at runtime, so they do not need to appear in the data files.
 :::
 
+To declare a dimension combination missing in this format, add a row with NULL time and value columns. See [Missing associations from NULL rows](../how_tos/how_to_dimension_associations.md#missing-associations-from-null-rows).
+
 (two-table-format)=
 ### Two Table Format
 
@@ -95,6 +97,7 @@ Two Parquet files comprise the dataset: a **data table** with time-series metric
 - `id` (integer) — matches the IDs in the data table.
 - Every non-time, non-trivial dimension that is *not* already a column in the data table. This typically includes all non-time dimensions (geography, sector, subsector, metric, scenario, model_year, weather_year, etc.).
 - `scaling_factor` (float, optional) — see [Lookup Table with Scaling Factor](#lookup-table-with-scaling-factor) below.
+- Rows with a `null` `id` (optional) — declare dimension combinations that have no data. See [Missing associations from NULL rows](../how_tos/how_to_dimension_associations.md#missing-associations-from-null-rows).
 
 #### Pivoted, No Scaling Factor
 

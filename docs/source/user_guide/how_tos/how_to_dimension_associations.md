@@ -76,6 +76,24 @@ Each entry in the list can be:
 
 Paths can be absolute or relative. Relative paths are resolved relative to the dataset configuration file by default. Alternatively, a different base directory can be specified using the `--associations-base-dir` (`-A`) CLI option.
 
+### Missing associations from NULL rows
+
+You can also supply missing associations as NULL rows in the data files themselves. During registration, dsgrid collects these rows into a missing associations table named `missing_associations_from_nulls`, stores it in the registry with the dataset's other missing associations tables, and removes the rows from the stored data. NULL rows and `missing_associations` files can be used together; dsgrid applies all of them.
+
+**Two-table format.** Add a row to the lookup table for each missing combination, with every dimension column filled in and `id` set to `null`. If the lookup table has a `scaling_factor` column, set it to `null` as well. The data table must not contain NULL rows.
+
+**One-table format.** Add one row for each missing combination, with every dimension column filled in and every time column and the `value` column set to `null`:
+
+| timestamp | geography | subsector | metric | value |
+|-----------|-----------|-----------|--------|-------|
+| 2012-01-01 00:00 | 08031 | com__Hospital | com_cooling | 2.04 |
+| … | … | … | … | … |
+| null | 36119 | com__Hospital | com_cooling | null |
+
+In a pivoted one-table file, a value column that is `null` for every timestamp of a dimension combination declares that metric missing for that combination.
+
+dsgrid rejects NULL rows that do not follow these rules, because a stray NULL would otherwise remove data silently. Registration fails if a row has a NULL value but non-NULL time, NULL time but a non-NULL value, or NULLs in only some of its time columns. It also fails if a combination is declared missing but also has data, for example a pivoted value column that is `null` for only part of the time series.
+
 ## File Format
 
 Missing association files can be in CSV or Parquet format. They should contain columns for dimension types (all types except time). Each row represents a combination of dimension records that legitimately has no data.

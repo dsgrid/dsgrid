@@ -97,6 +97,11 @@ def collect(df) -> list[Any]:
     return list(pdf.itertuples(index=False, name="Row"))
 
 
+def row_set(df) -> set[tuple]:
+    """Materialize ``df`` into a set of plain row tuples, for order-insensitive comparisons."""
+    return {tuple(row) for row in collect(df)}
+
+
 def order_by(df, *columns):
     """Order ``df`` by the given columns."""
     return df.order_by(*columns)
